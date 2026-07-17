@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, LogIn } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { logAdminAccess } from "@/app/actions/admin";
+import { logAdminAccess, startImpersonation } from "@/app/actions/admin";
 import { WorkspaceAdminEditor } from "@/components/workspace-admin-editor";
 
 export default async function AdminWorkspaceDetailPage({
@@ -57,7 +57,16 @@ export default async function AdminWorkspaceDetailPage({
         <Link href="/admin" className="text-muted hover:text-foreground">
           <ArrowLeft size={18} />
         </Link>
-        <h1 className="text-2xl font-semibold text-foreground">{workspace.name}</h1>
+        <h1 className="flex-1 text-2xl font-semibold text-foreground">{workspace.name}</h1>
+        <form action={startImpersonation.bind(null, workspace.id)}>
+          <button
+            type="submit"
+            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover"
+          >
+            <LogIn size={14} />
+            Entrar como este cliente
+          </button>
+        </form>
       </div>
 
       <WorkspaceAdminEditor

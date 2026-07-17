@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
+import { ImpersonationBanner } from "@/components/impersonation-banner";
 import { isPlatformAdmin } from "@/lib/admin";
+import { getWorkspaceId, getImpersonatedWorkspaceId } from "@/lib/workspace";
 
 export default async function DashboardLayout({
   children,
@@ -19,18 +21,19 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  const { data: membership } = await supabase
-    .from("workspace_members")
-    .select("workspace_id, workspaces(name, plan_id)")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
+  const isAdmin = await isPlatformAdmin(supabase);
+  const impersonatedWorkspaceId = isAdmin ? await getImpersonatedWorkspaceId() : null;
+  const workspaceId = await getWorkspaceId(supabase);
 
-  const workspace = membership?.workspaces as unknown as
-    | { name: string; plan_id: string | null }
-    | undefined;
+  const { data: workspace } = workspaceId
+    ? await supabase
+        .from("workspaces")
+        .select("name, plan_id")
+        .eq("id", workspaceId)
+        .maybeSingle()
+    : { data: null };
+
   const workspaceName = workspace?.name ?? "Tu workspace";
-  const workspaceId = membership?.workspace_id;
 
   // Explicit scope filter — RLS also allows platform admins to read every notification,
   // which would otherwise leak other clients' targeted notifications into an admin's own dashboard.
@@ -58,12 +61,13 @@ export default async function DashboardLayout({
     read: readIds.has(n.id),
   }));
 
-  const isAdmin = await isPlatformAdmin(supabase);
-
   return (
     <div className="flex bg-background">
       <Sidebar workspaceName={workspaceName} isPlatformAdmin={isAdmin} />
       <div className="flex min-h-screen flex-1 flex-col">
+        {impersonatedWorkspaceId && (
+          <ImpersonationBanner workspaceName={workspaceName} />
+        )}
         <Topbar
           workspaceName={workspaceName}
           userEmail={user.email ?? ""}

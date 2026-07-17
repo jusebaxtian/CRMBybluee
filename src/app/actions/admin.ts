@@ -1,8 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { isPlatformAdmin } from "@/lib/admin";
+import { IMPERSONATION_COOKIE } from "@/lib/workspace";
 
 export async function logAdminAccess(workspaceId: string) {
   const supabase = await createClient();
@@ -16,6 +19,30 @@ export async function logAdminAccess(workspaceId: string) {
     admin_user_id: user.id,
     workspace_id: workspaceId,
   });
+}
+
+export async function startImpersonation(workspaceId: string) {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) return;
+
+  await logAdminAccess(workspaceId);
+
+  const cookieStore = await cookies();
+  cookieStore.set(IMPERSONATION_COOKIE, workspaceId, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 4, // 4 hours
+  });
+
+  redirect("/dashboard");
+}
+
+export async function stopImpersonation() {
+  const cookieStore = await cookies();
+  cookieStore.delete(IMPERSONATION_COOKIE);
+  redirect("/admin");
 }
 
 export async function updateWorkspacePlan(workspaceId: string, planId: string) {

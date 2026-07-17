@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { CalendarClock, Package, ShieldCheck, MessageSquareOff, CheckCircle2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { ConnectWhatsAppButton } from "@/components/connect-whatsapp-button";
+import { getWorkspaceId } from "@/lib/workspace";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -14,16 +15,19 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const { data: membership } = await supabase
-    .from("workspace_members")
-    .select("role, workspace_id, workspaces(name, status, trial_ends_at, plans(name))")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
+  const workspaceId = await getWorkspaceId(supabase);
 
-  const workspace = membership?.workspaces as unknown as
+  const { data: workspaceRow } = workspaceId
+    ? await supabase
+        .from("workspaces")
+        .select("name, status, trial_ends_at, plans(name)")
+        .eq("id", workspaceId)
+        .maybeSingle()
+    : { data: null };
+
+  const workspace = workspaceRow as unknown as
     | { name: string; status: string; trial_ends_at: string; plans: { name: string } | null }
-    | undefined;
+    | null;
 
   const trialDaysLeft = workspace
     ? Math.max(
@@ -42,11 +46,11 @@ export default async function DashboardPage() {
     canceled: "Cancelado",
   };
 
-  const { data: whatsappAccount } = membership?.workspace_id
+  const { data: whatsappAccount } = workspaceId
     ? await supabase
         .from("whatsapp_accounts")
         .select("display_phone_number, status")
-        .eq("workspace_id", membership.workspace_id)
+        .eq("workspace_id", workspaceId)
         .maybeSingle()
     : { data: null };
 
