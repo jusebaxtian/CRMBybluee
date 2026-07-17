@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
-import { CalendarClock, Package, ShieldCheck, MessageSquareOff } from "lucide-react";
+import { CalendarClock, Package, ShieldCheck, MessageSquareOff, CheckCircle2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { ConnectWhatsAppButton } from "@/components/connect-whatsapp-button";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -41,6 +42,11 @@ export default async function DashboardPage() {
     canceled: "Cancelado",
   };
 
+  const { data: whatsappAccount } = await supabase
+    .from("whatsapp_accounts")
+    .select("display_phone_number, status")
+    .maybeSingle();
+
   return (
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -62,24 +68,33 @@ export default async function DashboardPage() {
       </div>
 
       <div className="rounded-xl border border-border bg-surface p-8 text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-hover text-muted">
-          <MessageSquareOff size={22} />
-        </div>
-        <h2 className="text-lg font-semibold text-foreground">
-          Aún no has conectado WhatsApp
-        </h2>
-        <p className="mx-auto mt-1 max-w-md text-sm text-muted">
-          Conecta tu número de WhatsApp Business para empezar a ver tus
-          conversaciones, contactos y campañas aquí.
-        </p>
-        <button
-          type="button"
-          disabled
-          className="mt-5 rounded-lg bg-primary/50 px-4 py-2 text-sm font-medium text-white/70"
-          title="Disponible próximamente"
-        >
-          Conectar WhatsApp (próximamente)
-        </button>
+        {whatsappAccount ? (
+          <>
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-success/15 text-success">
+              <CheckCircle2 size={22} />
+            </div>
+            <h2 className="text-lg font-semibold text-foreground">
+              WhatsApp conectado
+            </h2>
+            <p className="mx-auto mt-1 max-w-md text-sm text-muted">
+              {whatsappAccount.display_phone_number}
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-hover text-muted">
+              <MessageSquareOff size={22} />
+            </div>
+            <h2 className="text-lg font-semibold text-foreground">
+              Aún no has conectado WhatsApp
+            </h2>
+            <p className="mx-auto mt-1 max-w-md text-sm text-muted">
+              Conecta tu número de WhatsApp Business para empezar a ver tus
+              conversaciones, contactos y campañas aquí.
+            </p>
+            <ConnectWhatsAppButton />
+          </>
+        )}
       </div>
     </div>
   );
