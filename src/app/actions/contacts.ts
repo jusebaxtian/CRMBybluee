@@ -72,3 +72,15 @@ export async function createContact(_prevState: unknown, formData: FormData) {
   revalidatePath("/dashboard/contacts");
   return { success: true };
 }
+
+export async function updateContactNotes(contactId: string, notes: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("contacts")
+    .update({ notes })
+    .eq("id", contactId);
+
+  if (error) return { error: error.message };
+  revalidatePath("/dashboard/inbox");
+  return { success: true };
+}

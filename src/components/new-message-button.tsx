@@ -2,12 +2,18 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, X } from "lucide-react";
+import { Plus, SquarePen, X } from "lucide-react";
 import { sendMessageToContact } from "@/app/actions/whatsapp";
 
 type Contact = { id: string; name: string | null; wa_id: string };
 
-export function NewMessageButton({ contacts }: { contacts: Contact[] }) {
+export function NewMessageButton({
+  contacts,
+  compact = false,
+}: {
+  contacts: Contact[];
+  compact?: boolean;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [contactId, setContactId] = useState(contacts[0]?.id ?? "");
@@ -34,16 +40,28 @@ export function NewMessageButton({ contacts }: { contacts: Contact[] }) {
 
   return (
     <div className="relative inline-block">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        disabled={contacts.length === 0}
-        className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
-        title={contacts.length === 0 ? "No tienes contactos todavía" : undefined}
-      >
-        <Plus size={14} />
-        Nuevo mensaje
-      </button>
+      {compact ? (
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          disabled={contacts.length === 0}
+          className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white hover:bg-primary-hover disabled:opacity-50"
+          title={contacts.length === 0 ? "No tienes contactos todavía" : "Nuevo mensaje"}
+        >
+          <SquarePen size={16} />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          disabled={contacts.length === 0}
+          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
+          title={contacts.length === 0 ? "No tienes contactos todavía" : undefined}
+        >
+          <Plus size={14} />
+          Nuevo mensaje
+        </button>
+      )}
 
       {open && (
         <div className="absolute right-0 z-20 mt-2 w-80 rounded-lg border border-border bg-surface p-4 shadow-lg">
