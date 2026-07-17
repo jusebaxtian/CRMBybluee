@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { MessageComposer } from "@/components/message-composer";
+import { getWorkspaceId } from "@/lib/workspace";
 
 export default async function ConversationPage({
   params,
@@ -11,11 +12,13 @@ export default async function ConversationPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
 
   const { data: conversation } = await supabase
     .from("conversations")
     .select("id, contacts(name, wa_id)")
     .eq("id", id)
+    .eq("workspace_id", workspaceId ?? "")
     .maybeSingle();
 
   if (!conversation) notFound();

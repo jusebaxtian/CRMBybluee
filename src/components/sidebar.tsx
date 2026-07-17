@@ -14,6 +14,7 @@ import {
   BarChart3,
   Plug,
   Settings,
+  ShieldCheck,
 } from "lucide-react";
 
 const navItems = [
@@ -30,7 +31,13 @@ const navItems = [
   { href: "/dashboard/settings", label: "Configuración", icon: Settings, ready: false },
 ];
 
-export function Sidebar({ workspaceName }: { workspaceName: string }) {
+export function Sidebar({
+  workspaceName,
+  isPlatformAdmin = false,
+}: {
+  workspaceName: string;
+  isPlatformAdmin?: boolean;
+}) {
   const pathname = usePathname();
 
   return (
@@ -78,6 +85,18 @@ export function Sidebar({ workspaceName }: { workspaceName: string }) {
           );
         })}
       </nav>
+
+      {isPlatformAdmin && (
+        <div className="px-3 pb-2">
+          <Link
+            href="/admin"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-primary hover:bg-surface-hover"
+          >
+            <ShieldCheck size={18} />
+            Panel admin
+          </Link>
+        </div>
+      )}
 
       <div className="border-t border-border p-4">
         <div className="flex items-center gap-2 rounded-lg bg-surface-hover px-3 py-2">

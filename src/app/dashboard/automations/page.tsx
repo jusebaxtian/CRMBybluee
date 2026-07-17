@@ -2,13 +2,16 @@ import Link from "next/link";
 import { Zap, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { AutomationRowActions } from "@/components/automation-row-actions";
+import { getWorkspaceId } from "@/lib/workspace";
 
 export default async function AutomationsPage() {
   const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
 
   const { data: automations } = await supabase
     .from("automations")
     .select("id, name, trigger_type, trigger_keyword, is_active, tags(name)")
+    .eq("workspace_id", workspaceId ?? "")
     .order("created_at", { ascending: false });
 
   return (

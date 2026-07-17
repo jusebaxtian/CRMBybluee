@@ -1,14 +1,25 @@
 "use client";
 
-import { ChevronDown, Bell } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { logout } from "@/app/actions/auth";
+import { NotificationBell } from "@/components/notification-bell";
+
+type Notification = {
+  id: string;
+  title: string;
+  body: string;
+  created_at: string;
+  read: boolean;
+};
 
 export function Topbar({
   workspaceName,
   userEmail,
+  notifications,
 }: {
   workspaceName: string;
   userEmail: string;
+  notifications: Notification[];
 }) {
   return (
     <header className="flex items-center justify-between border-b border-border px-8 py-5">
@@ -18,14 +29,7 @@ export function Topbar({
       </div>
 
       <div className="flex items-center gap-3">
-        <button
-          type="button"
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted hover:text-foreground"
-          title="Notificaciones (próximamente)"
-          disabled
-        >
-          <Bell size={16} />
-        </button>
+        <NotificationBell notifications={notifications} />
 
         <div className="group relative">
           <div className="flex cursor-default items-center gap-2 rounded-lg border border-border px-3 py-1.5">

@@ -2,6 +2,7 @@ import { FileText } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { SyncTemplatesButton } from "@/components/sync-templates-button";
 import { CreateTemplateForm } from "@/components/create-template-form";
+import { getWorkspaceId } from "@/lib/workspace";
 
 const statusColor: Record<string, string> = {
   APPROVED: "text-success border-success",
@@ -11,10 +12,12 @@ const statusColor: Record<string, string> = {
 
 export default async function TemplatesPage() {
   const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
 
   const { data: templates } = await supabase
     .from("templates")
     .select("id, meta_template_name, language, category, status, body_text")
+    .eq("workspace_id", workspaceId ?? "")
     .order("meta_template_name");
 
   return (

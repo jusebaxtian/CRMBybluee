@@ -2,18 +2,22 @@ import Link from "next/link";
 import { MessageSquare } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { NewMessageButton } from "@/components/new-message-button";
+import { getWorkspaceId } from "@/lib/workspace";
 
 export default async function InboxPage() {
   const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
 
   const { data: conversations } = await supabase
     .from("conversations")
     .select("id, last_message_at, status, contacts(name, wa_id)")
+    .eq("workspace_id", workspaceId ?? "")
     .order("last_message_at", { ascending: false });
 
   const { data: contacts } = await supabase
     .from("contacts")
     .select("id, name, wa_id")
+    .eq("workspace_id", workspaceId ?? "")
     .order("name");
 
   if (!conversations || conversations.length === 0) {

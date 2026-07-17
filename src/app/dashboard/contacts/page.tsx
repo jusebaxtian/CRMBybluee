@@ -4,18 +4,22 @@ import { ContactTagPicker } from "@/components/contact-tag-picker";
 import { ImportContactsButton } from "@/components/import-contacts-button";
 import { AddContactForm } from "@/components/add-contact-form";
 import { SendMessagePopover } from "@/components/send-message-popover";
+import { getWorkspaceId } from "@/lib/workspace";
 
 export default async function ContactsPage() {
   const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
 
   const { data: contacts } = await supabase
     .from("contacts")
     .select("id, name, wa_id, created_at, contact_tags(tag_id)")
+    .eq("workspace_id", workspaceId ?? "")
     .order("created_at", { ascending: false });
 
   const { data: allTags } = await supabase
     .from("tags")
     .select("id, name, color")
+    .eq("workspace_id", workspaceId ?? "")
     .order("name");
 
   if (!contacts || contacts.length === 0) {

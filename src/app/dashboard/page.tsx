@@ -16,7 +16,7 @@ export default async function DashboardPage() {
 
   const { data: membership } = await supabase
     .from("workspace_members")
-    .select("role, workspaces(name, status, trial_ends_at, plans(name))")
+    .select("role, workspace_id, workspaces(name, status, trial_ends_at, plans(name))")
     .eq("user_id", user.id)
     .limit(1)
     .maybeSingle();
@@ -42,10 +42,13 @@ export default async function DashboardPage() {
     canceled: "Cancelado",
   };
 
-  const { data: whatsappAccount } = await supabase
-    .from("whatsapp_accounts")
-    .select("display_phone_number, status")
-    .maybeSingle();
+  const { data: whatsappAccount } = membership?.workspace_id
+    ? await supabase
+        .from("whatsapp_accounts")
+        .select("display_phone_number, status")
+        .eq("workspace_id", membership.workspace_id)
+        .maybeSingle()
+    : { data: null };
 
   return (
     <div className="flex flex-col gap-6">

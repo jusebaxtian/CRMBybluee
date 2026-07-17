@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { SendCampaignButton } from "@/components/send-campaign-button";
+import { getWorkspaceId } from "@/lib/workspace";
 
 const statusLabel: Record<string, string> = {
   draft: "Borrador",
@@ -26,11 +27,13 @@ export default async function CampaignDetailPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
 
   const { data: campaign } = await supabase
     .from("campaigns")
     .select("id, name, status, templates(meta_template_name)")
     .eq("id", id)
+    .eq("workspace_id", workspaceId ?? "")
     .maybeSingle();
 
   if (!campaign) notFound();

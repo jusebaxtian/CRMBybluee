@@ -2,13 +2,16 @@ import { Tag as TagIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { CreateTagForm } from "@/components/create-tag-form";
 import { DeleteTagButton } from "@/components/delete-tag-button";
+import { getWorkspaceId } from "@/lib/workspace";
 
 export default async function TagsPage() {
   const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
 
   const { data: tags } = await supabase
     .from("tags")
     .select("id, name, color")
+    .eq("workspace_id", workspaceId ?? "")
     .order("name");
 
   return (

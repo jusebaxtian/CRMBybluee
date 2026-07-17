@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Megaphone, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceId } from "@/lib/workspace";
 
 const statusLabel: Record<string, string> = {
   draft: "Borrador",
@@ -11,10 +12,12 @@ const statusLabel: Record<string, string> = {
 
 export default async function CampaignsPage() {
   const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
 
   const { data: campaigns } = await supabase
     .from("campaigns")
     .select("id, name, status, created_at, templates(meta_template_name)")
+    .eq("workspace_id", workspaceId ?? "")
     .order("created_at", { ascending: false });
 
   return (
