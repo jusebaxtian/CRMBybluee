@@ -55,32 +55,39 @@ export function ConnectWhatsAppButton() {
     setStatus("connecting");
     setMessage(null);
 
+    async function handleLoginResponse(response: {
+      authResponse?: { code?: string };
+      status?: string;
+    }) {
+      const code = response.authResponse?.code;
+      const signupData = signupDataRef.current;
+
+      if (!code || !signupData) {
+        setStatus("error");
+        setMessage("Se canceló la conexión o no se recibió la información esperada.");
+        return;
+      }
+
+      const result = await connectWhatsApp({
+        code,
+        wabaId: signupData.waba_id,
+        phoneNumberId: signupData.phone_number_id,
+      });
+
+      if ("error" in result) {
+        setStatus("error");
+        setMessage(result.error ?? "Ocurrió un error inesperado.");
+        return;
+      }
+
+      setStatus("success");
+      setMessage(`Conectado: ${result.displayPhoneNumber}`);
+      router.refresh();
+    }
+
     window.FB.login(
-      async (response) => {
-        const code = response.authResponse?.code;
-        const signupData = signupDataRef.current;
-
-        if (!code || !signupData) {
-          setStatus("error");
-          setMessage("Se canceló la conexión o no se recibió la información esperada.");
-          return;
-        }
-
-        const result = await connectWhatsApp({
-          code,
-          wabaId: signupData.waba_id,
-          phoneNumberId: signupData.phone_number_id,
-        });
-
-        if ("error" in result) {
-          setStatus("error");
-          setMessage(result.error ?? "Ocurrió un error inesperado.");
-          return;
-        }
-
-        setStatus("success");
-        setMessage(`Conectado: ${result.displayPhoneNumber}`);
-        router.refresh();
+      (response) => {
+        void handleLoginResponse(response);
       },
       {
         config_id: process.env.NEXT_PUBLIC_META_CONFIG_ID,
