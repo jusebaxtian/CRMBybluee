@@ -9,12 +9,19 @@ export default async function Home() {
     .eq("is_active", true);
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-zinc-50 p-16 text-center font-sans dark:bg-black">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-background p-16 text-center">
+      <div className="flex items-center gap-2">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-lg font-bold text-white">
+          B
+        </div>
+        <span className="text-2xl font-semibold text-foreground">ByBluee</span>
+      </div>
+
       <div>
-        <h1 className="text-4xl font-semibold text-black dark:text-white">
+        <h1 className="text-4xl font-semibold text-foreground">
           CRM Bybluee
         </h1>
-        <p className="mt-2 text-zinc-600 dark:text-zinc-400">
+        <p className="mt-2 text-muted">
           WhatsApp Business oficial para tu equipo de ventas.
         </p>
       </div>
@@ -22,13 +29,13 @@ export default async function Home() {
       <div className="flex gap-4">
         <Link
           href="/signup"
-          className="rounded-md bg-black px-5 py-2.5 text-sm font-medium text-white dark:bg-white dark:text-black"
+          className="rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-hover"
         >
           Empezar prueba gratis (7 días)
         </Link>
         <Link
           href="/login"
-          className="rounded-md border border-zinc-300 px-5 py-2.5 text-sm font-medium text-black dark:border-zinc-700 dark:text-white"
+          className="rounded-md border border-border px-5 py-2.5 text-sm font-medium text-foreground hover:bg-surface"
         >
           Iniciar sesión
         </Link>
@@ -37,7 +44,7 @@ export default async function Home() {
       {plans && plans.length > 0 && (
         <div className="flex flex-col gap-2">
           {plans.map((plan) => (
-            <p key={plan.id} className="text-sm text-zinc-500">
+            <p key={plan.id} className="text-sm text-muted">
               {plan.name} — ${(plan.price_cents / 100).toLocaleString("es-CO")}{" "}
               {plan.currency}/mes
             </p>
