@@ -2,6 +2,7 @@ import { Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { ContactTagPicker } from "@/components/contact-tag-picker";
 import { ImportContactsButton } from "@/components/import-contacts-button";
+import { AddContactForm } from "@/components/add-contact-form";
 
 export default async function ContactsPage() {
   const supabase = await createClient();
@@ -19,7 +20,10 @@ export default async function ContactsPage() {
   if (!contacts || contacts.length === 0) {
     return (
       <div className="flex flex-col gap-6">
-        <ImportContactsButton />
+        <div className="flex items-center gap-3">
+          <AddContactForm />
+          <ImportContactsButton />
+        </div>
         <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-surface p-16 text-center">
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-hover text-muted">
             <Users size={22} />
@@ -38,7 +42,10 @@ export default async function ContactsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <ImportContactsButton />
+      <div className="flex items-center gap-3">
+        <AddContactForm />
+        <ImportContactsButton />
+      </div>
       <div className="overflow-visible rounded-xl border border-border bg-surface">
         <table className="w-full text-left text-sm">
           <thead>

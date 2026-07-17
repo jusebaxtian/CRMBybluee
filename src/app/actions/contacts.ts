@@ -51,3 +51,24 @@ export async function importContactsCsv(csvText: string) {
   revalidatePath("/dashboard/contacts");
   return { success: true, count: rows.length };
 }
+
+export async function createContact(_prevState: unknown, formData: FormData) {
+  const name = String(formData.get("name") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").replace(/[^0-9]/g, "");
+
+  if (phone.length < 8) return { error: "Ingresa un número válido con código de país." };
+
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+
+  const { error } = await supabase.from("contacts").upsert(
+    { workspace_id: workspaceId, wa_id: phone, name: name || null },
+    { onConflict: "workspace_id,wa_id" }
+  );
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard/contacts");
+  return { success: true };
+}
