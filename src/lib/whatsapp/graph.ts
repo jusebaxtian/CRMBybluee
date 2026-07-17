@@ -77,6 +77,43 @@ export async function listTemplates(
   return data.data as MetaTemplate[];
 }
 
+export async function createMetaTemplate(
+  wabaId: string,
+  accessToken: string,
+  input: {
+    name: string;
+    language: string;
+    category: "MARKETING" | "UTILITY" | "AUTHENTICATION";
+    headerText?: string;
+    bodyText: string;
+    footerText?: string;
+  }
+): Promise<{ id: string; status: string; category: string }> {
+  const components: Record<string, unknown>[] = [];
+
+  if (input.headerText) {
+    components.push({ type: "HEADER", format: "TEXT", text: input.headerText });
+  }
+  components.push({ type: "BODY", text: input.bodyText });
+  if (input.footerText) {
+    components.push({ type: "FOOTER", text: input.footerText });
+  }
+
+  return graphFetch(`/${wabaId}/message_templates`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      name: input.name,
+      language: input.language,
+      category: input.category,
+      components,
+    }),
+  });
+}
+
 export async function sendTemplateMessage(
   phoneNumberId: string,
   accessToken: string,

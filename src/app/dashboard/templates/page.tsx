@@ -1,6 +1,7 @@
 import { FileText } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { SyncTemplatesButton } from "@/components/sync-templates-button";
+import { CreateTemplateForm } from "@/components/create-template-form";
 
 const statusColor: Record<string, string> = {
   APPROVED: "text-success border-success",
@@ -18,11 +19,16 @@ export default async function TemplatesPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="rounded-xl border border-border bg-surface p-6">
+        <h2 className="mb-4 text-sm font-semibold text-foreground">Crear nueva plantilla</h2>
+        <CreateTemplateForm />
+      </div>
+
       <div className="rounded-xl border border-border bg-surface p-5">
         <SyncTemplatesButton />
         <p className="mt-2 text-xs text-muted">
-          Las plantillas se crean y aprueban directamente en Meta Business Manager;
-          aquí solo sincronizamos las que ya existen para poder usarlas en campañas.
+          Sincroniza para traer el estado más reciente de aprobación de Meta (o plantillas
+          creadas antes desde Meta Business Manager).
         </p>
       </div>
 
@@ -32,10 +38,10 @@ export default async function TemplatesPage() {
             <FileText size={22} />
           </div>
           <h2 className="text-lg font-semibold text-foreground">
-            Todavía no tienes plantillas sincronizadas
+            Todavía no tienes plantillas
           </h2>
           <p className="mt-1 max-w-md text-sm text-muted">
-            Créalas en Meta Business Manager y luego dale click a &quot;Sincronizar&quot;.
+            Crea tu primera plantilla arriba, o sincroniza las que ya existan en Meta.
           </p>
         </div>
       ) : (
