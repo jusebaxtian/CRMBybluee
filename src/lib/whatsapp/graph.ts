@@ -57,3 +57,44 @@ export async function sendTextMessage(
     }),
   });
 }
+
+export type MetaTemplate = {
+  name: string;
+  language: string;
+  status: string;
+  category: string;
+  components: { type: string; text?: string }[];
+};
+
+export async function listTemplates(
+  wabaId: string,
+  accessToken: string
+): Promise<MetaTemplate[]> {
+  const data = await graphFetch(
+    `/${wabaId}/message_templates?fields=name,language,status,category,components&limit=100`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  return data.data as MetaTemplate[];
+}
+
+export async function sendTemplateMessage(
+  phoneNumberId: string,
+  accessToken: string,
+  to: string,
+  templateName: string,
+  language: string
+): Promise<{ messages: { id: string }[] }> {
+  return graphFetch(`/${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to,
+      type: "template",
+      template: { name: templateName, language: { code: language } },
+    }),
+  });
+}

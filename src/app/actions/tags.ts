@@ -2,22 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-
-async function getWorkspaceId(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: membership } = await supabase
-    .from("workspace_members")
-    .select("workspace_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-
-  return membership?.workspace_id ?? null;
-}
+import { getWorkspaceId } from "@/lib/workspace";
 
 export async function createTag(_prevState: unknown, formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
