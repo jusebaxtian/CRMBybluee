@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ContactTagPicker } from "@/components/contact-tag-picker";
 import { ImportContactsButton } from "@/components/import-contacts-button";
 import { AddContactForm } from "@/components/add-contact-form";
+import { SendMessagePopover } from "@/components/send-message-popover";
 
 export default async function ContactsPage() {
   const supabase = await createClient();
@@ -54,6 +55,7 @@ export default async function ContactsPage() {
               <th className="px-5 py-3 font-medium">Número</th>
               <th className="px-5 py-3 font-medium">Etiquetas</th>
               <th className="px-5 py-3 font-medium">Contacto desde</th>
+              <th className="px-5 py-3 font-medium"></th>
             </tr>
           </thead>
           <tbody>
@@ -74,6 +76,9 @@ export default async function ContactsPage() {
                   </td>
                   <td className="px-5 py-3 text-muted">
                     {new Date(c.created_at).toLocaleDateString("es-CO")}
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    <SendMessagePopover contactId={c.id} />
                   </td>
                 </tr>
               );

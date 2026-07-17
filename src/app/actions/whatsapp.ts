@@ -8,6 +8,7 @@ import {
   getPhoneNumberDetails,
   sendTextMessage,
 } from "@/lib/whatsapp/graph";
+import { getWorkspaceId } from "@/lib/workspace";
 
 export async function connectWhatsApp(input: {
   code: string;
@@ -59,6 +60,51 @@ export async function connectWhatsApp(input: {
   }
 }
 
+async function sendToConversation(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  conversationId: string,
+  workspaceId: string,
+  contactWaId: string,
+  body: string
+) {
+  const { data: account } = await supabase
+    .from("whatsapp_accounts")
+    .select("phone_number_id, access_token")
+    .eq("workspace_id", workspaceId)
+    .single();
+
+  if (!account) return { error: "Este workspace no tiene WhatsApp conectado." };
+
+  try {
+    const result = await sendTextMessage(
+      account.phone_number_id,
+      account.access_token,
+      contactWaId,
+      body
+    );
+
+    await supabase.from("messages").insert({
+      conversation_id: conversationId,
+      direction: "out",
+      message_type: "text",
+      body,
+      wa_message_id: result.messages[0]?.id,
+      status: "sent",
+    });
+
+    await supabase
+      .from("conversations")
+      .update({ last_message_at: new Date().toISOString() })
+      .eq("id", conversationId);
+
+    revalidatePath(`/dashboard/inbox/${conversationId}`);
+    revalidatePath("/dashboard/inbox");
+    return { success: true as const, conversationId };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Error desconocido." };
+  }
+}
+
 export async function sendMessage(input: { conversationId: string; body: string }) {
   const supabase = await createClient();
 
@@ -75,41 +121,41 @@ export async function sendMessage(input: { conversationId: string; body: string 
 
   if (!conversation) return { error: "Conversación no encontrada." };
 
-  const { data: account } = await supabase
-    .from("whatsapp_accounts")
-    .select("phone_number_id, access_token")
-    .eq("workspace_id", conversation.workspace_id)
-    .single();
-
-  if (!account) return { error: "Este workspace no tiene WhatsApp conectado." };
-
   const contactWaId = (conversation.contacts as unknown as { wa_id: string }).wa_id;
 
-  try {
-    const result = await sendTextMessage(
-      account.phone_number_id,
-      account.access_token,
-      contactWaId,
-      input.body
-    );
+  return sendToConversation(
+    supabase,
+    conversation.id,
+    conversation.workspace_id,
+    contactWaId,
+    input.body
+  );
+}
 
-    await supabase.from("messages").insert({
-      conversation_id: conversation.id,
-      direction: "out",
-      message_type: "text",
-      body: input.body,
-      wa_message_id: result.messages[0]?.id,
-      status: "sent",
-    });
+export async function sendMessageToContact(input: { contactId: string; body: string }) {
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
 
-    await supabase
-      .from("conversations")
-      .update({ last_message_at: new Date().toISOString() })
-      .eq("id", conversation.id);
+  const { data: contact } = await supabase
+    .from("contacts")
+    .select("id, wa_id")
+    .eq("id", input.contactId)
+    .single();
+  if (!contact) return { error: "Contacto no encontrado." };
 
-    revalidatePath(`/dashboard/inbox/${conversation.id}`);
-    return { success: true };
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : "Error desconocido." };
+  const { data: conversation, error: convError } = await supabase
+    .from("conversations")
+    .upsert(
+      { workspace_id: workspaceId, contact_id: contact.id },
+      { onConflict: "workspace_id,contact_id", ignoreDuplicates: false }
+    )
+    .select("id")
+    .single();
+
+  if (convError || !conversation) {
+    return { error: convError?.message ?? "No se pudo abrir la conversación." };
   }
+
+  return sendToConversation(supabase, conversation.id, workspaceId, contact.wa_id, input.body);
 }
