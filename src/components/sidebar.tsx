@@ -18,12 +18,12 @@ import {
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, ready: true },
-  { href: "/dashboard/inbox", label: "Conversaciones", icon: MessageSquare, ready: false },
-  { href: "/dashboard/contacts", label: "Contactos", icon: Users, ready: false },
+  { href: "/dashboard/inbox", label: "Conversaciones", icon: MessageSquare, ready: true },
+  { href: "/dashboard/contacts", label: "Contactos", icon: Users, ready: true },
   { href: "/dashboard/campaigns", label: "Campañas", icon: Megaphone, ready: false },
   { href: "/dashboard/templates", label: "Plantillas", icon: FileText, ready: false },
   { href: "/dashboard/automations", label: "Automatizaciones", icon: Zap, ready: false },
-  { href: "/dashboard/tags", label: "Etiquetas", icon: Tag, ready: false },
+  { href: "/dashboard/tags", label: "Etiquetas", icon: Tag, ready: true },
   { href: "/dashboard/quick-replies", label: "Respuestas rápidas", icon: Reply, ready: false },
   { href: "/dashboard/reports", label: "Reportes", icon: BarChart3, ready: false },
   { href: "/dashboard/integrations", label: "Integraciones", icon: Plug, ready: false },
@@ -44,7 +44,9 @@ export function Sidebar({ workspaceName }: { workspaceName: string }) {
 
       <nav className="flex-1 overflow-y-auto px-3">
         {navItems.map(({ href, label, icon: Icon, ready }) => {
-          const active = ready && pathname === href;
+          const active =
+            ready &&
+            (href === "/dashboard" ? pathname === href : pathname.startsWith(href));
           const content = (
             <span
               className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${

@@ -36,3 +36,24 @@ export async function getPhoneNumberDetails(
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
 }
+
+export async function sendTextMessage(
+  phoneNumberId: string,
+  accessToken: string,
+  to: string,
+  body: string
+): Promise<{ messages: { id: string }[] }> {
+  return graphFetch(`/${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to,
+      type: "text",
+      text: { body },
+    }),
+  });
+}

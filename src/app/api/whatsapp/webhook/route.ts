@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "node:crypto";
+import { ingestWhatsAppWebhook } from "@/lib/whatsapp/ingest";
+import type { WhatsAppWebhookPayload } from "@/lib/whatsapp/webhook-types";
 
 // Meta's handshake to verify this endpoint before it will send events.
 export async function GET(request: NextRequest) {
@@ -29,7 +31,7 @@ function isValidSignature(rawBody: string, signatureHeader: string | null) {
   );
 }
 
-// Meta requires a fast 200 response; message persistence is wired up in Fase 3 (inbox).
+// Meta requires a fast 200 response, so ingestion errors are logged, not thrown.
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
 
@@ -37,8 +39,13 @@ export async function POST(request: NextRequest) {
     return new NextResponse("Invalid signature", { status: 401 });
   }
 
-  const payload = JSON.parse(rawBody);
-  console.log("whatsapp webhook event:", JSON.stringify(payload));
+  const payload = JSON.parse(rawBody) as WhatsAppWebhookPayload;
+
+  try {
+    await ingestWhatsAppWebhook(payload);
+  } catch (err) {
+    console.error("whatsapp webhook ingest error:", err);
+  }
 
   return new NextResponse("EVENT_RECEIVED", { status: 200 });
 }
