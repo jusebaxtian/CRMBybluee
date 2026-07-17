@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { WhatsAppWebhookPayload } from "@/lib/whatsapp/webhook-types";
+import { runKeywordAutomations } from "@/lib/automations/engine";
 
 export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
   const supabase = createAdminClient();
@@ -60,6 +61,10 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           status: "delivered",
           created_at: new Date(Number(message.timestamp) * 1000).toISOString(),
         });
+
+        if (message.text?.body) {
+          await runKeywordAutomations(supabase, workspaceId, contact.id, message.text.body);
+        }
       }
 
       for (const status of value.statuses ?? []) {

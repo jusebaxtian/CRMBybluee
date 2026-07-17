@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
+import { runTagAddedAutomations } from "@/lib/automations/engine";
 
 export async function createTag(_prevState: unknown, formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
@@ -43,6 +44,11 @@ export async function toggleContactTag(input: {
     await supabase
       .from("contact_tags")
       .insert({ contact_id: input.contactId, tag_id: input.tagId });
+
+    const workspaceId = await getWorkspaceId(supabase);
+    if (workspaceId) {
+      await runTagAddedAutomations(supabase, workspaceId, input.contactId, input.tagId);
+    }
   } else {
     await supabase
       .from("contact_tags")

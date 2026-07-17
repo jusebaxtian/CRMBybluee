@@ -22,7 +22,7 @@ const navItems = [
   { href: "/dashboard/contacts", label: "Contactos", icon: Users, ready: true },
   { href: "/dashboard/campaigns", label: "Campañas", icon: Megaphone, ready: true },
   { href: "/dashboard/templates", label: "Plantillas", icon: FileText, ready: true },
-  { href: "/dashboard/automations", label: "Automatizaciones", icon: Zap, ready: false },
+  { href: "/dashboard/automations", label: "Automatizaciones", icon: Zap, ready: true },
   { href: "/dashboard/tags", label: "Etiquetas", icon: Tag, ready: true },
   { href: "/dashboard/quick-replies", label: "Respuestas rápidas", icon: Reply, ready: false },
   { href: "/dashboard/reports", label: "Reportes", icon: BarChart3, ready: false },
