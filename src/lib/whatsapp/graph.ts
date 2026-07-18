@@ -37,6 +37,24 @@ export async function getPhoneNumberDetails(
   );
 }
 
+export type PhoneNumberStatus = {
+  display_phone_number: string;
+  verified_name: string;
+  code_verification_status: string;
+  quality_rating: string;
+  name_status?: string;
+};
+
+export async function getPhoneNumberStatus(
+  phoneNumberId: string,
+  accessToken: string
+): Promise<PhoneNumberStatus> {
+  return graphFetch(
+    `/${phoneNumberId}?fields=display_phone_number,verified_name,code_verification_status,quality_rating,name_status`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+}
+
 export async function sendTextMessage(
   phoneNumberId: string,
   accessToken: string,

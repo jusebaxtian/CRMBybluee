@@ -147,6 +147,45 @@ export async function updateOwnerPassword(userId: string, password: string, work
   return { success: true };
 }
 
+export async function updateDashboardBanner(formData: FormData) {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
+
+  const file = formData.get("banner") as File | null;
+  if (!file || file.size === 0) return { error: "Selecciona una imagen." };
+
+  const admin = createAdminClient();
+  const ext = file.name.split(".").pop() ?? "png";
+  const path = `banner.${ext}`;
+
+  const { error: uploadError } = await admin.storage
+    .from("banners")
+    .upload(path, file, { upsert: true });
+
+  if (uploadError) return { error: uploadError.message };
+
+  const {
+    data: { publicUrl },
+  } = admin.storage.from("banners").getPublicUrl(path);
+
+  // Cache-bust so clients see the new image immediately instead of the
+  // previous file under the same path/URL.
+  const bustedUrl = `${publicUrl}?v=${Date.now()}`;
+
+  const { error } = await admin
+    .from("platform_settings")
+    .upsert(
+      { key: "dashboard_banner_url", value: bustedUrl, updated_at: new Date().toISOString() },
+      { onConflict: "key" }
+    );
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard");
+  revalidatePath("/admin/banner");
+  return { success: true };
+}
+
 export async function updateWorkspaceStatus(workspaceId: string, status: string) {
   const supabase = await createClient();
   if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
