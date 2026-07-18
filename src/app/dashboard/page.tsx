@@ -4,13 +4,13 @@ import {
   Crown,
   ShieldCheck,
   MessageSquareOff,
-  CheckCircle2,
   Lock,
   BadgeCheck,
   Gauge,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { ConnectWhatsAppButton } from "@/components/connect-whatsapp-button";
+import { WhatsAppIcon } from "@/components/whatsapp-icon";
 import { getWorkspaceId } from "@/lib/workspace";
 import { getPhoneNumberStatus } from "@/lib/whatsapp/graph";
 
@@ -142,6 +142,15 @@ export default async function DashboardPage({
     UNKNOWN: "text-muted border-border",
   };
 
+  const messagingLimitLabel: Record<string, string> = {
+    TIER_50: "50 conversaciones/día",
+    TIER_250: "250 conversaciones/día",
+    TIER_1K: "1.000 conversaciones/día",
+    TIER_10K: "10.000 conversaciones/día",
+    TIER_100K: "100.000 conversaciones/día",
+    UNLIMITED: "Sin límite",
+  };
+
   return (
     <div className="flex flex-col gap-6">
       {locked && (
@@ -258,14 +267,23 @@ export default async function DashboardPage({
           )}
         </div>
 
-        <div className="rounded-xl border border-border bg-surface p-8 text-center lg:text-left">
+        <div className="rounded-xl border border-border bg-surface p-6 text-center lg:text-left">
           {whatsappAccount ? (
             <>
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-success/15 text-success lg:mx-0">
-                <CheckCircle2 size={22} />
+              <div className="flex flex-col items-center gap-3 lg:flex-row">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-success/15 text-success">
+                  <WhatsAppIcon size={22} />
+                </div>
+                <div>
+                  <div className="flex items-center justify-center gap-2 lg:justify-start">
+                    <h2 className="text-lg font-semibold text-foreground">WhatsApp conectado</h2>
+                    <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted">
+                      WhatsApp API Cloud
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted">{whatsappAccount.display_phone_number}</p>
+                </div>
               </div>
-              <h2 className="text-lg font-semibold text-foreground">WhatsApp conectado</h2>
-              <p className="mt-1 text-sm text-muted">{whatsappAccount.display_phone_number}</p>
 
               <div className="mt-4 flex flex-wrap items-center justify-center gap-2 lg:justify-start">
                 <span className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs text-foreground">
@@ -293,7 +311,17 @@ export default async function DashboardPage({
                     Calidad: {qualityLabel[phoneStatus.quality_rating] ?? phoneStatus.quality_rating}
                   </span>
                 )}
+                {phoneStatus?.messaging_limit_tier && (
+                  <span className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs text-foreground">
+                    Límite: {messagingLimitLabel[phoneStatus.messaging_limit_tier] ?? phoneStatus.messaging_limit_tier}
+                  </span>
+                )}
               </div>
+              {phoneStatus?.messaging_limit_tier && (
+                <p className="mt-2 text-[11px] text-muted">
+                  El límite de mensajes diarios lo define Meta según la calidad y antigüedad de tu número.
+                </p>
+              )}
             </>
           ) : (
             <>

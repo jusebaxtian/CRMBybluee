@@ -43,6 +43,7 @@ export type PhoneNumberStatus = {
   code_verification_status: string;
   quality_rating: string;
   name_status?: string;
+  messaging_limit_tier?: string;
 };
 
 export async function getPhoneNumberStatus(
@@ -50,7 +51,7 @@ export async function getPhoneNumberStatus(
   accessToken: string
 ): Promise<PhoneNumberStatus> {
   return graphFetch(
-    `/${phoneNumberId}?fields=display_phone_number,verified_name,code_verification_status,quality_rating,name_status`,
+    `/${phoneNumberId}?fields=display_phone_number,verified_name,code_verification_status,quality_rating,name_status,messaging_limit_tier`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
 }
