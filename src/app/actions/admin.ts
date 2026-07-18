@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { isPlatformAdmin } from "@/lib/admin";
 import { IMPERSONATION_COOKIE } from "@/lib/workspace";
 
@@ -56,6 +57,46 @@ export async function updateWorkspacePlan(workspaceId: string, planId: string) {
 
   if (error) return { error: error.message };
   revalidatePath(`/admin/workspaces/${workspaceId}`);
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+export async function toggleWorkspaceAccess(workspaceId: string, disabled: boolean) {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
+
+  const { error } = await supabase
+    .from("workspaces")
+    .update({ access_disabled: disabled })
+    .eq("id", workspaceId);
+
+  if (error) return { error: error.message };
+  revalidatePath(`/admin/workspaces/${workspaceId}`);
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+export async function deleteWorkspace(workspaceId: string) {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
+
+  const { data: members } = await supabase
+    .from("workspace_members")
+    .select("user_id")
+    .eq("workspace_id", workspaceId);
+
+  const admin = createAdminClient();
+
+  // Deletes the workspace row, which cascades to every table that references
+  // it (contacts, conversations, messages, campaigns, automations, payments,
+  // subscriptions, etc.) before the owner accounts themselves are removed.
+  const { error } = await admin.from("workspaces").delete().eq("id", workspaceId);
+  if (error) return { error: error.message };
+
+  for (const member of members ?? []) {
+    await admin.auth.admin.deleteUser(member.user_id);
+  }
+
   revalidatePath("/admin");
   return { success: true };
 }

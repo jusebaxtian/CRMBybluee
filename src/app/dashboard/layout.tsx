@@ -28,10 +28,25 @@ export default async function DashboardLayout({
   const { data: workspace } = workspaceId
     ? await supabase
         .from("workspaces")
-        .select("name, plan_id")
+        .select("name, plan_id, access_disabled")
         .eq("id", workspaceId)
         .maybeSingle()
     : { data: null };
+
+  // Admins bypass this while impersonating — they need to be able to inspect
+  // a disabled account for support.
+  if (workspace?.access_disabled && !impersonatedWorkspaceId) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-8 text-center">
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">Cuenta desactivada</h1>
+          <p className="mt-2 max-w-sm text-sm text-muted">
+            Tu acceso a esta cuenta fue desactivado. Contacta a soporte si crees que esto es un error.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const workspaceName = workspace?.name ?? "Tu workspace";
 
