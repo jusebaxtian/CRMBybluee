@@ -101,6 +101,52 @@ export async function deleteWorkspace(workspaceId: string) {
   return { success: true };
 }
 
+export async function updateWorkspaceName(workspaceId: string, name: string) {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
+  if (!name.trim()) return { error: "El nombre no puede estar vacío." };
+
+  const { error } = await supabase
+    .from("workspaces")
+    .update({ name: name.trim() })
+    .eq("id", workspaceId);
+
+  if (error) return { error: error.message };
+  revalidatePath(`/admin/workspaces/${workspaceId}`);
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+export async function updateOwnerEmail(userId: string, email: string, workspaceId: string) {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
+  if (!email.trim()) return { error: "El correo no puede estar vacío." };
+
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.updateUserById(userId, {
+    email: email.trim(),
+    email_confirm: true,
+  });
+
+  if (error) return { error: error.message };
+  revalidatePath(`/admin/workspaces/${workspaceId}`);
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+export async function updateOwnerPassword(userId: string, password: string, workspaceId: string) {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
+  if (password.length < 8) return { error: "La contraseña debe tener al menos 8 caracteres." };
+
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.updateUserById(userId, { password });
+
+  if (error) return { error: error.message };
+  revalidatePath(`/admin/workspaces/${workspaceId}`);
+  return { success: true };
+}
+
 export async function updateWorkspaceStatus(workspaceId: string, status: string) {
   const supabase = await createClient();
   if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };

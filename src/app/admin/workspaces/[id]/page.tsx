@@ -2,8 +2,10 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, LogIn } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { logAdminAccess, startImpersonation } from "@/app/actions/admin";
 import { WorkspaceAdminEditor } from "@/components/workspace-admin-editor";
+import { EditClientFields } from "@/components/edit-client-fields";
 
 export default async function AdminWorkspaceDetailPage({
   params,
@@ -51,6 +53,21 @@ export default async function AdminWorkspaceDetailPage({
     .order("accessed_at", { ascending: false })
     .limit(5);
 
+  const { data: owner } = await supabase
+    .from("workspace_members")
+    .select("user_id")
+    .eq("workspace_id", id)
+    .eq("role", "owner")
+    .limit(1)
+    .maybeSingle();
+
+  let ownerEmail: string | null = null;
+  if (owner?.user_id) {
+    const admin = createAdminClient();
+    const { data } = await admin.auth.admin.getUserById(owner.user_id);
+    ownerEmail = data.user?.email ?? null;
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-3">
@@ -67,6 +84,16 @@ export default async function AdminWorkspaceDetailPage({
             Entrar como este cliente
           </button>
         </form>
+      </div>
+
+      <div className="rounded-xl border border-border bg-surface p-5">
+        <p className="mb-4 text-sm font-medium text-foreground">Datos del cliente</p>
+        <EditClientFields
+          workspaceId={workspace.id}
+          workspaceName={workspace.name}
+          ownerId={owner?.user_id ?? null}
+          ownerEmail={ownerEmail}
+        />
       </div>
 
       <WorkspaceAdminEditor

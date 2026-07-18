@@ -9,7 +9,12 @@ const statusColor: Record<string, string> = {
   canceled: "text-muted border-border",
 };
 
-export default async function AdminOverviewPage() {
+export default async function AdminOverviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
+  const { q } = await searchParams;
   const supabase = await createClient();
   const admin = createAdminClient();
 
@@ -59,12 +64,38 @@ export default async function AdminOverviewPage() {
     })
   );
 
+  const query = (q ?? "").trim().toLowerCase();
+  const filteredRows = query
+    ? rows.filter((r) => r.email.toLowerCase().includes(query))
+    : rows;
+
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Workspaces</h1>
         <p className="text-sm text-muted">{rows.length} cliente(s) registrados</p>
       </div>
+
+      <form className="flex items-center gap-2">
+        <input
+          type="text"
+          name="q"
+          defaultValue={q ?? ""}
+          placeholder="Buscar por correo..."
+          className="w-full max-w-xs rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+        />
+        <button
+          type="submit"
+          className="rounded-md bg-primary px-3 py-2 text-xs font-medium text-white hover:bg-primary-hover"
+        >
+          Buscar
+        </button>
+        {q && (
+          <a href="/admin" className="text-xs text-muted hover:text-foreground">
+            Limpiar
+          </a>
+        )}
+      </form>
 
       <div className="overflow-x-auto rounded-xl border border-border bg-surface">
         <table className="w-full text-left text-sm">
@@ -79,7 +110,7 @@ export default async function AdminOverviewPage() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
+            {filteredRows.map((r) => (
               <tr key={r.id} className="border-b border-border last:border-b-0">
                 <td className="px-5 py-3">
                   <p className="text-foreground">{r.email}</p>
@@ -115,10 +146,10 @@ export default async function AdminOverviewPage() {
                 </td>
               </tr>
             ))}
-            {rows.length === 0 && (
+            {filteredRows.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-5 py-6 text-center text-muted">
-                  Sin clientes registrados.
+                  {query ? "Sin resultados para esa búsqueda." : "Sin clientes registrados."}
                 </td>
               </tr>
             )}
