@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import {
   CalendarClock,
-  Package,
+  Crown,
   ShieldCheck,
   MessageSquareOff,
   CheckCircle2,
@@ -37,30 +37,69 @@ export default async function DashboardPage({
   const { data: workspaceRow } = workspaceId
     ? await supabase
         .from("workspaces")
-        .select("name, status, trial_ends_at, plans(name)")
+        .select("name, status, trial_ends_at, plans(name, price_cents, currency, billing_cycle)")
         .eq("id", workspaceId)
         .maybeSingle()
     : { data: null };
 
   const workspace = workspaceRow as unknown as
-    | { name: string; status: string; trial_ends_at: string; plans: { name: string } | null }
+    | {
+        name: string;
+        status: string;
+        trial_ends_at: string;
+        plans: {
+          name: string;
+          price_cents: number;
+          currency: string;
+          billing_cycle: string;
+        } | null;
+      }
     | null;
 
-  const trialDaysLeft = workspace
+  const { data: subscription } = workspaceId
+    ? await supabase
+        .from("subscriptions")
+        .select("current_period_end")
+        .eq("workspace_id", workspaceId)
+        .eq("status", "active")
+        .order("current_period_end", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
+
+  const isTrialing = workspace?.status === "trialing";
+  const periodEnd = isTrialing ? workspace?.trial_ends_at : subscription?.current_period_end;
+
+  const daysLeft = periodEnd
     ? Math.max(
         0,
-        Math.floor(
-          (new Date(workspace.trial_ends_at).getTime() - Date.now()) /
-            (1000 * 60 * 60 * 24)
-        )
+        Math.ceil((new Date(periodEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
       )
     : null;
+
+  const periodTotalDays = isTrialing ? 7 : 30;
+  const daysProgressPct =
+    daysLeft !== null ? Math.min(100, Math.max(0, (daysLeft / periodTotalDays) * 100)) : 0;
 
   const statusLabel: Record<string, string> = {
     trialing: "En periodo de prueba",
     active: "Activo",
     past_due: "Pago pendiente",
     canceled: "Cancelado",
+  };
+
+  const statusColor: Record<string, string> = {
+    trialing: "text-warning",
+    active: "text-success",
+    past_due: "text-red-400",
+    canceled: "text-muted",
+  };
+
+  const statusIconBg: Record<string, string> = {
+    trialing: "bg-warning/15 text-warning",
+    active: "bg-success/15 text-success",
+    past_due: "bg-red-400/15 text-red-400",
+    canceled: "bg-surface-hover text-muted",
   };
 
   const { data: whatsappAccount } = workspaceId
@@ -115,21 +154,98 @@ export default async function DashboardPage({
         </div>
       )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard
-          icon={<ShieldCheck size={20} />}
-          label="Estado de la cuenta"
-          value={workspace ? statusLabel[workspace.status] ?? workspace.status : "—"}
-        />
-        <StatCard
-          icon={<Package size={20} />}
-          label="Plan actual"
-          value={workspace?.plans?.name ?? "—"}
-        />
-        <StatCard
-          icon={<CalendarClock size={20} />}
-          label="Días de prueba restantes"
-          value={trialDaysLeft !== null ? `${trialDaysLeft} día(s)` : "—"}
-        />
+        {/* Estado de la cuenta */}
+        <div className="rounded-xl border border-border bg-surface p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm text-muted">Estado de la cuenta</p>
+              <p
+                className={`mt-1 text-2xl font-semibold ${
+                  workspace ? statusColor[workspace.status] ?? "text-foreground" : "text-foreground"
+                }`}
+              >
+                {workspace ? statusLabel[workspace.status] ?? workspace.status : "—"}
+              </p>
+              <p className="mt-1 text-xs text-muted">
+                {whatsappAccount ? "WhatsApp API Oficial" : workspace?.plans?.name ?? "—"}
+              </p>
+            </div>
+            <div
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+                workspace ? statusIconBg[workspace.status] ?? statusIconBg.canceled : statusIconBg.canceled
+              }`}
+            >
+              <ShieldCheck size={20} />
+            </div>
+          </div>
+          <div className="mt-3 flex items-center gap-1.5 text-xs text-muted">
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                whatsappAccount ? "bg-success" : "bg-muted"
+              }`}
+            />
+            {whatsappAccount ? "Todo funcionando correctamente" : "WhatsApp no conectado"}
+          </div>
+        </div>
+
+        {/* Plan actual */}
+        <div className="rounded-xl border border-border bg-surface p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm text-muted">Plan actual</p>
+              <p className="mt-1 text-2xl font-semibold text-blue-400">
+                {workspace?.plans?.name ?? "—"}
+              </p>
+              {workspace?.plans && (
+                <div className="mt-1 flex items-center gap-2 text-xs text-muted">
+                  <span>
+                    ${(workspace.plans.price_cents / 100).toLocaleString("es-CO")} /{" "}
+                    {workspace.plans.billing_cycle === "yearly" ? "año" : "mes"}
+                  </span>
+                  <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-foreground">
+                    {workspace.plans.billing_cycle === "yearly" ? "Anual" : "Mensual"}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-400/15 text-blue-400">
+              <Crown size={20} />
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-muted">
+            {subscription?.current_period_end
+              ? `Próximo pago: ${new Date(subscription.current_period_end).toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" })}`
+              : "Sin suscripción activa"}
+          </p>
+        </div>
+
+        {/* Días restantes */}
+        <div className="rounded-xl border border-border bg-surface p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm text-muted">
+                {isTrialing ? "Días restantes del período de prueba" : "Días para tu próxima renovación"}
+              </p>
+              <p className="mt-1 text-2xl font-semibold text-purple-400">
+                {daysLeft !== null ? `${daysLeft} día${daysLeft === 1 ? "" : "s"}` : "—"}
+              </p>
+            </div>
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-purple-400/15 text-purple-400">
+              <CalendarClock size={20} />
+            </div>
+          </div>
+          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-hover">
+            <div
+              className="h-full rounded-full bg-purple-400"
+              style={{ width: `${daysProgressPct}%` }}
+            />
+          </div>
+          <p className="mt-2 text-xs text-muted">
+            {periodEnd
+              ? `${isTrialing ? "Tu prueba termina el" : "Tu plan se renueva el"} ${new Date(periodEnd).toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" })}`
+              : "—"}
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
@@ -196,26 +312,6 @@ export default async function DashboardPage({
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function StatCard({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-xl border border-border bg-surface p-5">
-      <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
-        {icon}
-      </div>
-      <p className="text-sm text-muted">{label}</p>
-      <p className="mt-1 text-xl font-semibold text-foreground">{value}</p>
     </div>
   );
 }
