@@ -20,7 +20,7 @@ export default async function AdminOverviewPage({
 
   const { data: workspaces } = await supabase
     .from("workspaces")
-    .select("id, name, status, access_disabled, created_at, plans(name)")
+    .select("id, name, status, access_disabled, created_at, trial_ends_at, plans(name)")
     .order("created_at", { ascending: false });
 
   const rows = await Promise.all(
@@ -59,7 +59,7 @@ export default async function AdminOverviewPage({
         status: w.status,
         accessDisabled: w.access_disabled,
         createdAt: w.created_at,
-        renewalDate: subscription?.current_period_end ?? null,
+        renewalDate: subscription?.current_period_end ?? w.trial_ends_at ?? null,
       };
     })
   );
