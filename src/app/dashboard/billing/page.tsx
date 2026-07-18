@@ -1,7 +1,7 @@
 import { CreditCard, Landmark } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
-import { createBoldOrder } from "@/app/actions/billing";
+import { createBoldOrder, confirmBoldPayment } from "@/app/actions/billing";
 import { BoldCheckoutButton } from "@/components/bold-checkout-button";
 import { ManualTransferForm } from "@/components/manual-transfer-form";
 
@@ -12,7 +12,18 @@ const statusLabel: Record<string, string> = {
   canceled: "Cancelado",
 };
 
-export default async function BillingPage() {
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const params = await searchParams;
+  const boldOrderId = typeof params["bold-order-id"] === "string" ? params["bold-order-id"] : null;
+  const boldTxStatus = typeof params["bold-tx-status"] === "string" ? params["bold-tx-status"] : null;
+  if (boldOrderId) {
+    await confirmBoldPayment(boldOrderId, boldTxStatus);
+  }
+
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
 

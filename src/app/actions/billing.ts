@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPlatformAdmin } from "@/lib/admin";
 import { getWorkspaceId } from "@/lib/workspace";
-import { generateBoldIntegritySignature } from "@/lib/bold";
+import { generateBoldIntegritySignature, getBoldTransactionStatus } from "@/lib/bold";
 
 type BoldOrderResult =
   | { error: string }
@@ -44,6 +44,46 @@ export async function createBoldOrder(amountCents: number): Promise<BoldOrderRes
     signature,
     apiKey: process.env.NEXT_PUBLIC_BOLD_IDENTITY_KEY!,
   };
+}
+
+// The Bold payment-button widget has no webhook — it redirects back with
+// ?bold-order-id=...&bold-tx-status=..., which is what Bold's own docs specify
+// as the confirmation mechanism for this product. We'd prefer to double-check
+// via their Transaction API, but that requires a separate "API de pagos en
+// línea" activation this account doesn't have yet (calls come back with an
+// explicit-deny). Until that's activated, we trust the redirect status —
+// only for a bold_order_id we generated ourselves and that's still pending,
+// which limits it to orders this workspace actually created.
+export async function confirmBoldPayment(orderId: string, txStatus: string | null) {
+  const admin = createAdminClient();
+
+  const { data: payment } = await admin
+    .from("payments")
+    .select("id, workspace_id, status")
+    .eq("bold_order_id", orderId)
+    .maybeSingle();
+
+  if (!payment || payment.status !== "pending") return;
+
+  if (txStatus !== "approved") {
+    const apiStatus = await getBoldTransactionStatus(orderId);
+    if (apiStatus !== "APPROVED") return;
+  }
+
+  await admin.from("payments").update({ status: "approved" }).eq("id", payment.id);
+
+  await admin.from("subscriptions").insert({
+    workspace_id: payment.workspace_id,
+    provider: "bold",
+    external_id: orderId,
+    status: "active",
+    current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+  });
+
+  await admin.from("workspaces").update({ status: "active" }).eq("id", payment.workspace_id);
+
+  revalidatePath("/dashboard/billing");
+  revalidatePath("/dashboard");
 }
 
 export async function uploadPaymentProof(formData: FormData) {
