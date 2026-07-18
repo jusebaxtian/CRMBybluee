@@ -88,8 +88,9 @@ export default async function BillingPage() {
             tu cuenta manualmente.
           </p>
           <div className="mb-4 rounded-lg border border-border bg-background p-3 text-xs text-muted">
-            <p>Banco: (configurar en el panel admin)</p>
-            <p>Cuenta: (configurar en el panel admin)</p>
+            <p>Nequi: 316 623 0373</p>
+            <p>Daviplata: 316 623 0373</p>
+            <p>Bre-B: @3166230373</p>
             <p>A nombre de: ByBluee</p>
           </div>
           <ManualTransferForm />
