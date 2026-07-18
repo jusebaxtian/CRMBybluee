@@ -91,7 +91,7 @@ export default async function BillingPage() {
             <p>Nequi: 316 623 0373</p>
             <p>Daviplata: 316 623 0373</p>
             <p>Bre-B: @3166230373</p>
-            <p>A nombre de: ByBluee</p>
+            <p>A nombre de: Ju** Tol**</p>
           </div>
           <ManualTransferForm />
         </div>
