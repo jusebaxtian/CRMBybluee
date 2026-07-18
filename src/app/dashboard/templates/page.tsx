@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { SyncTemplatesButton } from "@/components/sync-templates-button";
 import { CreateTemplateForm } from "@/components/create-template-form";
 import { getWorkspaceId } from "@/lib/workspace";
+import { requireModule } from "@/lib/entitlements";
 
 const statusColor: Record<string, string> = {
   APPROVED: "text-success border-success",
@@ -13,6 +14,7 @@ const statusColor: Record<string, string> = {
 export default async function TemplatesPage() {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
+  await requireModule(supabase, workspaceId, "campaigns");
 
   const { data: templates } = await supabase
     .from("templates")

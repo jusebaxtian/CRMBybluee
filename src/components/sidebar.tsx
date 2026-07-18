@@ -16,29 +16,35 @@ import {
   Settings,
   ShieldCheck,
   CreditCard,
+  Lock,
 } from "lucide-react";
 
+// `built: false` items don't exist yet regardless of plan.
+// `moduleKey` items are gated by the workspace's plan (plan_modules);
+// omitting moduleKey means always available once built.
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, ready: true },
-  { href: "/dashboard/inbox", label: "Conversaciones", icon: MessageSquare, ready: true },
-  { href: "/dashboard/contacts", label: "Contactos", icon: Users, ready: true },
-  { href: "/dashboard/campaigns", label: "Campañas", icon: Megaphone, ready: true },
-  { href: "/dashboard/templates", label: "Plantillas", icon: FileText, ready: true },
-  { href: "/dashboard/automations", label: "Automatizaciones", icon: Zap, ready: true },
-  { href: "/dashboard/tags", label: "Etiquetas", icon: Tag, ready: true },
-  { href: "/dashboard/billing", label: "Facturación", icon: CreditCard, ready: true },
-  { href: "/dashboard/quick-replies", label: "Respuestas rápidas", icon: Reply, ready: false },
-  { href: "/dashboard/reports", label: "Reportes", icon: BarChart3, ready: false },
-  { href: "/dashboard/integrations", label: "Integraciones", icon: Plug, ready: false },
-  { href: "/dashboard/settings", label: "Configuración", icon: Settings, ready: false },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, built: true, moduleKey: null },
+  { href: "/dashboard/inbox", label: "Conversaciones", icon: MessageSquare, built: true, moduleKey: "inbox" },
+  { href: "/dashboard/contacts", label: "Contactos", icon: Users, built: true, moduleKey: "contacts" },
+  { href: "/dashboard/campaigns", label: "Campañas", icon: Megaphone, built: true, moduleKey: "campaigns" },
+  { href: "/dashboard/templates", label: "Plantillas", icon: FileText, built: true, moduleKey: "campaigns" },
+  { href: "/dashboard/automations", label: "Automatizaciones", icon: Zap, built: true, moduleKey: "automations" },
+  { href: "/dashboard/tags", label: "Etiquetas", icon: Tag, built: true, moduleKey: null },
+  { href: "/dashboard/billing", label: "Facturación", icon: CreditCard, built: true, moduleKey: null },
+  { href: "/dashboard/quick-replies", label: "Respuestas rápidas", icon: Reply, built: false, moduleKey: null },
+  { href: "/dashboard/reports", label: "Reportes", icon: BarChart3, built: false, moduleKey: null },
+  { href: "/dashboard/integrations", label: "Integraciones", icon: Plug, built: false, moduleKey: null },
+  { href: "/dashboard/settings", label: "Configuración", icon: Settings, built: false, moduleKey: null },
 ];
 
 export function Sidebar({
   workspaceName,
   isPlatformAdmin = false,
+  enabledModules = [],
 }: {
   workspaceName: string;
   isPlatformAdmin?: boolean;
+  enabledModules?: string[];
 }) {
   const pathname = usePathname();
 
@@ -52,7 +58,9 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3">
-        {navItems.map(({ href, label, icon: Icon, ready }) => {
+        {navItems.map(({ href, label, icon: Icon, built, moduleKey }) => {
+          const locked = built && moduleKey !== null && !enabledModules.includes(moduleKey);
+          const ready = built && !locked;
           const active =
             ready &&
             (href === "/dashboard" ? pathname === href : pathname.startsWith(href));
@@ -70,11 +78,12 @@ export function Sidebar({
                 <Icon size={18} />
                 {label}
               </span>
-              {!ready && (
+              {!built && (
                 <span className="rounded-full bg-surface-hover px-2 py-0.5 text-[10px] text-muted">
                   Pronto
                 </span>
               )}
+              {locked && <Lock size={12} className="text-muted" />}
             </span>
           );
 
@@ -83,7 +92,9 @@ export function Sidebar({
               {content}
             </Link>
           ) : (
-            <div key={href}>{content}</div>
+            <div key={href} title={locked ? "No incluido en tu plan actual" : undefined}>
+              {content}
+            </div>
           );
         })}
       </nav>

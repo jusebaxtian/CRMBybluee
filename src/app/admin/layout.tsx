@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { LayoutDashboard, Bell, CreditCard } from "lucide-react";
+import { LayoutDashboard, Bell, CreditCard, Package } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { isPlatformAdmin } from "@/lib/admin";
 import { logout } from "@/app/actions/auth";
@@ -54,6 +54,13 @@ export default async function AdminLayout({
           >
             <CreditCard size={18} />
             Pagos
+          </Link>
+          <Link
+            href="/admin/plans"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted hover:bg-surface-hover hover:text-foreground"
+          >
+            <Package size={18} />
+            Planes
           </Link>
         </nav>
         <div className="border-t border-border p-4">

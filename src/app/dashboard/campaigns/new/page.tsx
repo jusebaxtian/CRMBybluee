@@ -1,10 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { NewCampaignForm } from "@/components/new-campaign-form";
 import { getWorkspaceId } from "@/lib/workspace";
+import { requireModule } from "@/lib/entitlements";
 
 export default async function NewCampaignPage() {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
+  await requireModule(supabase, workspaceId, "campaigns");
 
   const { data: templates } = await supabase
     .from("templates")

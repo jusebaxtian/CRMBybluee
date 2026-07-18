@@ -5,10 +5,12 @@ import { ImportContactsButton } from "@/components/import-contacts-button";
 import { AddContactForm } from "@/components/add-contact-form";
 import { SendMessagePopover } from "@/components/send-message-popover";
 import { getWorkspaceId } from "@/lib/workspace";
+import { requireModule } from "@/lib/entitlements";
 
 export default async function ContactsPage() {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
+  await requireModule(supabase, workspaceId, "contacts");
 
   const { data: contacts } = await supabase
     .from("contacts")

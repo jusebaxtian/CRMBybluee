@@ -35,6 +35,14 @@ export default async function DashboardLayout({
 
   const workspaceName = workspace?.name ?? "Tu workspace";
 
+  const { data: planModules } = workspace?.plan_id
+    ? await supabase
+        .from("plan_modules")
+        .select("module_key")
+        .eq("plan_id", workspace.plan_id)
+    : { data: [] };
+  const enabledModules = (planModules ?? []).map((pm) => pm.module_key);
+
   // Explicit scope filter — RLS also allows platform admins to read every notification,
   // which would otherwise leak other clients' targeted notifications into an admin's own dashboard.
   const scopeFilter = workspace?.plan_id
@@ -63,7 +71,11 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex bg-background">
-      <Sidebar workspaceName={workspaceName} isPlatformAdmin={isAdmin} />
+      <Sidebar
+        workspaceName={workspaceName}
+        isPlatformAdmin={isAdmin}
+        enabledModules={enabledModules}
+      />
       <div className="flex min-h-screen flex-1 flex-col">
         {impersonatedWorkspaceId && (
           <ImpersonationBanner workspaceName={workspaceName} />

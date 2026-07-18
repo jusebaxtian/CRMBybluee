@@ -1,10 +1,17 @@
 import { redirect } from "next/navigation";
-import { CalendarClock, Package, ShieldCheck, MessageSquareOff, CheckCircle2 } from "lucide-react";
+import { CalendarClock, Package, ShieldCheck, MessageSquareOff, CheckCircle2, Lock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { ConnectWhatsAppButton } from "@/components/connect-whatsapp-button";
 import { getWorkspaceId } from "@/lib/workspace";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const params = await searchParams;
+  const locked = typeof params.locked === "string" ? params.locked : null;
+
   const supabase = await createClient();
 
   const {
@@ -56,6 +63,15 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {locked && (
+        <div className="flex items-center gap-3 rounded-xl border border-warning/30 bg-warning/10 p-4">
+          <Lock size={18} className="shrink-0 text-warning" />
+          <p className="text-sm text-foreground">
+            El módulo &quot;{locked}&quot; no está incluido en tu plan actual. Contacta a soporte
+            para actualizar tu plan.
+          </p>
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
           icon={<ShieldCheck size={20} />}

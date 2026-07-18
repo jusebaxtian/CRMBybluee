@@ -3,10 +3,12 @@ import { Zap, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { AutomationRowActions } from "@/components/automation-row-actions";
 import { getWorkspaceId } from "@/lib/workspace";
+import { requireModule } from "@/lib/entitlements";
 
 export default async function AutomationsPage() {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
+  await requireModule(supabase, workspaceId, "automations");
 
   const { data: automations } = await supabase
     .from("automations")

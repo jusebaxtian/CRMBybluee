@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
+import { requireModule } from "@/lib/entitlements";
 import { ConversationListPanel } from "@/components/conversation-list-panel";
 
 export default async function InboxLayout({
@@ -9,6 +10,7 @@ export default async function InboxLayout({
 }) {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
+  await requireModule(supabase, workspaceId, "inbox");
 
   const { data: conversationsRaw } = await supabase
     .from("conversations")
