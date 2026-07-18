@@ -15,6 +15,7 @@ import {
   Plug,
   Settings,
   ShieldCheck,
+  CreditCard,
 } from "lucide-react";
 
 const navItems = [
@@ -25,6 +26,7 @@ const navItems = [
   { href: "/dashboard/templates", label: "Plantillas", icon: FileText, ready: true },
   { href: "/dashboard/automations", label: "Automatizaciones", icon: Zap, ready: true },
   { href: "/dashboard/tags", label: "Etiquetas", icon: Tag, ready: true },
+  { href: "/dashboard/billing", label: "Facturación", icon: CreditCard, ready: true },
   { href: "/dashboard/quick-replies", label: "Respuestas rápidas", icon: Reply, ready: false },
   { href: "/dashboard/reports", label: "Reportes", icon: BarChart3, ready: false },
   { href: "/dashboard/integrations", label: "Integraciones", icon: Plug, ready: false },
