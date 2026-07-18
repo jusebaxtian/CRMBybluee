@@ -9,6 +9,7 @@ import { NewMessageButton } from "@/components/new-message-button";
 type Conversation = {
   id: string;
   last_message_at: string;
+  lastMessagePreview: string | null;
   contact: { name: string | null; wa_id: string };
 };
 type Contact = { id: string; name: string | null; wa_id: string };
@@ -23,10 +24,7 @@ export function ConversationListPanel({
   const pathname = usePathname();
   const [query, setQuery] = useState("");
 
-  const filtered = conversations.filter((c) => {
-    const label = (c.contact.name ?? c.contact.wa_id).toLowerCase();
-    return label.includes(query.toLowerCase()) || c.contact.wa_id.includes(query);
-  });
+  const filtered = conversations.filter((c) => c.contact.wa_id.includes(query));
 
   return (
     <aside className="flex h-full w-full shrink-0 flex-col border-r border-border bg-surface lg:w-80">
@@ -67,12 +65,12 @@ export function ConversationListPanel({
               }`}
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
-                {(conv.contact.name ?? conv.contact.wa_id).charAt(0).toUpperCase()}
+                {conv.contact.wa_id.charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between">
                   <p className="truncate text-sm font-medium text-foreground">
-                    {conv.contact.name ?? conv.contact.wa_id}
+                    {conv.contact.wa_id}
                   </p>
                   <span className="shrink-0 text-[10px] text-muted">
                     {new Date(conv.last_message_at).toLocaleTimeString("es-CO", {
@@ -81,7 +79,9 @@ export function ConversationListPanel({
                     })}
                   </span>
                 </div>
-                <p className="truncate text-xs text-muted">{conv.contact.wa_id}</p>
+                <p className="truncate text-xs text-muted">
+                  {conv.lastMessagePreview ?? "Sin mensajes"}
+                </p>
               </div>
             </Link>
           );

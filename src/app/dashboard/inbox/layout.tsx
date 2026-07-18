@@ -20,11 +20,43 @@ export default async function InboxLayout({
     .eq("workspace_id", workspaceId ?? "")
     .order("last_message_at", { ascending: false });
 
-  const conversations = (conversationsRaw ?? []).map((c) => ({
-    id: c.id,
-    last_message_at: c.last_message_at,
-    contact: c.contacts as unknown as { name: string | null; wa_id: string },
-  }));
+  const conversationIds = (conversationsRaw ?? []).map((c) => c.id);
+
+  const { data: recentMessages } = conversationIds.length
+    ? await supabase
+        .from("messages")
+        .select("conversation_id, body, message_type")
+        .in("conversation_id", conversationIds)
+        .order("created_at", { ascending: false })
+    : { data: [] };
+
+  const lastMessageByConversation = new Map<string, { body: string | null; message_type: string }>();
+  for (const m of recentMessages ?? []) {
+    if (!lastMessageByConversation.has(m.conversation_id)) {
+      lastMessageByConversation.set(m.conversation_id, { body: m.body, message_type: m.message_type });
+    }
+  }
+
+  const mediaLabel: Record<string, string> = {
+    image: "📷 Foto",
+    video: "🎥 Video",
+    audio: "🎤 Nota de voz",
+    document: "📄 Documento",
+  };
+
+  const conversations = (conversationsRaw ?? []).map((c) => {
+    const last = lastMessageByConversation.get(c.id);
+    const lastMessagePreview = last
+      ? last.body ?? mediaLabel[last.message_type] ?? "Mensaje"
+      : null;
+
+    return {
+      id: c.id,
+      last_message_at: c.last_message_at,
+      lastMessagePreview,
+      contact: c.contacts as unknown as { name: string | null; wa_id: string },
+    };
+  });
 
   const { data: contacts } = await supabase
     .from("contacts")

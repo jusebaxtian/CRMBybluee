@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { MessageComposer } from "@/components/message-composer";
 import { ContactTagPicker } from "@/components/contact-tag-picker";
 import { NotesEditor } from "@/components/notes-editor";
-import { MessageBubble } from "@/components/message-bubble";
+import { MessagesScrollArea } from "@/components/messages-scroll-area";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
 import { getWorkspaceId } from "@/lib/workspace";
 
@@ -82,11 +82,7 @@ export default async function ConversationPage({
           </div>
         </div>
 
-        <div className="flex-1 space-y-3 overflow-y-auto p-3 sm:p-5">
-          {messages?.map((m) => (
-            <MessageBubble key={m.id} message={m} />
-          ))}
-        </div>
+        <MessagesScrollArea messages={messages ?? []} />
 
         <MessageComposer conversationId={id} />
       </div>
