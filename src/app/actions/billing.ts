@@ -23,9 +23,15 @@ export async function createBoldOrder(amountCents: number): Promise<BoldOrderRes
   const workspaceId = await getWorkspaceId(supabase);
   if (!workspaceId) return { error: "No se encontró tu workspace." };
 
+  // Our DB/UI store prices as "amount_cents" (COP * 100, e.g. 15000000 = $150.000)
+  // for consistent display everywhere else, but Bold's data-amount expects the
+  // raw COP integer (their own example: data-amount="30000" for a $30.000
+  // charge) — sending the *100 value would overcharge by 100x.
+  const boldAmount = Math.round(amountCents / 100);
+
   const orderId = `ws-${workspaceId.slice(0, 8)}-${Date.now()}`;
   const currency = "COP";
-  const signature = generateBoldIntegritySignature(orderId, amountCents, currency);
+  const signature = generateBoldIntegritySignature(orderId, boldAmount, currency);
 
   await supabase.from("payments").insert({
     workspace_id: workspaceId,
@@ -39,7 +45,7 @@ export async function createBoldOrder(amountCents: number): Promise<BoldOrderRes
   return {
     success: true as const,
     orderId,
-    amountCents,
+    amountCents: boldAmount,
     currency,
     signature,
     apiKey: process.env.NEXT_PUBLIC_BOLD_IDENTITY_KEY!,
