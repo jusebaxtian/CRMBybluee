@@ -29,7 +29,7 @@ export function ConversationListPanel({
   });
 
   return (
-    <aside className="flex h-[calc(100vh-9rem)] w-80 shrink-0 flex-col border-r border-border bg-surface">
+    <aside className="flex h-full w-full shrink-0 flex-col border-r border-border bg-surface lg:w-80">
       <div className="flex items-center justify-between border-b border-border px-4 py-4">
         <div className="flex items-center gap-2">
           <h2 className="text-lg font-semibold text-foreground">Conversaciones</h2>

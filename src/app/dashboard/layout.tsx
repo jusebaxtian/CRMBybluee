@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Sidebar } from "@/components/sidebar";
-import { Topbar } from "@/components/topbar";
+import { DashboardChrome } from "@/components/dashboard-chrome";
 import { ImpersonationBanner } from "@/components/impersonation-banner";
 import { isPlatformAdmin } from "@/lib/admin";
 import { getWorkspaceId, getImpersonatedWorkspaceId } from "@/lib/workspace";
@@ -85,23 +84,17 @@ export default async function DashboardLayout({
   }));
 
   return (
-    <div className="flex bg-background">
-      <Sidebar
-        workspaceName={workspaceName}
-        isPlatformAdmin={isAdmin}
-        enabledModules={enabledModules}
-      />
-      <div className="flex min-h-screen flex-1 flex-col">
-        {impersonatedWorkspaceId && (
-          <ImpersonationBanner workspaceName={workspaceName} />
-        )}
-        <Topbar
-          workspaceName={workspaceName}
-          userEmail={user.email ?? ""}
-          notifications={notificationsWithRead}
-        />
-        <main className="flex-1 p-8">{children}</main>
-      </div>
-    </div>
+    <DashboardChrome
+      workspaceName={workspaceName}
+      isPlatformAdmin={isAdmin}
+      enabledModules={enabledModules}
+      userEmail={user.email ?? ""}
+      notifications={notificationsWithRead}
+      banner={
+        impersonatedWorkspaceId ? <ImpersonationBanner workspaceName={workspaceName} /> : null
+      }
+    >
+      {children}
+    </DashboardChrome>
   );
 }

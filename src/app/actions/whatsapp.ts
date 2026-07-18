@@ -2,13 +2,22 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   exchangeCodeForToken,
   subscribeAppToWaba,
   getPhoneNumberDetails,
   sendTextMessage,
+  sendMediaMessage,
 } from "@/lib/whatsapp/graph";
 import { getWorkspaceId } from "@/lib/workspace";
+
+function mediaTypeFromMime(mime: string): "image" | "audio" | "video" | "document" {
+  if (mime.startsWith("image/")) return "image";
+  if (mime.startsWith("audio/")) return "audio";
+  if (mime.startsWith("video/")) return "video";
+  return "document";
+}
 
 export async function connectWhatsApp(input: {
   code: string;
@@ -100,6 +109,85 @@ async function sendToConversation(
     revalidatePath(`/dashboard/inbox/${conversationId}`);
     revalidatePath("/dashboard/inbox");
     return { success: true as const, conversationId };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Error desconocido." };
+  }
+}
+
+export async function sendChatMedia(formData: FormData) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "No autenticado." };
+
+  const conversationId = String(formData.get("conversationId") ?? "");
+  const file = formData.get("file") as File | null;
+  if (!conversationId || !file || file.size === 0) {
+    return { error: "Adjunta un archivo." };
+  }
+
+  const { data: conversation } = await supabase
+    .from("conversations")
+    .select("id, workspace_id, contacts(wa_id)")
+    .eq("id", conversationId)
+    .single();
+
+  if (!conversation) return { error: "Conversación no encontrada." };
+
+  const { data: account } = await supabase
+    .from("whatsapp_accounts")
+    .select("phone_number_id, access_token")
+    .eq("workspace_id", conversation.workspace_id)
+    .single();
+
+  if (!account) return { error: "Este workspace no tiene WhatsApp conectado." };
+
+  const contactWaId = (conversation.contacts as unknown as { wa_id: string }).wa_id;
+  const mediaType = mediaTypeFromMime(file.type);
+
+  const admin = createAdminClient();
+  const path = `${conversation.workspace_id}/${conversationId}/${Date.now()}-${file.name}`;
+
+  const { error: uploadError } = await admin.storage
+    .from("chat-media")
+    .upload(path, file, { contentType: file.type });
+  if (uploadError) return { error: uploadError.message };
+
+  const {
+    data: { publicUrl },
+  } = admin.storage.from("chat-media").getPublicUrl(path);
+
+  try {
+    const result = await sendMediaMessage(
+      account.phone_number_id,
+      account.access_token,
+      contactWaId,
+      mediaType,
+      publicUrl,
+      file.name
+    );
+
+    await supabase.from("messages").insert({
+      conversation_id: conversationId,
+      direction: "out",
+      message_type: mediaType,
+      body: mediaType === "document" ? file.name : null,
+      media_url: publicUrl,
+      media_mime_type: file.type,
+      wa_message_id: result.messages[0]?.id,
+      status: "sent",
+    });
+
+    await supabase
+      .from("conversations")
+      .update({ last_message_at: new Date().toISOString() })
+      .eq("id", conversationId);
+
+    revalidatePath(`/dashboard/inbox/${conversationId}`);
+    revalidatePath("/dashboard/inbox");
+    return { success: true as const };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Error desconocido." };
   }

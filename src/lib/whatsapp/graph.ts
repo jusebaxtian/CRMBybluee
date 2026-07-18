@@ -132,6 +132,47 @@ export async function createMetaTemplate(
   });
 }
 
+export async function sendMediaMessage(
+  phoneNumberId: string,
+  accessToken: string,
+  to: string,
+  type: "image" | "audio" | "video" | "document",
+  link: string,
+  filename?: string
+): Promise<{ messages: { id: string }[] }> {
+  const mediaObject: Record<string, unknown> = { link };
+  if (type === "document" && filename) mediaObject.filename = filename;
+
+  return graphFetch(`/${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to,
+      type,
+      [type]: mediaObject,
+    }),
+  });
+}
+
+export async function getMediaUrl(
+  mediaId: string,
+  accessToken: string
+): Promise<{ url: string; mime_type: string }> {
+  return graphFetch(`/${mediaId}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+}
+
+export async function downloadMedia(url: string, accessToken: string): Promise<Blob> {
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!res.ok) throw new Error("No se pudo descargar el archivo multimedia.");
+  return res.blob();
+}
+
 export async function sendTemplateMessage(
   phoneNumberId: string,
   accessToken: string,

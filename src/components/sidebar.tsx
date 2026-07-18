@@ -41,15 +41,17 @@ export function Sidebar({
   workspaceName,
   isPlatformAdmin = false,
   enabledModules = [],
+  onNavigate,
 }: {
   workspaceName: string;
   isPlatformAdmin?: boolean;
   enabledModules?: string[];
+  onNavigate?: () => void;
 }) {
   const pathname = usePathname();
 
   return (
-    <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-border bg-surface">
+    <aside className="flex h-screen w-64 shrink-0 flex-col overflow-y-auto border-r border-border bg-surface">
       <div className="flex items-center gap-2 px-6 py-6">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary font-bold text-white">
           B
@@ -88,7 +90,7 @@ export function Sidebar({
           );
 
           return ready ? (
-            <Link key={href} href={href} className="block">
+            <Link key={href} href={href} className="block" onClick={onNavigate}>
               {content}
             </Link>
           ) : (
@@ -103,6 +105,7 @@ export function Sidebar({
         <div className="px-3 pb-2">
           <Link
             href="/admin"
+            onClick={onNavigate}
             className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-primary hover:bg-surface-hover"
           >
             <ShieldCheck size={18} />

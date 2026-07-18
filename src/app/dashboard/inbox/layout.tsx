@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
 import { ConversationListPanel } from "@/components/conversation-list-panel";
+import { InboxShell } from "@/components/inbox-shell";
 
 export default async function InboxLayout({
   children,
@@ -31,9 +32,10 @@ export default async function InboxLayout({
     .order("name");
 
   return (
-    <div className="-m-8 flex h-[calc(100vh-5.25rem)]">
-      <ConversationListPanel conversations={conversations} contacts={contacts ?? []} />
-      <div className="flex-1 overflow-hidden">{children}</div>
+    <div className="-m-8 h-[calc(100vh-5.25rem)]">
+      <InboxShell list={<ConversationListPanel conversations={conversations} contacts={contacts ?? []} />}>
+        {children}
+      </InboxShell>
     </div>
   );
 }

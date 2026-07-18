@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
-import { Zap } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { MessageComposer } from "@/components/message-composer";
 import { ContactTagPicker } from "@/components/contact-tag-picker";
 import { NotesEditor } from "@/components/notes-editor";
+import { MessageBubble } from "@/components/message-bubble";
 import { getWorkspaceId } from "@/lib/workspace";
 
 export default async function ConversationPage({
@@ -34,7 +36,7 @@ export default async function ConversationPage({
 
   const { data: messages } = await supabase
     .from("messages")
-    .select("id, direction, body, status, created_at")
+    .select("id, direction, body, status, message_type, media_url, media_mime_type, created_at")
     .eq("conversation_id", id)
     .order("created_at", { ascending: true });
 
@@ -56,47 +58,34 @@ export default async function ConversationPage({
   return (
     <div className="flex h-full">
       <div className="flex flex-1 flex-col overflow-hidden border-r border-border">
-        <div className="flex items-center gap-3 border-b border-border px-5 py-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
+        <div className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3 sm:px-5 sm:py-4">
+          <Link
+            href="/dashboard/inbox"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-foreground lg:hidden"
+          >
+            <ArrowLeft size={18} />
+          </Link>
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
             {(contact.name ?? contact.wa_id).charAt(0).toUpperCase()}
           </div>
-          <div>
-            <p className="text-sm font-medium text-foreground">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-foreground">
               {contact.name ?? contact.wa_id}
             </p>
             <p className="text-xs text-muted">Cliente</p>
           </div>
         </div>
 
-        <div className="flex-1 space-y-3 overflow-y-auto p-5">
+        <div className="flex-1 space-y-3 overflow-y-auto p-3 sm:p-5">
           {messages?.map((m) => (
-            <div
-              key={m.id}
-              className={`flex ${m.direction === "out" ? "justify-end" : "justify-start"}`}
-            >
-              <div
-                className={`max-w-[70%] rounded-lg px-3 py-2 text-sm ${
-                  m.direction === "out"
-                    ? "bg-primary text-white"
-                    : "bg-surface-hover text-foreground"
-                }`}
-              >
-                <p>{m.body}</p>
-                <p className="mt-1 text-[10px] opacity-70">
-                  {new Date(m.created_at).toLocaleTimeString("es-CO", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </p>
-              </div>
-            </div>
+            <MessageBubble key={m.id} message={m} />
           ))}
         </div>
 
         <MessageComposer conversationId={id} />
       </div>
 
-      <aside className="w-72 shrink-0 overflow-y-auto bg-surface p-5">
+      <aside className="hidden w-72 shrink-0 overflow-y-auto bg-surface p-5 lg:block">
         <div className="flex flex-col items-center text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/15 text-xl font-semibold text-primary">
             {(contact.name ?? contact.wa_id).charAt(0).toUpperCase()}
