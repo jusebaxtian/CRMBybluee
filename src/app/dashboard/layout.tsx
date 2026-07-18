@@ -83,11 +83,35 @@ export default async function DashboardLayout({
     read: readIds.has(n.id),
   }));
 
+  const { data: conversationsForUnread } = workspaceId
+    ? await supabase
+        .from("conversations")
+        .select("id, last_read_at")
+        .eq("workspace_id", workspaceId)
+    : { data: [] };
+
+  const conversationIds = (conversationsForUnread ?? []).map((c) => c.id);
+  const lastReadById = new Map((conversationsForUnread ?? []).map((c) => [c.id, c.last_read_at]));
+
+  const { data: inboundMessages } = conversationIds.length
+    ? await supabase
+        .from("messages")
+        .select("conversation_id, created_at")
+        .in("conversation_id", conversationIds)
+        .eq("direction", "in")
+    : { data: [] };
+
+  const unreadMessagesCount = (inboundMessages ?? []).filter((m) => {
+    const lastRead = lastReadById.get(m.conversation_id);
+    return !lastRead || new Date(m.created_at) > new Date(lastRead);
+  }).length;
+
   return (
     <DashboardChrome
       workspaceName={workspaceName}
       isPlatformAdmin={isAdmin}
       enabledModules={enabledModules}
+      unreadMessagesCount={unreadMessagesCount}
       userEmail={user.email ?? ""}
       notifications={notificationsWithRead}
       banner={

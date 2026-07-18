@@ -3,14 +3,18 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, SquarePen } from "lucide-react";
+import { Search } from "lucide-react";
 import { NewMessageButton } from "@/components/new-message-button";
 
+type Tag = { id: string; name: string; color: string };
 type Conversation = {
   id: string;
   last_message_at: string;
   lastMessagePreview: string | null;
+  answered: boolean;
+  unreadCount: number;
   contact: { name: string | null; wa_id: string };
+  tags: Tag[];
 };
 type Contact = { id: string; name: string | null; wa_id: string };
 
@@ -64,14 +68,32 @@ export function ConversationListPanel({
                 active ? "bg-surface-hover" : "hover:bg-surface-hover"
               }`}
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
-                {conv.contact.wa_id.charAt(0).toUpperCase()}
+              <div className="relative shrink-0">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
+                  {conv.contact.wa_id.charAt(0).toUpperCase()}
+                </div>
+                {!conv.answered && (
+                  <span
+                    title="Sin responder"
+                    className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface bg-warning"
+                  />
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between">
-                  <p className="truncate text-sm font-medium text-foreground">
-                    {conv.contact.wa_id}
-                  </p>
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <p className="truncate text-sm font-medium text-foreground">
+                      {conv.contact.wa_id}
+                    </p>
+                    {conv.tags.slice(0, 4).map((tag) => (
+                      <span
+                        key={tag.id}
+                        title={tag.name}
+                        className="h-1.5 w-1.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: tag.color }}
+                      />
+                    ))}
+                  </div>
                   <span className="shrink-0 text-[10px] text-muted">
                     {new Date(conv.last_message_at).toLocaleTimeString("es-CO", {
                       hour: "2-digit",
@@ -79,9 +101,16 @@ export function ConversationListPanel({
                     })}
                   </span>
                 </div>
-                <p className="truncate text-xs text-muted">
-                  {conv.lastMessagePreview ?? "Sin mensajes"}
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate text-xs text-muted">
+                    {conv.lastMessagePreview ?? "Sin mensajes"}
+                  </p>
+                  {conv.unreadCount > 0 && (
+                    <span className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-white">
+                      {conv.unreadCount > 99 ? "99+" : conv.unreadCount}
+                    </span>
+                  )}
+                </div>
               </div>
             </Link>
           );

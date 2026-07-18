@@ -20,7 +20,7 @@ export default async function ConversationPage({
 
   const { data: conversation } = await supabase
     .from("conversations")
-    .select("id, contact_id, contacts(name, wa_id, notes, contact_tags(tag_id))")
+    .select("id, contact_id, last_read_at, contacts(name, wa_id, notes, contact_tags(tag_id))")
     .eq("id", id)
     .eq("workspace_id", workspaceId ?? "")
     .maybeSingle();
@@ -40,6 +40,20 @@ export default async function ConversationPage({
     .select("id, direction, body, status, message_type, media_url, media_mime_type, created_at")
     .eq("conversation_id", id)
     .order("created_at", { ascending: true });
+
+  // Only write when there's something new to mark read — an unconditional
+  // update on every render would re-trigger the conversations-table realtime
+  // subscription that refreshes this same page, looping forever.
+  const lastMessage = messages?.[messages.length - 1];
+  const hasUnread =
+    !!lastMessage &&
+    (!conversation.last_read_at || new Date(lastMessage.created_at) > new Date(conversation.last_read_at));
+  if (hasUnread) {
+    await supabase
+      .from("conversations")
+      .update({ last_read_at: new Date().toISOString() })
+      .eq("id", id);
+  }
 
   const { data: allTags } = await supabase
     .from("tags")

@@ -16,6 +16,7 @@ export function DashboardChrome({
   workspaceName,
   isPlatformAdmin,
   enabledModules,
+  unreadMessagesCount,
   userEmail,
   notifications,
   banner,
@@ -24,6 +25,7 @@ export function DashboardChrome({
   workspaceName: string;
   isPlatformAdmin: boolean;
   enabledModules: string[];
+  unreadMessagesCount: number;
   userEmail: string;
   notifications: Notification[];
   banner: React.ReactNode;
@@ -51,6 +53,7 @@ export function DashboardChrome({
           workspaceName={workspaceName}
           isPlatformAdmin={isPlatformAdmin}
           enabledModules={enabledModules}
+          unreadMessagesCount={unreadMessagesCount}
           onNavigate={() => setMobileNavOpen(false)}
         />
       </div>

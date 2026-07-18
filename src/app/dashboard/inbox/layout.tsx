@@ -16,7 +16,9 @@ export default async function InboxLayout({
 
   const { data: conversationsRaw } = await supabase
     .from("conversations")
-    .select("id, last_message_at, contacts(name, wa_id)")
+    .select(
+      "id, last_message_at, last_read_at, contacts(name, wa_id, contact_tags(tags(id, name, color)))"
+    )
     .eq("workspace_id", workspaceId ?? "")
     .order("last_message_at", { ascending: false });
 
@@ -25,15 +27,37 @@ export default async function InboxLayout({
   const { data: recentMessages } = conversationIds.length
     ? await supabase
         .from("messages")
-        .select("conversation_id, body, message_type")
+        .select("conversation_id, body, message_type, direction, created_at")
         .in("conversation_id", conversationIds)
         .order("created_at", { ascending: false })
     : { data: [] };
 
-  const lastMessageByConversation = new Map<string, { body: string | null; message_type: string }>();
+  const lastReadAtByConversation = new Map(
+    (conversationsRaw ?? []).map((c) => [c.id, c.last_read_at as string | null])
+  );
+
+  const lastMessageByConversation = new Map<
+    string,
+    { body: string | null; message_type: string; direction: string }
+  >();
+  const unreadCountByConversation = new Map<string, number>();
+
   for (const m of recentMessages ?? []) {
     if (!lastMessageByConversation.has(m.conversation_id)) {
-      lastMessageByConversation.set(m.conversation_id, { body: m.body, message_type: m.message_type });
+      lastMessageByConversation.set(m.conversation_id, {
+        body: m.body,
+        message_type: m.message_type,
+        direction: m.direction,
+      });
+    }
+    if (m.direction === "in") {
+      const lastRead = lastReadAtByConversation.get(m.conversation_id);
+      if (!lastRead || new Date(m.created_at) > new Date(lastRead)) {
+        unreadCountByConversation.set(
+          m.conversation_id,
+          (unreadCountByConversation.get(m.conversation_id) ?? 0) + 1
+        );
+      }
     }
   }
 
@@ -49,12 +73,24 @@ export default async function InboxLayout({
     const lastMessagePreview = last
       ? last.body ?? mediaLabel[last.message_type] ?? "Mensaje"
       : null;
+    const contactRaw = c.contacts as unknown as {
+      name: string | null;
+      wa_id: string;
+      contact_tags: { tags: { id: string; name: string; color: string } | null }[];
+    };
 
     return {
       id: c.id,
       last_message_at: c.last_message_at,
       lastMessagePreview,
-      contact: c.contacts as unknown as { name: string | null; wa_id: string },
+      answered: last ? last.direction === "out" : true,
+      unreadCount: unreadCountByConversation.get(c.id) ?? 0,
+      contact: { name: contactRaw.name, wa_id: contactRaw.wa_id },
+      tags: contactRaw.contact_tags.map((ct) => ct.tags).filter((t) => t !== null) as {
+        id: string;
+        name: string;
+        color: string;
+      }[],
     };
   });
 

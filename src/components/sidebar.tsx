@@ -41,11 +41,13 @@ export function Sidebar({
   workspaceName,
   isPlatformAdmin = false,
   enabledModules = [],
+  unreadMessagesCount = 0,
   onNavigate,
 }: {
   workspaceName: string;
   isPlatformAdmin?: boolean;
   enabledModules?: string[];
+  unreadMessagesCount?: number;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
@@ -80,6 +82,11 @@ export function Sidebar({
                 <Icon size={18} />
                 {label}
               </span>
+              {href === "/dashboard/inbox" && ready && unreadMessagesCount > 0 && (
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-success px-1 text-[10px] font-medium text-white">
+                  {unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}
+                </span>
+              )}
               {!built && (
                 <span className="rounded-full bg-surface-hover px-2 py-0.5 text-[10px] text-muted">
                   Pronto
