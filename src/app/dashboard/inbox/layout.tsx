@@ -3,6 +3,7 @@ import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
 import { ConversationListPanel } from "@/components/conversation-list-panel";
 import { InboxShell } from "@/components/inbox-shell";
+import { RealtimeRefresh } from "@/components/realtime-refresh";
 
 export default async function InboxLayout({
   children,
@@ -33,6 +34,13 @@ export default async function InboxLayout({
 
   return (
     <div className="-m-8 h-[calc(100vh-5.25rem)]">
+      {workspaceId && (
+        <RealtimeRefresh
+          table="conversations"
+          filter={`workspace_id=eq.${workspaceId}`}
+          channelName={`conversations-${workspaceId}`}
+        />
+      )}
       <InboxShell list={<ConversationListPanel conversations={conversations} contacts={contacts ?? []} />}>
         {children}
       </InboxShell>

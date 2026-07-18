@@ -1,4 +1,4 @@
-import { FileText, Download } from "lucide-react";
+import { FileText, Download, Check, CheckCheck, AlertCircle, Clock } from "lucide-react";
 
 type Message = {
   id: string;
@@ -10,6 +10,14 @@ type Message = {
   media_mime_type: string | null;
   created_at: string;
 };
+
+function StatusTicks({ status }: { status: string }) {
+  if (status === "failed") return <AlertCircle size={13} className="text-red-300" />;
+  if (status === "read") return <CheckCheck size={14} className="text-sky-300" />;
+  if (status === "delivered") return <CheckCheck size={14} className="opacity-70" />;
+  if (status === "sent") return <Check size={14} className="opacity-70" />;
+  return <Clock size={12} className="opacity-70" />;
+}
 
 export function MessageBubble({ message: m }: { message: Message }) {
   const out = m.direction === "out";
@@ -59,7 +67,10 @@ export function MessageBubble({ message: m }: { message: Message }) {
 
         {m.body && m.message_type !== "document" && <p className="whitespace-pre-wrap">{m.body}</p>}
 
-        <p className="mt-1 text-[10px] opacity-70">{time}</p>
+        <p className="mt-1 flex items-center justify-end gap-1 text-[10px] opacity-70">
+          {time}
+          {out && <StatusTicks status={m.status} />}
+        </p>
       </div>
     </div>
   );

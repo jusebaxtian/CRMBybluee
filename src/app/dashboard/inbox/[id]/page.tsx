@@ -6,6 +6,7 @@ import { MessageComposer } from "@/components/message-composer";
 import { ContactTagPicker } from "@/components/contact-tag-picker";
 import { NotesEditor } from "@/components/notes-editor";
 import { MessageBubble } from "@/components/message-bubble";
+import { RealtimeRefresh } from "@/components/realtime-refresh";
 import { getWorkspaceId } from "@/lib/workspace";
 
 export default async function ConversationPage({
@@ -57,6 +58,11 @@ export default async function ConversationPage({
 
   return (
     <div className="flex h-full w-full min-w-0 flex-1">
+      <RealtimeRefresh
+        table="messages"
+        filter={`conversation_id=eq.${id}`}
+        channelName={`messages-${id}`}
+      />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden border-r border-border">
         <div className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3 sm:px-5 sm:py-4">
           <Link
