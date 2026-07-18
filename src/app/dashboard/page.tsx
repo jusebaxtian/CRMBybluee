@@ -132,8 +132,8 @@ export default async function DashboardPage({
         />
       </div>
 
-      <div className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-6 sm:flex-row sm:items-center">
-        <div className="mx-auto flex aspect-square w-40 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-background sm:mx-0">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
+        <div className="mx-auto flex aspect-[9/16] w-full max-w-[280px] items-center justify-center overflow-hidden rounded-xl border border-border bg-surface">
           {bannerUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={bannerUrl} alt="Banner" className="h-full w-full object-cover" />
@@ -142,16 +142,16 @@ export default async function DashboardPage({
           )}
         </div>
 
-        <div className="flex-1 text-center sm:text-left">
+        <div className="rounded-xl border border-border bg-surface p-8 text-center lg:text-left">
           {whatsappAccount ? (
             <>
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-success/15 text-success sm:mx-0">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-success/15 text-success lg:mx-0">
                 <CheckCircle2 size={22} />
               </div>
               <h2 className="text-lg font-semibold text-foreground">WhatsApp conectado</h2>
               <p className="mt-1 text-sm text-muted">{whatsappAccount.display_phone_number}</p>
 
-              <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2 lg:justify-start">
                 <span className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs text-foreground">
                   {phoneStatus?.verified_name ?? "—"}
                 </span>
@@ -181,13 +181,13 @@ export default async function DashboardPage({
             </>
           ) : (
             <>
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-hover text-muted sm:mx-0">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-hover text-muted lg:mx-0">
                 <MessageSquareOff size={22} />
               </div>
               <h2 className="text-lg font-semibold text-foreground">
                 Aún no has conectado WhatsApp
               </h2>
-              <p className="mt-1 max-w-md text-sm text-muted">
+              <p className="mx-auto mt-1 max-w-md text-sm text-muted lg:mx-0">
                 Conecta tu número de WhatsApp Business para empezar a ver tus
                 conversaciones, contactos y campañas aquí.
               </p>
