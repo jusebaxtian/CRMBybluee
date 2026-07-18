@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { LayoutDashboard, Bell, CreditCard, Package } from "lucide-react";
+import { LayoutDashboard, Bell, CreditCard, Package, ArrowLeftRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { isPlatformAdmin } from "@/lib/admin";
 import { logout } from "@/app/actions/auth";
@@ -63,6 +63,15 @@ export default async function AdminLayout({
             Planes
           </Link>
         </nav>
+        <div className="px-3 pb-2">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-primary hover:bg-surface-hover"
+          >
+            <ArrowLeftRight size={18} />
+            Volver a mi CRM
+          </Link>
+        </div>
         <div className="border-t border-border p-4">
           <p className="mb-2 truncate text-xs text-muted">{user.email}</p>
           <form action={logout}>
