@@ -87,9 +87,9 @@ export async function confirmBoldPayment(orderId: string, txStatus: string | nul
   });
 
   await admin.from("workspaces").update({ status: "active" }).eq("id", payment.workspace_id);
-
-  revalidatePath("/dashboard/billing");
-  revalidatePath("/dashboard");
+  // No revalidatePath here: this runs during the billing page's own render
+  // (Next.js throws if you call revalidatePath mid-render), and the page
+  // queries fresh data right after this returns anyway.
 }
 
 export async function uploadPaymentProof(formData: FormData) {
