@@ -1,4 +1,4 @@
-import { CreditCard, Landmark } from "lucide-react";
+import { CreditCard, Landmark, CheckCircle2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
 import { createBoldOrder, confirmBoldPayment } from "@/app/actions/billing";
@@ -46,8 +46,29 @@ export default async function BillingPage({
     .order("created_at", { ascending: false })
     .limit(10);
 
+  const { data: activeSubscription } = await supabase
+    .from("subscriptions")
+    .select("current_period_end")
+    .eq("workspace_id", workspaceId ?? "")
+    .eq("status", "active")
+    .order("current_period_end", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const renewalDate = activeSubscription?.current_period_end
+    ? new Date(activeSubscription.current_period_end)
+    : null;
+  const daysUntilRenewal = renewalDate
+    ? Math.ceil((renewalDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : null;
+
+  // Only offer payment when there's actually something to pay for: not active
+  // yet, past due, or the active subscription is within 2 days of renewing.
+  const canPay =
+    workspace?.status !== "active" || (daysUntilRenewal !== null && daysUntilRenewal <= 2);
+
   const amountCents = workspace?.plans?.price_cents ?? 0;
-  const boldOrder = amountCents > 0 ? await createBoldOrder(amountCents) : null;
+  const boldOrder = canPay && amountCents > 0 ? await createBoldOrder(amountCents) : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -66,6 +87,17 @@ export default async function BillingPage({
         </p>
       </div>
 
+      {!canPay && renewalDate && (
+        <div className="flex items-center gap-3 rounded-xl border border-success/30 bg-success/10 p-5">
+          <CheckCircle2 size={20} className="shrink-0 text-success" />
+          <p className="text-sm text-foreground">
+            Tu plan está pagado y activo. Se habilitará el pago para renovar 2 días antes del{" "}
+            {renewalDate.toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" })}.
+          </p>
+        </div>
+      )}
+
+      {canPay && (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="rounded-xl border border-border bg-surface p-5">
           <div className="mb-3 flex items-center gap-2">
@@ -107,6 +139,7 @@ export default async function BillingPage({
           <ManualTransferForm />
         </div>
       </div>
+      )}
 
       <div className="overflow-hidden rounded-xl border border-border bg-surface">
         <table className="w-full text-left text-sm">

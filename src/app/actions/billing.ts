@@ -29,18 +29,41 @@ export async function createBoldOrder(amountCents: number): Promise<BoldOrderRes
   // charge) — sending the *100 value would overcharge by 100x.
   const boldAmount = Math.round(amountCents / 100);
 
-  const orderId = `ws-${workspaceId.slice(0, 8)}-${Date.now()}`;
   const currency = "COP";
+
+  // Reuse a recent pending order instead of minting a new one on every page
+  // load/reload — the signature is deterministic so it's safe to recompute
+  // for an existing order_id.
+  const { data: existing } = await supabase
+    .from("payments")
+    .select("bold_order_id, created_at")
+    .eq("workspace_id", workspaceId)
+    .eq("provider", "bold")
+    .eq("status", "pending")
+    .eq("amount_cents", amountCents)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const recentEnough =
+    existing && Date.now() - new Date(existing.created_at).getTime() < 30 * 60 * 1000;
+
+  const orderId = recentEnough
+    ? existing!.bold_order_id!
+    : `ws-${workspaceId.slice(0, 8)}-${Date.now()}`;
+
   const signature = generateBoldIntegritySignature(orderId, boldAmount, currency);
 
-  await supabase.from("payments").insert({
-    workspace_id: workspaceId,
-    provider: "bold",
-    amount_cents: amountCents,
-    currency,
-    status: "pending",
-    bold_order_id: orderId,
-  });
+  if (!recentEnough) {
+    await supabase.from("payments").insert({
+      workspace_id: workspaceId,
+      provider: "bold",
+      amount_cents: amountCents,
+      currency,
+      status: "pending",
+      bold_order_id: orderId,
+    });
+  }
 
   return {
     success: true as const,
