@@ -20,8 +20,13 @@ export default async function AdminOverviewPage({
 
   const { data: workspaces } = await supabase
     .from("workspaces")
-    .select("id, name, status, access_disabled, created_at, trial_ends_at, plans(name)")
+    .select("id, name, status, access_disabled, created_at, trial_ends_at, signup_ip, plans(name)")
     .order("created_at", { ascending: false });
+
+  const ipCounts = new Map<string, number>();
+  for (const w of workspaces ?? []) {
+    if (w.signup_ip) ipCounts.set(w.signup_ip, (ipCounts.get(w.signup_ip) ?? 0) + 1);
+  }
 
   const rows = await Promise.all(
     (workspaces ?? []).map(async (w) => {
@@ -60,6 +65,8 @@ export default async function AdminOverviewPage({
         accessDisabled: w.access_disabled,
         createdAt: w.created_at,
         renewalDate: subscription?.current_period_end ?? w.trial_ends_at ?? null,
+        signupIp: w.signup_ip,
+        sharedIp: w.signup_ip ? (ipCounts.get(w.signup_ip) ?? 0) > 1 : false,
       };
     })
   );
@@ -104,6 +111,7 @@ export default async function AdminOverviewPage({
               <th className="px-5 py-3 font-medium">Cliente</th>
               <th className="px-5 py-3 font-medium">Plan</th>
               <th className="px-5 py-3 font-medium">Estado</th>
+              <th className="px-5 py-3 font-medium">IP de registro</th>
               <th className="px-5 py-3 font-medium">Creado</th>
               <th className="px-5 py-3 font-medium">Renovación</th>
               <th className="px-5 py-3 font-medium"></th>
@@ -131,6 +139,17 @@ export default async function AdminOverviewPage({
                     )}
                   </div>
                 </td>
+                <td className="px-5 py-3">
+                  <p className="text-muted">{r.signupIp ?? "—"}</p>
+                  {r.sharedIp && (
+                    <span
+                      title="Otro workspace se registró desde esta misma IP"
+                      className="mt-1 inline-block w-fit rounded-full border border-warning px-2 py-0.5 text-[10px] text-warning"
+                    >
+                      Posible multicuenta
+                    </span>
+                  )}
+                </td>
                 <td className="px-5 py-3 text-muted">
                   {new Date(r.createdAt).toLocaleDateString("es-CO")}
                 </td>
@@ -148,7 +167,7 @@ export default async function AdminOverviewPage({
             ))}
             {filteredRows.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-5 py-6 text-center text-muted">
+                <td colSpan={7} className="px-5 py-6 text-center text-muted">
                   {query ? "Sin resultados para esa búsqueda." : "Sin clientes registrados."}
                 </td>
               </tr>

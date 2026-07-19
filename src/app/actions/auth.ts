@@ -1,7 +1,17 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+
+// nginx forwards the real client IP via X-Forwarded-For (may be a chain of
+// "client, proxy1, proxy2" — the first entry is the actual visitor).
+async function getClientIp(): Promise<string | null> {
+  const headerStore = await headers();
+  const forwardedFor = headerStore.get("x-forwarded-for");
+  if (forwardedFor) return forwardedFor.split(",")[0].trim();
+  return headerStore.get("x-real-ip");
+}
 
 export type AuthFormState =
   | {
@@ -36,8 +46,10 @@ export async function signup(
   }
 
   // ENABLE_EMAIL_AUTOCONFIRM is on, so signUp already returns an active session.
+  const signupIp = await getClientIp();
   const { error: rpcError } = await supabase.rpc("create_workspace_with_owner", {
     workspace_name: companyName,
+    signup_ip: signupIp,
   });
 
   if (rpcError) {

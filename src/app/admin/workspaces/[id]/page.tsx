@@ -17,11 +17,19 @@ export default async function AdminWorkspaceDetailPage({
 
   const { data: workspace } = await supabase
     .from("workspaces")
-    .select("id, name, status, plan_id, trial_ends_at, created_at")
+    .select("id, name, status, plan_id, trial_ends_at, created_at, signup_ip")
     .eq("id", id)
     .maybeSingle();
 
   if (!workspace) notFound();
+
+  const { data: sameIpWorkspaces } = workspace.signup_ip
+    ? await supabase
+        .from("workspaces")
+        .select("id, name")
+        .eq("signup_ip", workspace.signup_ip)
+        .neq("id", id)
+    : { data: [] };
 
   await logAdminAccess(id);
 
@@ -111,6 +119,30 @@ export default async function AdminWorkspaceDetailPage({
           label="WhatsApp"
           value={whatsappAccount ? whatsappAccount.display_phone_number ?? "Conectado" : "No conectado"}
         />
+      </div>
+
+      <div className="rounded-xl border border-border bg-surface p-5">
+        <p className="mb-2 text-sm font-medium text-foreground">IP de registro</p>
+        <p className="text-sm text-muted">{workspace.signup_ip ?? "No registrada"}</p>
+        {sameIpWorkspaces && sameIpWorkspaces.length > 0 && (
+          <div className="mt-3">
+            <p className="mb-2 text-xs font-medium text-warning">
+              ⚠ Otros {sameIpWorkspaces.length} workspace(s) se registraron desde esta misma IP:
+            </p>
+            <ul className="flex flex-col gap-1">
+              {sameIpWorkspaces.map((w) => (
+                <li key={w.id}>
+                  <Link
+                    href={`/admin/workspaces/${w.id}`}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    {w.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       <div className="rounded-xl border border-border bg-surface p-5">
