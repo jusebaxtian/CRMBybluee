@@ -167,7 +167,9 @@ export function MessageComposer({
             autoComplete="off"
             disabled={uploading}
             required
-            className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground outline-none focus:border-primary disabled:opacity-50 sm:h-10 sm:px-3"
+            // 16px min font size on mobile — anything smaller makes iOS/Android
+            // auto-zoom the page on focus, which pushes the send button off-screen.
+            className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 text-base text-foreground outline-none focus:border-primary disabled:opacity-50 sm:h-10 sm:px-3 sm:text-sm"
           />
           <button
             type="button"
