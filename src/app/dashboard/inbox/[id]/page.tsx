@@ -2,10 +2,9 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { MessageComposer } from "@/components/message-composer";
 import { ContactTagPicker } from "@/components/contact-tag-picker";
 import { NotesEditor } from "@/components/notes-editor";
-import { MessagesScrollArea } from "@/components/messages-scroll-area";
+import { ChatPane } from "@/components/chat-pane";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
 import { getWorkspaceId } from "@/lib/workspace";
 
@@ -96,9 +95,7 @@ export default async function ConversationPage({
           </div>
         </div>
 
-        <MessagesScrollArea messages={messages ?? []} />
-
-        <MessageComposer conversationId={id} />
+        <ChatPane conversationId={id} messages={messages ?? []} />
       </div>
 
       <aside className="hidden w-72 shrink-0 overflow-y-auto bg-surface p-5 lg:block">

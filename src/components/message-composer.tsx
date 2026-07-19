@@ -4,10 +4,17 @@ import { useActionState, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Send, Paperclip, Mic, Square, X } from "lucide-react";
 import { sendMessage, sendChatMedia } from "@/app/actions/whatsapp";
+import type { OptimisticMessage } from "@/components/chat-pane";
 
 type State = Awaited<ReturnType<typeof sendMessage>> | undefined;
 
-export function MessageComposer({ conversationId }: { conversationId: string }) {
+export function MessageComposer({
+  conversationId,
+  onOptimisticSend,
+}: {
+  conversationId: string;
+  onOptimisticSend?: (message: OptimisticMessage) => void;
+}) {
   const formRef = useRef<HTMLFormElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -25,9 +32,23 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
     async (_prev, formData) => {
       const body = String(formData.get("body") ?? "").trim();
       if (!body) return undefined;
+
+      // Show the message immediately (WhatsApp-style) instead of waiting on
+      // the round trip to Meta's Graph API before anything appears.
+      formRef.current?.reset();
+      onOptimisticSend?.({
+        id: `temp-${Date.now()}`,
+        direction: "out",
+        body,
+        status: "sending",
+        message_type: "text",
+        media_url: null,
+        media_mime_type: null,
+        created_at: new Date().toISOString(),
+      });
+
       const result = await sendMessage({ conversationId, body });
       if (!("error" in result)) {
-        formRef.current?.reset();
         router.refresh();
       }
       return result;
@@ -97,15 +118,17 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
   const ss = String(recordSeconds % 60).padStart(2, "0");
 
   return (
-    <div className="border-t border-border bg-surface p-3 sm:p-4">
+    <div className="w-full min-w-0 border-t border-border bg-surface p-2 sm:p-4">
       {recording ? (
-        <div className="flex items-center gap-3 rounded-lg border border-red-400/40 bg-red-400/10 px-4 py-2.5">
+        <div className="flex w-full min-w-0 items-center gap-2 rounded-lg border border-red-400/40 bg-red-400/10 px-3 py-2 sm:gap-3 sm:px-4 sm:py-2.5">
           <span className="flex h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-red-400" />
-          <span className="flex-1 text-sm text-foreground">Grabando... {mm}:{ss}</span>
+          <span className="min-w-0 flex-1 truncate text-sm text-foreground">
+            Grabando... {mm}:{ss}
+          </span>
           <button
             type="button"
             onClick={() => stopRecording(true)}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-surface-hover"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-hover sm:h-9 sm:w-9"
             title="Cancelar"
           >
             <X size={16} />
@@ -113,14 +136,14 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
           <button
             type="button"
             onClick={() => stopRecording(false)}
-            className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-white sm:h-9 sm:w-9"
             title="Enviar nota de voz"
           >
             <Square size={14} />
           </button>
         </div>
       ) : (
-        <form ref={formRef} action={action} className="flex items-center gap-2">
+        <form ref={formRef} action={action} className="flex w-full min-w-0 items-center gap-1.5 sm:gap-2">
           <input
             ref={fileInputRef}
             type="file"
@@ -132,7 +155,7 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-foreground disabled:opacity-50"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-foreground disabled:opacity-50 sm:h-10 sm:w-10"
             title="Adjuntar archivo"
           >
             <Paperclip size={18} />
@@ -144,13 +167,13 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
             autoComplete="off"
             disabled={uploading}
             required
-            className="h-10 flex-1 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary disabled:opacity-50"
+            className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 text-sm text-foreground outline-none focus:border-primary disabled:opacity-50 sm:h-10 sm:px-3"
           />
           <button
             type="button"
             onClick={startRecording}
             disabled={uploading}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-foreground disabled:opacity-50"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-foreground disabled:opacity-50 sm:h-10 sm:w-10"
             title="Grabar nota de voz"
           >
             <Mic size={18} />
@@ -158,7 +181,7 @@ export function MessageComposer({ conversationId }: { conversationId: string }) 
           <button
             type="submit"
             disabled={pending || uploading}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-white disabled:opacity-50"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-white disabled:opacity-50 sm:h-10 sm:w-10"
             title="Enviar"
           >
             <Send size={16} />
