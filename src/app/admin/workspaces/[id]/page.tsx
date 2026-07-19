@@ -70,11 +70,17 @@ export default async function AdminWorkspaceDetailPage({
     .maybeSingle();
 
   let ownerEmail: string | null = null;
+  let lastSignInAt: string | null = null;
   if (owner?.user_id) {
     const admin = createAdminClient();
     const { data } = await admin.auth.admin.getUserById(owner.user_id);
     ownerEmail = data.user?.email ?? null;
+    lastSignInAt = data.user?.last_sign_in_at ?? null;
   }
+
+  const daysSinceLastSignIn = lastSignInAt
+    ? Math.max(0, Math.floor((Date.now() - new Date(lastSignInAt).getTime()) / (1000 * 60 * 60 * 24)))
+    : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -111,13 +117,21 @@ export default async function AdminWorkspaceDetailPage({
         plans={plans ?? []}
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-5">
         <StatCard label="Contactos" value={contactsCount ?? 0} />
         <StatCard label="Conversaciones" value={conversationsCount ?? 0} />
         <StatCard label="Usuarios" value={membersCount ?? 0} />
         <StatCard
           label="WhatsApp"
           value={whatsappAccount ? whatsappAccount.display_phone_number ?? "Conectado" : "No conectado"}
+        />
+        <StatCard
+          label="Última conexión"
+          value={
+            lastSignInAt
+              ? `${new Date(lastSignInAt).toLocaleDateString("es-CO", { day: "2-digit", month: "short" })} · hace ${daysSinceLastSignIn} día(s)`
+              : "Nunca"
+          }
         />
       </div>
 

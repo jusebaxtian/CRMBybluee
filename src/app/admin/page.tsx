@@ -2,6 +2,13 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { WorkspaceRowActions } from "@/components/workspace-row-actions";
 
+function daysSince(dateStr: string): number {
+  return Math.max(
+    0,
+    Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24))
+  );
+}
+
 const statusColor: Record<string, string> = {
   trialing: "text-warning border-warning",
   active: "text-success border-success",
@@ -49,9 +56,11 @@ export default async function AdminOverviewPage({
       ]);
 
       let email = "—";
+      let lastSignInAt: string | null = null;
       if (owner?.user_id) {
         const { data } = await admin.auth.admin.getUserById(owner.user_id);
         email = data.user?.email ?? "—";
+        lastSignInAt = data.user?.last_sign_in_at ?? null;
       }
 
       const plan = w.plans as unknown as { name: string } | null;
@@ -67,6 +76,7 @@ export default async function AdminOverviewPage({
         renewalDate: subscription?.current_period_end ?? w.trial_ends_at ?? null,
         signupIp: w.signup_ip,
         sharedIp: w.signup_ip ? (ipCounts.get(w.signup_ip) ?? 0) > 1 : false,
+        lastSignInAt,
       };
     })
   );
@@ -112,6 +122,7 @@ export default async function AdminOverviewPage({
               <th className="px-5 py-3 font-medium">Plan</th>
               <th className="px-5 py-3 font-medium">Estado</th>
               <th className="px-5 py-3 font-medium">IP de registro</th>
+              <th className="px-5 py-3 font-medium">Última conexión</th>
               <th className="px-5 py-3 font-medium">Creado</th>
               <th className="px-5 py-3 font-medium">Renovación</th>
               <th className="px-5 py-3 font-medium"></th>
@@ -150,6 +161,25 @@ export default async function AdminOverviewPage({
                     </span>
                   )}
                 </td>
+                <td className="px-5 py-3">
+                  {r.lastSignInAt ? (
+                    <>
+                      <p className="text-muted">
+                        {new Date(r.lastSignInAt).toLocaleString("es-CO", {
+                          day: "2-digit",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                      <p className="text-xs text-muted">
+                        Hace {daysSince(r.lastSignInAt)} día(s)
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-muted">—</p>
+                  )}
+                </td>
                 <td className="px-5 py-3 text-muted">
                   {new Date(r.createdAt).toLocaleDateString("es-CO")}
                 </td>
@@ -167,7 +197,7 @@ export default async function AdminOverviewPage({
             ))}
             {filteredRows.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-5 py-6 text-center text-muted">
+                <td colSpan={8} className="px-5 py-6 text-center text-muted">
                   {query ? "Sin resultados para esa búsqueda." : "Sin clientes registrados."}
                 </td>
               </tr>
