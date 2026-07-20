@@ -14,9 +14,8 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
       <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-8 shadow-sm">
         <div className="mb-6 flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary font-bold text-white">
-            B
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="ByBluee" className="h-8 w-8 rounded-lg" />
           <span className="text-lg font-semibold text-foreground">ByBluee</span>
         </div>
         <h1 className="mb-6 text-2xl font-semibold text-foreground">

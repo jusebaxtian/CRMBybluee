@@ -10,12 +10,8 @@ export default async function Home() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-background p-16 text-center">
-      <div className="flex items-center gap-2">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-lg font-bold text-white">
-          B
-        </div>
-        <span className="text-2xl font-semibold text-foreground">ByBluee</span>
-      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/logo.png" alt="ByBluee" className="h-28 w-28 rounded-full" />
 
       <div>
         <h1 className="text-4xl font-semibold text-foreground">

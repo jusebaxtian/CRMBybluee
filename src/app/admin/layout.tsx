@@ -25,9 +25,8 @@ export default async function AdminLayout({
     <div className="flex min-h-screen bg-background">
       <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-surface">
         <div className="flex items-center gap-2 px-6 py-6">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary font-bold text-white">
-            B
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="ByBluee" className="h-8 w-8 rounded-lg" />
           <div>
             <p className="text-lg font-semibold text-foreground">ByBluee</p>
             <p className="text-xs text-muted">Panel admin</p>
