@@ -84,3 +84,58 @@ export async function updateContactNotes(contactId: string, notes: string) {
   revalidatePath("/dashboard/inbox");
   return { success: true };
 }
+
+export async function updateContact(contactId: string, name: string, phone: string) {
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+
+  const cleanPhone = phone.replace(/[^0-9]/g, "");
+  if (cleanPhone.length < 8) return { error: "Ingresa un número válido con código de país." };
+
+  const { error } = await supabase
+    .from("contacts")
+    .update({ name: name.trim() || null, wa_id: cleanPhone })
+    .eq("id", contactId)
+    .eq("workspace_id", workspaceId);
+
+  if (error) return { error: error.message };
+  revalidatePath("/dashboard/contacts");
+  return { success: true };
+}
+
+export async function bulkDeleteContacts(contactIds: string[]) {
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  if (contactIds.length === 0) return { error: "No hay contactos seleccionados." };
+
+  const { error } = await supabase
+    .from("contacts")
+    .delete()
+    .eq("workspace_id", workspaceId)
+    .in("id", contactIds);
+
+  if (error) return { error: error.message };
+  revalidatePath("/dashboard/contacts");
+  return { success: true };
+}
+
+export async function bulkAddTagToContacts(contactIds: string[], tagId: string) {
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  if (contactIds.length === 0) return { error: "No hay contactos seleccionados." };
+  if (!tagId) return { error: "Selecciona una etiqueta." };
+
+  const { error } = await supabase
+    .from("contact_tags")
+    .upsert(
+      contactIds.map((contactId) => ({ contact_id: contactId, tag_id: tagId })),
+      { onConflict: "contact_id,tag_id", ignoreDuplicates: true }
+    );
+
+  if (error) return { error: error.message };
+  revalidatePath("/dashboard/contacts");
+  return { success: true };
+}

@@ -1,9 +1,8 @@
 import { Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { ContactTagPicker } from "@/components/contact-tag-picker";
 import { ImportContactsButton } from "@/components/import-contacts-button";
 import { AddContactForm } from "@/components/add-contact-form";
-import { SendMessagePopover } from "@/components/send-message-popover";
+import { ContactsTable } from "@/components/contacts-table";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
 
@@ -47,51 +46,21 @@ export default async function ContactsPage() {
     );
   }
 
+  const rows = contacts.map((c) => ({
+    id: c.id,
+    name: c.name,
+    wa_id: c.wa_id,
+    created_at: c.created_at,
+    assignedTagIds: (c.contact_tags as unknown as { tag_id: string }[]).map((ct) => ct.tag_id),
+  }));
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
         <AddContactForm />
         <ImportContactsButton />
       </div>
-      <div className="overflow-visible rounded-xl border border-border bg-surface">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-border text-muted">
-              <th className="px-5 py-3 font-medium">Nombre</th>
-              <th className="px-5 py-3 font-medium">Número</th>
-              <th className="px-5 py-3 font-medium">Etiquetas</th>
-              <th className="px-5 py-3 font-medium">Contacto desde</th>
-              <th className="px-5 py-3 font-medium"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {contacts.map((c) => {
-              const assignedTagIds = (
-                c.contact_tags as unknown as { tag_id: string }[]
-              ).map((ct) => ct.tag_id);
-              return (
-                <tr key={c.id} className="border-b border-border last:border-b-0">
-                  <td className="px-5 py-3 text-foreground">{c.name ?? "—"}</td>
-                  <td className="px-5 py-3 text-foreground">{c.wa_id}</td>
-                  <td className="px-5 py-3">
-                    <ContactTagPicker
-                      contactId={c.id}
-                      allTags={allTags ?? []}
-                      assignedTagIds={assignedTagIds}
-                    />
-                  </td>
-                  <td className="px-5 py-3 text-muted">
-                    {new Date(c.created_at).toLocaleDateString("es-CO")}
-                  </td>
-                  <td className="px-5 py-3 text-right">
-                    <SendMessagePopover contactId={c.id} />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <ContactsTable contacts={rows} allTags={allTags ?? []} />
     </div>
   );
 }
