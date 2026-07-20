@@ -3,13 +3,62 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getWorkspaceId } from "@/lib/workspace";
 
 type ActionInput = {
-  action_type: "send_message" | "add_tag";
+  action_type:
+    | "send_message"
+    | "add_tag"
+    | "send_image"
+    | "send_video"
+    | "send_audio"
+    | "send_document"
+    | "send_template";
   message_body?: string;
   tag_id?: string;
+  media_url?: string;
+  media_filename?: string;
+  template_id?: string;
 };
+
+const mediaTypes = new Set(["send_image", "send_video", "send_audio", "send_document"]);
+
+function actionRow(a: ActionInput, automationId: string, index: number) {
+  return {
+    automation_id: automationId,
+    position: index,
+    action_type: a.action_type,
+    message_body: a.action_type === "send_message" ? a.message_body : null,
+    tag_id: a.action_type === "add_tag" ? a.tag_id : null,
+    media_url: mediaTypes.has(a.action_type) ? a.media_url : null,
+    media_filename: a.action_type === "send_document" ? a.media_filename : null,
+    template_id: a.action_type === "send_template" ? a.template_id : null,
+  };
+}
+
+export async function uploadAutomationActionMedia(formData: FormData) {
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+
+  const file = formData.get("file") as File | null;
+  if (!file || file.size === 0) return { error: "Selecciona un archivo." };
+
+  const admin = createAdminClient();
+  const path = `${workspaceId}/automations/${Date.now()}-${file.name}`;
+
+  const { error } = await admin.storage
+    .from("chat-media")
+    .upload(path, file, { contentType: file.type });
+  if (error) return { error: error.message };
+
+  const {
+    data: { publicUrl },
+  } = admin.storage.from("chat-media").getPublicUrl(path);
+
+  return { success: true as const, url: publicUrl, filename: file.name };
+}
 
 export async function createAutomation(_prevState: unknown, formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
@@ -33,6 +82,14 @@ export async function createAutomation(_prevState: unknown, formData: FormData) 
     return { error: "Acciones inválidas." };
   }
   if (actions.length === 0) return { error: "Agrega al menos una acción." };
+  for (const a of actions) {
+    if (mediaTypes.has(a.action_type) && !a.media_url) {
+      return { error: "Sube un archivo para cada acción de imagen/video/audio/documento." };
+    }
+    if (a.action_type === "send_template" && !a.template_id) {
+      return { error: "Selecciona una plantilla para cada acción de plantilla." };
+    }
+  }
 
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
@@ -52,15 +109,9 @@ export async function createAutomation(_prevState: unknown, formData: FormData) 
 
   if (error || !automation) return { error: error?.message ?? "No se pudo crear." };
 
-  await supabase.from("automation_actions").insert(
-    actions.map((a, index) => ({
-      automation_id: automation.id,
-      position: index,
-      action_type: a.action_type,
-      message_body: a.action_type === "send_message" ? a.message_body : null,
-      tag_id: a.action_type === "add_tag" ? a.tag_id : null,
-    }))
-  );
+  await supabase
+    .from("automation_actions")
+    .insert(actions.map((a, index) => actionRow(a, automation.id, index)));
 
   revalidatePath("/dashboard/automations");
   redirect("/dashboard/automations");
@@ -90,6 +141,14 @@ export async function updateAutomation(_prevState: unknown, formData: FormData) 
     return { error: "Acciones inválidas." };
   }
   if (actions.length === 0) return { error: "Agrega al menos una acción." };
+  for (const a of actions) {
+    if (mediaTypes.has(a.action_type) && !a.media_url) {
+      return { error: "Sube un archivo para cada acción de imagen/video/audio/documento." };
+    }
+    if (a.action_type === "send_template" && !a.template_id) {
+      return { error: "Selecciona una plantilla para cada acción de plantilla." };
+    }
+  }
 
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
@@ -109,15 +168,9 @@ export async function updateAutomation(_prevState: unknown, formData: FormData) 
   if (error) return { error: error.message };
 
   await supabase.from("automation_actions").delete().eq("automation_id", automationId);
-  await supabase.from("automation_actions").insert(
-    actions.map((a, index) => ({
-      automation_id: automationId,
-      position: index,
-      action_type: a.action_type,
-      message_body: a.action_type === "send_message" ? a.message_body : null,
-      tag_id: a.action_type === "add_tag" ? a.tag_id : null,
-    }))
-  );
+  await supabase
+    .from("automation_actions")
+    .insert(actions.map((a, index) => actionRow(a, automationId, index)));
 
   revalidatePath("/dashboard/automations");
   redirect("/dashboard/automations");

@@ -13,11 +13,17 @@ export default async function NewAutomationPage() {
     .eq("workspace_id", workspaceId ?? "")
     .order("name");
 
+  const { data: templates } = await supabase
+    .from("templates")
+    .select("id, meta_template_name, language, status")
+    .eq("workspace_id", workspaceId ?? "")
+    .order("meta_template_name");
+
   return (
     <div className="mx-auto max-w-lg">
       <div className="rounded-xl border border-border bg-surface p-6">
         <h1 className="mb-4 text-lg font-semibold text-foreground">Nueva automatización</h1>
-        <NewAutomationForm tags={tags ?? []} />
+        <NewAutomationForm tags={tags ?? []} templates={templates ?? []} />
       </div>
     </div>
   );

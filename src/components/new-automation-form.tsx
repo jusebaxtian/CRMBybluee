@@ -5,6 +5,7 @@ import { createAutomation, updateAutomation } from "@/app/actions/automations";
 import { AutomationActionsBuilder, type InitialAction } from "@/components/automation-actions-builder";
 
 type Tag = { id: string; name: string };
+type Template = { id: string; meta_template_name: string; language: string; status: string };
 
 type ExistingAutomation = {
   id: string;
@@ -17,9 +18,11 @@ type ExistingAutomation = {
 
 export function NewAutomationForm({
   tags,
+  templates = [],
   automation,
 }: {
   tags: Tag[];
+  templates?: Template[];
   automation?: ExistingAutomation;
 }) {
   const [state, action, pending] = useActionState(
@@ -89,7 +92,11 @@ export function NewAutomationForm({
 
       <div>
         <label className="mb-1 block text-sm font-medium text-muted">Qué hace</label>
-        <AutomationActionsBuilder tags={tags} initialActions={automation?.actions} />
+        <AutomationActionsBuilder
+          tags={tags}
+          templates={templates}
+          initialActions={automation?.actions}
+        />
       </div>
 
       {state && "error" in state && <p className="text-sm text-red-400">{state.error}</p>}
