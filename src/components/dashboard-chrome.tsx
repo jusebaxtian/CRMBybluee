@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
+import { InboundMessageSound } from "@/components/inbound-message-sound";
 
 type Notification = {
   id: string;
@@ -35,6 +36,7 @@ export function DashboardChrome({
 
   return (
     <div className="flex bg-background">
+      <InboundMessageSound />
       {mobileNavOpen && (
         <button
           type="button"
