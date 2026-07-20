@@ -5,11 +5,28 @@ import { Trash2, Plus } from "lucide-react";
 
 type Tag = { id: string; name: string };
 type ActionRow = { action_type: "send_message" | "add_tag"; message_body: string; tag_id: string };
+export type InitialAction = {
+  action_type: "send_message" | "add_tag";
+  message_body: string | null;
+  tag_id: string | null;
+};
 
-export function AutomationActionsBuilder({ tags }: { tags: Tag[] }) {
-  const [actions, setActions] = useState<ActionRow[]>([
-    { action_type: "send_message", message_body: "", tag_id: tags[0]?.id ?? "" },
-  ]);
+export function AutomationActionsBuilder({
+  tags,
+  initialActions,
+}: {
+  tags: Tag[];
+  initialActions?: InitialAction[];
+}) {
+  const [actions, setActions] = useState<ActionRow[]>(
+    initialActions && initialActions.length > 0
+      ? initialActions.map((a) => ({
+          action_type: a.action_type,
+          message_body: a.message_body ?? "",
+          tag_id: a.tag_id ?? tags[0]?.id ?? "",
+        }))
+      : [{ action_type: "send_message", message_body: "", tag_id: tags[0]?.id ?? "" }]
+  );
 
   function updateAction(index: number, patch: Partial<ActionRow>) {
     setActions((prev) => prev.map((a, i) => (i === index ? { ...a, ...patch } : a)));

@@ -1,17 +1,39 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { createAutomation } from "@/app/actions/automations";
-import { AutomationActionsBuilder } from "@/components/automation-actions-builder";
+import { createAutomation, updateAutomation } from "@/app/actions/automations";
+import { AutomationActionsBuilder, type InitialAction } from "@/components/automation-actions-builder";
 
 type Tag = { id: string; name: string };
 
-export function NewAutomationForm({ tags }: { tags: Tag[] }) {
-  const [state, action, pending] = useActionState(createAutomation, undefined);
-  const [triggerType, setTriggerType] = useState<"tag_added" | "keyword">("tag_added");
+type ExistingAutomation = {
+  id: string;
+  name: string;
+  trigger_type: "tag_added" | "keyword";
+  trigger_tag_id: string | null;
+  trigger_keyword: string | null;
+  actions: InitialAction[];
+};
+
+export function NewAutomationForm({
+  tags,
+  automation,
+}: {
+  tags: Tag[];
+  automation?: ExistingAutomation;
+}) {
+  const [state, action, pending] = useActionState(
+    automation ? updateAutomation : createAutomation,
+    undefined
+  );
+  const [triggerType, setTriggerType] = useState<"tag_added" | "keyword">(
+    automation?.trigger_type ?? "tag_added"
+  );
 
   return (
     <form action={action} className="flex flex-col gap-5">
+      {automation && <input type="hidden" name="automationId" value={automation.id} />}
+
       <div>
         <label htmlFor="name" className="mb-1 block text-sm font-medium text-muted">
           Nombre
@@ -21,6 +43,7 @@ export function NewAutomationForm({ tags }: { tags: Tag[] }) {
           name="name"
           type="text"
           required
+          defaultValue={automation?.name}
           placeholder="Bienvenida a nuevos clientes"
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
         />
@@ -42,6 +65,7 @@ export function NewAutomationForm({ tags }: { tags: Tag[] }) {
           <select
             name="triggerTagId"
             required
+            defaultValue={automation?.trigger_tag_id ?? ""}
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
           >
             {tags.length === 0 && <option value="">No tienes etiquetas creadas</option>}
@@ -56,6 +80,7 @@ export function NewAutomationForm({ tags }: { tags: Tag[] }) {
             name="triggerKeyword"
             type="text"
             required
+            defaultValue={automation?.trigger_keyword ?? ""}
             placeholder="ej: precio, horario, información"
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
           />
@@ -64,7 +89,7 @@ export function NewAutomationForm({ tags }: { tags: Tag[] }) {
 
       <div>
         <label className="mb-1 block text-sm font-medium text-muted">Qué hace</label>
-        <AutomationActionsBuilder tags={tags} />
+        <AutomationActionsBuilder tags={tags} initialActions={automation?.actions} />
       </div>
 
       {state && "error" in state && <p className="text-sm text-red-400">{state.error}</p>}
@@ -74,7 +99,7 @@ export function NewAutomationForm({ tags }: { tags: Tag[] }) {
         disabled={pending}
         className="self-start rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
       >
-        {pending ? "Creando..." : "Crear automatización"}
+        {pending ? "Guardando..." : automation ? "Guardar cambios" : "Crear automatización"}
       </button>
     </form>
   );

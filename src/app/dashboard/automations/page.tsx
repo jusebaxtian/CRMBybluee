@@ -58,7 +58,11 @@ export default async function AutomationsPage() {
                       : `Se activa con la palabra clave "${a.trigger_keyword}"`}
                   </p>
                 </div>
-                <AutomationRowActions automationId={a.id} isActive={a.is_active} />
+                <AutomationRowActions
+                  automationId={a.id}
+                  automationName={a.name}
+                  isActive={a.is_active}
+                />
               </div>
             );
           })}
