@@ -18,6 +18,8 @@ export function DashboardChrome({
   isPlatformAdmin,
   enabledModules,
   unreadMessagesCount,
+  supportWhatsappNumber,
+  supportWhatsappMessage,
   userEmail,
   notifications,
   banner,
@@ -27,6 +29,8 @@ export function DashboardChrome({
   isPlatformAdmin: boolean;
   enabledModules: string[];
   unreadMessagesCount: number;
+  supportWhatsappNumber?: string | null;
+  supportWhatsappMessage?: string | null;
   userEmail: string;
   notifications: Notification[];
   banner: React.ReactNode;
@@ -56,6 +60,8 @@ export function DashboardChrome({
           isPlatformAdmin={isPlatformAdmin}
           enabledModules={enabledModules}
           unreadMessagesCount={unreadMessagesCount}
+          supportWhatsappNumber={supportWhatsappNumber}
+          supportWhatsappMessage={supportWhatsappMessage}
           onNavigate={() => setMobileNavOpen(false)}
         />
       </div>

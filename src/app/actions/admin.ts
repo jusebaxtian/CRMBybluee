@@ -186,6 +186,34 @@ export async function updateDashboardBanner(formData: FormData) {
   return { success: true };
 }
 
+export async function updateSupportWhatsapp(_prevState: unknown, formData: FormData) {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
+
+  const number = String(formData.get("number") ?? "").trim().replace(/[^\d]/g, "");
+  const message = String(formData.get("message") ?? "").trim();
+
+  if (!number) return { error: "Ingresa el número de WhatsApp (con indicativo, sin +)." };
+  if (!message) return { error: "Escribe el mensaje predeterminado." };
+
+  const admin = createAdminClient();
+  const now = new Date().toISOString();
+
+  const { error } = await admin.from("platform_settings").upsert(
+    [
+      { key: "support_whatsapp_number", value: number, updated_at: now },
+      { key: "support_whatsapp_message", value: message, updated_at: now },
+    ],
+    { onConflict: "key" }
+  );
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/support");
+  revalidatePath("/dashboard", "layout");
+  return { success: true };
+}
+
 export async function updateWorkspaceStatus(workspaceId: string, status: string) {
   const supabase = await createClient();
   if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };

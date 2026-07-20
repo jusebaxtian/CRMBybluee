@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   CreditCard,
   Lock,
+  LifeBuoy,
 } from "lucide-react";
 
 // `built: false` items don't exist yet regardless of plan.
@@ -42,14 +43,21 @@ export function Sidebar({
   isPlatformAdmin = false,
   enabledModules = [],
   unreadMessagesCount = 0,
+  supportWhatsappNumber,
+  supportWhatsappMessage,
   onNavigate,
 }: {
   workspaceName: string;
   isPlatformAdmin?: boolean;
   enabledModules?: string[];
   unreadMessagesCount?: number;
+  supportWhatsappNumber?: string | null;
+  supportWhatsappMessage?: string | null;
   onNavigate?: () => void;
 }) {
+  const supportHref = supportWhatsappNumber
+    ? `https://wa.me/${supportWhatsappNumber}?text=${encodeURIComponent(supportWhatsappMessage ?? "")}`
+    : null;
   const pathname = usePathname();
 
   return (
@@ -130,6 +138,18 @@ export function Sidebar({
             <p className="text-xs text-muted">Administrador</p>
           </div>
         </div>
+
+        {supportHref && (
+          <a
+            href={supportHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-muted hover:bg-surface-hover hover:text-foreground"
+          >
+            <LifeBuoy size={16} />
+            Ayuda / Soporte
+          </a>
+        )}
       </div>
     </aside>
   );

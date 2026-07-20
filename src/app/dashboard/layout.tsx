@@ -106,12 +106,23 @@ export default async function DashboardLayout({
     return !lastRead || new Date(m.created_at) > new Date(lastRead);
   }).length;
 
+  const { data: supportSettings } = await supabase
+    .from("platform_settings")
+    .select("key, value")
+    .in("key", ["support_whatsapp_number", "support_whatsapp_message"]);
+  const supportWhatsappNumber =
+    supportSettings?.find((s) => s.key === "support_whatsapp_number")?.value ?? null;
+  const supportWhatsappMessage =
+    supportSettings?.find((s) => s.key === "support_whatsapp_message")?.value ?? null;
+
   return (
     <DashboardChrome
       workspaceName={workspaceName}
       isPlatformAdmin={isAdmin}
       enabledModules={enabledModules}
       unreadMessagesCount={unreadMessagesCount}
+      supportWhatsappNumber={supportWhatsappNumber}
+      supportWhatsappMessage={supportWhatsappMessage}
       userEmail={user.email ?? ""}
       notifications={notificationsWithRead}
       banner={

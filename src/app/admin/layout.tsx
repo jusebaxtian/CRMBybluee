@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { LayoutDashboard, Bell, CreditCard, Package, ArrowLeftRight, Image as ImageIcon } from "lucide-react";
+import { LayoutDashboard, Bell, CreditCard, Package, ArrowLeftRight, Image as ImageIcon, LifeBuoy } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { isPlatformAdmin } from "@/lib/admin";
 import { logout } from "@/app/actions/auth";
@@ -67,6 +67,13 @@ export default async function AdminLayout({
           >
             <ImageIcon size={18} />
             Banner
+          </Link>
+          <Link
+            href="/admin/support"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted hover:bg-surface-hover hover:text-foreground"
+          >
+            <LifeBuoy size={18} />
+            Ayuda / Soporte
           </Link>
         </nav>
         <div className="px-3 pb-2">
