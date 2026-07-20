@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { createTag } from "@/app/actions/tags";
 
-const COLORS = ["#7c5cff", "#22c55e", "#eab308", "#ef4444", "#3b82f6", "#ec4899"];
+const COLORS = ["#1ba84a", "#7c5cff", "#22c55e", "#eab308", "#ef4444", "#3b82f6", "#ec4899"];
 
 export function CreateTagForm() {
   const [state, action, pending] = useActionState(createTag, undefined);

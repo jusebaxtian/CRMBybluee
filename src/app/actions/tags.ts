@@ -7,7 +7,7 @@ import { runTagAddedAutomations } from "@/lib/automations/engine";
 
 export async function createTag(_prevState: unknown, formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
-  const color = String(formData.get("color") ?? "#7c5cff");
+  const color = String(formData.get("color") ?? "#1ba84a");
   if (!name) return { error: "El nombre es obligatorio." };
 
   const supabase = await createClient();
