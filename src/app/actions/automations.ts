@@ -20,20 +20,24 @@ type ActionInput = {
   media_url?: string;
   media_filename?: string;
   template_id?: string;
+  delay_seconds?: number;
 };
 
 const mediaTypes = new Set(["send_image", "send_video", "send_audio", "send_document"]);
+// Audio messages don't support a caption in the Cloud API, but image/video/document do.
+const captionableTypes = new Set(["send_message", "send_image", "send_video", "send_document"]);
 
 function actionRow(a: ActionInput, automationId: string, index: number) {
   return {
     automation_id: automationId,
     position: index,
     action_type: a.action_type,
-    message_body: a.action_type === "send_message" ? a.message_body : null,
+    message_body: captionableTypes.has(a.action_type) ? a.message_body || null : null,
     tag_id: a.action_type === "add_tag" ? a.tag_id : null,
     media_url: mediaTypes.has(a.action_type) ? a.media_url : null,
     media_filename: a.action_type === "send_document" ? a.media_filename : null,
     template_id: a.action_type === "send_template" ? a.template_id : null,
+    delay_seconds: Math.max(0, Math.min(86400, Math.floor(a.delay_seconds ?? 0))),
   };
 }
 

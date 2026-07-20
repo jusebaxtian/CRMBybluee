@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2, Plus, Info } from "lucide-react";
+import { Trash2, Plus, Info, ChevronUp, ChevronDown, Clock } from "lucide-react";
 import { uploadAutomationActionMedia } from "@/app/actions/automations";
 
 type Tag = { id: string; name: string };
@@ -23,6 +23,8 @@ type ActionRow = {
   media_url: string;
   media_filename: string;
   template_id: string;
+  delay_value: number;
+  delay_unit: "seconds" | "minutes";
 };
 
 export type InitialAction = {
@@ -32,6 +34,7 @@ export type InitialAction = {
   media_url?: string | null;
   media_filename?: string | null;
   template_id?: string | null;
+  delay_seconds?: number | null;
 };
 
 const mediaLabel: Record<string, string> = {
@@ -48,6 +51,9 @@ const mediaAccept: Record<string, string> = {
   send_document: "application/pdf,.doc,.docx,.xls,.xlsx",
 };
 
+// Audio messages don't support a caption in the Cloud API.
+const captionableTypes = new Set(["send_message", "send_image", "send_video", "send_document"]);
+
 function emptyRow(defaultTagId: string): ActionRow {
   return {
     action_type: "send_message",
@@ -56,7 +62,15 @@ function emptyRow(defaultTagId: string): ActionRow {
     media_url: "",
     media_filename: "",
     template_id: "",
+    delay_value: 0,
+    delay_unit: "seconds",
   };
+}
+
+function toDelayValueUnit(seconds: number | null | undefined): { value: number; unit: "seconds" | "minutes" } {
+  const s = seconds ?? 0;
+  if (s > 0 && s % 60 === 0) return { value: s / 60, unit: "minutes" };
+  return { value: s, unit: "seconds" };
 }
 
 export function AutomationActionsBuilder({
@@ -70,14 +84,19 @@ export function AutomationActionsBuilder({
 }) {
   const [actions, setActions] = useState<ActionRow[]>(
     initialActions && initialActions.length > 0
-      ? initialActions.map((a) => ({
-          action_type: a.action_type,
-          message_body: a.message_body ?? "",
-          tag_id: a.tag_id ?? tags[0]?.id ?? "",
-          media_url: a.media_url ?? "",
-          media_filename: a.media_filename ?? "",
-          template_id: a.template_id ?? templates[0]?.id ?? "",
-        }))
+      ? initialActions.map((a) => {
+          const { value, unit } = toDelayValueUnit(a.delay_seconds);
+          return {
+            action_type: a.action_type,
+            message_body: a.message_body ?? "",
+            tag_id: a.tag_id ?? tags[0]?.id ?? "",
+            media_url: a.media_url ?? "",
+            media_filename: a.media_filename ?? "",
+            template_id: a.template_id ?? templates[0]?.id ?? "",
+            delay_value: value,
+            delay_unit: unit,
+          };
+        })
       : [emptyRow(tags[0]?.id ?? "")]
   );
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
@@ -97,6 +116,16 @@ export function AutomationActionsBuilder({
     setActions((prev) => prev.filter((_, i) => i !== index));
   }
 
+  function moveAction(index: number, direction: -1 | 1) {
+    setActions((prev) => {
+      const target = index + direction;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
   async function handleFile(index: number, file: File) {
     setUploadingIndex(index);
     setUploadError(null);
@@ -113,11 +142,12 @@ export function AutomationActionsBuilder({
 
   const serialized = actions.map((a) => ({
     action_type: a.action_type,
-    message_body: a.action_type === "send_message" ? a.message_body : undefined,
+    message_body: captionableTypes.has(a.action_type) ? a.message_body || undefined : undefined,
     tag_id: a.action_type === "add_tag" ? a.tag_id : undefined,
     media_url: mediaLabel[a.action_type] ? a.media_url : undefined,
     media_filename: a.action_type === "send_document" ? a.media_filename : undefined,
     template_id: a.action_type === "send_template" ? a.template_id : undefined,
+    delay_seconds: a.delay_value > 0 ? a.delay_value * (a.delay_unit === "minutes" ? 60 : 1) : 0,
   }));
 
   return (
@@ -126,13 +156,14 @@ export function AutomationActionsBuilder({
 
       {actions.map((action, index) => (
         <div key={index} className="rounded-lg border border-border p-3">
-          <div className="mb-2 flex items-center justify-between">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-medium text-primary">
+              {index + 1}
+            </span>
             <select
               value={action.action_type}
-              onChange={(e) =>
-                updateAction(index, { action_type: e.target.value as ActionType })
-              }
-              className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-primary"
+              onChange={(e) => updateAction(index, { action_type: e.target.value as ActionType })}
+              className="flex-1 rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-primary"
             >
               <option value="send_message">Enviar mensaje de texto</option>
               <option value="send_image">Enviar imagen</option>
@@ -142,11 +173,32 @@ export function AutomationActionsBuilder({
               <option value="send_template">Enviar plantilla aprobada</option>
               <option value="add_tag">Agregar etiqueta</option>
             </select>
+            <div className="flex shrink-0 items-center gap-0.5">
+              <button
+                type="button"
+                onClick={() => moveAction(index, -1)}
+                disabled={index === 0}
+                className="text-muted hover:text-foreground disabled:opacity-30"
+                title="Mover arriba"
+              >
+                <ChevronUp size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => moveAction(index, 1)}
+                disabled={index === actions.length - 1}
+                className="text-muted hover:text-foreground disabled:opacity-30"
+                title="Mover abajo"
+              >
+                <ChevronDown size={16} />
+              </button>
+            </div>
             {actions.length > 1 && (
               <button
                 type="button"
                 onClick={() => removeAction(index)}
-                className="text-muted hover:text-red-400"
+                className="shrink-0 text-muted hover:text-red-400"
+                title="Eliminar acción"
               >
                 <Trash2 size={14} />
               </button>
@@ -197,6 +249,15 @@ export function AutomationActionsBuilder({
                   ✓ {action.media_filename || "Archivo listo"}
                 </p>
               )}
+              {captionableTypes.has(action.action_type) && (
+                <textarea
+                  value={action.message_body}
+                  onChange={(e) => updateAction(index, { message_body: e.target.value })}
+                  rows={2}
+                  placeholder="Texto que acompaña la imagen/video/documento (opcional)"
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+                />
+              )}
             </div>
           )}
 
@@ -224,6 +285,29 @@ export function AutomationActionsBuilder({
               </p>
             </div>
           )}
+
+          <div className="mt-2 flex items-center gap-2 border-t border-border pt-2">
+            <Clock size={13} className="shrink-0 text-muted" />
+            <span className="text-xs text-muted">Esperar</span>
+            <input
+              type="number"
+              min={0}
+              value={action.delay_value}
+              onChange={(e) =>
+                updateAction(index, { delay_value: Math.max(0, Number(e.target.value) || 0) })
+              }
+              className="w-16 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:border-primary"
+            />
+            <select
+              value={action.delay_unit}
+              onChange={(e) => updateAction(index, { delay_unit: e.target.value as "seconds" | "minutes" })}
+              className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:border-primary"
+            >
+              <option value="seconds">segundos</option>
+              <option value="minutes">minutos</option>
+            </select>
+            <span className="text-xs text-muted">antes de esta acción</span>
+          </div>
         </div>
       ))}
 

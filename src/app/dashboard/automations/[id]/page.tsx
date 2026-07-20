@@ -25,7 +25,7 @@ export default async function EditAutomationPage({
 
   const { data: actions } = await supabase
     .from("automation_actions")
-    .select("action_type, message_body, tag_id, media_url, media_filename, template_id")
+    .select("action_type, message_body, tag_id, media_url, media_filename, template_id, delay_seconds")
     .eq("automation_id", id)
     .order("position", { ascending: true });
 

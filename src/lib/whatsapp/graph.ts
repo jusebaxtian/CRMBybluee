@@ -139,10 +139,13 @@ export async function sendMediaMessage(
   to: string,
   type: "image" | "audio" | "video" | "document",
   link: string,
-  filename?: string
+  filename?: string,
+  caption?: string
 ): Promise<{ messages: { id: string }[] }> {
   const mediaObject: Record<string, unknown> = { link };
   if (type === "document" && filename) mediaObject.filename = filename;
+  // Audio messages don't support captions in the Cloud API.
+  if (type !== "audio" && caption) mediaObject.caption = caption;
 
   return graphFetch(`/${phoneNumberId}/messages`, {
     method: "POST",
