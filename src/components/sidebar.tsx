@@ -21,13 +21,17 @@ import {
   LifeBuoy,
   ChevronDown,
 } from "lucide-react";
+import { WhatsAppIcon } from "@/components/whatsapp-icon";
 
 type NavLeaf = {
   href: string;
   label: string;
-  icon: typeof LayoutDashboard;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
   built: boolean;
   moduleKey: string | null;
+  // Set on leaves whose href is a strict prefix of a sibling's href (e.g. a
+  // group's default landing page), so it isn't shown as active on siblings.
+  exact?: boolean;
 };
 
 // `built: false` items don't exist yet regardless of plan.
@@ -54,7 +58,17 @@ const navItems: (NavLeaf & { children?: NavLeaf[] })[] = [
   { href: "/dashboard/quick-replies", label: "Respuestas rápidas", icon: Reply, built: false, moduleKey: null },
   { href: "/dashboard/reports", label: "Reportes", icon: BarChart3, built: false, moduleKey: null },
   { href: "/dashboard/integrations", label: "Integraciones", icon: Plug, built: false, moduleKey: null },
-  { href: "/dashboard/settings", label: "Configuración", icon: Settings, built: true, moduleKey: "settings" },
+  {
+    href: "/dashboard/settings",
+    label: "Configuración",
+    icon: Settings,
+    built: true,
+    moduleKey: "settings",
+    children: [
+      { href: "/dashboard/settings", label: "Agentes de respuesta", icon: Users, built: true, moduleKey: "settings", exact: true },
+      { href: "/dashboard/settings/whatsapp", label: "WhatsApp API", icon: WhatsAppIcon, built: true, moduleKey: "settings" },
+    ],
+  },
 ];
 
 export function Sidebar({
@@ -101,12 +115,13 @@ export function Sidebar({
   }
 
   function renderRow(
-    { href, label, icon: Icon, built, moduleKey }: NavLeaf,
+    { href, label, icon: Icon, built, moduleKey, exact }: NavLeaf,
     { indent = false }: { indent?: boolean } = {}
   ) {
     const locked = built && moduleKey !== null && !enabledModules.includes(moduleKey);
     const ready = built && !locked;
-    const active = ready && (href === "/dashboard" ? pathname === href : pathname.startsWith(href));
+    const active =
+      ready && (href === "/dashboard" || exact ? pathname === href : pathname.startsWith(href));
     const content = (
       <span
         className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${
