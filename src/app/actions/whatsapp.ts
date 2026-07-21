@@ -69,7 +69,7 @@ export async function connectWhatsApp(input: {
   }
 }
 
-export async function disconnectWhatsApp() {
+export async function disconnectWhatsApp(password: string) {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
   if (!workspaceId) return { error: "No se encontró tu workspace." };
@@ -78,6 +78,19 @@ export async function disconnectWhatsApp() {
   if (role !== "owner" && role !== "admin") {
     return { error: "No tienes permiso para desconectar WhatsApp." };
   }
+
+  if (!password) return { error: "Ingresa tu contraseña para confirmar." };
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user?.email) return { error: "No se pudo verificar tu sesión." };
+
+  const { error: authError } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password,
+  });
+  if (authError) return { error: "Contraseña incorrecta." };
 
   const { error } = await supabase
     .from("whatsapp_accounts")
