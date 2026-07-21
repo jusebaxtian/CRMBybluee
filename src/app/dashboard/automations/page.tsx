@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AutomationRowActions } from "@/components/automation-row-actions";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
+import { CampaignsTabs } from "@/components/campaigns-tabs";
 
 export default async function AutomationsPage() {
   const supabase = await createClient();
@@ -18,6 +19,8 @@ export default async function AutomationsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <CampaignsTabs />
+
       <div className="flex justify-end">
         <Link
           href="/dashboard/automations/new"

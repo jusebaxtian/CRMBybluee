@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CreateTagForm } from "@/components/create-tag-form";
 import { DeleteTagButton } from "@/components/delete-tag-button";
 import { getWorkspaceId } from "@/lib/workspace";
+import { CampaignsTabs } from "@/components/campaigns-tabs";
 
 export default async function TagsPage() {
   const supabase = await createClient();
@@ -16,6 +17,8 @@ export default async function TagsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <CampaignsTabs />
+
       <div className="rounded-xl border border-border bg-surface p-5">
         <CreateTagForm />
       </div>

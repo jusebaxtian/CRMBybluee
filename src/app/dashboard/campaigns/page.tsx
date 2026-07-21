@@ -3,6 +3,7 @@ import { Megaphone, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
+import { CampaignsTabs } from "@/components/campaigns-tabs";
 
 const statusLabel: Record<string, string> = {
   draft: "Borrador",
@@ -24,6 +25,8 @@ export default async function CampaignsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <CampaignsTabs />
+
       <div className="flex justify-end">
         <Link
           href="/dashboard/campaigns/new"

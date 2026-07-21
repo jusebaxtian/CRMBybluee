@@ -4,6 +4,7 @@ import { SyncTemplatesButton } from "@/components/sync-templates-button";
 import { CreateTemplateForm } from "@/components/create-template-form";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
+import { CampaignsTabs } from "@/components/campaigns-tabs";
 
 const statusColor: Record<string, string> = {
   APPROVED: "text-success border-success",
@@ -24,6 +25,8 @@ export default async function TemplatesPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <CampaignsTabs />
+
       <div className="rounded-xl border border-border bg-surface p-6">
         <h2 className="mb-4 text-sm font-semibold text-foreground">Crear nueva plantilla</h2>
         <CreateTemplateForm />

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -8,9 +7,6 @@ import {
   MessageSquare,
   Users,
   Megaphone,
-  FileText,
-  Zap,
-  Tag,
   Reply,
   BarChart3,
   Plug,
@@ -19,37 +15,16 @@ import {
   CreditCard,
   Lock,
   LifeBuoy,
-  ChevronDown,
 } from "lucide-react";
-
-type NavLeaf = {
-  href: string;
-  label: string;
-  icon: typeof LayoutDashboard;
-  built: boolean;
-  moduleKey: string | null;
-};
 
 // `built: false` items don't exist yet regardless of plan.
 // `moduleKey` items are gated by the workspace's plan (plan_modules);
 // omitting moduleKey means always available once built.
-// Items with `children` render as a collapsible group in the sidebar.
-const navItems: (NavLeaf & { children?: NavLeaf[] })[] = [
+const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, built: true, moduleKey: null },
   { href: "/dashboard/inbox", label: "Conversaciones", icon: MessageSquare, built: true, moduleKey: "inbox" },
   { href: "/dashboard/contacts", label: "Contactos", icon: Users, built: true, moduleKey: "contacts" },
-  {
-    href: "/dashboard/campaigns",
-    label: "Campañas",
-    icon: Megaphone,
-    built: true,
-    moduleKey: "campaigns",
-    children: [
-      { href: "/dashboard/templates", label: "Plantillas", icon: FileText, built: true, moduleKey: "campaigns" },
-      { href: "/dashboard/automations", label: "Automatizaciones", icon: Zap, built: true, moduleKey: "automations" },
-      { href: "/dashboard/tags", label: "Etiquetas", icon: Tag, built: true, moduleKey: null },
-    ],
-  },
+  { href: "/dashboard/campaigns", label: "Campañas", icon: Megaphone, built: true, moduleKey: "campaigns" },
   { href: "/dashboard/billing", label: "Facturación", icon: CreditCard, built: true, moduleKey: null },
   { href: "/dashboard/quick-replies", label: "Respuestas rápidas", icon: Reply, built: false, moduleKey: null },
   { href: "/dashboard/reports", label: "Reportes", icon: BarChart3, built: false, moduleKey: null },
@@ -81,73 +56,6 @@ export function Sidebar({
     : null;
   const pathname = usePathname();
 
-  const [expanded, setExpanded] = useState<Set<string>>(() => {
-    const initial = new Set<string>();
-    for (const item of navItems) {
-      if (item.children?.some((c) => pathname.startsWith(c.href))) {
-        initial.add(item.href);
-      }
-    }
-    return initial;
-  });
-
-  function toggleExpanded(href: string) {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(href)) next.delete(href);
-      else next.add(href);
-      return next;
-    });
-  }
-
-  function renderRow(
-    { href, label, icon: Icon, built, moduleKey }: NavLeaf,
-    { indent = false }: { indent?: boolean } = {}
-  ) {
-    const locked = built && moduleKey !== null && !enabledModules.includes(moduleKey);
-    const ready = built && !locked;
-    const active = ready && (href === "/dashboard" ? pathname === href : pathname.startsWith(href));
-    const content = (
-      <span
-        className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${
-          indent ? "py-1.5 pl-9 text-[13px]" : ""
-        } ${
-          active
-            ? "bg-primary text-white"
-            : ready
-              ? "text-muted hover:bg-surface-hover hover:text-foreground"
-              : "text-muted/50 cursor-default"
-        }`}
-      >
-        <span className="flex items-center gap-3">
-          <Icon size={indent ? 15 : 18} />
-          {label}
-        </span>
-        {href === "/dashboard/inbox" && ready && unreadMessagesCount > 0 && (
-          <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-success px-1 text-[10px] font-medium text-white">
-            {unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}
-          </span>
-        )}
-        {!built && (
-          <span className="rounded-full bg-surface-hover px-2 py-0.5 text-[10px] text-muted">
-            Pronto
-          </span>
-        )}
-        {locked && <Lock size={12} className="text-muted" />}
-      </span>
-    );
-
-    return ready ? (
-      <Link key={href} href={href} className="block" onClick={onNavigate}>
-        {content}
-      </Link>
-    ) : (
-      <div key={href} title={locked ? "No incluido en tu plan actual" : undefined}>
-        {content}
-      </div>
-    );
-  }
-
   return (
     <aside className="flex h-screen w-64 shrink-0 flex-col overflow-y-auto border-r border-border bg-surface">
       <div className="flex items-center gap-2 px-6 py-6">
@@ -159,64 +67,50 @@ export function Sidebar({
       <nav className="flex-1 overflow-y-auto px-3">
         {navItems
           .filter((item) => workspaceRole !== "agent" || item.href === "/dashboard/inbox")
-          .map((item) => {
-            if (!item.children) return renderRow(item);
+          .map(({ href, label, icon: Icon, built, moduleKey }) => {
+          const locked = built && moduleKey !== null && !enabledModules.includes(moduleKey);
+          const ready = built && !locked;
+          const active =
+            ready &&
+            (href === "/dashboard" ? pathname === href : pathname.startsWith(href));
+          const content = (
+            <span
+              className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors ${
+                active
+                  ? "bg-primary text-white"
+                  : ready
+                    ? "text-muted hover:bg-surface-hover hover:text-foreground"
+                    : "text-muted/50 cursor-default"
+              }`}
+            >
+              <span className="flex items-center gap-3">
+                <Icon size={18} />
+                {label}
+              </span>
+              {href === "/dashboard/inbox" && ready && unreadMessagesCount > 0 && (
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-success px-1 text-[10px] font-medium text-white">
+                  {unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}
+                </span>
+              )}
+              {!built && (
+                <span className="rounded-full bg-surface-hover px-2 py-0.5 text-[10px] text-muted">
+                  Pronto
+                </span>
+              )}
+              {locked && <Lock size={12} className="text-muted" />}
+            </span>
+          );
 
-            const isOpen = expanded.has(item.href);
-            const locked = item.built && item.moduleKey !== null && !enabledModules.includes(item.moduleKey);
-            const ready = item.built && !locked;
-            const active = ready && pathname.startsWith(item.href);
-            const Icon = item.icon;
-
-            return (
-              <div key={item.href}>
-                <div
-                  className={`flex items-center justify-between rounded-lg pr-1.5 text-sm transition-colors ${
-                    active
-                      ? "bg-primary text-white"
-                      : ready
-                        ? "text-muted hover:bg-surface-hover hover:text-foreground"
-                        : "text-muted/50 cursor-default"
-                  }`}
-                >
-                  {ready ? (
-                    <Link
-                      href={item.href}
-                      className="flex flex-1 items-center gap-3 px-3 py-2"
-                      onClick={onNavigate}
-                    >
-                      <Icon size={18} />
-                      {item.label}
-                    </Link>
-                  ) : (
-                    <span className="flex flex-1 items-center gap-3 px-3 py-2">
-                      <Icon size={18} />
-                      {item.label}
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => toggleExpanded(item.href)}
-                    aria-label={isOpen ? "Colapsar" : "Expandir"}
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
-                      active ? "hover:bg-white/15" : "hover:bg-surface-hover"
-                    }`}
-                  >
-                    <ChevronDown
-                      size={14}
-                      className={`transition-transform ${isOpen ? "rotate-180" : ""}`}
-                    />
-                  </button>
-                </div>
-
-                {isOpen && (
-                  <div className="mt-0.5 flex flex-col gap-0.5">
-                    {item.children.map((child) => renderRow(child, { indent: true }))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          return ready ? (
+            <Link key={href} href={href} className="block" onClick={onNavigate}>
+              {content}
+            </Link>
+          ) : (
+            <div key={href} title={locked ? "No incluido en tu plan actual" : undefined}>
+              {content}
+            </div>
+          );
+        })}
       </nav>
 
       {isPlatformAdmin && (
