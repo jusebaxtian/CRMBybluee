@@ -72,7 +72,7 @@ export function Sidebar({
 
       <nav className="flex-1 overflow-y-auto px-3">
         {navItems
-          .filter((item) => item.href !== "/dashboard/settings" || workspaceRole !== "agent")
+          .filter((item) => workspaceRole !== "agent" || item.href === "/dashboard/inbox")
           .map(({ href, label, icon: Icon, built, moduleKey }) => {
           const locked = built && moduleKey !== null && !enabledModules.includes(moduleKey);
           const ready = built && !locked;
