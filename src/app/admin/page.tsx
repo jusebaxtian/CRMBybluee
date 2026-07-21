@@ -1,3 +1,4 @@
+import { Users, CreditCard, Clock, AlertTriangle, Plug, Send } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { WorkspaceRowActions } from "@/components/workspace-row-actions";
@@ -86,11 +87,42 @@ export default async function AdminOverviewPage({
     ? rows.filter((r) => r.email.toLowerCase().includes(query))
     : rows;
 
+  const totalClients = rows.length;
+  const activePaidClients = rows.filter((r) => r.status === "active").length;
+  const trialingClients = rows.filter((r) => r.status === "trialing").length;
+  const unpaidClients = rows.filter((r) => r.status === "past_due").length;
+
+  const [{ count: connectedWhatsappCount }, { count: sentMessagesCount }] = await Promise.all([
+    supabase.from("whatsapp_accounts").select("id", { count: "exact", head: true }),
+    supabase.from("messages").select("id", { count: "exact", head: true }).eq("direction", "out"),
+  ]);
+
+  const kpis = [
+    { label: "Total clientes", value: totalClients, icon: Users, color: "text-blue-400 bg-blue-400/15" },
+    { label: "Clientes activos con pago", value: activePaidClients, icon: CreditCard, color: "text-success bg-success/15" },
+    { label: "Clientes en periodo de prueba", value: trialingClients, icon: Clock, color: "text-warning bg-warning/15" },
+    { label: "Clientes sin pago", value: unpaidClients, icon: AlertTriangle, color: "text-red-400 bg-red-400/15" },
+    { label: "APIs de WhatsApp conectadas", value: connectedWhatsappCount ?? 0, icon: Plug, color: "text-purple-400 bg-purple-400/15" },
+    { label: "Mensajes enviados", value: sentMessagesCount ?? 0, icon: Send, color: "text-primary bg-primary/15" },
+  ];
+
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Workspaces</h1>
         <p className="text-sm text-muted">{rows.length} cliente(s) registrados</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+        {kpis.map(({ label, value, icon: Icon, color }) => (
+          <div key={label} className="rounded-xl border border-border bg-surface p-4">
+            <div className={`mb-3 flex h-9 w-9 items-center justify-center rounded-lg ${color}`}>
+              <Icon size={17} />
+            </div>
+            <p className="text-2xl font-semibold text-foreground">{value.toLocaleString("es-CO")}</p>
+            <p className="mt-1 text-xs text-muted">{label}</p>
+          </div>
+        ))}
       </div>
 
       <form className="flex items-center gap-2">
