@@ -13,14 +13,19 @@ export function DashboardBannerUploader({ currentUrl }: { currentUrl: string | n
   async function handleSubmit(formData: FormData) {
     setPending(true);
     setError(null);
-    const result = await updateDashboardBanner(formData);
-    setPending(false);
-    if (result?.error) {
-      setError(result.error);
-      return;
+    try {
+      const result = await updateDashboardBanner(formData);
+      if (result?.error) {
+        setError(result.error);
+        return;
+      }
+      setPreview(null);
+      router.refresh();
+    } catch {
+      setError("No se pudo subir la imagen. Prueba con un archivo más liviano.");
+    } finally {
+      setPending(false);
     }
-    setPreview(null);
-    router.refresh();
   }
 
   return (
