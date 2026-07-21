@@ -24,18 +24,18 @@ export function Topbar({
   onMenuClick?: () => void;
 }) {
   return (
-    <header className="flex items-center justify-between border-b border-border px-4 py-4 sm:px-8 sm:py-5">
+    <header className="flex items-center justify-between border-b border-border px-4 py-2.5 sm:px-8 sm:py-3">
       <div className="flex items-center gap-3">
         <button
           type="button"
           onClick={onMenuClick}
-          className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-foreground lg:hidden"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-foreground lg:hidden"
         >
-          <Menu size={20} />
+          <Menu size={18} />
         </button>
         <div>
-          <h1 className="text-lg font-semibold text-foreground sm:text-2xl">Dashboard</h1>
-          <p className="hidden text-sm text-muted sm:block">Resumen general de tu cuenta</p>
+          <h1 className="text-base font-semibold text-foreground sm:text-lg">Dashboard</h1>
+          <p className="hidden text-xs text-muted sm:block">Resumen general de tu cuenta</p>
         </div>
       </div>
 
