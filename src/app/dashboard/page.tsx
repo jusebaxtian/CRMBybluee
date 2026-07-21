@@ -152,7 +152,7 @@ export default async function DashboardPage({
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-3">
       {locked && (
         <div className="flex items-center gap-3 rounded-xl border border-warning/30 bg-warning/10 p-4">
           <Lock size={18} className="shrink-0 text-warning" />

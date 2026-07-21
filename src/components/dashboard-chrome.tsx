@@ -77,7 +77,7 @@ export function DashboardChrome({
           notifications={notifications}
           onMenuClick={() => setMobileNavOpen(true)}
         />
-        <main className="flex-1 p-8">{children}</main>
+        <main className="flex-1 p-4 sm:p-5">{children}</main>
       </div>
     </div>
   );

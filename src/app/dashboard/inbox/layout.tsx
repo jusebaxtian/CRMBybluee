@@ -101,7 +101,7 @@ export default async function InboxLayout({
     .order("name");
 
   return (
-    <div className="-m-8 h-[calc(100vh-5.25rem)]">
+    <div className="-m-4 h-[calc(100vh-3.75rem)] sm:-m-5 sm:h-[calc(100vh-4rem)]">
       {workspaceId && (
         <RealtimeRefresh
           table="conversations"
