@@ -20,9 +20,9 @@ const statusColor: Record<string, string> = {
 export default async function AdminOverviewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; from?: string; to?: string }>;
 }) {
-  const { q } = await searchParams;
+  const { q, from, to } = await searchParams;
   const supabase = await createClient();
   const admin = createAdminClient();
 
@@ -83,18 +83,37 @@ export default async function AdminOverviewPage({
   );
 
   const query = (q ?? "").trim().toLowerCase();
-  const filteredRows = query
+  let filteredRows = query
     ? rows.filter((r) => r.email.toLowerCase().includes(query))
     : rows;
 
-  const totalClients = rows.length;
-  const activePaidClients = rows.filter((r) => r.status === "active").length;
-  const trialingClients = rows.filter((r) => r.status === "trialing").length;
-  const unpaidClients = rows.filter((r) => r.status === "past_due").length;
+  const fromDate = from ? new Date(from) : null;
+  const toDate = to ? new Date(`${to}T23:59:59`) : null;
+  if (fromDate) filteredRows = filteredRows.filter((r) => new Date(r.createdAt) >= fromDate);
+  if (toDate) filteredRows = filteredRows.filter((r) => new Date(r.createdAt) <= toDate);
+
+  // KPI cards always reflect the current calendar month, independent of the
+  // date/email filters above (which only affect the table below).
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const monthLabel = now.toLocaleDateString("es-CO", { month: "long", year: "numeric" });
+
+  const monthRows = rows.filter((r) => r.createdAt >= monthStart);
+  const totalClients = monthRows.length;
+  const activePaidClients = monthRows.filter((r) => r.status === "active").length;
+  const trialingClients = monthRows.filter((r) => r.status === "trialing").length;
+  const unpaidClients = monthRows.filter((r) => r.status === "past_due").length;
 
   const [{ count: connectedWhatsappCount }, { count: sentMessagesCount }] = await Promise.all([
-    supabase.from("whatsapp_accounts").select("id", { count: "exact", head: true }),
-    supabase.from("messages").select("id", { count: "exact", head: true }).eq("direction", "out"),
+    supabase
+      .from("whatsapp_accounts")
+      .select("id", { count: "exact", head: true })
+      .gte("connected_at", monthStart),
+    supabase
+      .from("messages")
+      .select("id", { count: "exact", head: true })
+      .eq("direction", "out")
+      .gte("created_at", monthStart),
   ]);
 
   const kpis = [
@@ -113,6 +132,9 @@ export default async function AdminOverviewPage({
         <p className="text-sm text-muted">{rows.length} cliente(s) registrados</p>
       </div>
 
+      <p className="-mb-2 text-xs text-muted">
+        Tarjetas del mes actual ({monthLabel})
+      </p>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         {kpis.map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="rounded-xl border border-border bg-surface p-4">
@@ -125,7 +147,7 @@ export default async function AdminOverviewPage({
         ))}
       </div>
 
-      <form className="flex items-center gap-2">
+      <form className="flex flex-wrap items-center gap-2">
         <input
           type="text"
           name="q"
@@ -133,13 +155,29 @@ export default async function AdminOverviewPage({
           placeholder="Buscar por correo..."
           className="w-full max-w-xs rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
         />
+        <div className="flex items-center gap-1.5 text-xs text-muted">
+          <span>Creado entre</span>
+          <input
+            type="date"
+            name="from"
+            defaultValue={from ?? ""}
+            className="rounded-md border border-border bg-background px-2 py-2 text-sm text-foreground outline-none focus:border-primary"
+          />
+          <span>y</span>
+          <input
+            type="date"
+            name="to"
+            defaultValue={to ?? ""}
+            className="rounded-md border border-border bg-background px-2 py-2 text-sm text-foreground outline-none focus:border-primary"
+          />
+        </div>
         <button
           type="submit"
           className="rounded-md bg-primary px-3 py-2 text-xs font-medium text-white hover:bg-primary-hover"
         >
-          Buscar
+          Filtrar
         </button>
-        {q && (
+        {(q || from || to) && (
           <a href="/admin" className="text-xs text-muted hover:text-foreground">
             Limpiar
           </a>
