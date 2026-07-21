@@ -10,7 +10,7 @@ import {
   sendTextMessage,
   sendMediaMessage,
 } from "@/lib/whatsapp/graph";
-import { getWorkspaceId } from "@/lib/workspace";
+import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
 
 function mediaTypeFromMime(mime: string): "image" | "audio" | "video" | "document" {
   if (mime.startsWith("image/")) return "image";
@@ -67,6 +67,28 @@ export async function connectWhatsApp(input: {
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Error desconocido." };
   }
+}
+
+export async function disconnectWhatsApp() {
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+
+  const role = await getWorkspaceRole(supabase, workspaceId);
+  if (role !== "owner" && role !== "admin") {
+    return { error: "No tienes permiso para desconectar WhatsApp." };
+  }
+
+  const { error } = await supabase
+    .from("whatsapp_accounts")
+    .delete()
+    .eq("workspace_id", workspaceId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/settings");
+  return { success: true as const };
 }
 
 async function sendToConversation(
