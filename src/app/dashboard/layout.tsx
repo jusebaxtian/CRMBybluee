@@ -28,10 +28,17 @@ export default async function DashboardLayout({
   const { data: workspace } = workspaceId
     ? await supabase
         .from("workspaces")
-        .select("name, plan_id, access_disabled")
+        .select("name, plan_id, access_disabled, status")
         .eq("id", workspaceId)
         .maybeSingle()
     : { data: null };
+
+  // Trial expired or subscription lapsed: mirrors the middleware's route
+  // lockout, but here it's just used to hide everything but Facturación
+  // from the sidebar (admins impersonating still see the full menu).
+  const billingLocked =
+    (workspace?.status === "past_due" || workspace?.status === "canceled") &&
+    !impersonatedWorkspaceId;
 
   // Admins bypass this while impersonating — they need to be able to inspect
   // a disabled account for support.
@@ -120,6 +127,7 @@ export default async function DashboardLayout({
     <DashboardChrome
       workspaceName={workspaceName}
       workspaceRole={workspaceRole}
+      billingLocked={billingLocked}
       isPlatformAdmin={isAdmin}
       enabledModules={enabledModules}
       unreadMessagesCount={unreadMessagesCount}

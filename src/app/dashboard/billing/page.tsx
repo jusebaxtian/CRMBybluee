@@ -1,4 +1,4 @@
-import { CreditCard, Landmark, CheckCircle2 } from "lucide-react";
+import { CreditCard, Landmark, CheckCircle2, AlertTriangle } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
 import { createBoldOrder, confirmBoldPayment } from "@/app/actions/billing";
@@ -86,6 +86,17 @@ export default async function BillingPage({
           Estado: {workspace ? statusLabel[workspace.status] ?? workspace.status : "—"}
         </p>
       </div>
+
+      {(workspace?.status === "past_due" || workspace?.status === "canceled") && (
+        <div className="flex items-center gap-3 rounded-xl border border-red-400/30 bg-red-400/10 p-5">
+          <AlertTriangle size={20} className="shrink-0 text-red-400" />
+          <p className="text-sm text-foreground">
+            {workspace.status === "past_due"
+              ? "Tu período de prueba o suscripción venció. Compra un plan para recuperar el acceso a tu cuenta."
+              : "Tu suscripción está cancelada. Compra un plan para reactivar tu cuenta."}
+          </p>
+        </div>
+      )}
 
       {!canPay && renewalDate && (
         <div className="flex items-center gap-3 rounded-xl border border-success/30 bg-success/10 p-5">

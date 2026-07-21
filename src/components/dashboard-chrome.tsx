@@ -16,6 +16,7 @@ type Notification = {
 export function DashboardChrome({
   workspaceName,
   workspaceRole,
+  billingLocked = false,
   isPlatformAdmin,
   enabledModules,
   unreadMessagesCount,
@@ -28,6 +29,7 @@ export function DashboardChrome({
 }: {
   workspaceName: string;
   workspaceRole?: string | null;
+  billingLocked?: boolean;
   isPlatformAdmin: boolean;
   enabledModules: string[];
   unreadMessagesCount: number;
@@ -60,6 +62,7 @@ export function DashboardChrome({
         <Sidebar
           workspaceName={workspaceName}
           workspaceRole={workspaceRole}
+          billingLocked={billingLocked}
           isPlatformAdmin={isPlatformAdmin}
           enabledModules={enabledModules}
           unreadMessagesCount={unreadMessagesCount}
