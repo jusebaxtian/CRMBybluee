@@ -16,7 +16,10 @@ type ActionType =
   | "send_audio"
   | "send_document"
   | "send_template"
-  | "assign_agent";
+  | "assign_agent"
+  | "assign_agent_random";
+
+type AgentShare = { agent_id: string; percent: number };
 
 type ActionRow = {
   action_type: ActionType;
@@ -26,6 +29,7 @@ type ActionRow = {
   media_filename: string;
   template_id: string;
   target_agent_id: string;
+  agent_distribution: AgentShare[];
   delay_value: number;
   delay_unit: "seconds" | "minutes";
 };
@@ -38,6 +42,7 @@ export type InitialAction = {
   media_filename?: string | null;
   template_id?: string | null;
   target_agent_id?: string | null;
+  agent_distribution?: AgentShare[] | null;
   delay_seconds?: number | null;
 };
 
@@ -67,6 +72,7 @@ function emptyRow(defaultTagId: string): ActionRow {
     media_filename: "",
     template_id: "",
     target_agent_id: "",
+    agent_distribution: [],
     delay_value: 0,
     delay_unit: "seconds",
   };
@@ -101,6 +107,7 @@ export function AutomationActionsBuilder({
             media_filename: a.media_filename ?? "",
             template_id: a.template_id ?? templates[0]?.id ?? "",
             target_agent_id: a.target_agent_id ?? agents[0]?.id ?? "",
+            agent_distribution: a.agent_distribution ?? [],
             delay_value: value,
             delay_unit: unit,
           };
@@ -114,6 +121,46 @@ export function AutomationActionsBuilder({
 
   function updateAction(index: number, patch: Partial<ActionRow>) {
     setActions((prev) => prev.map((a, i) => (i === index ? { ...a, ...patch } : a)));
+  }
+
+  function addAgentShare(actionIndex: number) {
+    setActions((prev) =>
+      prev.map((a, i) => {
+        if (i !== actionIndex) return a;
+        const usedIds = new Set(a.agent_distribution.map((d) => d.agent_id));
+        const nextAgent = agents.find((ag) => !usedIds.has(ag.id));
+        if (!nextAgent) return a;
+        return {
+          ...a,
+          agent_distribution: [...a.agent_distribution, { agent_id: nextAgent.id, percent: 0 }],
+        };
+      })
+    );
+  }
+
+  function updateAgentShare(actionIndex: number, shareIndex: number, patch: Partial<AgentShare>) {
+    setActions((prev) =>
+      prev.map((a, i) =>
+        i === actionIndex
+          ? {
+              ...a,
+              agent_distribution: a.agent_distribution.map((d, j) =>
+                j === shareIndex ? { ...d, ...patch } : d
+              ),
+            }
+          : a
+      )
+    );
+  }
+
+  function removeAgentShare(actionIndex: number, shareIndex: number) {
+    setActions((prev) =>
+      prev.map((a, i) =>
+        i === actionIndex
+          ? { ...a, agent_distribution: a.agent_distribution.filter((_, j) => j !== shareIndex) }
+          : a
+      )
+    );
   }
 
   function addAction() {
@@ -156,6 +203,7 @@ export function AutomationActionsBuilder({
     media_filename: a.action_type === "send_document" ? a.media_filename : undefined,
     template_id: a.action_type === "send_template" ? a.template_id : undefined,
     target_agent_id: a.action_type === "assign_agent" ? a.target_agent_id : undefined,
+    agent_distribution: a.action_type === "assign_agent_random" ? a.agent_distribution : undefined,
     delay_seconds: a.delay_value > 0 ? a.delay_value * (a.delay_unit === "minutes" ? 60 : 1) : 0,
   }));
 
@@ -182,6 +230,7 @@ export function AutomationActionsBuilder({
               <option value="send_template">Enviar plantilla aprobada</option>
               <option value="add_tag">Agregar etiqueta</option>
               <option value="assign_agent">Asignar a un agente</option>
+              <option value="assign_agent_random">Asignar aleatoriamente (%) entre agentes</option>
             </select>
             <div className="flex shrink-0 items-center gap-0.5">
               <button
@@ -285,6 +334,83 @@ export function AutomationActionsBuilder({
               ))}
             </select>
           )}
+
+          {action.action_type === "assign_agent_random" && (() => {
+            const usedIds = new Set(action.agent_distribution.map((d) => d.agent_id));
+            const totalPercent = action.agent_distribution.reduce(
+              (sum, d) => sum + (Number(d.percent) || 0),
+              0
+            );
+            const availableToAdd = agents.filter((a) => !usedIds.has(a.id));
+
+            return (
+              <div className="flex flex-col gap-2">
+                {agents.length === 0 && (
+                  <p className="text-xs text-muted">No tienes agentes creados.</p>
+                )}
+                {action.agent_distribution.map((share, shareIndex) => (
+                  <div key={shareIndex} className="flex items-center gap-2">
+                    <select
+                      value={share.agent_id}
+                      onChange={(e) =>
+                        updateAgentShare(index, shareIndex, { agent_id: e.target.value })
+                      }
+                      className="flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
+                    >
+                      {agents
+                        .filter((a) => a.id === share.agent_id || !usedIds.has(a.id))
+                        .map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name ?? a.email}
+                          </option>
+                        ))}
+                    </select>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={share.percent}
+                      onChange={(e) =>
+                        updateAgentShare(index, shareIndex, {
+                          percent: Math.max(0, Math.min(100, Number(e.target.value) || 0)),
+                        })
+                      }
+                      className="w-16 rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
+                    />
+                    <span className="text-xs text-muted">%</span>
+                    <button
+                      type="button"
+                      onClick={() => removeAgentShare(index, shareIndex)}
+                      className="text-muted hover:text-red-400"
+                      title="Quitar agente"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                ))}
+
+                {availableToAdd.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => addAgentShare(index)}
+                    className="flex items-center gap-1 self-start text-xs text-primary hover:underline"
+                  >
+                    <Plus size={12} />
+                    Agregar agente
+                  </button>
+                )}
+
+                <p
+                  className={`text-[11px] ${
+                    totalPercent === 100 ? "text-success" : "text-muted"
+                  }`}
+                >
+                  Total: {totalPercent}%{" "}
+                  {totalPercent !== 100 && "— se recomienda que sume 100% (se reparte proporcional si no)"}
+                </p>
+              </div>
+            );
+          })()}
 
           {action.action_type === "send_template" && (
             <div className="flex flex-col gap-2">

@@ -16,8 +16,23 @@ type AutomationAction = {
   template_id: string | null;
   delay_seconds: number;
   target_agent_id: string | null;
+  agent_distribution: { agent_id: string; percent: number }[] | null;
   templates: { meta_template_name: string; language: string } | null;
 };
+
+// Picks one agent from a weighted list (weights don't need to sum to 100 —
+// they're treated as relative shares of whatever total they add up to).
+function pickWeightedAgent(distribution: { agent_id: string; percent: number }[]): string | null {
+  const total = distribution.reduce((sum, d) => sum + Math.max(0, d.percent), 0);
+  if (total <= 0) return null;
+
+  let roll = Math.random() * total;
+  for (const entry of distribution) {
+    roll -= Math.max(0, entry.percent);
+    if (roll <= 0) return entry.agent_id;
+  }
+  return distribution[distribution.length - 1].agent_id;
+}
 
 const mediaActionType: Record<string, "image" | "video" | "audio" | "document"> = {
   send_image: "image",
@@ -59,6 +74,19 @@ async function executeAction(
       await supabase
         .from("conversations")
         .update({ assigned_agent_id: action.target_agent_id })
+        .eq("id", conversationId);
+    }
+    return;
+  }
+
+  if (action.action_type === "assign_agent_random" && action.agent_distribution?.length) {
+    const chosenAgentId = pickWeightedAgent(action.agent_distribution);
+    if (!chosenAgentId) return;
+    const conversationId = await getOrCreateConversation(supabase, automation.workspace_id, contactId);
+    if (conversationId) {
+      await supabase
+        .from("conversations")
+        .update({ assigned_agent_id: chosenAgentId })
         .eq("id", conversationId);
     }
     return;
@@ -165,7 +193,7 @@ async function fetchActions(
   const { data } = await supabase
     .from("automation_actions")
     .select(
-      "position, action_type, message_body, tag_id, media_url, media_filename, template_id, delay_seconds, target_agent_id, templates(meta_template_name, language)"
+      "position, action_type, message_body, tag_id, media_url, media_filename, template_id, delay_seconds, target_agent_id, agent_distribution, templates(meta_template_name, language)"
     )
     .eq("automation_id", automationId)
     .order("position");

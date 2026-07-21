@@ -15,13 +15,15 @@ type ActionInput = {
     | "send_audio"
     | "send_document"
     | "send_template"
-    | "assign_agent";
+    | "assign_agent"
+    | "assign_agent_random";
   message_body?: string;
   tag_id?: string;
   media_url?: string;
   media_filename?: string;
   template_id?: string;
   target_agent_id?: string;
+  agent_distribution?: { agent_id: string; percent: number }[];
   delay_seconds?: number;
 };
 
@@ -40,6 +42,10 @@ function actionRow(a: ActionInput, automationId: string, index: number) {
     media_filename: a.action_type === "send_document" ? a.media_filename : null,
     template_id: a.action_type === "send_template" ? a.template_id : null,
     target_agent_id: a.action_type === "assign_agent" ? a.target_agent_id : null,
+    agent_distribution:
+      a.action_type === "assign_agent_random"
+        ? (a.agent_distribution ?? []).filter((d) => d.agent_id && d.percent > 0)
+        : null,
     delay_seconds: Math.max(0, Math.min(86400, Math.floor(a.delay_seconds ?? 0))),
   };
 }
@@ -98,6 +104,12 @@ export async function createAutomation(_prevState: unknown, formData: FormData) 
     }
     if (a.action_type === "assign_agent" && !a.target_agent_id) {
       return { error: "Selecciona el agente para cada acción de asignación." };
+    }
+    if (a.action_type === "assign_agent_random") {
+      const rows = (a.agent_distribution ?? []).filter((d) => d.agent_id && d.percent > 0);
+      if (rows.length < 2) {
+        return { error: "El aleatorizador necesita al menos 2 agentes con un porcentaje mayor a 0." };
+      }
     }
   }
 
@@ -160,6 +172,12 @@ export async function updateAutomation(_prevState: unknown, formData: FormData) 
     }
     if (a.action_type === "assign_agent" && !a.target_agent_id) {
       return { error: "Selecciona el agente para cada acción de asignación." };
+    }
+    if (a.action_type === "assign_agent_random") {
+      const rows = (a.agent_distribution ?? []).filter((d) => d.agent_id && d.percent > 0);
+      if (rows.length < 2) {
+        return { error: "El aleatorizador necesita al menos 2 agentes con un porcentaje mayor a 0." };
+      }
     }
   }
 
