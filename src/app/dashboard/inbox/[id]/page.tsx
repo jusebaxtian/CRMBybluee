@@ -6,7 +6,9 @@ import { ContactTagPicker } from "@/components/contact-tag-picker";
 import { NotesEditor } from "@/components/notes-editor";
 import { ChatPane } from "@/components/chat-pane";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
+import { ConversationAssignmentControl } from "@/components/conversation-assignment-control";
 import { getWorkspaceId } from "@/lib/workspace";
+import { listWorkspaceAgents } from "@/lib/agents";
 
 export default async function ConversationPage({
   params,
@@ -19,7 +21,9 @@ export default async function ConversationPage({
 
   const { data: conversation } = await supabase
     .from("conversations")
-    .select("id, contact_id, last_read_at, contacts(name, wa_id, notes, contact_tags(tag_id))")
+    .select(
+      "id, contact_id, last_read_at, assigned_agent_id, contacts(name, wa_id, notes, contact_tags(tag_id))"
+    )
     .eq("id", id)
     .eq("workspace_id", workspaceId ?? "")
     .maybeSingle();
@@ -69,6 +73,8 @@ export default async function ConversationPage({
         .in("trigger_tag_id", assignedTagIds)
     : { data: [] };
 
+  const agents = await listWorkspaceAgents(supabase, workspaceId);
+
   return (
     <div className="flex h-full w-full min-w-0 flex-1">
       <RealtimeRefresh
@@ -108,6 +114,19 @@ export default async function ConversationPage({
           </p>
           <p className="text-sm text-muted">{contact.wa_id}</p>
         </div>
+
+        {agents.length > 0 && (
+          <div className="mt-6">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
+              Asignado a
+            </p>
+            <ConversationAssignmentControl
+              conversationId={conversation.id}
+              agents={agents}
+              assignedAgentId={conversation.assigned_agent_id}
+            />
+          </div>
+        )}
 
         <div className="mt-6">
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">

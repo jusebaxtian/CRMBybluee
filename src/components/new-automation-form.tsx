@@ -6,6 +6,7 @@ import { AutomationActionsBuilder, type InitialAction } from "@/components/autom
 
 type Tag = { id: string; name: string };
 type Template = { id: string; meta_template_name: string; language: string; status: string };
+type Agent = { id: string; name: string | null; email: string };
 
 type ExistingAutomation = {
   id: string;
@@ -19,10 +20,12 @@ type ExistingAutomation = {
 export function NewAutomationForm({
   tags,
   templates = [],
+  agents = [],
   automation,
 }: {
   tags: Tag[];
   templates?: Template[];
+  agents?: Agent[];
   automation?: ExistingAutomation;
 }) {
   const [state, action, pending] = useActionState(
@@ -95,6 +98,7 @@ export function NewAutomationForm({
         <AutomationActionsBuilder
           tags={tags}
           templates={templates}
+          agents={agents}
           initialActions={automation?.actions}
         />
       </div>

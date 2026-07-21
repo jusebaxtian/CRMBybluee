@@ -6,6 +6,7 @@ import { uploadAutomationActionMedia } from "@/app/actions/automations";
 
 type Tag = { id: string; name: string };
 type Template = { id: string; meta_template_name: string; language: string; status: string };
+type Agent = { id: string; name: string | null; email: string };
 
 type ActionType =
   | "send_message"
@@ -14,7 +15,8 @@ type ActionType =
   | "send_video"
   | "send_audio"
   | "send_document"
-  | "send_template";
+  | "send_template"
+  | "assign_agent";
 
 type ActionRow = {
   action_type: ActionType;
@@ -23,6 +25,7 @@ type ActionRow = {
   media_url: string;
   media_filename: string;
   template_id: string;
+  target_agent_id: string;
   delay_value: number;
   delay_unit: "seconds" | "minutes";
 };
@@ -34,6 +37,7 @@ export type InitialAction = {
   media_url?: string | null;
   media_filename?: string | null;
   template_id?: string | null;
+  target_agent_id?: string | null;
   delay_seconds?: number | null;
 };
 
@@ -62,6 +66,7 @@ function emptyRow(defaultTagId: string): ActionRow {
     media_url: "",
     media_filename: "",
     template_id: "",
+    target_agent_id: "",
     delay_value: 0,
     delay_unit: "seconds",
   };
@@ -76,10 +81,12 @@ function toDelayValueUnit(seconds: number | null | undefined): { value: number; 
 export function AutomationActionsBuilder({
   tags,
   templates = [],
+  agents = [],
   initialActions,
 }: {
   tags: Tag[];
   templates?: Template[];
+  agents?: Agent[];
   initialActions?: InitialAction[];
 }) {
   const [actions, setActions] = useState<ActionRow[]>(
@@ -93,6 +100,7 @@ export function AutomationActionsBuilder({
             media_url: a.media_url ?? "",
             media_filename: a.media_filename ?? "",
             template_id: a.template_id ?? templates[0]?.id ?? "",
+            target_agent_id: a.target_agent_id ?? agents[0]?.id ?? "",
             delay_value: value,
             delay_unit: unit,
           };
@@ -147,6 +155,7 @@ export function AutomationActionsBuilder({
     media_url: mediaLabel[a.action_type] ? a.media_url : undefined,
     media_filename: a.action_type === "send_document" ? a.media_filename : undefined,
     template_id: a.action_type === "send_template" ? a.template_id : undefined,
+    target_agent_id: a.action_type === "assign_agent" ? a.target_agent_id : undefined,
     delay_seconds: a.delay_value > 0 ? a.delay_value * (a.delay_unit === "minutes" ? 60 : 1) : 0,
   }));
 
@@ -172,6 +181,7 @@ export function AutomationActionsBuilder({
               <option value="send_document">Enviar documento</option>
               <option value="send_template">Enviar plantilla aprobada</option>
               <option value="add_tag">Agregar etiqueta</option>
+              <option value="assign_agent">Asignar a un agente</option>
             </select>
             <div className="flex shrink-0 items-center gap-0.5">
               <button
@@ -259,6 +269,21 @@ export function AutomationActionsBuilder({
                 />
               )}
             </div>
+          )}
+
+          {action.action_type === "assign_agent" && (
+            <select
+              value={action.target_agent_id}
+              onChange={(e) => updateAction(index, { target_agent_id: e.target.value })}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            >
+              {agents.length === 0 && <option value="">No tienes agentes creados</option>}
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name ?? a.email}
+                </option>
+              ))}
+            </select>
           )}
 
           {action.action_type === "send_template" && (

@@ -15,6 +15,7 @@ type AutomationAction = {
   media_filename: string | null;
   template_id: string | null;
   delay_seconds: number;
+  target_agent_id: string | null;
   templates: { meta_template_name: string; language: string } | null;
 };
 
@@ -49,6 +50,17 @@ async function executeAction(
 ) {
   if (action.action_type === "add_tag" && action.tag_id) {
     await supabase.from("contact_tags").upsert({ contact_id: contactId, tag_id: action.tag_id });
+    return;
+  }
+
+  if (action.action_type === "assign_agent" && action.target_agent_id) {
+    const conversationId = await getOrCreateConversation(supabase, automation.workspace_id, contactId);
+    if (conversationId) {
+      await supabase
+        .from("conversations")
+        .update({ assigned_agent_id: action.target_agent_id })
+        .eq("id", conversationId);
+    }
     return;
   }
 
@@ -153,7 +165,7 @@ async function fetchActions(
   const { data } = await supabase
     .from("automation_actions")
     .select(
-      "position, action_type, message_body, tag_id, media_url, media_filename, template_id, delay_seconds, templates(meta_template_name, language)"
+      "position, action_type, message_body, tag_id, media_url, media_filename, template_id, delay_seconds, target_agent_id, templates(meta_template_name, language)"
     )
     .eq("automation_id", automationId)
     .order("position");

@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NewAutomationForm } from "@/components/new-automation-form";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
+import { listWorkspaceAgents } from "@/lib/agents";
 
 export default async function NewAutomationPage() {
   const supabase = await createClient();
@@ -19,11 +20,13 @@ export default async function NewAutomationPage() {
     .eq("workspace_id", workspaceId ?? "")
     .order("meta_template_name");
 
+  const agents = await listWorkspaceAgents(supabase, workspaceId);
+
   return (
     <div className="mx-auto max-w-lg">
       <div className="rounded-xl border border-border bg-surface p-6">
         <h1 className="mb-4 text-lg font-semibold text-foreground">Nueva automatización</h1>
-        <NewAutomationForm tags={tags ?? []} templates={templates ?? []} />
+        <NewAutomationForm tags={tags ?? []} templates={templates ?? []} agents={agents} />
       </div>
     </div>
   );

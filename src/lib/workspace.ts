@@ -37,3 +37,25 @@ export async function getImpersonatedWorkspaceId() {
   const cookieStore = await cookies();
   return cookieStore.get(IMPERSONATION_COOKIE)?.value ?? null;
 }
+
+/** The caller's role within the given workspace ('owner' | 'admin' | 'agent'), or null. */
+export async function getWorkspaceRole(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  workspaceId: string | null
+) {
+  if (!workspaceId) return null;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data } = await supabase
+    .from("workspace_members")
+    .select("role")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  return data?.role ?? null;
+}

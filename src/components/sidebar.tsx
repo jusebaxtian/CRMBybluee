@@ -35,11 +35,12 @@ const navItems = [
   { href: "/dashboard/quick-replies", label: "Respuestas rápidas", icon: Reply, built: false, moduleKey: null },
   { href: "/dashboard/reports", label: "Reportes", icon: BarChart3, built: false, moduleKey: null },
   { href: "/dashboard/integrations", label: "Integraciones", icon: Plug, built: false, moduleKey: null },
-  { href: "/dashboard/settings", label: "Configuración", icon: Settings, built: false, moduleKey: null },
+  { href: "/dashboard/settings", label: "Configuración", icon: Settings, built: true, moduleKey: "settings" },
 ];
 
 export function Sidebar({
   workspaceName,
+  workspaceRole,
   isPlatformAdmin = false,
   enabledModules = [],
   unreadMessagesCount = 0,
@@ -48,6 +49,7 @@ export function Sidebar({
   onNavigate,
 }: {
   workspaceName: string;
+  workspaceRole?: string | null;
   isPlatformAdmin?: boolean;
   enabledModules?: string[];
   unreadMessagesCount?: number;
@@ -69,7 +71,9 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3">
-        {navItems.map(({ href, label, icon: Icon, built, moduleKey }) => {
+        {navItems
+          .filter((item) => item.href !== "/dashboard/settings" || workspaceRole !== "agent")
+          .map(({ href, label, icon: Icon, built, moduleKey }) => {
           const locked = built && moduleKey !== null && !enabledModules.includes(moduleKey);
           const ready = built && !locked;
           const active =

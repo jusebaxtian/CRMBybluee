@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NewAutomationForm } from "@/components/new-automation-form";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
+import { listWorkspaceAgents } from "@/lib/agents";
 
 export default async function EditAutomationPage({
   params,
@@ -25,7 +26,9 @@ export default async function EditAutomationPage({
 
   const { data: actions } = await supabase
     .from("automation_actions")
-    .select("action_type, message_body, tag_id, media_url, media_filename, template_id, delay_seconds")
+    .select(
+      "action_type, message_body, tag_id, media_url, media_filename, template_id, target_agent_id, delay_seconds"
+    )
     .eq("automation_id", id)
     .order("position", { ascending: true });
 
@@ -41,6 +44,8 @@ export default async function EditAutomationPage({
     .eq("workspace_id", workspaceId ?? "")
     .order("meta_template_name");
 
+  const agents = await listWorkspaceAgents(supabase, workspaceId);
+
   return (
     <div className="mx-auto max-w-lg">
       <div className="rounded-xl border border-border bg-surface p-6">
@@ -48,6 +53,7 @@ export default async function EditAutomationPage({
         <NewAutomationForm
           tags={tags ?? []}
           templates={templates ?? []}
+          agents={agents}
           automation={{
             id: automation.id,
             name: automation.name,

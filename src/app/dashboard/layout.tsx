@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { DashboardChrome } from "@/components/dashboard-chrome";
 import { ImpersonationBanner } from "@/components/impersonation-banner";
 import { isPlatformAdmin } from "@/lib/admin";
-import { getWorkspaceId, getImpersonatedWorkspaceId } from "@/lib/workspace";
+import { getWorkspaceId, getImpersonatedWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
 
 export default async function DashboardLayout({
   children,
@@ -23,6 +23,7 @@ export default async function DashboardLayout({
   const isAdmin = await isPlatformAdmin(supabase);
   const impersonatedWorkspaceId = isAdmin ? await getImpersonatedWorkspaceId() : null;
   const workspaceId = await getWorkspaceId(supabase);
+  const workspaceRole = await getWorkspaceRole(supabase, workspaceId);
 
   const { data: workspace } = workspaceId
     ? await supabase
@@ -118,6 +119,7 @@ export default async function DashboardLayout({
   return (
     <DashboardChrome
       workspaceName={workspaceName}
+      workspaceRole={workspaceRole}
       isPlatformAdmin={isAdmin}
       enabledModules={enabledModules}
       unreadMessagesCount={unreadMessagesCount}

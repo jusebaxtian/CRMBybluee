@@ -14,12 +14,14 @@ type ActionInput = {
     | "send_video"
     | "send_audio"
     | "send_document"
-    | "send_template";
+    | "send_template"
+    | "assign_agent";
   message_body?: string;
   tag_id?: string;
   media_url?: string;
   media_filename?: string;
   template_id?: string;
+  target_agent_id?: string;
   delay_seconds?: number;
 };
 
@@ -37,6 +39,7 @@ function actionRow(a: ActionInput, automationId: string, index: number) {
     media_url: mediaTypes.has(a.action_type) ? a.media_url : null,
     media_filename: a.action_type === "send_document" ? a.media_filename : null,
     template_id: a.action_type === "send_template" ? a.template_id : null,
+    target_agent_id: a.action_type === "assign_agent" ? a.target_agent_id : null,
     delay_seconds: Math.max(0, Math.min(86400, Math.floor(a.delay_seconds ?? 0))),
   };
 }
@@ -92,6 +95,9 @@ export async function createAutomation(_prevState: unknown, formData: FormData) 
     }
     if (a.action_type === "send_template" && !a.template_id) {
       return { error: "Selecciona una plantilla para cada acción de plantilla." };
+    }
+    if (a.action_type === "assign_agent" && !a.target_agent_id) {
+      return { error: "Selecciona el agente para cada acción de asignación." };
     }
   }
 
@@ -151,6 +157,9 @@ export async function updateAutomation(_prevState: unknown, formData: FormData) 
     }
     if (a.action_type === "send_template" && !a.template_id) {
       return { error: "Selecciona una plantilla para cada acción de plantilla." };
+    }
+    if (a.action_type === "assign_agent" && !a.target_agent_id) {
+      return { error: "Selecciona el agente para cada acción de asignación." };
     }
   }
 
