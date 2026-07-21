@@ -164,30 +164,30 @@ export default async function DashboardPage({
       )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {/* Estado de la cuenta */}
-        <div className="rounded-xl border border-border bg-surface p-5">
+        <div className="rounded-xl border border-border bg-surface p-4">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm text-muted">Estado de la cuenta</p>
+              <p className="text-xs text-muted">Estado de la cuenta</p>
               <p
-                className={`mt-1 text-2xl font-semibold ${
+                className={`text-xl font-semibold leading-tight ${
                   workspace ? statusColor[workspace.status] ?? "text-foreground" : "text-foreground"
                 }`}
               >
                 {workspace ? statusLabel[workspace.status] ?? workspace.status : "—"}
               </p>
-              <p className="mt-1 text-xs text-muted">
+              <p className="text-xs text-muted">
                 {whatsappAccount ? "WhatsApp API Oficial" : workspace?.plans?.name ?? "—"}
               </p>
             </div>
             <div
-              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
                 workspace ? statusIconBg[workspace.status] ?? statusIconBg.canceled : statusIconBg.canceled
               }`}
             >
-              <ShieldCheck size={20} />
+              <ShieldCheck size={18} />
             </div>
           </div>
-          <div className="mt-3 flex items-center gap-1.5 text-xs text-muted">
+          <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted">
             <span
               className={`h-1.5 w-1.5 rounded-full ${
                 whatsappAccount ? "bg-success" : "bg-muted"
@@ -198,15 +198,15 @@ export default async function DashboardPage({
         </div>
 
         {/* Plan actual */}
-        <div className="rounded-xl border border-border bg-surface p-5">
+        <div className="rounded-xl border border-border bg-surface p-4">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm text-muted">Plan actual</p>
-              <p className="mt-1 text-2xl font-semibold text-blue-400">
+              <p className="text-xs text-muted">Plan actual</p>
+              <p className="text-xl font-semibold leading-tight text-blue-400">
                 {workspace?.plans?.name ?? "—"}
               </p>
               {workspace?.plans && (
-                <div className="mt-1 flex items-center gap-2 text-xs text-muted">
+                <div className="flex items-center gap-2 text-xs text-muted">
                   <span>
                     ${(workspace.plans.price_cents / 100).toLocaleString("es-CO")} /{" "}
                     {workspace.plans.billing_cycle === "yearly" ? "año" : "mes"}
@@ -217,11 +217,11 @@ export default async function DashboardPage({
                 </div>
               )}
             </div>
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-400/15 text-blue-400">
-              <Crown size={20} />
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-400/15 text-blue-400">
+              <Crown size={18} />
             </div>
           </div>
-          <p className="mt-3 text-xs text-muted">
+          <p className="mt-1.5 text-xs text-muted">
             {subscription?.current_period_end
               ? `Próximo pago: ${new Date(subscription.current_period_end).toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" })}`
               : "Sin suscripción activa"}
@@ -229,27 +229,27 @@ export default async function DashboardPage({
         </div>
 
         {/* Días restantes */}
-        <div className="rounded-xl border border-border bg-surface p-5">
+        <div className="rounded-xl border border-border bg-surface p-4">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm text-muted">
+              <p className="text-xs text-muted">
                 {isTrialing ? "Días restantes del período de prueba" : "Días para tu próxima renovación"}
               </p>
-              <p className="mt-1 text-2xl font-semibold text-purple-400">
+              <p className="text-xl font-semibold leading-tight text-purple-400">
                 {daysLeft !== null ? `${daysLeft} día${daysLeft === 1 ? "" : "s"}` : "—"}
               </p>
             </div>
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-purple-400/15 text-purple-400">
-              <CalendarClock size={20} />
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-purple-400/15 text-purple-400">
+              <CalendarClock size={18} />
             </div>
           </div>
-          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-hover">
+          <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-hover">
             <div
               className="h-full rounded-full bg-purple-400"
               style={{ width: `${daysProgressPct}%` }}
             />
           </div>
-          <p className="mt-2 text-xs text-muted">
+          <p className="mt-1 text-xs text-muted">
             {periodEnd
               ? `${isTrialing ? "Tu prueba termina el" : "Tu plan se renueva el"} ${new Date(periodEnd).toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" })}`
               : "—"}
