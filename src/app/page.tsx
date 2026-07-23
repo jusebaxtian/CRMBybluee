@@ -293,7 +293,7 @@ export default async function Home() {
                     </div>
                     <a
                       href={waHref(
-                        `Hola, quiero el plan ${plan.name} de CRM ByBluee.`
+                        `Hola, quiero el plan ${plan.name} de CRM ByBluee por $${(plan.price_cents / 100).toLocaleString("es-CO")} ${plan.currency}.`
                       )}
                       target="_blank"
                       rel="noopener noreferrer"
