@@ -1,22 +1,10 @@
 import Link from "next/link";
-import {
-  Inbox,
-  Users,
-  Megaphone,
-  Zap,
-  UserCog,
-  FileCheck2,
-  ArrowRight,
-  Clock,
-  MessageSquareOff,
-  LayoutDashboard,
-  PlugZap,
-  Rocket,
-} from "lucide-react";
+import { ArrowRight, Clock, MessageSquareOff, Megaphone } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Reveal } from "@/components/reveal";
 import { HeroInboxMockup } from "@/components/hero-inbox-mockup";
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
+import { features, steps } from "@/lib/landing-content";
 
 const sectors = [
   "Inmobiliarias",
@@ -27,57 +15,6 @@ const sectors = [
   "Coaches y consultores",
   "Educación",
   "Estudios jurídicos",
-];
-
-const features = [
-  {
-    icon: Inbox,
-    title: "Bandeja unificada",
-    text: "Todas tus conversaciones de WhatsApp en un solo lugar, con estado de entrega y lectura en tiempo real.",
-  },
-  {
-    icon: Users,
-    title: "Contactos y etiquetas",
-    text: "Organiza a tus clientes por etiquetas, notas y segmentos — sabes exactamente quién es quién.",
-  },
-  {
-    icon: Megaphone,
-    title: "Campañas masivas",
-    text: "Envía plantillas aprobadas por Meta a miles de contactos, respetando los límites oficiales de WhatsApp.",
-  },
-  {
-    icon: Zap,
-    title: "Automatizaciones",
-    text: "Flujos que responden solos por etiqueta o palabra clave, con esperas configurables y reparto entre agentes.",
-  },
-  {
-    icon: UserCog,
-    title: "Agentes de respuesta",
-    text: "Crea usuarios que solo ven y responden las conversaciones que les asignes — ideal para equipos de ventas.",
-  },
-  {
-    icon: FileCheck2,
-    title: "Plantillas aprobadas",
-    text: "Sincroniza y reutiliza tus plantillas de Meta para reabrir conversaciones fuera de la ventana de 24 horas.",
-  },
-];
-
-const steps = [
-  {
-    icon: PlugZap,
-    title: "Conectas tu número",
-    text: "Vinculas tu WhatsApp Business con la API oficial de Meta en minutos, directo desde tu panel.",
-  },
-  {
-    icon: LayoutDashboard,
-    title: "Organizas tus conversaciones",
-    text: "Cada chat se organiza con etiquetas, contactos y notas — ves de un vistazo en qué va cada cliente.",
-  },
-  {
-    icon: Rocket,
-    title: "Automatizas y escalas",
-    text: "Activas seguimientos automáticos, sumas agentes de respuesta y llegas a más clientes sin perder el control.",
-  },
 ];
 
 export default async function Home() {
