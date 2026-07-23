@@ -61,6 +61,9 @@ export default async function ByBlueeLanding() {
 
   // Configurable at /admin/support — falls back to a placeholder until set.
   const salesWhatsappNumber = supportSetting?.value || "573000000000";
+  const genericWaHref = `https://wa.me/${salesWhatsappNumber}?text=${encodeURIComponent(
+    "Hola, quiero información sobre CRM ByBluee."
+  )}`;
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-background text-foreground">
@@ -138,16 +141,18 @@ export default async function ByBlueeLanding() {
 
         <Reveal delay={280}>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link
-              href="/signup"
+            <a
+              href={genericWaHref}
+              target="_blank"
+              rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/25 transition-colors hover:bg-primary-hover"
             >
               Empieza ahora
               <ArrowRight size={16} />
-            </Link>
+            </a>
           </div>
           <p className="mt-3 text-xs text-muted">
-            ✦ Configuración en minutos. 7 días de prueba gratis, sin tarjeta.
+            ✦ Configuración en minutos. Te atendemos por WhatsApp.
           </p>
         </Reveal>
 
@@ -331,13 +336,15 @@ export default async function ByBlueeLanding() {
             Empieza hoy y convierte más conversaciones en ventas.
           </p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-            <Link
-              href="/signup"
+            <a
+              href={genericWaHref}
+              target="_blank"
+              rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/25 transition-colors hover:bg-primary-hover"
             >
               Empieza ahora
               <ArrowRight size={16} />
-            </Link>
+            </a>
             <Link
               href="/login"
               className="flex items-center justify-center gap-2 rounded-lg border border-border px-6 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-surface"
@@ -346,7 +353,7 @@ export default async function ByBlueeLanding() {
             </Link>
           </div>
           <p className="mt-3 text-xs text-muted">
-            Sin tarjeta de crédito • Configuración en minutos
+            Te atendemos por WhatsApp • Configuración en minutos
           </p>
         </Reveal>
       </section>
