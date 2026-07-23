@@ -25,6 +25,18 @@ export default async function Home() {
     .eq("is_active", true)
     .order("price_cents");
 
+  const { data: supportSetting } = await supabase
+    .from("platform_settings")
+    .select("value")
+    .eq("key", "support_whatsapp_number")
+    .maybeSingle();
+
+  // Configurable at /admin/support — falls back to a placeholder until set.
+  const salesWhatsappNumber = supportSetting?.value || "573000000000";
+  const waHref = (text: string) =>
+    `https://wa.me/${salesWhatsappNumber}?text=${encodeURIComponent(text)}`;
+  const genericWaHref = waHref("Hola, quiero información sobre CRM ByBluee.");
+
   return (
     <div className="min-h-screen overflow-x-hidden bg-background text-foreground">
       {/* Nav */}
@@ -58,12 +70,14 @@ export default async function Home() {
             >
               Iniciar sesión
             </Link>
-            <Link
-              href="/signup"
+            <a
+              href={genericWaHref}
+              target="_blank"
+              rel="noopener noreferrer"
               className="hidden rounded-md bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover sm:block"
             >
               Prueba gratis
-            </Link>
+            </a>
           </div>
         </div>
       </header>
@@ -98,13 +112,15 @@ export default async function Home() {
 
             <Reveal delay={240}>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Link
-                  href="/signup"
+                <a
+                  href={genericWaHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/25 transition-colors hover:bg-primary-hover"
                 >
                   Empezar prueba gratis
                   <ArrowRight size={16} />
-                </Link>
+                </a>
                 <Link
                   href="/login"
                   className="flex items-center justify-center gap-2 rounded-lg border border-border px-6 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-surface"
@@ -113,7 +129,7 @@ export default async function Home() {
                 </Link>
               </div>
               <p className="mt-3 text-xs text-muted">
-                7 días de prueba gratis. Sin tarjeta de crédito.
+                Te atendemos por WhatsApp. Configuración en minutos.
               </p>
             </Reveal>
           </div>
@@ -256,8 +272,8 @@ export default async function Home() {
                 Un plan para cada etapa de tu negocio
               </h2>
               <p className="mx-auto mt-4 max-w-xl text-center text-muted">
-                Todos los planes incluyen 7 días de prueba gratis, sin tarjeta de
-                crédito.
+                Escríbenos por WhatsApp y te ayudamos a activar el plan que
+                necesitas.
               </p>
             </Reveal>
 
@@ -275,12 +291,16 @@ export default async function Home() {
                         {plan.billing_cycle === "yearly" ? "año" : "mes"}
                       </span>
                     </div>
-                    <Link
-                      href="/signup"
+                    <a
+                      href={waHref(
+                        `Hola, quiero el plan ${plan.name} de CRM ByBluee.`
+                      )}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="mt-6 rounded-lg bg-primary px-4 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
                     >
-                      Empezar prueba gratis
-                    </Link>
+                      Empezar ahora
+                    </a>
                   </div>
                 </Reveal>
               ))}
@@ -299,13 +319,15 @@ export default async function Home() {
             Conecta tu número, organiza tu bandeja y empieza a automatizar hoy mismo.
           </p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-            <Link
-              href="/signup"
+            <a
+              href={genericWaHref}
+              target="_blank"
+              rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/25 transition-colors hover:bg-primary-hover"
             >
               Empezar prueba gratis
               <ArrowRight size={16} />
-            </Link>
+            </a>
             <Link
               href="/login"
               className="flex items-center justify-center gap-2 rounded-lg border border-border px-6 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-surface"
