@@ -21,13 +21,46 @@ const trustBadges = [
   { icon: RefreshCw, title: "Mejoras constantes", text: "Siempre lo último del CRM" },
 ];
 
+const pricingPlans = [
+  {
+    name: "CRM Bybluee Anual (1 Año)",
+    priceLabel: "$150.000",
+    featured: false,
+    message: "Hola, quiero el plan Anual (1 año) de CRM ByBluee por $150.000 COP.",
+  },
+  {
+    name: "CRM Bybluee Vitalicio",
+    priceLabel: "$300.000",
+    featured: true,
+    message: "Hola, quiero el plan Vitalicio de CRM ByBluee por $300.000 COP.",
+  },
+  {
+    name: "Plan Emprendedor",
+    priceLabel: "$700.000",
+    featured: false,
+    message: "Hola, quiero el Plan Emprendedor de CRM ByBluee por $700.000 COP.",
+  },
+];
+
+const pricingFeatures = [
+  "Chatbot para WhatsApp",
+  "CRM de contactos",
+  "Automatizaciones ilimitadas",
+  "Campañas masivas",
+  "Reportes avanzados",
+  "Soporte premium",
+];
+
 export default async function ByBlueeLanding() {
   const supabase = await createClient();
-  const { data: plans } = await supabase
-    .from("plans")
-    .select("*")
-    .eq("is_active", true)
-    .order("price_cents");
+  const { data: supportSetting } = await supabase
+    .from("platform_settings")
+    .select("value")
+    .eq("key", "support_whatsapp_number")
+    .maybeSingle();
+
+  // Configurable at /admin/support — falls back to a placeholder until set.
+  const salesWhatsappNumber = supportSetting?.value || "573000000000";
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-background text-foreground">
@@ -227,62 +260,66 @@ export default async function ByBlueeLanding() {
       </section>
 
       {/* Pricing */}
-      {plans && plans.length > 0 && (
-        <section id="precios" className="bg-surface/40 py-20">
-          <div className="mx-auto max-w-6xl px-5 sm:px-8">
-            <Reveal>
-              <p className="text-center text-xs font-semibold uppercase tracking-wide text-primary">
-                Elige tu plan
-              </p>
-              <h2 className="mx-auto mt-2 max-w-2xl text-center text-3xl font-semibold text-foreground sm:text-4xl">
-                Comienza hoy mismo
-              </h2>
-              <p className="mx-auto mt-4 max-w-xl text-center text-muted">
-                7 días de prueba gratis en cualquier plan, sin tarjeta de crédito.
-              </p>
-            </Reveal>
+      <section id="precios" className="bg-surface/40 py-20">
+        <div className="mx-auto max-w-6xl px-5 sm:px-8">
+          <Reveal>
+            <h2 className="mx-auto max-w-2xl text-center text-3xl font-semibold text-foreground sm:text-4xl">
+              Elige tu plan y comienza hoy
+            </h2>
+          </Reveal>
 
-            <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {plans.map((plan, i) => (
-                <Reveal key={plan.id} delay={i * 100}>
-                  <div className="relative flex h-full flex-col rounded-2xl border border-border bg-surface p-6">
-                    {i === 0 && plans.length > 1 && (
-                      <span className="absolute -top-3 left-6 rounded-full bg-primary px-3 py-1 text-[10px] font-semibold text-white">
-                        Más popular
-                      </span>
-                    )}
-                    <h3 className="text-lg font-semibold text-foreground">{plan.name}</h3>
+          <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {pricingPlans.map((plan, i) => {
+              const waHref = `https://wa.me/${salesWhatsappNumber}?text=${encodeURIComponent(plan.message)}`;
+              return (
+                <Reveal key={plan.name} delay={i * 100}>
+                  <div
+                    className={`relative flex h-full flex-col rounded-2xl border p-6 ${
+                      plan.featured
+                        ? "border-primary bg-primary/5"
+                        : "border-border bg-surface"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-semibold text-foreground">{plan.name}</h3>
+                      {plan.featured && (
+                        <span className="flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-semibold text-white">
+                          <ZapIcon size={10} />
+                          Más popular
+                        </span>
+                      )}
+                    </div>
                     <div className="mt-3 flex items-baseline gap-1">
                       <span className="text-3xl font-semibold text-foreground">
-                        ${(plan.price_cents / 100).toLocaleString("es-CO")}
+                        {plan.priceLabel}
                       </span>
-                      <span className="text-sm text-muted">
-                        {plan.currency} /{" "}
-                        {plan.billing_cycle === "yearly" ? "año" : "mes"}
-                      </span>
+                      <span className="text-sm text-muted">COP</span>
                     </div>
+                    <p className="text-xs text-muted">Pago único • Acceso de por vida</p>
                     <ul className="mt-5 flex flex-1 flex-col gap-2 text-sm text-muted">
-                      {includedItems.slice(0, 6).map((item) => (
+                      {pricingFeatures.map((item) => (
                         <li key={item} className="flex items-center gap-2">
                           <Check size={13} className="shrink-0 text-success" />
                           {item}
                         </li>
                       ))}
                     </ul>
-                    <Link
-                      href="/signup"
+                    <a
+                      href={waHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="mt-6 flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
                     >
+                      <WhatsAppIcon size={14} />
                       Comenzar ahora
-                      <ArrowRight size={14} />
-                    </Link>
+                    </a>
                   </div>
                 </Reveal>
-              ))}
-            </div>
+              );
+            })}
           </div>
-        </section>
-      )}
+        </div>
+      </section>
 
       {/* Final CTA */}
       <section className="mx-auto max-w-4xl px-5 py-24 text-center sm:px-8">
