@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
 import { InboundMessageSound } from "@/components/inbound-message-sound";
 import { PushNotifications } from "@/components/push-notifications";
+import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 
 type Notification = {
   id: string;
@@ -82,7 +83,13 @@ export function DashboardChrome({
           notifications={notifications}
           onMenuClick={() => setMobileNavOpen(true)}
         />
-        <main className="flex-1 p-4 sm:p-5">{children}</main>
+        <main className="flex-1 p-4 pb-20 sm:p-5 sm:pb-20 lg:pb-5">{children}</main>
+        <MobileBottomNav
+          workspaceRole={workspaceRole}
+          billingLocked={billingLocked}
+          enabledModules={enabledModules}
+          unreadMessagesCount={unreadMessagesCount}
+        />
       </div>
     </div>
   );

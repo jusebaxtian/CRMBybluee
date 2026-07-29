@@ -7,6 +7,7 @@ import { NotesEditor } from "@/components/notes-editor";
 import { ChatPane } from "@/components/chat-pane";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
 import { ConversationAssignmentControl } from "@/components/conversation-assignment-control";
+import { ConversationDetailsSheet } from "@/components/conversation-details-sheet";
 import { getWorkspaceId } from "@/lib/workspace";
 import { listWorkspaceAgents } from "@/lib/agents";
 
@@ -93,12 +94,24 @@ export default async function ConversationPage({
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
             {(contact.name ?? contact.wa_id).charAt(0).toUpperCase()}
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-foreground">
               {contact.name ?? contact.wa_id}
             </p>
             <p className="text-xs text-muted">Cliente</p>
           </div>
+          <ConversationDetailsSheet
+            contactName={contact.name}
+            contactWaId={contact.wa_id}
+            conversationId={conversation.id}
+            contactId={conversation.contact_id}
+            agents={agents}
+            assignedAgentId={conversation.assigned_agent_id}
+            allTags={allTags ?? []}
+            assignedTagIds={assignedTagIds}
+            notes={contact.notes}
+            automations={automations ?? []}
+          />
         </div>
 
         <ChatPane conversationId={id} messages={messages ?? []} />
