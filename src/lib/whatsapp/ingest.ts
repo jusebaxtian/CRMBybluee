@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { WhatsAppWebhookPayload } from "@/lib/whatsapp/webhook-types";
 import { runKeywordAutomations } from "@/lib/automations/engine";
 import { getMediaUrl, downloadMedia } from "@/lib/whatsapp/graph";
+import { notifyNewMessage } from "@/lib/push/send";
 
 const extensionFromMime: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -86,7 +87,7 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
             },
             { onConflict: "workspace_id,contact_id" }
           )
-          .select("id")
+          .select("id, assigned_agent_id")
           .single();
 
         if (!conversation) continue;
@@ -107,20 +108,31 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           mediaMimeType = persisted?.mimeType ?? mediaPayload.mime_type;
         }
 
+        const messageBody =
+          message.text?.body ??
+          (message.image?.caption || message.video?.caption || message.document?.caption) ??
+          (message.document?.filename ?? null);
+
         await supabase.from("messages").insert({
           conversation_id: conversation.id,
           direction: "in",
           message_type: message.type,
-          body:
-            message.text?.body ??
-            (message.image?.caption || message.video?.caption || message.document?.caption) ??
-            (message.document?.filename ?? null),
+          body: messageBody,
           media_url: mediaUrl,
           media_mime_type: mediaMimeType,
           wa_message_id: message.id,
           status: "delivered",
           created_at: new Date(Number(message.timestamp) * 1000).toISOString(),
         });
+
+        await notifyNewMessage(
+          supabase,
+          workspaceId,
+          conversation.id,
+          conversation.assigned_agent_id,
+          profileName ?? null,
+          messageBody || "Nuevo mensaje de WhatsApp"
+        );
 
         if (message.text?.body) {
           await runKeywordAutomations(supabase, workspaceId, contact.id, message.text.body);
