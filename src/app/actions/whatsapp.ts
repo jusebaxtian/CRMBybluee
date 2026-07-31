@@ -1,6 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { writeFile, readFile, unlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import crypto from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
@@ -11,6 +17,36 @@ import {
   sendMediaMessage,
 } from "@/lib/whatsapp/graph";
 import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
+
+const execFileAsync = promisify(execFile);
+
+// The browser's MediaRecorder produces audio/webm (Chrome/Edge) or
+// audio/mp4 (Safari) — WhatsApp's Cloud API only accepts AAC, AMR, MP3,
+// MP4 audio, or OGG/Opus (its own voice-note format), so webm recordings
+// are silently rejected by Meta. Re-encode to OGG/Opus before sending.
+async function transcodeToOggOpus(buffer: Buffer): Promise<Buffer> {
+  const id = crypto.randomUUID();
+  const inPath = path.join(tmpdir(), `${id}-in.webm`);
+  const outPath = path.join(tmpdir(), `${id}-out.ogg`);
+  await writeFile(inPath, buffer);
+  try {
+    await execFileAsync("ffmpeg", [
+      "-y",
+      "-i",
+      inPath,
+      "-vn",
+      "-c:a",
+      "libopus",
+      "-b:a",
+      "32k",
+      outPath,
+    ]);
+    return await readFile(outPath);
+  } finally {
+    await unlink(inPath).catch(() => {});
+    await unlink(outPath).catch(() => {});
+  }
+}
 
 function mediaTypeFromMime(mime: string): "image" | "audio" | "video" | "document" {
   if (mime.startsWith("image/")) return "image";
@@ -182,17 +218,38 @@ export async function sendChatMedia(formData: FormData) {
   const contactWaId = (conversation.contacts as unknown as { wa_id: string }).wa_id;
   const mediaType = mediaTypeFromMime(file.type);
 
+  let uploadBuffer: Buffer | File = file;
+  let uploadContentType = file.type;
+  let uploadFilename = file.name;
+
+  // Only webm needs converting — WhatsApp already accepts the other formats
+  // browsers might produce (e.g. Safari's audio/mp4).
+  if (mediaType === "audio" && file.type.includes("webm")) {
+    try {
+      const original = Buffer.from(await file.arrayBuffer());
+      uploadBuffer = await transcodeToOggOpus(original);
+      uploadContentType = "audio/ogg; codecs=opus";
+      uploadFilename = file.name.replace(/\.webm$/i, ".ogg");
+    } catch (err) {
+      return {
+        error:
+          "No se pudo procesar la nota de voz: " +
+          (err instanceof Error ? err.message : "error desconocido"),
+      };
+    }
+  }
+
   const admin = createAdminClient();
-  const path = `${conversation.workspace_id}/${conversationId}/${Date.now()}-${file.name}`;
+  const storagePath = `${conversation.workspace_id}/${conversationId}/${Date.now()}-${uploadFilename}`;
 
   const { error: uploadError } = await admin.storage
     .from("chat-media")
-    .upload(path, file, { contentType: file.type });
+    .upload(storagePath, uploadBuffer, { contentType: uploadContentType });
   if (uploadError) return { error: uploadError.message };
 
   const {
     data: { publicUrl },
-  } = admin.storage.from("chat-media").getPublicUrl(path);
+  } = admin.storage.from("chat-media").getPublicUrl(storagePath);
 
   try {
     const result = await sendMediaMessage(
@@ -201,16 +258,16 @@ export async function sendChatMedia(formData: FormData) {
       contactWaId,
       mediaType,
       publicUrl,
-      file.name
+      uploadFilename
     );
 
     await supabase.from("messages").insert({
       conversation_id: conversationId,
       direction: "out",
       message_type: mediaType,
-      body: mediaType === "document" ? file.name : null,
+      body: mediaType === "document" ? uploadFilename : null,
       media_url: publicUrl,
-      media_mime_type: file.type,
+      media_mime_type: uploadContentType,
       wa_message_id: result.messages[0]?.id,
       status: "sent",
     });
