@@ -23,6 +23,7 @@ export type WhatsAppWebhookPayload = {
           status: "sent" | "delivered" | "read" | "failed";
           timestamp: string;
           recipient_id: string;
+          errors?: { code: number; title: string; message?: string; error_data?: { details?: string } }[];
         }[];
       };
     }[];

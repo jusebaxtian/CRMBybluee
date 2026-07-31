@@ -35,6 +35,8 @@ async function transcodeToOggOpus(buffer: Buffer): Promise<Buffer> {
       "-i",
       inPath,
       "-vn",
+      "-map_metadata",
+      "-1",
       "-c:a",
       "libopus",
       "-b:a",
@@ -228,7 +230,11 @@ export async function sendChatMedia(formData: FormData) {
     try {
       const original = Buffer.from(await file.arrayBuffer());
       uploadBuffer = await transcodeToOggOpus(original);
-      uploadContentType = "audio/ogg; codecs=opus";
+      // WhatsApp's media-link fetcher matches the Content-Type header against
+      // its supported-format allowlist exactly — "audio/ogg; codecs=opus" (a
+      // valid MIME type in general) doesn't match their "audio/ogg" entry, so
+      // the message gets silently marked "failed" after Meta downloads it.
+      uploadContentType = "audio/ogg";
       uploadFilename = file.name.replace(/\.webm$/i, ".ogg");
     } catch (err) {
       return {

@@ -140,6 +140,12 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
       }
 
       for (const status of value.statuses ?? []) {
+        if (status.status === "failed" && status.errors?.length) {
+          console.error(
+            `whatsapp delivery failed for wa_message_id=${status.id}:`,
+            JSON.stringify(status.errors)
+          );
+        }
         await supabase
           .from("messages")
           .update({ status: status.status })
