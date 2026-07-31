@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { LayoutDashboard, Bell, CreditCard, Package, ArrowLeftRight, Image as ImageIcon, LifeBuoy } from "lucide-react";
+import { LayoutDashboard, Bell, CreditCard, Package, ArrowLeftRight, Image as ImageIcon, LifeBuoy, MessageSquare } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { isPlatformAdmin } from "@/lib/admin";
 import { logout } from "@/app/actions/auth";
@@ -60,6 +60,13 @@ export default async function AdminLayout({
           >
             <Package size={18} />
             Planes
+          </Link>
+          <Link
+            href="/admin/whatsapp"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted hover:bg-surface-hover hover:text-foreground"
+          >
+            <MessageSquare size={18} />
+            WhatsApp Admin
           </Link>
           <Link
             href="/admin/banner"

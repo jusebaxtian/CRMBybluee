@@ -38,6 +38,19 @@ export default function SignupPage() {
             />
           </div>
           <div>
+            <label htmlFor="phone" className="mb-1 block text-sm font-medium text-muted">
+              Número de WhatsApp
+            </label>
+            <input
+              id="phone"
+              name="phone"
+              type="tel"
+              placeholder="Ej: 573001234567"
+              required
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            />
+          </div>
+          <div>
             <label htmlFor="email" className="mb-1 block text-sm font-medium text-muted">
               Correo
             </label>

@@ -6,6 +6,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { logAdminAccess, startImpersonation } from "@/app/actions/admin";
 import { WorkspaceAdminEditor } from "@/components/workspace-admin-editor";
 import { EditClientFields } from "@/components/edit-client-fields";
+import { NotifyActivationButton } from "@/components/notify-activation-button";
+import { getActivationTemplateConfig } from "@/app/actions/admin-whatsapp";
 
 export default async function AdminWorkspaceDetailPage({
   params,
@@ -17,7 +19,7 @@ export default async function AdminWorkspaceDetailPage({
 
   const { data: workspace } = await supabase
     .from("workspaces")
-    .select("id, name, status, plan_id, trial_ends_at, created_at, signup_ip")
+    .select("id, name, status, plan_id, trial_ends_at, created_at, signup_ip, phone")
     .eq("id", id)
     .maybeSingle();
 
@@ -34,6 +36,8 @@ export default async function AdminWorkspaceDetailPage({
   await logAdminAccess(id);
 
   const { data: plans } = await supabase.from("plans").select("id, name").order("name");
+  const currentPlanName = plans?.find((p) => p.id === workspace.plan_id)?.name ?? "";
+  const activationConfig = await getActivationTemplateConfig();
 
   const [{ count: contactsCount }, { count: conversationsCount }, { count: membersCount }] =
     await Promise.all([
@@ -105,9 +109,20 @@ export default async function AdminWorkspaceDetailPage({
         <EditClientFields
           workspaceId={workspace.id}
           workspaceName={workspace.name}
+          workspacePhone={workspace.phone}
           ownerId={owner?.user_id ?? null}
           ownerEmail={ownerEmail}
         />
+        <div className="mt-4 border-t border-border pt-4">
+          <NotifyActivationButton
+            workspaceId={workspace.id}
+            phone={workspace.phone}
+            planName={currentPlanName}
+            username={workspace.name}
+            email={ownerEmail ?? ""}
+            hasTemplateConfig={!!activationConfig}
+          />
+        </div>
       </div>
 
       <WorkspaceAdminEditor

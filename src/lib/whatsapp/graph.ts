@@ -182,8 +182,19 @@ export async function sendTemplateMessage(
   accessToken: string,
   to: string,
   templateName: string,
-  language: string
+  language: string,
+  bodyParams?: string[]
 ): Promise<{ messages: { id: string }[] }> {
+  const template: Record<string, unknown> = { name: templateName, language: { code: language } };
+  if (bodyParams && bodyParams.length > 0) {
+    template.components = [
+      {
+        type: "body",
+        parameters: bodyParams.map((text) => ({ type: "text", text })),
+      },
+    ];
+  }
+
   return graphFetch(`/${phoneNumberId}/messages`, {
     method: "POST",
     headers: {
@@ -194,7 +205,7 @@ export async function sendTemplateMessage(
       messaging_product: "whatsapp",
       to,
       type: "template",
-      template: { name: templateName, language: { code: language } },
+      template,
     }),
   });
 }

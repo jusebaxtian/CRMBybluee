@@ -117,6 +117,20 @@ export async function updateWorkspaceName(workspaceId: string, name: string) {
   return { success: true };
 }
 
+export async function updateWorkspacePhone(workspaceId: string, phone: string) {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
+
+  const { error } = await supabase
+    .from("workspaces")
+    .update({ phone: phone.trim().replace(/[^\d]/g, "") || null })
+    .eq("id", workspaceId);
+
+  if (error) return { error: error.message };
+  revalidatePath(`/admin/workspaces/${workspaceId}`);
+  return { success: true };
+}
+
 export async function updateOwnerEmail(userId: string, email: string, workspaceId: string) {
   const supabase = await createClient();
   if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };

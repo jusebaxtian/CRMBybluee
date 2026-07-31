@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { updateWorkspaceName, updateOwnerEmail, updateOwnerPassword } from "@/app/actions/admin";
+import {
+  updateWorkspaceName,
+  updateOwnerEmail,
+  updateOwnerPassword,
+  updateWorkspacePhone,
+} from "@/app/actions/admin";
 
 function EditableField({
   label,
@@ -62,11 +67,13 @@ function EditableField({
 export function EditClientFields({
   workspaceId,
   workspaceName,
+  workspacePhone,
   ownerId,
   ownerEmail,
 }: {
   workspaceId: string;
   workspaceName: string;
+  workspacePhone: string | null;
   ownerId: string | null;
   ownerEmail: string | null;
 }) {
@@ -76,6 +83,13 @@ export function EditClientFields({
         label="Nombre del cliente / negocio"
         initialValue={workspaceName}
         onSave={(v) => updateWorkspaceName(workspaceId, v)}
+      />
+      <EditableField
+        label="Número de WhatsApp"
+        initialValue={workspacePhone ?? ""}
+        type="tel"
+        placeholder="Ej: 573001234567"
+        onSave={(v) => updateWorkspacePhone(workspaceId, v)}
       />
       {ownerId ? (
         <>

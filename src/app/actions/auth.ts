@@ -26,8 +26,9 @@ export async function signup(
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const companyName = String(formData.get("companyName") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim().replace(/[^\d]/g, "");
 
-  if (!email || !password || !companyName) {
+  if (!email || !password || !companyName || !phone) {
     return { error: "Completa todos los campos." };
   }
   if (password.length < 8) {
@@ -50,6 +51,7 @@ export async function signup(
   const { error: rpcError } = await supabase.rpc("create_workspace_with_owner", {
     workspace_name: companyName,
     signup_ip: signupIp,
+    phone,
   });
 
   if (rpcError) {
