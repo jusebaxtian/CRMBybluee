@@ -23,6 +23,7 @@ const FIELD_LABELS: Record<ActivationField, string> = {
   expiry_date: "Fecha de vencimiento",
   username: "Usuario (nombre del cliente)",
   email: "Correo",
+  password: "Clave de acceso",
   fixed: "Texto fijo...",
 };
 

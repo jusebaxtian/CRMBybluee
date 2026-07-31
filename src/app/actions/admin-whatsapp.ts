@@ -20,6 +20,7 @@ export type ActivationField =
   | "expiry_date"
   | "username"
   | "email"
+  | "password"
   | "fixed";
 
 export type ActivationTemplateConfig = {
@@ -174,6 +175,7 @@ export async function sendActivationNotification(input: {
   expiryDate: string;
   username: string;
   email: string;
+  password: string;
 }) {
   const supabase = await createClient();
   if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
@@ -196,6 +198,7 @@ export async function sendActivationNotification(input: {
     expiry_date: input.expiryDate,
     username: input.username,
     email: input.email,
+    password: input.password,
   };
 
   const params = config.variables.map((v) =>

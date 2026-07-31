@@ -41,6 +41,7 @@ export function NotifyActivationButton({
     expiryDate: plusDaysIso(30),
     username,
     email,
+    password: "",
   });
 
   function close() {
@@ -60,6 +61,7 @@ export function NotifyActivationButton({
         expiryDate: form.expiryDate,
         username: form.username,
         email: form.email,
+        password: form.password,
       });
       if (result?.error) {
         setError(result.error);
@@ -134,6 +136,15 @@ export function NotifyActivationButton({
                   value={form.email}
                   onChange={(v) => setForm((f) => ({ ...f, email: v }))}
                 />
+                <Field
+                  label="Clave de acceso"
+                  value={form.password}
+                  onChange={(v) => setForm((f) => ({ ...f, password: v }))}
+                />
+                <p className="-mt-2 text-[11px] text-muted">
+                  Escríbela solo si tu plantilla la incluye — no se guarda, se envía tal cual la
+                  escribas aquí.
+                </p>
 
                 {error && <p className="text-xs text-red-400">{error}</p>}
 
