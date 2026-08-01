@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { sendTextMessage, sendMediaMessage, sendTemplateMessage } from "@/lib/whatsapp/graph";
+import { sendTextMessage, sendMediaMessage, sendTemplateMessage, uploadMedia } from "@/lib/whatsapp/graph";
 
 type Automation = {
   id: string;
@@ -134,12 +134,27 @@ async function executeAction(
   }
 
   if (mediaType && action.media_url) {
+    // Audio is sent by uploaded media id, not by link — see uploadMedia's
+    // comment: link-based audio can show "delivered" yet be unplayable.
+    const source =
+      mediaType === "audio"
+        ? {
+            id: await uploadMedia(
+              account.phone_number_id,
+              account.access_token,
+              Buffer.from(await (await fetch(action.media_url)).arrayBuffer()),
+              "audio/ogg",
+              action.media_filename ?? "audio.ogg"
+            ),
+          }
+        : { link: action.media_url };
+
     const result = await sendMediaMessage(
       account.phone_number_id,
       account.access_token,
       contact.wa_id,
       mediaType,
-      action.media_url,
+      source,
       action.media_filename ?? undefined,
       mediaType !== "audio" ? action.message_body ?? undefined : undefined
     );

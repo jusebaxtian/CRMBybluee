@@ -15,6 +15,7 @@ import {
   getPhoneNumberDetails,
   sendTextMessage,
   sendMediaMessage,
+  uploadMedia,
 } from "@/lib/whatsapp/graph";
 import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
 
@@ -37,10 +38,23 @@ async function transcodeToOggOpus(buffer: Buffer): Promise<Buffer> {
       "-vn",
       "-map_metadata",
       "-1",
+      "-ar",
+      "48000",
+      "-ac",
+      "1",
       "-c:a",
       "libopus",
+      // "voip" tunes Opus for speech instead of generic audio — Android's
+      // player tolerates non-voip Opus fine, but iOS's WhatsApp app only
+      // reliably plays voice notes encoded with this exact profile.
+      "-application",
+      "voip",
       "-b:a",
       "32k",
+      "-vbr",
+      "on",
+      "-compression_level",
+      "10",
       outPath,
     ]);
     return await readFile(outPath);
@@ -258,12 +272,30 @@ export async function sendChatMedia(formData: FormData) {
   } = admin.storage.from("chat-media").getPublicUrl(storagePath);
 
   try {
+    // Audio specifically is sent by uploaded media id, not by link — see the
+    // comment on uploadMedia for why (link-based audio can show "delivered"
+    // yet be unplayable for the recipient).
+    const source =
+      mediaType === "audio"
+        ? {
+            id: await uploadMedia(
+              account.phone_number_id,
+              account.access_token,
+              Buffer.isBuffer(uploadBuffer)
+                ? uploadBuffer
+                : Buffer.from(await (uploadBuffer as File).arrayBuffer()),
+              uploadContentType,
+              uploadFilename
+            ),
+          }
+        : { link: publicUrl };
+
     const result = await sendMediaMessage(
       account.phone_number_id,
       account.access_token,
       contactWaId,
       mediaType,
-      publicUrl,
+      source,
       uploadFilename
     );
 

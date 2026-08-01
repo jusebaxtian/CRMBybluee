@@ -133,16 +133,44 @@ export async function createMetaTemplate(
   });
 }
 
+// Uploads a file straight to Meta's media storage and returns its media id.
+// Sending audio by id (instead of by link) makes Meta fetch/validate the
+// file synchronously at upload time — sending by link instead defers that to
+// an async CDN fetch that can succeed (message shows "delivered") while still
+// leaving the recipient with an unplayable voice note ("no disponible").
+export async function uploadMedia(
+  phoneNumberId: string,
+  accessToken: string,
+  buffer: Buffer,
+  mimeType: string,
+  filename: string
+): Promise<string> {
+  const form = new FormData();
+  form.append("messaging_product", "whatsapp");
+  form.append("file", new Blob([new Uint8Array(buffer)], { type: mimeType }), filename);
+
+  const res = await fetch(`${GRAPH_BASE}/${phoneNumberId}/media`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: form,
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data?.error?.message ?? "No se pudo subir el archivo a WhatsApp.");
+  }
+  return data.id as string;
+}
+
 export async function sendMediaMessage(
   phoneNumberId: string,
   accessToken: string,
   to: string,
   type: "image" | "audio" | "video" | "document",
-  link: string,
+  source: { link: string } | { id: string },
   filename?: string,
   caption?: string
 ): Promise<{ messages: { id: string }[] }> {
-  const mediaObject: Record<string, unknown> = { link };
+  const mediaObject: Record<string, unknown> = { ...source };
   if (type === "document" && filename) mediaObject.filename = filename;
   // Audio messages don't support captions in the Cloud API.
   if (type !== "audio" && caption) mediaObject.caption = caption;
