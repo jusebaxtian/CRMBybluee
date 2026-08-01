@@ -4,6 +4,7 @@ import { requireModule } from "@/lib/entitlements";
 import { ConversationListPanel } from "@/components/conversation-list-panel";
 import { InboxShell } from "@/components/inbox-shell";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
+import { listWorkspaceAgents } from "@/lib/agents";
 
 export default async function InboxLayout({
   children,
@@ -17,7 +18,7 @@ export default async function InboxLayout({
   const { data: conversationsRaw } = await supabase
     .from("conversations")
     .select(
-      "id, last_message_at, last_read_at, contacts(name, wa_id, contact_tags(tags(id, name, color)))"
+      "id, last_message_at, last_read_at, assigned_agent_id, contacts(name, wa_id, contact_tags(tags(id, name, color)))"
     )
     .eq("workspace_id", workspaceId ?? "")
     .order("last_message_at", { ascending: false });
@@ -85,6 +86,7 @@ export default async function InboxLayout({
       lastMessagePreview,
       answered: last ? last.direction === "out" : true,
       unreadCount: unreadCountByConversation.get(c.id) ?? 0,
+      assignedAgentId: c.assigned_agent_id as string | null,
       contact: { name: contactRaw.name, wa_id: contactRaw.wa_id },
       tags: contactRaw.contact_tags.map((ct) => ct.tags).filter((t) => t !== null) as {
         id: string;
@@ -100,6 +102,14 @@ export default async function InboxLayout({
     .eq("workspace_id", workspaceId ?? "")
     .order("name");
 
+  const { data: workspaceTags } = await supabase
+    .from("tags")
+    .select("id, name, color")
+    .eq("workspace_id", workspaceId ?? "")
+    .order("name");
+
+  const agents = await listWorkspaceAgents(supabase, workspaceId);
+
   return (
     <div className="-m-4 sm:-m-5">
       {workspaceId && (
@@ -109,7 +119,16 @@ export default async function InboxLayout({
           channelName={`conversations-${workspaceId}`}
         />
       )}
-      <InboxShell list={<ConversationListPanel conversations={conversations} contacts={contacts ?? []} />}>
+      <InboxShell
+        list={
+          <ConversationListPanel
+            conversations={conversations}
+            contacts={contacts ?? []}
+            allTags={workspaceTags ?? []}
+            agents={agents}
+          />
+        }
+      >
         {children}
       </InboxShell>
     </div>
