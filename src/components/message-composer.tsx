@@ -238,7 +238,7 @@ export function MessageComposer({
   const ss = String(recordSeconds % 60).padStart(2, "0");
 
   return (
-    <div className="w-full min-w-0 border-t border-border bg-surface p-2 sm:p-4">
+    <div className="relative w-full min-w-0 border-t border-border bg-surface p-2 sm:p-4">
       {recStatus !== "idle" && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/95 backdrop-blur-sm">
           <button
@@ -318,11 +318,9 @@ export function MessageComposer({
         </div>
       )}
 
-      <form
-        ref={formRef}
-        onSubmit={handleSubmit}
-        className="flex w-full min-w-0 items-center gap-1.5 sm:gap-2"
-      >
+      {/* Floating cluster — sits above the input instead of crowding the
+          typing row, so it never wraps/overlaps on narrow screens. */}
+      <div className="absolute -top-14 right-2 flex items-center gap-2 rounded-full border border-border bg-surface p-1.5 shadow-lg">
         <input
           ref={fileInputRef}
           type="file"
@@ -333,11 +331,27 @@ export function MessageComposer({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-foreground sm:h-10 sm:w-10"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-hover hover:text-foreground"
           title="Adjuntar archivo"
         >
           <Paperclip size={18} />
         </button>
+        <QuickReplyPicker contactId={contactId} quickReplies={quickReplies} />
+        <button
+          type="button"
+          onClick={startRecording}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-hover hover:text-foreground"
+          title="Grabar nota de voz"
+        >
+          <Mic size={18} />
+        </button>
+      </div>
+
+      <form
+        ref={formRef}
+        onSubmit={handleSubmit}
+        className="flex w-full min-w-0 items-center gap-1.5 sm:gap-2"
+      >
         <input
           name="body"
           type="text"
@@ -348,15 +362,6 @@ export function MessageComposer({
           // auto-zoom the page on focus, which pushes the send button off-screen.
           className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 text-base text-foreground outline-none focus:border-primary sm:h-10 sm:px-3 sm:text-sm"
         />
-        <QuickReplyPicker contactId={contactId} quickReplies={quickReplies} />
-        <button
-          type="button"
-          onClick={startRecording}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-foreground sm:h-10 sm:w-10"
-          title="Grabar nota de voz"
-        >
-          <Mic size={18} />
-        </button>
         <button
           type="submit"
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-white sm:h-10 sm:w-10"
