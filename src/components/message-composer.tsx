@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Send, Paperclip, Mic, Square, X, Check, Play, Pause } from "lucide-react";
+import { Send, Paperclip, Mic, Square, X, Check, Play, Pause, RotateCcw } from "lucide-react";
 import { sendMessage, sendChatMedia } from "@/app/actions/whatsapp";
 import type { OptimisticMessage } from "@/components/chat-pane";
 
@@ -24,6 +24,7 @@ export function MessageComposer({
   const [recStatus, setRecStatus] = useState<RecordingStatus>("idle");
   const [recordSeconds, setRecordSeconds] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingMimeTypeRef = useRef<string>("audio/webm");
   const audioChunksRef = useRef<Blob[]>([]);
   const recordedBlobRef = useRef<Blob | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -104,7 +105,20 @@ export function MessageComposer({
     setUploadError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      // Different browsers support different container/codec combos for
+      // MediaRecorder (Chrome/Edge: webm/opus, Safari: often mp4/aac) — using
+      // whatever the browser actually records instead of hardcoding "webm"
+      // is what makes the local preview player able to decode it.
+      const candidates = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/mp4",
+        "audio/mpeg",
+      ];
+      const mimeType =
+        candidates.find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
+      recordingMimeTypeRef.current = mimeType || "audio/webm";
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       audioChunksRef.current = [];
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
@@ -133,7 +147,7 @@ export function MessageComposer({
       }
       recorder.onstop = () => {
         recorder.stream.getTracks().forEach((t) => t.stop());
-        resolve(new Blob(audioChunksRef.current, { type: "audio/webm" }));
+        resolve(new Blob(audioChunksRef.current, { type: recordingMimeTypeRef.current }));
       };
       recorder.stop();
     });
@@ -164,16 +178,27 @@ export function MessageComposer({
     setRecordSeconds(0);
   }
 
-  function togglePreviewPlayback() {
+  async function togglePreviewPlayback() {
     const audio = previewAudioRef.current;
     if (!audio) return;
     if (audio.paused) {
-      audio.play();
-      setPreviewPlaying(true);
+      try {
+        await audio.play();
+        setPreviewPlaying(true);
+      } catch {
+        setUploadError("No se pudo reproducir el audio. Intenta de nuevo.");
+      }
     } else {
       audio.pause();
       setPreviewPlaying(false);
     }
+  }
+
+  function reRecord() {
+    discardPreview();
+    setRecStatus("idle");
+    setRecordSeconds(0);
+    startRecording();
   }
 
   function sendRecording() {
@@ -182,7 +207,8 @@ export function MessageComposer({
     setRecordSeconds(0);
     discardPreview();
     if (blob && blob.size > 0) {
-      uploadFile(new File([blob], `nota-de-voz-${Date.now()}.webm`, { type: "audio/webm" }));
+      const ext = blob.type.includes("mp4") ? "mp4" : blob.type.includes("mpeg") ? "mp3" : "webm";
+      uploadFile(new File([blob], `nota-de-voz-${Date.now()}.${ext}`, { type: blob.type }));
     }
   }
 
@@ -223,8 +249,11 @@ export function MessageComposer({
                 <audio
                   ref={previewAudioRef}
                   src={previewUrl}
+                  preload="auto"
+                  playsInline
                   onEnded={() => setPreviewPlaying(false)}
-                  className="hidden"
+                  onPause={() => setPreviewPlaying(false)}
+                  style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
                 />
               )}
               <button
@@ -236,14 +265,24 @@ export function MessageComposer({
               >
                 {previewPlaying ? <Pause size={30} /> : <Play size={30} className="ml-1" />}
               </button>
-              <button
-                type="button"
-                onClick={sendRecording}
-                aria-label="Enviar nota de voz"
-                className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-white shadow-lg hover:bg-primary-hover"
-              >
-                <Check size={28} />
-              </button>
+              <div className="flex items-center gap-6">
+                <button
+                  type="button"
+                  onClick={reRecord}
+                  aria-label="Grabar de nuevo"
+                  className="flex h-12 w-12 items-center justify-center rounded-full border border-border text-muted hover:text-foreground"
+                >
+                  <RotateCcw size={20} />
+                </button>
+                <button
+                  type="button"
+                  onClick={sendRecording}
+                  aria-label="Enviar nota de voz"
+                  className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-white shadow-lg hover:bg-primary-hover"
+                >
+                  <Check size={28} />
+                </button>
+              </div>
             </div>
           )}
 
@@ -252,7 +291,7 @@ export function MessageComposer({
               ? "Toca para detener"
               : previewPlaying
                 ? "Reproduciendo..."
-                : "Toca para escuchar · luego envía"}
+                : "Escucha, vuelve a grabar o envía"}
           </p>
         </div>
       )}
