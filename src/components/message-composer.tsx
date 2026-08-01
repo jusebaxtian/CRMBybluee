@@ -238,7 +238,7 @@ export function MessageComposer({
   const ss = String(recordSeconds % 60).padStart(2, "0");
 
   return (
-    <div className="relative w-full min-w-0 border-t border-border bg-surface p-2 sm:p-4">
+    <div className="w-full min-w-0 border-t border-border bg-surface p-2 sm:p-4">
       {recStatus !== "idle" && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/95 backdrop-blur-sm">
           <button
@@ -321,7 +321,7 @@ export function MessageComposer({
       {/* Floating cluster — a vertical stack pinned to the left edge, clear
           of the message bubbles and the input row instead of overlapping
           either. */}
-      <div className="fixed left-3 top-1/2 z-30 flex -translate-y-1/2 flex-col items-center gap-2 rounded-full border border-border bg-surface p-1.5 shadow-lg">
+      <div className="absolute left-3 top-1/2 z-30 flex -translate-y-1/2 flex-col items-center gap-2 rounded-full border border-border bg-surface p-1.5 shadow-lg">
         <input
           ref={fileInputRef}
           type="file"

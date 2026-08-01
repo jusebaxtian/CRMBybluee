@@ -38,7 +38,7 @@ export function QuickReplyPicker({
   return (
     <div className="relative">
       {open && (
-        <div className="absolute bottom-full right-0 z-20 mb-2 w-64 rounded-xl border border-border bg-surface p-2 shadow-xl">
+        <div className="absolute left-full top-1/2 z-20 ml-2 w-64 -translate-y-1/2 rounded-xl border border-border bg-surface p-2 shadow-xl">
           <div className="mb-1 flex items-center justify-between px-1">
             <p className="text-xs font-medium uppercase tracking-wide text-muted">
               Respuestas rápidas

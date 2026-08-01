@@ -36,7 +36,7 @@ export function ChatPane({
   const combined = [...messages, ...pending];
 
   return (
-    <>
+    <div className="relative flex min-h-0 flex-1 flex-col">
       <MessagesScrollArea messages={combined} />
       <MessageComposer
         conversationId={conversationId}
@@ -44,6 +44,6 @@ export function ChatPane({
         quickReplies={quickReplies}
         onOptimisticSend={(message) => setPending((p) => [...p, message])}
       />
-    </>
+    </div>
   );
 }
