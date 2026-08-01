@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Send, Paperclip, Mic, Square, X } from "lucide-react";
 import { sendMessage, sendChatMedia } from "@/app/actions/whatsapp";
 import type { OptimisticMessage } from "@/components/chat-pane";
@@ -17,7 +16,6 @@ export function MessageComposer({
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const router = useRouter();
 
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -47,11 +45,10 @@ export function MessageComposer({
         created_at: new Date().toISOString(),
       });
 
-      const result = await sendMessage({ conversationId, body });
-      if (!("error" in result)) {
-        router.refresh();
-      }
-      return result;
+      // No manual refresh here — RealtimeRefresh already refetches the page
+      // (debounced ~250ms) as soon as the message row lands in the DB, and
+      // the optimistic bubble above covers the gap until then.
+      return await sendMessage({ conversationId, body });
     },
     undefined
   );
@@ -68,7 +65,7 @@ export function MessageComposer({
       setUploadError(result.error);
       return;
     }
-    router.refresh();
+    // RealtimeRefresh picks up the new message row automatically.
   }
 
   function handleFilePicked(e: React.ChangeEvent<HTMLInputElement>) {

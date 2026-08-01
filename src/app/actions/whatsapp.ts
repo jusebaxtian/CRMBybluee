@@ -191,19 +191,21 @@ async function sendToConversation(
       body
     );
 
-    await supabase.from("messages").insert({
-      conversation_id: conversationId,
-      direction: "out",
-      message_type: "text",
-      body,
-      wa_message_id: result.messages[0]?.id,
-      status: "sent",
-    });
-
-    await supabase
-      .from("conversations")
-      .update({ last_message_at: new Date().toISOString() })
-      .eq("id", conversationId);
+    // Independent writes — no need to wait on one before starting the other.
+    await Promise.all([
+      supabase.from("messages").insert({
+        conversation_id: conversationId,
+        direction: "out",
+        message_type: "text",
+        body,
+        wa_message_id: result.messages[0]?.id,
+        status: "sent",
+      }),
+      supabase
+        .from("conversations")
+        .update({ last_message_at: new Date().toISOString() })
+        .eq("id", conversationId),
+    ]);
 
     revalidatePath(`/dashboard/inbox/${conversationId}`);
     revalidatePath("/dashboard/inbox");
@@ -216,22 +218,26 @@ async function sendToConversation(
 export async function sendChatMedia(formData: FormData) {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "No autenticado." };
-
   const conversationId = String(formData.get("conversationId") ?? "");
   const file = formData.get("file") as File | null;
   if (!conversationId || !file || file.size === 0) {
     return { error: "Adjunta un archivo." };
   }
 
-  const { data: conversation } = await supabase
-    .from("conversations")
-    .select("id, workspace_id, contacts(wa_id)")
-    .eq("id", conversationId)
-    .single();
+  const [
+    {
+      data: { user },
+    },
+    { data: conversation },
+  ] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase
+      .from("conversations")
+      .select("id, workspace_id, contacts(wa_id)")
+      .eq("id", conversationId)
+      .single(),
+  ]);
+  if (!user) return { error: "No autenticado." };
 
   if (!conversation) return { error: "Conversación no encontrada." };
 
@@ -274,9 +280,23 @@ export async function sendChatMedia(formData: FormData) {
   const admin = createAdminClient();
   const storagePath = `${conversation.workspace_id}/${conversationId}/${Date.now()}-${uploadFilename}`;
 
-  const { error: uploadError } = await admin.storage
-    .from("chat-media")
-    .upload(storagePath, uploadBuffer, { contentType: uploadContentType });
+  // Audio specifically is sent by uploaded media id, not by link — see the
+  // comment on uploadMedia for why (link-based audio can show "delivered"
+  // yet be unplayable for the recipient). Neither upload depends on the
+  // other's result, so run them together instead of one after another.
+  const metaBuffer =
+    mediaType === "audio"
+      ? Buffer.isBuffer(uploadBuffer)
+        ? uploadBuffer
+        : Buffer.from(await (uploadBuffer as File).arrayBuffer())
+      : null;
+
+  const [{ error: uploadError }, metaMediaId] = await Promise.all([
+    admin.storage.from("chat-media").upload(storagePath, uploadBuffer, { contentType: uploadContentType }),
+    metaBuffer
+      ? uploadMedia(account.phone_number_id, account.access_token, metaBuffer, uploadContentType, uploadFilename)
+      : Promise.resolve(null),
+  ]);
   if (uploadError) return { error: uploadError.message };
 
   const {
@@ -284,23 +304,7 @@ export async function sendChatMedia(formData: FormData) {
   } = admin.storage.from("chat-media").getPublicUrl(storagePath);
 
   try {
-    // Audio specifically is sent by uploaded media id, not by link — see the
-    // comment on uploadMedia for why (link-based audio can show "delivered"
-    // yet be unplayable for the recipient).
-    const source =
-      mediaType === "audio"
-        ? {
-            id: await uploadMedia(
-              account.phone_number_id,
-              account.access_token,
-              Buffer.isBuffer(uploadBuffer)
-                ? uploadBuffer
-                : Buffer.from(await (uploadBuffer as File).arrayBuffer()),
-              uploadContentType,
-              uploadFilename
-            ),
-          }
-        : { link: publicUrl };
+    const source = metaMediaId ? { id: metaMediaId } : { link: publicUrl };
 
     const result = await sendMediaMessage(
       account.phone_number_id,
@@ -311,21 +315,22 @@ export async function sendChatMedia(formData: FormData) {
       uploadFilename
     );
 
-    await supabase.from("messages").insert({
-      conversation_id: conversationId,
-      direction: "out",
-      message_type: mediaType,
-      body: mediaType === "document" ? uploadFilename : null,
-      media_url: publicUrl,
-      media_mime_type: uploadContentType,
-      wa_message_id: result.messages[0]?.id,
-      status: "sent",
-    });
-
-    await supabase
-      .from("conversations")
-      .update({ last_message_at: new Date().toISOString() })
-      .eq("id", conversationId);
+    await Promise.all([
+      supabase.from("messages").insert({
+        conversation_id: conversationId,
+        direction: "out",
+        message_type: mediaType,
+        body: mediaType === "document" ? uploadFilename : null,
+        media_url: publicUrl,
+        media_mime_type: uploadContentType,
+        wa_message_id: result.messages[0]?.id,
+        status: "sent",
+      }),
+      supabase
+        .from("conversations")
+        .update({ last_message_at: new Date().toISOString() })
+        .eq("id", conversationId),
+    ]);
 
     revalidatePath(`/dashboard/inbox/${conversationId}`);
     revalidatePath("/dashboard/inbox");
@@ -338,16 +343,21 @@ export async function sendChatMedia(formData: FormData) {
 export async function sendMessage(input: { conversationId: string; body: string }) {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Independent reads — run them together instead of one after another.
+  const [
+    {
+      data: { user },
+    },
+    { data: conversation },
+  ] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase
+      .from("conversations")
+      .select("id, workspace_id, contacts(wa_id)")
+      .eq("id", input.conversationId)
+      .single(),
+  ]);
   if (!user) return { error: "No autenticado." };
-
-  const { data: conversation } = await supabase
-    .from("conversations")
-    .select("id, workspace_id, contacts(wa_id)")
-    .eq("id", input.conversationId)
-    .single();
 
   if (!conversation) return { error: "Conversación no encontrada." };
 
