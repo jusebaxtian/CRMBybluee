@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { createQuickReply, updateQuickReply } from "@/app/actions/quick-replies";
 import { AutomationActionsBuilder, type InitialAction } from "@/components/automation-actions-builder";
 
@@ -26,6 +26,7 @@ export function NewQuickReplyForm({
     quickReply ? updateQuickReply : createQuickReply,
     undefined
   );
+  const [uploading, setUploading] = useState(false);
 
   return (
     <form action={action} className="flex flex-col gap-5">
@@ -54,6 +55,7 @@ export function NewQuickReplyForm({
           initialActions={quickReply?.actions}
           hideAgentActions
           showDelay={false}
+          onUploadingChange={setUploading}
         />
       </div>
 
@@ -61,10 +63,16 @@ export function NewQuickReplyForm({
 
       <button
         type="submit"
-        disabled={pending}
+        disabled={pending || uploading}
         className="self-start rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
       >
-        {pending ? "Guardando..." : quickReply ? "Guardar cambios" : "Crear respuesta rápida"}
+        {uploading
+          ? "Subiendo archivo..."
+          : pending
+            ? "Guardando..."
+            : quickReply
+              ? "Guardar cambios"
+              : "Crear respuesta rápida"}
       </button>
     </form>
   );

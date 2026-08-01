@@ -91,6 +91,7 @@ export function AutomationActionsBuilder({
   initialActions,
   hideAgentActions = false,
   showDelay = true,
+  onUploadingChange,
 }: {
   tags: Tag[];
   templates?: Template[];
@@ -98,6 +99,7 @@ export function AutomationActionsBuilder({
   initialActions?: InitialAction[];
   hideAgentActions?: boolean;
   showDelay?: boolean;
+  onUploadingChange?: (uploading: boolean) => void;
 }) {
   const [actions, setActions] = useState<ActionRow[]>(
     initialActions && initialActions.length > 0
@@ -188,10 +190,12 @@ export function AutomationActionsBuilder({
   async function handleFile(index: number, file: File) {
     setUploadingIndex(index);
     setUploadError(null);
+    onUploadingChange?.(true);
     const formData = new FormData();
     formData.set("file", file);
     const result = await uploadAutomationActionMedia(formData);
     setUploadingIndex(null);
+    onUploadingChange?.(false);
     if (result.error) {
       setUploadError(result.error);
       return;

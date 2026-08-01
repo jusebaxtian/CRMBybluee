@@ -35,6 +35,7 @@ export function NewAutomationForm({
   const [triggerType, setTriggerType] = useState<"tag_added" | "keyword">(
     automation?.trigger_type ?? "tag_added"
   );
+  const [uploading, setUploading] = useState(false);
 
   return (
     <form action={action} className="flex flex-col gap-5">
@@ -100,6 +101,7 @@ export function NewAutomationForm({
           templates={templates}
           agents={agents}
           initialActions={automation?.actions}
+          onUploadingChange={setUploading}
         />
       </div>
 
@@ -107,10 +109,16 @@ export function NewAutomationForm({
 
       <button
         type="submit"
-        disabled={pending}
+        disabled={pending || uploading}
         className="self-start rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
       >
-        {pending ? "Guardando..." : automation ? "Guardar cambios" : "Crear automatización"}
+        {uploading
+          ? "Subiendo archivo..."
+          : pending
+            ? "Guardando..."
+            : automation
+              ? "Guardar cambios"
+              : "Crear automatización"}
       </button>
     </form>
   );
