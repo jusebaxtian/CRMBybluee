@@ -1,9 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Send, Paperclip, Mic, Square, X } from "lucide-react";
+import { Send, Paperclip, Mic, Square, X, Check } from "lucide-react";
 import { sendMessage, sendChatMedia } from "@/app/actions/whatsapp";
 import type { OptimisticMessage } from "@/components/chat-pane";
+
+type RecordingStatus = "idle" | "recording" | "reviewing";
 
 export function MessageComposer({
   conversationId,
@@ -19,10 +21,11 @@ export function MessageComposer({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
 
-  const [recording, setRecording] = useState(false);
+  const [recStatus, setRecStatus] = useState<RecordingStatus>("idle");
   const [recordSeconds, setRecordSeconds] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const recordedBlobRef = useRef<Blob | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Typing "hola" [enter] "cómo estás" [enter] shouldn't have to wait for the
@@ -103,16 +106,10 @@ export function MessageComposer({
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
-      recorder.onstop = () => {
-        stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        if (blob.size > 0) {
-          uploadFile(new File([blob], `nota-de-voz-${Date.now()}.webm`, { type: "audio/webm" }));
-        }
-      };
       recorder.start();
       mediaRecorderRef.current = recorder;
-      setRecording(true);
+      recordedBlobRef.current = null;
+      setRecStatus("recording");
       setRecordSeconds(0);
       timerRef.current = setInterval(() => setRecordSeconds((s) => s + 1), 1000);
     } catch {
@@ -120,15 +117,49 @@ export function MessageComposer({
     }
   }
 
-  function stopRecording(discard = false) {
-    if (timerRef.current) clearInterval(timerRef.current);
-    setRecording(false);
-    if (discard && mediaRecorderRef.current) {
-      mediaRecorderRef.current.onstop = () => {
-        mediaRecorderRef.current?.stream.getTracks().forEach((t) => t.stop());
+  // Stops capture without sending yet — moves to a review step (tap the
+  // circle again) so the send/cancel controls sit in the center of the
+  // screen instead of the composer bar, which on iPhone gets covered by the
+  // Safari/WhatsApp-webview bottom chrome right when you need to tap them.
+  function stopCapture(): Promise<Blob> {
+    return new Promise((resolve) => {
+      const recorder = mediaRecorderRef.current;
+      if (!recorder) {
+        resolve(new Blob());
+        return;
+      }
+      recorder.onstop = () => {
+        recorder.stream.getTracks().forEach((t) => t.stop());
+        resolve(new Blob(audioChunksRef.current, { type: "audio/webm" }));
       };
+      recorder.stop();
+    });
+  }
+
+  async function handleCirclePress() {
+    if (timerRef.current) clearInterval(timerRef.current);
+    const blob = await stopCapture();
+    recordedBlobRef.current = blob;
+    setRecStatus("reviewing");
+  }
+
+  async function cancelRecording() {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (recStatus === "recording") {
+      await stopCapture();
     }
-    mediaRecorderRef.current?.stop();
+    recordedBlobRef.current = null;
+    setRecStatus("idle");
+    setRecordSeconds(0);
+  }
+
+  function sendRecording() {
+    const blob = recordedBlobRef.current;
+    setRecStatus("idle");
+    setRecordSeconds(0);
+    if (blob && blob.size > 0) {
+      uploadFile(new File([blob], `nota-de-voz-${Date.now()}.webm`, { type: "audio/webm" }));
+    }
   }
 
   const mm = String(Math.floor(recordSeconds / 60)).padStart(2, "0");
@@ -136,81 +167,104 @@ export function MessageComposer({
 
   return (
     <div className="w-full min-w-0 border-t border-border bg-surface p-2 sm:p-4">
-      {recording ? (
-        <div className="flex w-full min-w-0 items-center gap-2 rounded-lg border border-red-400/40 bg-red-400/10 px-3 py-2 sm:gap-3 sm:px-4 sm:py-2.5">
-          <span className="flex h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-red-400" />
-          <span className="min-w-0 flex-1 truncate text-sm text-foreground">
-            Grabando... {mm}:{ss}
-          </span>
+      {recStatus !== "idle" && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/95 backdrop-blur-sm">
           <button
             type="button"
-            onClick={() => stopRecording(true)}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-hover sm:h-9 sm:w-9"
-            title="Cancelar"
+            onClick={cancelRecording}
+            aria-label="Cancelar"
+            className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full bg-surface-hover text-foreground"
+            style={{ top: "max(1.25rem, env(safe-area-inset-top))" }}
           >
-            <X size={16} />
+            <X size={20} />
           </button>
-          <button
-            type="button"
-            onClick={() => stopRecording(false)}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-white sm:h-9 sm:w-9"
-            title="Enviar nota de voz"
-          >
-            <Square size={14} />
-          </button>
+
+          <p className="mb-8 text-2xl font-medium tabular-nums text-foreground">
+            {mm}:{ss}
+          </p>
+
+          {recStatus === "recording" ? (
+            <button
+              type="button"
+              onClick={handleCirclePress}
+              aria-label="Detener grabación"
+              className="relative flex h-24 w-24 items-center justify-center rounded-full bg-red-500 text-white shadow-lg"
+            >
+              <span className="absolute inset-0 animate-ping rounded-full bg-red-500/50" />
+              <Square size={30} fill="white" className="relative" />
+            </button>
+          ) : (
+            <div className="flex flex-col items-center gap-6">
+              <div className="flex h-24 w-24 items-center justify-center rounded-full bg-surface-hover">
+                <Mic size={30} className="text-muted" />
+              </div>
+              <button
+                type="button"
+                onClick={sendRecording}
+                aria-label="Enviar nota de voz"
+                className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-white shadow-lg hover:bg-primary-hover"
+              >
+                <Check size={28} />
+              </button>
+            </div>
+          )}
+
+          <p className="mt-8 text-sm text-muted">
+            {recStatus === "recording" ? "Toca para detener" : "Toca para enviar"}
+          </p>
         </div>
-      ) : (
-        <form
-          ref={formRef}
-          onSubmit={handleSubmit}
-          className="flex w-full min-w-0 items-center gap-1.5 sm:gap-2"
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx"
-            onChange={handleFilePicked}
-            className="hidden"
-          />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-foreground disabled:opacity-50 sm:h-10 sm:w-10"
-            title="Adjuntar archivo"
-          >
-            <Paperclip size={18} />
-          </button>
-          <input
-            name="body"
-            type="text"
-            placeholder={uploading ? "Enviando adjunto..." : "Escribe un mensaje..."}
-            autoComplete="off"
-            disabled={uploading}
-            required
-            // 16px min font size on mobile — anything smaller makes iOS/Android
-            // auto-zoom the page on focus, which pushes the send button off-screen.
-            className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 text-base text-foreground outline-none focus:border-primary disabled:opacity-50 sm:h-10 sm:px-3 sm:text-sm"
-          />
-          <button
-            type="button"
-            onClick={startRecording}
-            disabled={uploading}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-foreground disabled:opacity-50 sm:h-10 sm:w-10"
-            title="Grabar nota de voz"
-          >
-            <Mic size={18} />
-          </button>
-          <button
-            type="submit"
-            disabled={uploading}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-white disabled:opacity-50 sm:h-10 sm:w-10"
-            title="Enviar"
-          >
-            <Send size={16} />
-          </button>
-        </form>
       )}
+
+      <form
+        ref={formRef}
+        onSubmit={handleSubmit}
+        className="flex w-full min-w-0 items-center gap-1.5 sm:gap-2"
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx"
+          onChange={handleFilePicked}
+          className="hidden"
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-foreground disabled:opacity-50 sm:h-10 sm:w-10"
+          title="Adjuntar archivo"
+        >
+          <Paperclip size={18} />
+        </button>
+        <input
+          name="body"
+          type="text"
+          placeholder={uploading ? "Enviando adjunto..." : "Escribe un mensaje..."}
+          autoComplete="off"
+          disabled={uploading}
+          required
+          // 16px min font size on mobile — anything smaller makes iOS/Android
+          // auto-zoom the page on focus, which pushes the send button off-screen.
+          className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 text-base text-foreground outline-none focus:border-primary disabled:opacity-50 sm:h-10 sm:px-3 sm:text-sm"
+        />
+        <button
+          type="button"
+          onClick={startRecording}
+          disabled={uploading}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-foreground disabled:opacity-50 sm:h-10 sm:w-10"
+          title="Grabar nota de voz"
+        >
+          <Mic size={18} />
+        </button>
+        <button
+          type="submit"
+          disabled={uploading}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-white disabled:opacity-50 sm:h-10 sm:w-10"
+          title="Enviar"
+        >
+          <Send size={16} />
+        </button>
+      </form>
       {sendError && <p className="mt-2 text-xs text-red-400">{sendError}</p>}
       {uploadError && <p className="mt-2 text-xs text-red-400">{uploadError}</p>}
     </div>
