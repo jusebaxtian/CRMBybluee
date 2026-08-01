@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Send, Paperclip, Mic, Square, X, Check } from "lucide-react";
+import { Send, Paperclip, Mic, Square, X, Check, Play, Pause } from "lucide-react";
 import { sendMessage, sendChatMedia } from "@/app/actions/whatsapp";
 import type { OptimisticMessage } from "@/components/chat-pane";
 
@@ -27,6 +27,9 @@ export function MessageComposer({
   const audioChunksRef = useRef<Blob[]>([]);
   const recordedBlobRef = useRef<Blob | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewPlaying, setPreviewPlaying] = useState(false);
+  const previewAudioRef = useRef<HTMLAudioElement>(null);
 
   // Typing "hola" [enter] "cómo estás" [enter] shouldn't have to wait for the
   // first message's round trip to Meta before the second can be typed and
@@ -140,7 +143,14 @@ export function MessageComposer({
     if (timerRef.current) clearInterval(timerRef.current);
     const blob = await stopCapture();
     recordedBlobRef.current = blob;
+    setPreviewUrl(blob.size > 0 ? URL.createObjectURL(blob) : null);
     setRecStatus("reviewing");
+  }
+
+  function discardPreview() {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    setPreviewPlaying(false);
   }
 
   async function cancelRecording() {
@@ -149,14 +159,28 @@ export function MessageComposer({
       await stopCapture();
     }
     recordedBlobRef.current = null;
+    discardPreview();
     setRecStatus("idle");
     setRecordSeconds(0);
+  }
+
+  function togglePreviewPlayback() {
+    const audio = previewAudioRef.current;
+    if (!audio) return;
+    if (audio.paused) {
+      audio.play();
+      setPreviewPlaying(true);
+    } else {
+      audio.pause();
+      setPreviewPlaying(false);
+    }
   }
 
   function sendRecording() {
     const blob = recordedBlobRef.current;
     setRecStatus("idle");
     setRecordSeconds(0);
+    discardPreview();
     if (blob && blob.size > 0) {
       uploadFile(new File([blob], `nota-de-voz-${Date.now()}.webm`, { type: "audio/webm" }));
     }
@@ -195,9 +219,23 @@ export function MessageComposer({
             </button>
           ) : (
             <div className="flex flex-col items-center gap-6">
-              <div className="flex h-24 w-24 items-center justify-center rounded-full bg-surface-hover">
-                <Mic size={30} className="text-muted" />
-              </div>
+              {previewUrl && (
+                <audio
+                  ref={previewAudioRef}
+                  src={previewUrl}
+                  onEnded={() => setPreviewPlaying(false)}
+                  className="hidden"
+                />
+              )}
+              <button
+                type="button"
+                onClick={togglePreviewPlayback}
+                disabled={!previewUrl}
+                aria-label={previewPlaying ? "Pausar" : "Escuchar nota de voz"}
+                className="flex h-24 w-24 items-center justify-center rounded-full bg-surface-hover text-foreground disabled:opacity-50"
+              >
+                {previewPlaying ? <Pause size={30} /> : <Play size={30} className="ml-1" />}
+              </button>
               <button
                 type="button"
                 onClick={sendRecording}
@@ -210,7 +248,11 @@ export function MessageComposer({
           )}
 
           <p className="mt-8 text-sm text-muted">
-            {recStatus === "recording" ? "Toca para detener" : "Toca para enviar"}
+            {recStatus === "recording"
+              ? "Toca para detener"
+              : previewPlaying
+                ? "Reproduciendo..."
+                : "Toca para escuchar · luego envía"}
           </p>
         </div>
       )}
