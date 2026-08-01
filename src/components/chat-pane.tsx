@@ -17,10 +17,14 @@ export type OptimisticMessage = {
 
 export function ChatPane({
   conversationId,
+  contactId,
   messages,
+  quickReplies = [],
 }: {
   conversationId: string;
+  contactId: string;
   messages: OptimisticMessage[];
+  quickReplies?: { id: string; name: string }[];
 }) {
   const [pending, setPending] = useState<OptimisticMessage[]>([]);
 
@@ -36,6 +40,8 @@ export function ChatPane({
       <MessagesScrollArea messages={combined} />
       <MessageComposer
         conversationId={conversationId}
+        contactId={contactId}
+        quickReplies={quickReplies}
         onOptimisticSend={(message) => setPending((p) => [...p, message])}
       />
     </>

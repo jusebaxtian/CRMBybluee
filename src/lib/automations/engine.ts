@@ -1,12 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendTextMessage, sendMediaMessage, sendTemplateMessage, uploadMedia } from "@/lib/whatsapp/graph";
 
-type Automation = {
+export type Automation = {
   id: string;
   workspace_id: string;
 };
 
-type AutomationAction = {
+export type AutomationAction = {
   position: number;
   action_type: string;
   message_body: string | null;
@@ -57,7 +57,7 @@ async function getOrCreateConversation(
   return data?.id ?? null;
 }
 
-async function executeAction(
+export async function executeAction(
   supabase: SupabaseClient,
   automation: Automation,
   contactId: string,

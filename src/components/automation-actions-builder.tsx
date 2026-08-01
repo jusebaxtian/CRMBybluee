@@ -89,11 +89,15 @@ export function AutomationActionsBuilder({
   templates = [],
   agents = [],
   initialActions,
+  hideAgentActions = false,
+  showDelay = true,
 }: {
   tags: Tag[];
   templates?: Template[];
   agents?: Agent[];
   initialActions?: InitialAction[];
+  hideAgentActions?: boolean;
+  showDelay?: boolean;
 }) {
   const [actions, setActions] = useState<ActionRow[]>(
     initialActions && initialActions.length > 0
@@ -229,8 +233,12 @@ export function AutomationActionsBuilder({
               <option value="send_document">Enviar documento</option>
               <option value="send_template">Enviar plantilla aprobada</option>
               <option value="add_tag">Agregar etiqueta</option>
-              <option value="assign_agent">Asignar a un agente</option>
-              <option value="assign_agent_random">Asignar aleatoriamente (%) entre agentes</option>
+              {!hideAgentActions && (
+                <>
+                  <option value="assign_agent">Asignar a un agente</option>
+                  <option value="assign_agent_random">Asignar aleatoriamente (%) entre agentes</option>
+                </>
+              )}
             </select>
             <div className="flex shrink-0 items-center gap-0.5">
               <button
@@ -437,28 +445,30 @@ export function AutomationActionsBuilder({
             </div>
           )}
 
-          <div className="mt-2 flex items-center gap-2 border-t border-border pt-2">
-            <Clock size={13} className="shrink-0 text-muted" />
-            <span className="text-xs text-muted">Esperar</span>
-            <input
-              type="number"
-              min={0}
-              value={action.delay_value}
-              onChange={(e) =>
-                updateAction(index, { delay_value: Math.max(0, Number(e.target.value) || 0) })
-              }
-              className="w-16 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:border-primary"
-            />
-            <select
-              value={action.delay_unit}
-              onChange={(e) => updateAction(index, { delay_unit: e.target.value as "seconds" | "minutes" })}
-              className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:border-primary"
-            >
-              <option value="seconds">segundos</option>
-              <option value="minutes">minutos</option>
-            </select>
-            <span className="text-xs text-muted">antes de esta acción</span>
-          </div>
+          {showDelay && (
+            <div className="mt-2 flex items-center gap-2 border-t border-border pt-2">
+              <Clock size={13} className="shrink-0 text-muted" />
+              <span className="text-xs text-muted">Esperar</span>
+              <input
+                type="number"
+                min={0}
+                value={action.delay_value}
+                onChange={(e) =>
+                  updateAction(index, { delay_value: Math.max(0, Number(e.target.value) || 0) })
+                }
+                className="w-16 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:border-primary"
+              />
+              <select
+                value={action.delay_unit}
+                onChange={(e) => updateAction(index, { delay_unit: e.target.value as "seconds" | "minutes" })}
+                className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:border-primary"
+              >
+                <option value="seconds">segundos</option>
+                <option value="minutes">minutos</option>
+              </select>
+              <span className="text-xs text-muted">antes de esta acción</span>
+            </div>
+          )}
         </div>
       ))}
 

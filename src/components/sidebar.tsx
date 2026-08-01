@@ -26,7 +26,7 @@ const navItems = [
   { href: "/dashboard/contacts", label: "Contactos", icon: Users, built: true, moduleKey: "contacts" },
   { href: "/dashboard/campaigns", label: "Campañas", icon: Megaphone, built: true, moduleKey: "campaigns" },
   { href: "/dashboard/billing", label: "Facturación", icon: CreditCard, built: true, moduleKey: null },
-  { href: "/dashboard/quick-replies", label: "Respuestas rápidas", icon: Reply, built: false, moduleKey: null },
+  { href: "/dashboard/quick-replies", label: "Respuestas rápidas", icon: Reply, built: true, moduleKey: "quick_replies" },
   { href: "/dashboard/reports", label: "Reportes", icon: BarChart3, built: false, moduleKey: null },
   { href: "/dashboard/integrations", label: "Integraciones", icon: Plug, built: false, moduleKey: null },
   { href: "/dashboard/settings", label: "Configuración", icon: Settings, built: true, moduleKey: "settings" },

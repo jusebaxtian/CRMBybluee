@@ -76,6 +76,13 @@ export default async function ConversationPage({
 
   const agents = await listWorkspaceAgents(supabase, workspaceId);
 
+  const { data: quickReplies } = await supabase
+    .from("quick_replies")
+    .select("id, name")
+    .eq("workspace_id", workspaceId ?? "")
+    .eq("is_active", true)
+    .order("name");
+
   return (
     <div className="flex h-full w-full min-w-0 flex-1">
       <RealtimeRefresh
@@ -114,7 +121,12 @@ export default async function ConversationPage({
           />
         </div>
 
-        <ChatPane conversationId={id} messages={messages ?? []} />
+        <ChatPane
+          conversationId={id}
+          contactId={conversation.contact_id}
+          messages={messages ?? []}
+          quickReplies={quickReplies ?? []}
+        />
       </div>
 
       <aside className="hidden w-72 shrink-0 overflow-y-auto bg-surface p-5 lg:block">

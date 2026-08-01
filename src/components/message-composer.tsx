@@ -4,14 +4,19 @@ import { useRef, useState } from "react";
 import { Send, Paperclip, Mic, Square, X, Check, Play, Pause, RotateCcw } from "lucide-react";
 import { sendMessage, sendChatMedia } from "@/app/actions/whatsapp";
 import type { OptimisticMessage } from "@/components/chat-pane";
+import { QuickReplyPicker } from "@/components/quick-reply-picker";
 
 type RecordingStatus = "idle" | "recording" | "reviewing";
 
 export function MessageComposer({
   conversationId,
+  contactId,
+  quickReplies = [],
   onOptimisticSend,
 }: {
   conversationId: string;
+  contactId: string;
+  quickReplies?: { id: string; name: string }[];
   onOptimisticSend?: (message: OptimisticMessage) => void;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
@@ -343,6 +348,7 @@ export function MessageComposer({
           // auto-zoom the page on focus, which pushes the send button off-screen.
           className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 text-base text-foreground outline-none focus:border-primary sm:h-10 sm:px-3 sm:text-sm"
         />
+        <QuickReplyPicker contactId={contactId} quickReplies={quickReplies} />
         <button
           type="button"
           onClick={startRecording}
