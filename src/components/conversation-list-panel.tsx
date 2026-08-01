@@ -221,19 +221,9 @@ export function ConversationListPanel({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between">
-                  <div className="flex min-w-0 items-center gap-1.5">
-                    <p className="truncate text-sm font-medium text-foreground">
-                      {conv.contact.wa_id}
-                    </p>
-                    {conv.tags.slice(0, 4).map((tag) => (
-                      <span
-                        key={tag.id}
-                        title={tag.name}
-                        className="h-1.5 w-1.5 shrink-0 rounded-full"
-                        style={{ backgroundColor: tag.color }}
-                      />
-                    ))}
-                  </div>
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {conv.contact.wa_id}
+                  </p>
                   <span className="shrink-0 text-[10px] text-muted">
                     {new Date(conv.last_message_at).toLocaleTimeString("es-CO", {
                       hour: "2-digit",
@@ -241,6 +231,20 @@ export function ConversationListPanel({
                     })}
                   </span>
                 </div>
+                {conv.tags.length > 0 && (
+                  <div className="mt-0.5 flex flex-wrap gap-1">
+                    {conv.tags.map((tag) => (
+                      <span
+                        key={tag.id}
+                        title={tag.name}
+                        className="rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none text-white"
+                        style={{ backgroundColor: tag.color }}
+                      >
+                        {tag.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <div className="flex items-center justify-between gap-2">
                   <p className="truncate text-xs text-muted">
                     {conv.lastMessagePreview ?? "Sin mensajes"}
