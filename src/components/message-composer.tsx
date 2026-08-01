@@ -80,24 +80,41 @@ export function MessageComposer({
     drainQueue();
   }
 
-  async function uploadFile(file: File) {
-    setUploading(true);
+  // Same idea as the text queue: recording and sending a second voice note
+  // shouldn't have to wait for the first one's upload + Meta round trip
+  // (transcoding included) to finish — enqueue and drain in the background
+  // instead of disabling the mic/composer while an upload is in flight.
+  const fileQueueRef = useRef<File[]>([]);
+  const fileDraining = useRef(false);
+
+  function drainFileQueue() {
+    if (fileDraining.current) return;
+    fileDraining.current = true;
+    (async () => {
+      while (fileQueueRef.current.length > 0) {
+        setUploading(true);
+        const file = fileQueueRef.current.shift()!;
+        const formData = new FormData();
+        formData.set("conversationId", conversationId);
+        formData.set("file", file);
+        const result = await sendChatMedia(formData);
+        if (result?.error) setUploadError(result.error);
+        // RealtimeRefresh picks up each sent message row automatically.
+      }
+      setUploading(false);
+      fileDraining.current = false;
+    })();
+  }
+
+  function enqueueUpload(file: File) {
     setUploadError(null);
-    const formData = new FormData();
-    formData.set("conversationId", conversationId);
-    formData.set("file", file);
-    const result = await sendChatMedia(formData);
-    setUploading(false);
-    if (result?.error) {
-      setUploadError(result.error);
-      return;
-    }
-    // RealtimeRefresh picks up the new message row automatically.
+    fileQueueRef.current.push(file);
+    drainFileQueue();
   }
 
   function handleFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) uploadFile(file);
+    if (file) enqueueUpload(file);
     e.target.value = "";
   }
 
@@ -208,7 +225,7 @@ export function MessageComposer({
     discardPreview();
     if (blob && blob.size > 0) {
       const ext = blob.type.includes("mp4") ? "mp4" : blob.type.includes("mpeg") ? "mp3" : "webm";
-      uploadFile(new File([blob], `nota-de-voz-${Date.now()}.${ext}`, { type: blob.type }));
+      enqueueUpload(new File([blob], `nota-de-voz-${Date.now()}.${ext}`, { type: blob.type }));
     }
   }
 
@@ -311,8 +328,7 @@ export function MessageComposer({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-foreground disabled:opacity-50 sm:h-10 sm:w-10"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-foreground sm:h-10 sm:w-10"
           title="Adjuntar archivo"
         >
           <Paperclip size={18} />
@@ -320,32 +336,35 @@ export function MessageComposer({
         <input
           name="body"
           type="text"
-          placeholder={uploading ? "Enviando adjunto..." : "Escribe un mensaje..."}
+          placeholder="Escribe un mensaje..."
           autoComplete="off"
-          disabled={uploading}
           required
           // 16px min font size on mobile — anything smaller makes iOS/Android
           // auto-zoom the page on focus, which pushes the send button off-screen.
-          className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 text-base text-foreground outline-none focus:border-primary disabled:opacity-50 sm:h-10 sm:px-3 sm:text-sm"
+          className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 text-base text-foreground outline-none focus:border-primary sm:h-10 sm:px-3 sm:text-sm"
         />
         <button
           type="button"
           onClick={startRecording}
-          disabled={uploading}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-foreground disabled:opacity-50 sm:h-10 sm:w-10"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-foreground sm:h-10 sm:w-10"
           title="Grabar nota de voz"
         >
           <Mic size={18} />
         </button>
         <button
           type="submit"
-          disabled={uploading}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-white disabled:opacity-50 sm:h-10 sm:w-10"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-white sm:h-10 sm:w-10"
           title="Enviar"
         >
           <Send size={16} />
         </button>
       </form>
+      {uploading && (
+        <p className="mt-2 flex items-center gap-1.5 text-xs text-muted">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+          Enviando adjunto en segundo plano...
+        </p>
+      )}
       {sendError && <p className="mt-2 text-xs text-red-400">{sendError}</p>}
       {uploadError && <p className="mt-2 text-xs text-red-400">{uploadError}</p>}
     </div>
