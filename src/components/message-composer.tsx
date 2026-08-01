@@ -318,9 +318,10 @@ export function MessageComposer({
         </div>
       )}
 
-      {/* Floating cluster — sits above the input instead of crowding the
-          typing row, so it never wraps/overlaps on narrow screens. */}
-      <div className="absolute -top-14 right-2 flex items-center gap-2 rounded-full border border-border bg-surface p-1.5 shadow-lg">
+      {/* Floating cluster — a vertical stack pinned to the left edge, clear
+          of the message bubbles and the input row instead of overlapping
+          either. */}
+      <div className="fixed left-3 top-1/2 z-30 flex -translate-y-1/2 flex-col items-center gap-2 rounded-full border border-border bg-surface p-1.5 shadow-lg">
         <input
           ref={fileInputRef}
           type="file"
