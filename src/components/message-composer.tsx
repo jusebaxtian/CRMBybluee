@@ -1,11 +1,9 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Send, Paperclip, Mic, Square, X } from "lucide-react";
 import { sendMessage, sendChatMedia } from "@/app/actions/whatsapp";
 import type { OptimisticMessage } from "@/components/chat-pane";
-
-type State = Awaited<ReturnType<typeof sendMessage>> | undefined;
 
 export function MessageComposer({
   conversationId,
@@ -19,6 +17,7 @@ export function MessageComposer({
 
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   const [recording, setRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
@@ -26,32 +25,53 @@ export function MessageComposer({
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const [state, action, pending] = useActionState<State, FormData>(
-    async (_prev, formData) => {
-      const body = String(formData.get("body") ?? "").trim();
-      if (!body) return undefined;
+  // Typing "hola" [enter] "cómo estás" [enter] shouldn't have to wait for the
+  // first message's round trip to Meta before the second can be typed and
+  // sent — queue each submit and drain it in the background, one at a time
+  // (order matters for a conversation), instead of blocking the input/button
+  // on the in-flight request.
+  const queueRef = useRef<string[]>([]);
+  const draining = useRef(false);
 
-      // Show the message immediately (WhatsApp-style) instead of waiting on
-      // the round trip to Meta's Graph API before anything appears.
-      formRef.current?.reset();
-      onOptimisticSend?.({
-        id: `temp-${Date.now()}`,
-        direction: "out",
-        body,
-        status: "sending",
-        message_type: "text",
-        media_url: null,
-        media_mime_type: null,
-        created_at: new Date().toISOString(),
-      });
+  function drainQueue() {
+    if (draining.current) return;
+    draining.current = true;
+    (async () => {
+      while (queueRef.current.length > 0) {
+        const body = queueRef.current.shift()!;
+        const result = await sendMessage({ conversationId, body });
+        if (result && "error" in result) {
+          setSendError(result.error ?? "No se pudo enviar el mensaje.");
+        }
+      }
+      draining.current = false;
+    })();
+  }
 
-      // No manual refresh here — RealtimeRefresh already refetches the page
-      // (debounced ~250ms) as soon as the message row lands in the DB, and
-      // the optimistic bubble above covers the gap until then.
-      return await sendMessage({ conversationId, body });
-    },
-    undefined
-  );
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const body = String(formData.get("body") ?? "").trim();
+    if (!body) return;
+
+    // Show the message immediately (WhatsApp-style) instead of waiting on
+    // the round trip to Meta's Graph API before anything appears.
+    formRef.current?.reset();
+    setSendError(null);
+    onOptimisticSend?.({
+      id: `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      direction: "out",
+      body,
+      status: "sending",
+      message_type: "text",
+      media_url: null,
+      media_mime_type: null,
+      created_at: new Date().toISOString(),
+    });
+
+    queueRef.current.push(body);
+    drainQueue();
+  }
 
   async function uploadFile(file: File) {
     setUploading(true);
@@ -140,7 +160,11 @@ export function MessageComposer({
           </button>
         </div>
       ) : (
-        <form ref={formRef} action={action} className="flex w-full min-w-0 items-center gap-1.5 sm:gap-2">
+        <form
+          ref={formRef}
+          onSubmit={handleSubmit}
+          className="flex w-full min-w-0 items-center gap-1.5 sm:gap-2"
+        >
           <input
             ref={fileInputRef}
             type="file"
@@ -179,7 +203,7 @@ export function MessageComposer({
           </button>
           <button
             type="submit"
-            disabled={pending || uploading}
+            disabled={uploading}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-white disabled:opacity-50 sm:h-10 sm:w-10"
             title="Enviar"
           >
@@ -187,9 +211,7 @@ export function MessageComposer({
           </button>
         </form>
       )}
-      {state && "error" in state && (
-        <p className="mt-2 text-xs text-red-400">{state.error}</p>
-      )}
+      {sendError && <p className="mt-2 text-xs text-red-400">{sendError}</p>}
       {uploadError && <p className="mt-2 text-xs text-red-400">{uploadError}</p>}
     </div>
   );
