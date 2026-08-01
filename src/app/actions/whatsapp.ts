@@ -28,25 +28,36 @@ const execFileAsync = promisify(execFile);
 async function transcodeToOggOpus(buffer: Buffer): Promise<Buffer> {
   const id = crypto.randomUUID();
   const inPath = path.join(tmpdir(), `${id}-in.webm`);
+  const wavPath = path.join(tmpdir(), `${id}-mid.wav`);
   const outPath = path.join(tmpdir(), `${id}-out.ogg`);
   await writeFile(inPath, buffer);
   try {
+    // Two passes: decode fully to a clean PCM WAV first, then encode that to
+    // Opus/OGG — encoding straight from the source webm's Opus stream can
+    // carry over timestamp/container quirks that Android's lenient player
+    // shrugs off but iOS's WhatsApp rejects outright ("ya no disponible").
     await execFileAsync("ffmpeg", [
       "-y",
       "-i",
       inPath,
       "-vn",
-      "-map_metadata",
-      "-1",
       "-ar",
       "48000",
       "-ac",
       "1",
+      wavPath,
+    ]);
+    await execFileAsync("ffmpeg", [
+      "-y",
+      "-i",
+      wavPath,
+      "-map_metadata",
+      "-1",
       "-c:a",
       "libopus",
-      // "voip" tunes Opus for speech instead of generic audio — Android's
-      // player tolerates non-voip Opus fine, but iOS's WhatsApp app only
-      // reliably plays voice notes encoded with this exact profile.
+      // "voip" tunes Opus for speech instead of generic audio — matches the
+      // exact profile WhatsApp's own voice-note recorder uses, which iOS's
+      // stricter decoder requires.
       "-application",
       "voip",
       "-b:a",
@@ -60,6 +71,7 @@ async function transcodeToOggOpus(buffer: Buffer): Promise<Buffer> {
     return await readFile(outPath);
   } finally {
     await unlink(inPath).catch(() => {});
+    await unlink(wavPath).catch(() => {});
     await unlink(outPath).catch(() => {});
   }
 }
