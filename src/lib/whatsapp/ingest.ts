@@ -38,6 +38,57 @@ const extensionFromMime: Record<string, string> = {
   "application/pdf": "pdf",
 };
 
+// Finds or creates the contact for an inbound message. Prefers matching by
+// bsuid (Meta's Business-Scoped User ID) when we have one on file — it's
+// stable per user+business even if "wa_id" itself changes representation
+// between messages (e.g. a username-only contact vs. a phone number once
+// Contact Book links them). Falls back to the existing wa_id-based upsert,
+// which is still how virtually every contact resolves today.
+async function resolveContact(
+  supabase: ReturnType<typeof createAdminClient>,
+  workspaceId: string,
+  waId: string,
+  bsuid: string | null,
+  profileName: string | undefined
+): Promise<{ id: string } | null> {
+  if (bsuid) {
+    const { data: existing } = await supabase
+      .from("contacts")
+      .select("id")
+      .eq("workspace_id", workspaceId)
+      .eq("bsuid", bsuid)
+      .maybeSingle();
+
+    if (existing) {
+      await supabase
+        .from("contacts")
+        .update({ wa_id: waId, ...(profileName ? { name: profileName } : {}) })
+        .eq("id", existing.id);
+      return existing;
+    }
+  }
+
+  // Only include bsuid in the payload when we actually have one — on
+  // conflict, Supabase's upsert sets every column present in the object, so
+  // passing bsuid: null here would wipe out a bsuid learned from an earlier
+  // message where it happened to be present.
+  const { data: contact } = await supabase
+    .from("contacts")
+    .upsert(
+      {
+        workspace_id: workspaceId,
+        wa_id: waId,
+        name: profileName,
+        ...(bsuid ? { bsuid } : {}),
+      },
+      { onConflict: "workspace_id,wa_id", ignoreDuplicates: false }
+    )
+    .select("id")
+    .single();
+
+  return contact;
+}
+
 async function persistIncomingMedia(
   supabase: ReturnType<typeof createAdminClient>,
   workspaceId: string,
@@ -85,17 +136,11 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
       const workspaceId = account.workspace_id as string;
 
       for (const message of value.messages ?? []) {
-        const profileName = value.contacts?.find((c) => c.wa_id === message.from)
-          ?.profile?.name;
+        const contactEntry = value.contacts?.find((c) => c.wa_id === message.from);
+        const profileName = contactEntry?.profile?.name;
+        const bsuid = message.user_id ?? contactEntry?.user_id ?? null;
 
-        const { data: contact } = await supabase
-          .from("contacts")
-          .upsert(
-            { workspace_id: workspaceId, wa_id: message.from, name: profileName },
-            { onConflict: "workspace_id,wa_id", ignoreDuplicates: false }
-          )
-          .select("id")
-          .single();
+        const contact = await resolveContact(supabase, workspaceId, message.from, bsuid, profileName);
 
         if (!contact) continue;
 
