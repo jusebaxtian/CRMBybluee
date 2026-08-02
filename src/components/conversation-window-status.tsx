@@ -3,7 +3,7 @@
 import { useMessageWindow } from "@/lib/use-message-window";
 
 export function ConversationWindowStatus({ lastInboundAt }: { lastInboundAt: string | null }) {
-  const { open, msRemaining, expiresAt } = useMessageWindow(lastInboundAt);
+  const { open, expiresAt } = useMessageWindow(lastInboundAt);
 
   if (!lastInboundAt) {
     return (
@@ -19,9 +19,6 @@ export function ConversationWindowStatus({ lastInboundAt }: { lastInboundAt: str
     );
   }
 
-  const h = Math.floor(msRemaining / 3_600_000);
-  const m = Math.floor((msRemaining % 3_600_000) / 60_000);
-  const s = Math.floor((msRemaining % 60_000) / 1_000);
   const expiresLabel = expiresAt?.toLocaleString("es-CO", {
     day: "2-digit",
     month: "short",
@@ -29,9 +26,5 @@ export function ConversationWindowStatus({ lastInboundAt }: { lastInboundAt: str
     minute: "2-digit",
   });
 
-  return (
-    <p className="truncate text-xs text-success">
-      Ventana de 24h: {h}h {m}m {s}s · vence {expiresLabel}
-    </p>
-  );
+  return <p className="truncate text-xs text-success">Vence {expiresLabel}</p>;
 }
