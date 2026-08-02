@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { NewMessageButton } from "@/components/new-message-button";
+import { useMessageWindow } from "@/lib/use-message-window";
 
 type Tag = { id: string; name: string; color: string };
 type Agent = { id: string; name: string | null; email: string };
@@ -15,9 +16,25 @@ type Conversation = {
   answered: boolean;
   unreadCount: number;
   assignedAgentId: string | null;
+  lastInboundAt: string | null;
   contact: { name: string | null; wa_id: string };
   tags: Tag[];
 };
+
+// Small red "24h" flag next to the timestamp when the WhatsApp free-form
+// window has expired for that contact — same rule as the chat's own gate.
+function WindowExpiredBadge({ lastInboundAt }: { lastInboundAt: string | null }) {
+  const { open } = useMessageWindow(lastInboundAt);
+  if (!lastInboundAt || open) return null;
+  return (
+    <span
+      title="Ventana de 24h vencida — solo se pueden enviar plantillas"
+      className="shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold text-red-400"
+    >
+      24h
+    </span>
+  );
+}
 type Contact = { id: string; name: string | null; wa_id: string };
 
 export function ConversationListPanel({
@@ -224,11 +241,14 @@ export function ConversationListPanel({
                   <p className="truncate text-sm font-medium text-foreground">
                     {conv.contact.wa_id}
                   </p>
-                  <span className="shrink-0 text-[10px] text-muted">
-                    {new Date(conv.last_message_at).toLocaleTimeString("es-CO", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                  <span className="flex shrink-0 items-center gap-1">
+                    <WindowExpiredBadge lastInboundAt={conv.lastInboundAt} />
+                    <span className="text-[10px] text-muted">
+                      {new Date(conv.last_message_at).toLocaleTimeString("es-CO", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
                   </span>
                 </div>
                 {conv.tags.length > 0 && (

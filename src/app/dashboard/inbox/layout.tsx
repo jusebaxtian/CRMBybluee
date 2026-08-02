@@ -42,6 +42,7 @@ export default async function InboxLayout({
     { body: string | null; message_type: string; direction: string }
   >();
   const unreadCountByConversation = new Map<string, number>();
+  const lastInboundAtByConversation = new Map<string, string>();
 
   for (const m of recentMessages ?? []) {
     if (!lastMessageByConversation.has(m.conversation_id)) {
@@ -52,6 +53,11 @@ export default async function InboxLayout({
       });
     }
     if (m.direction === "in") {
+      // recentMessages is ordered newest-first, so the first "in" row seen
+      // per conversation is its most recent inbound message.
+      if (!lastInboundAtByConversation.has(m.conversation_id)) {
+        lastInboundAtByConversation.set(m.conversation_id, m.created_at);
+      }
       const lastRead = lastReadAtByConversation.get(m.conversation_id);
       if (!lastRead || new Date(m.created_at) > new Date(lastRead)) {
         unreadCountByConversation.set(
@@ -87,6 +93,7 @@ export default async function InboxLayout({
       answered: last ? last.direction === "out" : true,
       unreadCount: unreadCountByConversation.get(c.id) ?? 0,
       assignedAgentId: c.assigned_agent_id as string | null,
+      lastInboundAt: lastInboundAtByConversation.get(c.id) ?? null,
       contact: { name: contactRaw.name, wa_id: contactRaw.wa_id },
       tags: contactRaw.contact_tags.map((ct) => ct.tags).filter((t) => t !== null) as {
         id: string;
