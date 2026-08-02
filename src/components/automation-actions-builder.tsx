@@ -2,7 +2,38 @@
 
 import { useState } from "react";
 import { Trash2, Plus, Info, ChevronUp, ChevronDown, Clock } from "lucide-react";
-import { uploadAutomationActionMedia } from "@/app/actions/automations";
+
+// Uploads via XHR (not the uploadAutomationActionMedia server action) so we
+// can report real progress — fetch/Server Actions don't expose upload
+// progress events, XHR's upload.onprogress does.
+function uploadWithProgress(
+  file: File,
+  onProgress: (percent: number) => void
+): Promise<{ url: string; filename: string } | { error: string }> {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/automation-media");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      try {
+        const data = JSON.parse(xhr.responseText);
+        if (xhr.status >= 200 && xhr.status < 300 && data.success) {
+          resolve({ url: data.url, filename: data.filename });
+        } else {
+          resolve({ error: data.error ?? "No se pudo subir el archivo." });
+        }
+      } catch {
+        resolve({ error: "No se pudo subir el archivo." });
+      }
+    };
+    xhr.onerror = () => resolve({ error: "No se pudo subir el archivo. Revisa tu conexión." });
+    const formData = new FormData();
+    formData.set("file", file);
+    xhr.send(formData);
+  });
+}
 
 type Tag = { id: string; name: string };
 type Template = { id: string; meta_template_name: string; language: string; status: string };
@@ -121,6 +152,7 @@ export function AutomationActionsBuilder({
       : [emptyRow(tags[0]?.id ?? "")]
   );
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const approvedTemplates = templates.filter((t) => t.status === "APPROVED");
@@ -189,14 +221,13 @@ export function AutomationActionsBuilder({
 
   async function handleFile(index: number, file: File) {
     setUploadingIndex(index);
+    setUploadProgress(0);
     setUploadError(null);
     onUploadingChange?.(true);
-    const formData = new FormData();
-    formData.set("file", file);
-    const result = await uploadAutomationActionMedia(formData);
+    const result = await uploadWithProgress(file, setUploadProgress);
     setUploadingIndex(null);
     onUploadingChange?.(false);
-    if (result.error) {
+    if ("error" in result) {
       setUploadError(result.error);
       return;
     }
@@ -313,7 +344,15 @@ export function AutomationActionsBuilder({
                 className="text-xs text-foreground file:mr-2 file:rounded-md file:border-0 file:bg-primary file:px-2.5 file:py-1.5 file:text-xs file:font-medium file:text-white hover:file:bg-primary-hover"
               />
               {uploadingIndex === index && (
-                <p className="text-xs text-muted">Subiendo archivo...</p>
+                <div className="flex flex-col gap-1">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-hover">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all duration-150"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted">Subiendo archivo... {uploadProgress}%</p>
+                </div>
               )}
               {action.media_url && uploadingIndex !== index && (
                 <p className="truncate text-xs text-success">
