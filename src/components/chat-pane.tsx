@@ -12,6 +12,7 @@ export type OptimisticMessage = {
   message_type: string;
   media_url: string | null;
   media_mime_type: string | null;
+  error_detail?: string | null;
   created_at: string;
 };
 

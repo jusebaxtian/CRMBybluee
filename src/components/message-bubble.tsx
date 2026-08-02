@@ -8,11 +8,17 @@ type Message = {
   message_type: string;
   media_url: string | null;
   media_mime_type: string | null;
+  error_detail?: string | null;
   created_at: string;
 };
 
-function StatusTicks({ status }: { status: string }) {
-  if (status === "failed") return <AlertCircle size={13} className="text-red-300" />;
+function StatusTicks({ status, errorDetail }: { status: string; errorDetail?: string | null }) {
+  if (status === "failed")
+    return (
+      <span title={errorDetail || "No se pudo enviar el mensaje."}>
+        <AlertCircle size={13} className="text-red-300" />
+      </span>
+    );
   if (status === "read") return <CheckCheck size={14} className="text-sky-300" />;
   if (status === "delivered") return <CheckCheck size={14} className="opacity-70" />;
   if (status === "sent") return <Check size={14} className="opacity-70" />;
@@ -69,8 +75,13 @@ export function MessageBubble({ message: m }: { message: Message }) {
 
         <p className="mt-1 flex items-center justify-end gap-1 text-[10px] opacity-70">
           {time}
-          {out && <StatusTicks status={m.status} />}
+          {out && <StatusTicks status={m.status} errorDetail={m.error_detail} />}
         </p>
+
+        {/* Tooltips don't work on touch devices — show the reason inline too. */}
+        {out && m.status === "failed" && m.error_detail && (
+          <p className="mt-1 text-[11px] text-red-200">{m.error_detail}</p>
+        )}
       </div>
     </div>
   );

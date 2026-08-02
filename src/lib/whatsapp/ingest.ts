@@ -4,6 +4,29 @@ import { runKeywordAutomations } from "@/lib/automations/engine";
 import { getMediaUrl, downloadMedia } from "@/lib/whatsapp/graph";
 import { notifyNewMessage } from "@/lib/push/send";
 
+// Translates the most common Cloud API delivery-failure codes into a short,
+// actionable message an agent can actually understand — the raw error is
+// still logged in full via console.error for debugging.
+function friendlyWhatsAppError(error: {
+  code: number;
+  title: string;
+  message?: string;
+  error_data?: { details?: string };
+}): string {
+  switch (error.code) {
+    case 131047:
+      return "No se pudo enviar: han pasado más de 24 horas desde el último mensaje del cliente. Solo se puede reabrir la conversación con una plantilla aprobada.";
+    case 131053:
+      return `No se pudo enviar: formato de archivo no compatible. ${error.error_data?.details ?? ""}`.trim();
+    case 131026:
+      return "No se pudo enviar: el número no tiene WhatsApp o no puede recibir mensajes.";
+    case 131031:
+      return "No se pudo enviar: tu cuenta de WhatsApp Business fue restringida por Meta.";
+    default:
+      return error.error_data?.details || error.message || error.title || "No se pudo enviar el mensaje.";
+  }
+}
+
 const extensionFromMime: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -140,15 +163,17 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
       }
 
       for (const status of value.statuses ?? []) {
+        let errorDetail: string | null = null;
         if (status.status === "failed" && status.errors?.length) {
           console.error(
             `whatsapp delivery failed for wa_message_id=${status.id}:`,
             JSON.stringify(status.errors)
           );
+          errorDetail = friendlyWhatsAppError(status.errors[0]);
         }
         await supabase
           .from("messages")
-          .update({ status: status.status })
+          .update({ status: status.status, error_detail: errorDetail })
           .eq("wa_message_id", status.id);
       }
     }
