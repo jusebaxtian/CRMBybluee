@@ -15,6 +15,7 @@ import {
   getPhoneNumberDetails,
   sendTextMessage,
   sendMediaMessage,
+  sendTemplateMessage,
   uploadMedia,
 } from "@/lib/whatsapp/graph";
 import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
@@ -398,4 +399,70 @@ export async function sendMessageToContact(input: { contactId: string; body: str
   }
 
   return sendToConversation(supabase, conversation.id, workspaceId, contact.wa_id, input.body);
+}
+
+// Templates are the only message type WhatsApp allows outside the 24h
+// customer-service window, so this is what the composer falls back to once
+// that window closes.
+export async function sendTemplateToConversation(input: {
+  conversationId: string;
+  templateId: string;
+}) {
+  const supabase = await createClient();
+
+  const [{ data: conversation }, { data: template }] = await Promise.all([
+    supabase
+      .from("conversations")
+      .select("id, workspace_id, contacts(wa_id)")
+      .eq("id", input.conversationId)
+      .single(),
+    supabase
+      .from("templates")
+      .select("meta_template_name, language")
+      .eq("id", input.templateId)
+      .single(),
+  ]);
+
+  if (!conversation) return { error: "Conversación no encontrada." };
+  if (!template) return { error: "Plantilla no encontrada." };
+
+  const { data: account } = await supabase
+    .from("whatsapp_accounts")
+    .select("phone_number_id, access_token")
+    .eq("workspace_id", conversation.workspace_id)
+    .single();
+  if (!account) return { error: "Este workspace no tiene WhatsApp conectado." };
+
+  const contactWaId = (conversation.contacts as unknown as { wa_id: string }).wa_id;
+
+  try {
+    const result = await sendTemplateMessage(
+      account.phone_number_id,
+      account.access_token,
+      contactWaId,
+      template.meta_template_name,
+      template.language
+    );
+
+    await Promise.all([
+      supabase.from("messages").insert({
+        conversation_id: input.conversationId,
+        direction: "out",
+        message_type: "template",
+        body: `[Plantilla: ${template.meta_template_name}]`,
+        wa_message_id: result.messages[0]?.id,
+        status: "sent",
+      }),
+      supabase
+        .from("conversations")
+        .update({ last_message_at: new Date().toISOString() })
+        .eq("id", input.conversationId),
+    ]);
+
+    revalidatePath(`/dashboard/inbox/${input.conversationId}`);
+    revalidatePath("/dashboard/inbox");
+    return { success: true as const };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Error desconocido." };
+  }
 }

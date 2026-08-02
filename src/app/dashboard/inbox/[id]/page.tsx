@@ -8,6 +8,7 @@ import { ChatPane } from "@/components/chat-pane";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
 import { ConversationAssignmentControl } from "@/components/conversation-assignment-control";
 import { ConversationDetailsSheet } from "@/components/conversation-details-sheet";
+import { ConversationWindowStatus } from "@/components/conversation-window-status";
 import { getWorkspaceId } from "@/lib/workspace";
 import { listWorkspaceAgents } from "@/lib/agents";
 
@@ -83,6 +84,21 @@ export default async function ConversationPage({
     .eq("is_active", true)
     .order("name");
 
+  const { data: approvedTemplates } = await supabase
+    .from("templates")
+    .select("id, meta_template_name, language, body_text")
+    .eq("workspace_id", workspaceId ?? "")
+    .eq("status", "APPROVED")
+    .order("meta_template_name");
+
+  const lastInboundAt =
+    (messages ?? [])
+      .filter((m) => m.direction === "in")
+      .reduce<string | null>(
+        (latest, m) => (!latest || m.created_at > latest ? m.created_at : latest),
+        null
+      );
+
   return (
     <div className="flex h-full w-full min-w-0 flex-1">
       <RealtimeRefresh
@@ -105,7 +121,7 @@ export default async function ConversationPage({
             <p className="truncate text-sm font-medium text-foreground">
               {contact.name ?? contact.wa_id}
             </p>
-            <p className="text-xs text-muted">Cliente</p>
+            <ConversationWindowStatus lastInboundAt={lastInboundAt} />
           </div>
           <ConversationDetailsSheet
             contactName={contact.name}
@@ -126,6 +142,7 @@ export default async function ConversationPage({
           contactId={conversation.contact_id}
           messages={messages ?? []}
           quickReplies={quickReplies ?? []}
+          approvedTemplates={approvedTemplates ?? []}
         />
       </div>
 
