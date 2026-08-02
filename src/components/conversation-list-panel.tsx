@@ -1,11 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { Search, SlidersHorizontal, X, Clock } from "lucide-react";
 import { NewMessageButton } from "@/components/new-message-button";
 import { useMessageWindow } from "@/lib/use-message-window";
+
+const WINDOW_MS = 24 * 60 * 60 * 1000;
+const EXPIRING_SOON_MAX_MS = 2 * 60 * 60 * 1000; // 2h
+const EXPIRING_SOON_MIN_MS = 10 * 1000; // 10s
+
+function msRemaining(lastInboundAt: string, now: number) {
+  return new Date(lastInboundAt).getTime() + WINDOW_MS - now;
+}
 
 type Tag = { id: string; name: string; color: string };
 type Agent = { id: string; name: string | null; email: string };
@@ -35,6 +43,30 @@ function WindowExpiredBadge({ lastInboundAt }: { lastInboundAt: string | null })
     </span>
   );
 }
+// Orange flag when the window is about to close (between 10s and 2h left)
+// — an agent still has time to send a quick follow-up before it locks.
+function WindowExpiringSoonBadge({
+  lastInboundAt,
+  now,
+}: {
+  lastInboundAt: string | null;
+  now: number;
+}) {
+  if (!lastInboundAt) return null;
+  const remaining = msRemaining(lastInboundAt, now);
+  if (remaining < EXPIRING_SOON_MIN_MS || remaining > EXPIRING_SOON_MAX_MS) return null;
+  const m = Math.floor(remaining / 60_000);
+  return (
+    <span
+      title="La ventana de 24h está por vencer"
+      className="flex shrink-0 items-center gap-0.5 rounded px-1 py-0.5 text-[9px] font-semibold text-warning"
+    >
+      <Clock size={10} />
+      {m}m
+    </span>
+  );
+}
+
 type Contact = { id: string; name: string | null; wa_id: string };
 
 export function ConversationListPanel({
@@ -54,11 +86,26 @@ export function ConversationListPanel({
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [assignedFilter, setAssignedFilter] = useState<string>(""); // "" = all, "unassigned", or agent id
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [expiringSoon, setExpiringSoon] = useState(false);
+
+  // Only needed to keep the "por vencer" filter and its badges live —
+  // ticks once a second so a conversation drops out of the list the moment
+  // it crosses the 2h or 10s edge, without a manual refresh.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   const filtered = useMemo(() => {
     return conversations.filter((c) => {
       if (query && !c.contact.wa_id.includes(query)) return false;
       if (unreadOnly && c.unreadCount === 0) return false;
+      if (expiringSoon) {
+        if (!c.lastInboundAt) return false;
+        const remaining = msRemaining(c.lastInboundAt, now);
+        if (remaining < EXPIRING_SOON_MIN_MS || remaining > EXPIRING_SOON_MAX_MS) return false;
+      }
       if (
         selectedTagIds.length > 0 &&
         !c.tags.some((t) => selectedTagIds.includes(t.id))
@@ -73,10 +120,10 @@ export function ConversationListPanel({
         return false;
       return true;
     });
-  }, [conversations, query, unreadOnly, selectedTagIds, assignedFilter]);
+  }, [conversations, query, unreadOnly, expiringSoon, now, selectedTagIds, assignedFilter]);
 
   const activeFilterCount =
-    selectedTagIds.length + (assignedFilter ? 1 : 0) + (unreadOnly ? 1 : 0);
+    selectedTagIds.length + (assignedFilter ? 1 : 0) + (unreadOnly ? 1 : 0) + (expiringSoon ? 1 : 0);
 
   function toggleTag(id: string) {
     setSelectedTagIds((prev) =>
@@ -88,6 +135,7 @@ export function ConversationListPanel({
     setSelectedTagIds([]);
     setAssignedFilter("");
     setUnreadOnly(false);
+    setExpiringSoon(false);
   }
 
   return (
@@ -133,17 +181,32 @@ export function ConversationListPanel({
 
       {filtersOpen && (
         <div className="flex flex-col gap-3 border-b border-border bg-background/50 p-3">
-          <button
-            type="button"
-            onClick={() => setUnreadOnly((v) => !v)}
-            className={`self-start rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-              unreadOnly
-                ? "border-primary bg-primary text-white"
-                : "border-border text-muted hover:text-foreground"
-            }`}
-          >
-            No leídos
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setUnreadOnly((v) => !v)}
+              className={`self-start rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                unreadOnly
+                  ? "border-primary bg-primary text-white"
+                  : "border-border text-muted hover:text-foreground"
+              }`}
+            >
+              No leídos
+            </button>
+            <button
+              type="button"
+              onClick={() => setExpiringSoon((v) => !v)}
+              title="Ventana de 24h por vencer (entre 10 segundos y 2 horas)"
+              className={`flex items-center gap-1 self-start rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                expiringSoon
+                  ? "border-warning bg-warning text-black"
+                  : "border-border text-muted hover:text-foreground"
+              }`}
+            >
+              <Clock size={12} />
+              Por vencer (2h)
+            </button>
+          </div>
 
           {allTags.length > 0 && (
             <div>
@@ -243,6 +306,7 @@ export function ConversationListPanel({
                   </p>
                   <span className="flex shrink-0 items-center gap-1">
                     <WindowExpiredBadge lastInboundAt={conv.lastInboundAt} />
+                    <WindowExpiringSoonBadge lastInboundAt={conv.lastInboundAt} now={now} />
                     <span className="text-[10px] text-muted">
                       {new Date(conv.last_message_at).toLocaleTimeString("es-CO", {
                         hour: "2-digit",
