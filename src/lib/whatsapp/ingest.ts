@@ -155,10 +155,30 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
             },
             { onConflict: "workspace_id,contact_id" }
           )
-          .select("id, assigned_agent_id")
+          .select("id, assigned_agent_id, ad_source_id")
           .single();
 
         if (!conversation) continue;
+
+        // Only Meta ("ad") referrals identify a paid campaign — organic
+        // "post" shares also set referral but aren't Meta Ads. Written once:
+        // a conversation's ad attribution is whichever ad started it, so a
+        // later message (which won't carry referral again) must not clear it.
+        if (
+          message.referral?.source_type === "ad" &&
+          message.referral.source_id &&
+          !conversation.ad_source_id
+        ) {
+          await supabase
+            .from("conversations")
+            .update({
+              ad_source_id: message.referral.source_id,
+              ad_headline: message.referral.headline ?? null,
+              ad_body: message.referral.body ?? null,
+              ctwa_clid: message.referral.ctwa_clid ?? null,
+            })
+            .eq("id", conversation.id);
+        }
 
         const mediaPayload =
           message.image ?? message.audio ?? message.video ?? message.document ?? null;

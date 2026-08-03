@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Zap } from "lucide-react";
+import { ArrowLeft, Zap, Megaphone } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { ContactTagPicker } from "@/components/contact-tag-picker";
 import { NotesEditor } from "@/components/notes-editor";
@@ -25,7 +25,7 @@ export default async function ConversationPage({
   const { data: conversation } = await supabase
     .from("conversations")
     .select(
-      "id, contact_id, last_read_at, assigned_agent_id, contacts(name, wa_id, notes, contact_tags(tag_id))"
+      "id, contact_id, last_read_at, assigned_agent_id, ad_source_id, ad_headline, ad_body, contacts(name, wa_id, notes, contact_tags(tag_id))"
     )
     .eq("id", id)
     .eq("workspace_id", workspaceId ?? "")
@@ -160,6 +160,21 @@ export default async function ConversationPage({
             {isPhoneNumber(contact.wa_id) ? contact.wa_id : "Usuario (sin número)"}
           </p>
         </div>
+
+        {conversation.ad_source_id && (
+          <div className="mt-6 rounded-lg border border-primary/30 bg-primary/5 p-3">
+            <p className="flex items-center gap-1.5 text-xs font-medium text-primary">
+              <Megaphone size={13} />
+              Vino de un anuncio de Meta Ads
+            </p>
+            {conversation.ad_headline && (
+              <p className="mt-1 text-xs text-foreground">{conversation.ad_headline}</p>
+            )}
+            {conversation.ad_body && (
+              <p className="mt-0.5 text-xs text-muted">{conversation.ad_body}</p>
+            )}
+          </div>
+        )}
 
         {agents.length > 0 && (
           <div className="mt-6">

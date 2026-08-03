@@ -21,6 +21,15 @@ export type WhatsAppWebhookPayload = {
           audio?: { id: string; mime_type: string };
           video?: { id: string; mime_type: string; caption?: string };
           document?: { id: string; mime_type: string; filename?: string; caption?: string };
+          // Present only on the first inbound message of a "Click to
+          // WhatsApp" ad conversation — identifies which Meta ad it came from.
+          referral?: {
+            source_type?: string;
+            source_id?: string;
+            headline?: string;
+            body?: string;
+            ctwa_clid?: string;
+          };
         }[];
         statuses?: {
           id: string;

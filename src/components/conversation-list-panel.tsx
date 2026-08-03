@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, SlidersHorizontal, X, Clock } from "lucide-react";
+import { Search, SlidersHorizontal, X, Clock, Megaphone } from "lucide-react";
 import { NewMessageButton } from "@/components/new-message-button";
 import { useMessageWindow } from "@/lib/use-message-window";
 
@@ -25,6 +25,8 @@ type Conversation = {
   unreadCount: number;
   assignedAgentId: string | null;
   lastInboundAt: string | null;
+  fromAds: boolean;
+  adHeadline: string | null;
   contact: { name: string | null; wa_id: string };
   tags: Tag[];
 };
@@ -313,8 +315,19 @@ export function ConversationListPanel({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between">
-                  <p className="truncate text-sm font-medium text-foreground">
-                    {conv.contact.wa_id}
+                  <p className="flex min-w-0 items-center gap-1 truncate text-sm font-medium text-foreground">
+                    <span className="truncate">{conv.contact.wa_id}</span>
+                    {conv.fromAds && (
+                      <span
+                        title={
+                          conv.adHeadline
+                            ? `Desde anuncio de Meta Ads: ${conv.adHeadline}`
+                            : "Desde un anuncio de Meta Ads"
+                        }
+                      >
+                        <Megaphone size={11} className="shrink-0 text-primary" />
+                      </span>
+                    )}
                   </p>
                   <span className="flex shrink-0 items-center gap-1">
                     <WindowExpiredBadge lastInboundAt={conv.lastInboundAt} />
