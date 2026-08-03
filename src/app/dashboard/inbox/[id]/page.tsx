@@ -9,6 +9,7 @@ import { RealtimeRefresh } from "@/components/realtime-refresh";
 import { ConversationAssignmentControl } from "@/components/conversation-assignment-control";
 import { ConversationDetailsSheet } from "@/components/conversation-details-sheet";
 import { ConversationWindowStatus } from "@/components/conversation-window-status";
+import { ConversationFollowupsToggle } from "@/components/conversation-followups-toggle";
 import { getWorkspaceId } from "@/lib/workspace";
 import { listWorkspaceAgents } from "@/lib/agents";
 import { isPhoneNumber } from "@/lib/whatsapp/identity";
@@ -25,7 +26,7 @@ export default async function ConversationPage({
   const { data: conversation } = await supabase
     .from("conversations")
     .select(
-      "id, contact_id, last_read_at, assigned_agent_id, ad_source_id, ad_headline, ad_body, contacts(name, wa_id, notes, contact_tags(tag_id))"
+      "id, contact_id, last_read_at, assigned_agent_id, ad_source_id, ad_headline, ad_body, followups_enabled, contacts(name, wa_id, notes, contact_tags(tag_id, tags(excludes_followups)))"
     )
     .eq("id", id)
     .eq("workspace_id", workspaceId ?? "")
@@ -37,9 +38,10 @@ export default async function ConversationPage({
     name: string | null;
     wa_id: string;
     notes: string | null;
-    contact_tags: { tag_id: string }[];
+    contact_tags: { tag_id: string; tags: { excludes_followups: boolean } | null }[];
   };
   const assignedTagIds = contact.contact_tags.map((ct) => ct.tag_id);
+  const excludedFromFollowupsByTag = contact.contact_tags.some((ct) => ct.tags?.excludes_followups);
 
   const { data: messages } = await supabase
     .from("messages")
@@ -199,6 +201,14 @@ export default async function ConversationPage({
             />
           </div>
         )}
+
+        <div className="mt-6">
+          <ConversationFollowupsToggle
+            conversationId={conversation.id}
+            enabled={conversation.followups_enabled}
+            excludedByTag={excludedFromFollowupsByTag}
+          />
+        </div>
 
         <div className="mt-6">
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">

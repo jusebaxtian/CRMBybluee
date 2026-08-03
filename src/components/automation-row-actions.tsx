@@ -10,28 +10,36 @@ export function AutomationRowActions({
   automationId,
   automationName,
   isActive,
+  editHref,
+  itemLabel = "la automatización",
+  onToggle,
+  onDelete,
 }: {
   automationId: string;
   automationName: string;
   isActive: boolean;
+  editHref?: string;
+  itemLabel?: string;
+  onToggle?: (id: string, active: boolean) => Promise<unknown>;
+  onDelete?: (id: string) => Promise<unknown>;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
 
   async function handleToggle() {
     setPending(true);
-    await toggleAutomationActive(automationId, !isActive);
+    await (onToggle ?? toggleAutomationActive)(automationId, !isActive);
     setPending(false);
     router.refresh();
   }
 
   async function handleDelete() {
     const confirmed = window.confirm(
-      `¿Eliminar la automatización "${automationName}"? Esta acción no se puede deshacer.`
+      `¿Eliminar ${itemLabel} "${automationName}"? Esta acción no se puede deshacer.`
     );
     if (!confirmed) return;
     setPending(true);
-    await deleteAutomation(automationId);
+    await (onDelete ?? deleteAutomation)(automationId);
     setPending(false);
     router.refresh();
   }
@@ -51,7 +59,7 @@ export function AutomationRowActions({
         {isActive ? "Activa" : "Pausada"}
       </button>
       <Link
-        href={`/dashboard/automations/${automationId}`}
+        href={editHref ?? `/dashboard/automations/${automationId}`}
         className="text-muted hover:text-foreground"
         title="Editar"
       >

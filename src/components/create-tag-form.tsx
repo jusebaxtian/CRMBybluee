@@ -28,6 +28,10 @@ export function CreateTagForm() {
           </option>
         ))}
       </select>
+      <label className="flex items-center gap-1.5 text-xs text-muted">
+        <input type="checkbox" name="excludesFollowups" className="accent-primary" />
+        Excluir de seguimientos (ej: &quot;No interesados&quot;)
+      </label>
       <button
         type="submit"
         disabled={pending}

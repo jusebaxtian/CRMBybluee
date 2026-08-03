@@ -2,6 +2,7 @@ import { Tag as TagIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { CreateTagForm } from "@/components/create-tag-form";
 import { DeleteTagButton } from "@/components/delete-tag-button";
+import { TagFollowupsToggle } from "@/components/tag-followups-toggle";
 import { getWorkspaceId } from "@/lib/workspace";
 import { CampaignsTabs } from "@/components/campaigns-tabs";
 
@@ -11,7 +12,7 @@ export default async function TagsPage() {
 
   const { data: tags } = await supabase
     .from("tags")
-    .select("id, name, color")
+    .select("id, name, color, excludes_followups")
     .eq("workspace_id", workspaceId ?? "")
     .order("name");
 
@@ -44,6 +45,7 @@ export default async function TagsPage() {
               style={{ color: tag.color, borderColor: tag.color }}
             >
               {tag.name}
+              <TagFollowupsToggle tagId={tag.id} excludesFollowups={tag.excludes_followups} />
               <DeleteTagButton tagId={tag.id} />
             </div>
           ))}

@@ -165,6 +165,7 @@ export async function executeAction(
         body: action.message_body,
         wa_message_id: result.messages[0]?.id,
         status: "sent",
+        via_automation_id: automation.id,
       });
     }
   }
@@ -204,6 +205,7 @@ export async function executeAction(
         media_url: action.media_url,
         wa_message_id: result.messages[0]?.id,
         status: "sent",
+        via_automation_id: automation.id,
       });
     }
   }
@@ -225,6 +227,7 @@ export async function executeAction(
         body: action.templates.body_text || `[Plantilla: ${action.templates.meta_template_name}]`,
         wa_message_id: result.messages[0]?.id,
         status: "sent",
+        via_automation_id: automation.id,
       });
     }
   }
@@ -354,6 +357,31 @@ export async function runTagAddedAutomations(
   for (const automation of automations ?? []) {
     await runActionsForAutomation(supabase, automation, contactId);
   }
+}
+
+// Re-checked right before a deferred follow-up step fires (in addition to
+// the DB trigger's check when the sequence was first scheduled) — a
+// "No interesados" tag or the conversation's own toggle may have been
+// applied any time during the wait.
+export async function isContactExcludedFromFollowups(
+  supabase: SupabaseClient,
+  contactId: string
+): Promise<boolean> {
+  const { data: conversation } = await supabase
+    .from("conversations")
+    .select("followups_enabled")
+    .eq("contact_id", contactId)
+    .maybeSingle();
+  if (conversation && conversation.followups_enabled === false) return true;
+
+  const { data: tags } = await supabase
+    .from("contact_tags")
+    .select("tags(excludes_followups)")
+    .eq("contact_id", contactId);
+
+  return (tags ?? []).some(
+    (t) => (t.tags as unknown as { excludes_followups: boolean } | null)?.excludes_followups
+  );
 }
 
 export async function runKeywordAutomations(

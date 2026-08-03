@@ -8,6 +8,7 @@ import { runTagAddedAutomations } from "@/lib/automations/engine";
 export async function createTag(_prevState: unknown, formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const color = String(formData.get("color") ?? "#1ba84a");
+  const excludesFollowups = formData.get("excludesFollowups") === "on";
   if (!name) return { error: "El nombre es obligatorio." };
 
   const supabase = await createClient();
@@ -18,12 +19,28 @@ export async function createTag(_prevState: unknown, formData: FormData) {
     workspace_id: workspaceId,
     name,
     color,
+    excludes_followups: excludesFollowups,
   });
 
   if (error) return { error: error.message };
 
   revalidatePath("/dashboard/tags");
   return { success: true };
+}
+
+// Contacts with an "excludes_followups" tag (e.g. "No interesados") never
+// receive any follow-up sequence step, regardless of the sequence or the
+// conversation's own toggle — checked both when a sequence is first
+// scheduled and again right before each deferred step fires.
+export async function toggleTagExcludesFollowups(tagId: string, excludesFollowups: boolean) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("tags")
+    .update({ excludes_followups: excludesFollowups })
+    .eq("id", tagId);
+  if (error) return { error: error.message };
+  revalidatePath("/dashboard/tags");
+  return { success: true as const };
 }
 
 export async function deleteTag(tagId: string) {
