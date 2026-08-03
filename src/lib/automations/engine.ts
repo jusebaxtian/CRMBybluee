@@ -14,6 +14,7 @@ export type AutomationAction = {
   media_url: string | null;
   media_filename: string | null;
   template_id: string | null;
+  quick_reply_id: string | null;
   delay_seconds: number;
   target_agent_id: string | null;
   agent_distribution: { agent_id: string; percent: number }[] | null;
@@ -61,8 +62,43 @@ export async function executeAction(
   supabase: SupabaseClient,
   automation: Automation,
   contactId: string,
-  action: AutomationAction
+  action: AutomationAction,
+  depth = 0
 ) {
+  // send_quick_reply recurses back into this function to run the quick
+  // reply's own actions — a hard depth cap is just a safety net in case a
+  // quick reply is ever made to reference itself (the UI doesn't expose
+  // that option, but nothing stops a direct DB edit from creating one).
+  if (depth > 3) return;
+
+  if (action.action_type === "send_quick_reply" && action.quick_reply_id) {
+    const { data: qrActions } = await supabase
+      .from("quick_reply_actions")
+      .select(
+        "position, action_type, message_body, tag_id, media_url, media_filename, template_id, templates(meta_template_name, language, body_text)"
+      )
+      .eq("quick_reply_id", action.quick_reply_id)
+      .order("position");
+
+    for (const qrAction of qrActions ?? []) {
+      await executeAction(
+        supabase,
+        automation,
+        contactId,
+        {
+          ...qrAction,
+          quick_reply_id: null,
+          delay_seconds: 0,
+          target_agent_id: null,
+          agent_distribution: null,
+          templates: qrAction.templates as unknown as AutomationAction["templates"],
+        },
+        depth + 1
+      );
+    }
+    return;
+  }
+
   if (action.action_type === "add_tag" && action.tag_id) {
     await supabase.from("contact_tags").upsert({ contact_id: contactId, tag_id: action.tag_id });
     return;
@@ -208,7 +244,7 @@ async function fetchActions(
   const { data } = await supabase
     .from("automation_actions")
     .select(
-      "position, action_type, message_body, tag_id, media_url, media_filename, template_id, delay_seconds, target_agent_id, agent_distribution, templates(meta_template_name, language, body_text)"
+      "position, action_type, message_body, tag_id, media_url, media_filename, template_id, quick_reply_id, delay_seconds, target_agent_id, agent_distribution, templates(meta_template_name, language, body_text)"
     )
     .eq("automation_id", automationId)
     .order("position");

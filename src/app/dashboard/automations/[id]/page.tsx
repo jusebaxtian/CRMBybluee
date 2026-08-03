@@ -27,7 +27,7 @@ export default async function EditAutomationPage({
   const { data: actions } = await supabase
     .from("automation_actions")
     .select(
-      "action_type, message_body, tag_id, media_url, media_filename, template_id, target_agent_id, agent_distribution, delay_seconds"
+      "action_type, message_body, tag_id, media_url, media_filename, template_id, quick_reply_id, target_agent_id, agent_distribution, delay_seconds"
     )
     .eq("automation_id", id)
     .order("position", { ascending: true });
@@ -46,6 +46,13 @@ export default async function EditAutomationPage({
 
   const agents = await listWorkspaceAgents(supabase, workspaceId);
 
+  const { data: quickReplies } = await supabase
+    .from("quick_replies")
+    .select("id, name")
+    .eq("workspace_id", workspaceId ?? "")
+    .eq("is_active", true)
+    .order("name");
+
   return (
     <div className="mx-auto max-w-lg">
       <div className="rounded-xl border border-border bg-surface p-6">
@@ -54,6 +61,7 @@ export default async function EditAutomationPage({
           tags={tags ?? []}
           templates={templates ?? []}
           agents={agents}
+          quickReplies={quickReplies ?? []}
           automation={{
             id: automation.id,
             name: automation.name,

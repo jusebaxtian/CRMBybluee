@@ -16,6 +16,7 @@ type ActionInput = {
     | "send_audio"
     | "send_document"
     | "send_template"
+    | "send_quick_reply"
     | "assign_agent"
     | "assign_agent_random";
   message_body?: string;
@@ -23,6 +24,7 @@ type ActionInput = {
   media_url?: string;
   media_filename?: string;
   template_id?: string;
+  quick_reply_id?: string;
   target_agent_id?: string;
   agent_distribution?: { agent_id: string; percent: number }[];
   delay_seconds?: number;
@@ -42,6 +44,7 @@ function actionRow(a: ActionInput, automationId: string, index: number) {
     media_url: mediaTypes.has(a.action_type) ? a.media_url : null,
     media_filename: a.action_type === "send_document" ? a.media_filename : null,
     template_id: a.action_type === "send_template" ? a.template_id : null,
+    quick_reply_id: a.action_type === "send_quick_reply" ? a.quick_reply_id : null,
     target_agent_id: a.action_type === "assign_agent" ? a.target_agent_id : null,
     agent_distribution:
       a.action_type === "assign_agent_random"
@@ -103,6 +106,9 @@ export async function createAutomation(_prevState: unknown, formData: FormData) 
     if (a.action_type === "send_template" && !a.template_id) {
       return { error: "Selecciona una plantilla para cada acción de plantilla." };
     }
+    if (a.action_type === "send_quick_reply" && !a.quick_reply_id) {
+      return { error: "Selecciona una respuesta rápida para cada acción de ese tipo." };
+    }
     if (a.action_type === "assign_agent" && !a.target_agent_id) {
       return { error: "Selecciona el agente para cada acción de asignación." };
     }
@@ -132,9 +138,16 @@ export async function createAutomation(_prevState: unknown, formData: FormData) 
 
   if (error || !automation) return { error: error?.message ?? "No se pudo crear." };
 
-  await supabase
+  const { error: actionsError } = await supabase
     .from("automation_actions")
     .insert(actions.map((a, index) => actionRow(a, automation.id, index)));
+  if (actionsError) {
+    // The automation record above already saved — leaving it with zero
+    // actions (silently, as this used to) is worse than deleting it and
+    // surfacing the failure so the user can retry.
+    await supabase.from("automations").delete().eq("id", automation.id);
+    return { error: actionsError.message };
+  }
 
   revalidatePath("/dashboard/automations");
   redirect("/dashboard/automations");
@@ -171,6 +184,9 @@ export async function updateAutomation(_prevState: unknown, formData: FormData) 
     if (a.action_type === "send_template" && !a.template_id) {
       return { error: "Selecciona una plantilla para cada acción de plantilla." };
     }
+    if (a.action_type === "send_quick_reply" && !a.quick_reply_id) {
+      return { error: "Selecciona una respuesta rápida para cada acción de ese tipo." };
+    }
     if (a.action_type === "assign_agent" && !a.target_agent_id) {
       return { error: "Selecciona el agente para cada acción de asignación." };
     }
@@ -200,9 +216,10 @@ export async function updateAutomation(_prevState: unknown, formData: FormData) 
   if (error) return { error: error.message };
 
   await supabase.from("automation_actions").delete().eq("automation_id", automationId);
-  await supabase
+  const { error: actionsError } = await supabase
     .from("automation_actions")
     .insert(actions.map((a, index) => actionRow(a, automationId, index)));
+  if (actionsError) return { error: actionsError.message };
 
   revalidatePath("/dashboard/automations");
   redirect("/dashboard/automations");

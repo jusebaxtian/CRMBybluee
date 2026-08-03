@@ -48,6 +48,7 @@ function uploadWithProgress(
 type Tag = { id: string; name: string };
 type Template = { id: string; meta_template_name: string; language: string; status: string };
 type Agent = { id: string; name: string | null; email: string };
+type QuickReply = { id: string; name: string };
 
 type ActionType =
   | "send_message"
@@ -57,6 +58,7 @@ type ActionType =
   | "send_audio"
   | "send_document"
   | "send_template"
+  | "send_quick_reply"
   | "assign_agent"
   | "assign_agent_random";
 
@@ -69,6 +71,7 @@ type ActionRow = {
   media_url: string;
   media_filename: string;
   template_id: string;
+  quick_reply_id: string;
   target_agent_id: string;
   agent_distribution: AgentShare[];
   delay_value: number;
@@ -82,6 +85,7 @@ export type InitialAction = {
   media_url?: string | null;
   media_filename?: string | null;
   template_id?: string | null;
+  quick_reply_id?: string | null;
   target_agent_id?: string | null;
   agent_distribution?: AgentShare[] | null;
   delay_seconds?: number | null;
@@ -119,6 +123,7 @@ function emptyRow(defaultTagId: string): ActionRow {
     media_url: "",
     media_filename: "",
     template_id: "",
+    quick_reply_id: "",
     target_agent_id: "",
     agent_distribution: [],
     delay_value: 0,
@@ -136,6 +141,7 @@ export function AutomationActionsBuilder({
   tags,
   templates = [],
   agents = [],
+  quickReplies = [],
   initialActions,
   hideAgentActions = false,
   showDelay = true,
@@ -144,6 +150,7 @@ export function AutomationActionsBuilder({
   tags: Tag[];
   templates?: Template[];
   agents?: Agent[];
+  quickReplies?: QuickReply[];
   initialActions?: InitialAction[];
   hideAgentActions?: boolean;
   showDelay?: boolean;
@@ -160,6 +167,7 @@ export function AutomationActionsBuilder({
             media_url: a.media_url ?? "",
             media_filename: a.media_filename ?? "",
             template_id: a.template_id ?? templates[0]?.id ?? "",
+            quick_reply_id: a.quick_reply_id ?? quickReplies[0]?.id ?? "",
             target_agent_id: a.target_agent_id ?? agents[0]?.id ?? "",
             agent_distribution: a.agent_distribution ?? [],
             delay_value: value,
@@ -270,6 +278,7 @@ export function AutomationActionsBuilder({
     media_url: mediaLabel[a.action_type] ? a.media_url : undefined,
     media_filename: a.action_type === "send_document" ? a.media_filename : undefined,
     template_id: a.action_type === "send_template" ? a.template_id : undefined,
+    quick_reply_id: a.action_type === "send_quick_reply" ? a.quick_reply_id : undefined,
     target_agent_id: a.action_type === "assign_agent" ? a.target_agent_id : undefined,
     agent_distribution: a.action_type === "assign_agent_random" ? a.agent_distribution : undefined,
     delay_seconds: a.delay_value > 0 ? a.delay_value * (a.delay_unit === "minutes" ? 60 : 1) : 0,
@@ -287,7 +296,22 @@ export function AutomationActionsBuilder({
             </span>
             <select
               value={action.action_type}
-              onChange={(e) => updateAction(index, { action_type: e.target.value as ActionType })}
+              onChange={(e) => {
+                const nextType = e.target.value as ActionType;
+                // The <select> visually shows its first <option> whenever
+                // the bound value doesn't match any option (e.g. still the
+                // empty-string default) — but that's just native <select>
+                // fallback rendering, the actual state stays empty unless
+                // set explicitly, which silently drops the field on submit.
+                const patch: Partial<ActionRow> = { action_type: nextType };
+                if (nextType === "send_quick_reply" && !action.quick_reply_id) {
+                  patch.quick_reply_id = quickReplies[0]?.id ?? "";
+                }
+                if (nextType === "send_template" && !action.template_id) {
+                  patch.template_id = approvedTemplates[0]?.id ?? "";
+                }
+                updateAction(index, patch);
+              }}
               className="flex-1 rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-primary"
             >
               <option value="send_message">Enviar mensaje de texto</option>
@@ -296,6 +320,9 @@ export function AutomationActionsBuilder({
               <option value="send_audio">Enviar audio / nota de voz</option>
               <option value="send_document">Enviar documento</option>
               <option value="send_template">Enviar plantilla aprobada</option>
+              {quickReplies.length > 0 && (
+                <option value="send_quick_reply">Enviar respuesta rápida</option>
+              )}
               <option value="add_tag">Agregar etiqueta</option>
               {!hideAgentActions && (
                 <>
@@ -555,6 +582,28 @@ export function AutomationActionsBuilder({
                 Usa plantillas para reabrir la conversación con un contacto aunque ya hayan
                 pasado más de 24 horas desde su último mensaje — es la única forma que permite
                 WhatsApp de escribirle primero fuera de esa ventana.
+              </p>
+            </div>
+          )}
+
+          {action.action_type === "send_quick_reply" && (
+            <div className="flex flex-col gap-2">
+              <select
+                value={action.quick_reply_id}
+                onChange={(e) => updateAction(index, { quick_reply_id: e.target.value })}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+              >
+                {quickReplies.length === 0 && <option value="">No tienes respuestas rápidas</option>}
+                {quickReplies.map((qr) => (
+                  <option key={qr.id} value={qr.id}>
+                    {qr.name}
+                  </option>
+                ))}
+              </select>
+              <p className="flex items-start gap-1.5 text-[11px] text-muted">
+                <Info size={13} className="mt-0.5 shrink-0" />
+                Ejecuta todas las acciones de esa respuesta rápida, en orden, como parte de esta
+                automatización.
               </p>
             </div>
           )}

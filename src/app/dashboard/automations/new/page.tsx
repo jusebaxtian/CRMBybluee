@@ -22,11 +22,23 @@ export default async function NewAutomationPage() {
 
   const agents = await listWorkspaceAgents(supabase, workspaceId);
 
+  const { data: quickReplies } = await supabase
+    .from("quick_replies")
+    .select("id, name")
+    .eq("workspace_id", workspaceId ?? "")
+    .eq("is_active", true)
+    .order("name");
+
   return (
     <div className="mx-auto max-w-lg">
       <div className="rounded-xl border border-border bg-surface p-6">
         <h1 className="mb-4 text-lg font-semibold text-foreground">Nueva automatización</h1>
-        <NewAutomationForm tags={tags ?? []} templates={templates ?? []} agents={agents} />
+        <NewAutomationForm
+          tags={tags ?? []}
+          templates={templates ?? []}
+          agents={agents}
+          quickReplies={quickReplies ?? []}
+        />
       </div>
     </div>
   );

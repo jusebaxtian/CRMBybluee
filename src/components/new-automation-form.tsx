@@ -7,6 +7,7 @@ import { AutomationActionsBuilder, type InitialAction } from "@/components/autom
 type Tag = { id: string; name: string };
 type Template = { id: string; meta_template_name: string; language: string; status: string };
 type Agent = { id: string; name: string | null; email: string };
+type QuickReply = { id: string; name: string };
 
 type ExistingAutomation = {
   id: string;
@@ -21,11 +22,13 @@ export function NewAutomationForm({
   tags,
   templates = [],
   agents = [],
+  quickReplies = [],
   automation,
 }: {
   tags: Tag[];
   templates?: Template[];
   agents?: Agent[];
+  quickReplies?: QuickReply[];
   automation?: ExistingAutomation;
 }) {
   const [state, action, pending] = useActionState(
@@ -100,6 +103,7 @@ export function NewAutomationForm({
           tags={tags}
           templates={templates}
           agents={agents}
+          quickReplies={quickReplies}
           initialActions={automation?.actions}
           onUploadingChange={setUploading}
         />

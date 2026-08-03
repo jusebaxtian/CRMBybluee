@@ -160,6 +160,7 @@ export async function sendQuickReply(quickReplyId: string, contactId: string) {
 
   const actions: AutomationAction[] = (actionsRaw ?? []).map((a) => ({
     ...a,
+    quick_reply_id: null,
     delay_seconds: 0,
     target_agent_id: null,
     agent_distribution: null,
