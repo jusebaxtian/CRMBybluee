@@ -125,6 +125,13 @@ export function ConversationListPanel({
   const activeFilterCount =
     selectedTagIds.length + (assignedFilter ? 1 : 0) + (unreadOnly ? 1 : 0) + (expiringSoon ? 1 : 0);
 
+  // Total chats with unread messages — independent of the active filters,
+  // so this badge always reflects "how many I haven't opened yet".
+  const unreadConversationsCount = useMemo(
+    () => conversations.filter((c) => c.unreadCount > 0).length,
+    [conversations]
+  );
+
   function toggleTag(id: string) {
     setSelectedTagIds((prev) =>
       prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]
@@ -143,9 +150,14 @@ export function ConversationListPanel({
       <div className="flex items-center justify-between border-b border-border px-4 py-4">
         <div className="flex items-center gap-2">
           <h2 className="text-lg font-semibold text-foreground">Conversaciones</h2>
-          <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs text-primary">
-            {filtered.length}
-          </span>
+          {unreadConversationsCount > 0 && (
+            <span
+              title="Chats sin abrir"
+              className="rounded-full bg-primary/15 px-2 py-0.5 text-xs text-primary"
+            >
+              {unreadConversationsCount}
+            </span>
+          )}
         </div>
         <NewMessageButton contacts={contacts} compact />
       </div>
