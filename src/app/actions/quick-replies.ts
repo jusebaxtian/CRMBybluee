@@ -153,7 +153,7 @@ export async function sendQuickReply(quickReplyId: string, contactId: string) {
   const { data: actionsRaw } = await supabase
     .from("quick_reply_actions")
     .select(
-      "position, action_type, message_body, tag_id, media_url, media_filename, template_id, templates(meta_template_name, language)"
+      "position, action_type, message_body, tag_id, media_url, media_filename, template_id, templates(meta_template_name, language, body_text)"
     )
     .eq("quick_reply_id", quickReplyId)
     .order("position");
@@ -163,7 +163,9 @@ export async function sendQuickReply(quickReplyId: string, contactId: string) {
     delay_seconds: 0,
     target_agent_id: null,
     agent_distribution: null,
-    templates: a.templates as unknown as { meta_template_name: string; language: string } | null,
+    templates: a.templates as unknown as
+      | { meta_template_name: string; language: string; body_text: string | null }
+      | null,
   }));
 
   try {

@@ -17,7 +17,7 @@ export type AutomationAction = {
   delay_seconds: number;
   target_agent_id: string | null;
   agent_distribution: { agent_id: string; percent: number }[] | null;
-  templates: { meta_template_name: string; language: string } | null;
+  templates: { meta_template_name: string; language: string; body_text: string | null } | null;
 };
 
 // Picks one agent from a weighted list (weights don't need to sum to 100 —
@@ -186,7 +186,7 @@ export async function executeAction(
         conversation_id: conversationId,
         direction: "out",
         message_type: "template",
-        body: `[Plantilla: ${action.templates.meta_template_name}]`,
+        body: action.templates.body_text || `[Plantilla: ${action.templates.meta_template_name}]`,
         wa_message_id: result.messages[0]?.id,
         status: "sent",
       });
@@ -208,7 +208,7 @@ async function fetchActions(
   const { data } = await supabase
     .from("automation_actions")
     .select(
-      "position, action_type, message_body, tag_id, media_url, media_filename, template_id, delay_seconds, target_agent_id, agent_distribution, templates(meta_template_name, language)"
+      "position, action_type, message_body, tag_id, media_url, media_filename, template_id, delay_seconds, target_agent_id, agent_distribution, templates(meta_template_name, language, body_text)"
     )
     .eq("automation_id", automationId)
     .order("position");

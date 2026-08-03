@@ -418,7 +418,7 @@ export async function sendTemplateToConversation(input: {
       .single(),
     supabase
       .from("templates")
-      .select("meta_template_name, language")
+      .select("meta_template_name, language, body_text")
       .eq("id", input.templateId)
       .single(),
   ]);
@@ -449,7 +449,7 @@ export async function sendTemplateToConversation(input: {
         conversation_id: input.conversationId,
         direction: "out",
         message_type: "template",
-        body: `[Plantilla: ${template.meta_template_name}]`,
+        body: template.body_text || `[Plantilla: ${template.meta_template_name}]`,
         wa_message_id: result.messages[0]?.id,
         status: "sent",
       }),
