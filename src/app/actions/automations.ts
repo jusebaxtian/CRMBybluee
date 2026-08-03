@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getWorkspaceId } from "@/lib/workspace";
+import { runActionsForAutomation } from "@/lib/automations/engine";
 
 type ActionInput = {
   action_type:
@@ -217,4 +218,37 @@ export async function deleteAutomation(automationId: string) {
   const supabase = await createClient();
   await supabase.from("automations").delete().eq("id", automationId);
   revalidatePath("/dashboard/automations");
+}
+
+// Triggered by a single click from the chat's floating menu — same
+// executor keyword/tag automations use, just started manually instead of
+// by an event. Both automation and contact are re-checked against the
+// caller's workspace so an id from another tenant can't be run here.
+export async function runAutomationManually(automationId: string, contactId: string) {
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+
+  const { data: automation } = await supabase
+    .from("automations")
+    .select("id, workspace_id")
+    .eq("id", automationId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (!automation) return { error: "Automatización no encontrada." };
+
+  const { data: contact } = await supabase
+    .from("contacts")
+    .select("id")
+    .eq("id", contactId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (!contact) return { error: "Contacto no encontrado." };
+
+  try {
+    await runActionsForAutomation(supabase, automation, contactId);
+    return { success: true as const };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "No se pudo ejecutar la automatización." };
+  }
 }

@@ -78,6 +78,16 @@ export default async function ConversationPage({
 
   const agents = await listWorkspaceAgents(supabase, workspaceId);
 
+  // All active automations, not just the ones triggered by this contact's
+  // tags — the chat's floating menu lets an agent fire any flow manually,
+  // same idea as quick replies but reusing automation flows.
+  const { data: allAutomations } = await supabase
+    .from("automations")
+    .select("id, name")
+    .eq("workspace_id", workspaceId ?? "")
+    .eq("is_active", true)
+    .order("name");
+
   const { data: quickReplies } = await supabase
     .from("quick_replies")
     .select("id, name")
@@ -144,6 +154,7 @@ export default async function ConversationPage({
           contactId={conversation.contact_id}
           messages={messages ?? []}
           quickReplies={quickReplies ?? []}
+          automations={allAutomations ?? []}
           approvedTemplates={approvedTemplates ?? []}
         />
       </div>

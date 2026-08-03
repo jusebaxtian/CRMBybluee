@@ -245,7 +245,7 @@ async function runFrom(
   }
 }
 
-async function runActionsForAutomation(
+export async function runActionsForAutomation(
   supabase: SupabaseClient,
   automation: Automation,
   contactId: string

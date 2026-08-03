@@ -25,12 +25,14 @@ export function ChatPane({
   contactId,
   messages,
   quickReplies = [],
+  automations = [],
   approvedTemplates = [],
 }: {
   conversationId: string;
   contactId: string;
   messages: OptimisticMessage[];
   quickReplies?: { id: string; name: string }[];
+  automations?: { id: string; name: string }[];
   approvedTemplates?: ApprovedTemplate[];
 }) {
   const [pending, setPending] = useState<OptimisticMessage[]>([]);
@@ -58,6 +60,7 @@ export function ChatPane({
           conversationId={conversationId}
           contactId={contactId}
           quickReplies={quickReplies}
+          automations={automations}
           onOptimisticSend={(message) => setPending((p) => [...p, message])}
         />
       ) : (

@@ -5,6 +5,7 @@ import { Send, Paperclip, Mic, Square, X, Check, Play, Pause, RotateCcw } from "
 import { sendMessage, sendChatMedia } from "@/app/actions/whatsapp";
 import type { OptimisticMessage } from "@/components/chat-pane";
 import { QuickReplyPicker } from "@/components/quick-reply-picker";
+import { AutomationPicker } from "@/components/automation-picker";
 
 type RecordingStatus = "idle" | "recording" | "reviewing";
 
@@ -12,11 +13,13 @@ export function MessageComposer({
   conversationId,
   contactId,
   quickReplies = [],
+  automations = [],
   onOptimisticSend,
 }: {
   conversationId: string;
   contactId: string;
   quickReplies?: { id: string; name: string }[];
+  automations?: { id: string; name: string }[];
   onOptimisticSend?: (message: OptimisticMessage) => void;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
@@ -338,6 +341,7 @@ export function MessageComposer({
           <Paperclip size={18} />
         </button>
         <QuickReplyPicker contactId={contactId} quickReplies={quickReplies} />
+        <AutomationPicker contactId={contactId} automations={automations} />
         <button
           type="button"
           onClick={startRecording}
