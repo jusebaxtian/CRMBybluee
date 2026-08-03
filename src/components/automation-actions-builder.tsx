@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2, Plus, Info, ChevronUp, ChevronDown, Clock } from "lucide-react";
+import { Trash2, Plus, Info, ChevronUp, ChevronDown, Clock, X, FileText } from "lucide-react";
 
 // Uploads via XHR (not the uploadAutomationActionMedia server action) so we
 // can report real progress — fetch/Server Actions don't expose upload
@@ -361,9 +361,51 @@ export function AutomationActionsBuilder({
                 </div>
               )}
               {action.media_url && uploadingIndex !== index && (
-                <p className="truncate text-xs text-success">
-                  ✓ {action.media_filename || "Archivo listo"}
-                </p>
+                <div className="flex items-start gap-2 rounded-lg border border-border bg-background p-2">
+                  <div className="min-w-0 flex-1">
+                    {action.action_type === "send_image" && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={action.media_url}
+                        alt={action.media_filename || "Imagen cargada"}
+                        className="h-28 w-28 rounded-md object-cover"
+                      />
+                    )}
+                    {action.action_type === "send_video" && (
+                      <video
+                        src={action.media_url}
+                        controls
+                        playsInline
+                        className="max-h-40 w-full max-w-xs rounded-md bg-black"
+                      />
+                    )}
+                    {action.action_type === "send_audio" && (
+                      <audio src={action.media_url} controls className="w-full max-w-xs" />
+                    )}
+                    {action.action_type === "send_document" && (
+                      <a
+                        href={action.media_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-xs text-primary hover:underline"
+                      >
+                        <FileText size={16} className="shrink-0" />
+                        <span className="truncate">{action.media_filename || "Ver documento"}</span>
+                      </a>
+                    )}
+                    <p className="mt-1 truncate text-[11px] text-success">
+                      ✓ {action.media_filename || "Archivo listo"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => updateAction(index, { media_url: "", media_filename: "" })}
+                    title="Quitar archivo"
+                    className="shrink-0 text-muted hover:text-red-400"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
               )}
               {captionableTypes.has(action.action_type) && (
                 <textarea
