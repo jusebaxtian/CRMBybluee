@@ -8,6 +8,7 @@ import { Trash2, Plus, Info, ChevronUp, ChevronDown, Clock } from "lucide-react"
 // progress events, XHR's upload.onprogress does.
 function uploadWithProgress(
   file: File,
+  actionType: string,
   onProgress: (percent: number) => void
 ): Promise<{ url: string; filename: string } | { error: string }> {
   return new Promise((resolve) => {
@@ -31,6 +32,7 @@ function uploadWithProgress(
     xhr.onerror = () => resolve({ error: "No se pudo subir el archivo. Revisa tu conexión." });
     const formData = new FormData();
     formData.set("file", file);
+    formData.set("actionType", actionType);
     xhr.send(formData);
   });
 }
@@ -84,11 +86,15 @@ const mediaLabel: Record<string, string> = {
   send_document: "Documento",
 };
 
+// Matches WhatsApp Cloud API's actual supported mime types per media kind
+// (see allowedMimesByActionType in /api/automation-media/route.ts) — not
+// a generic "video/*"/"image/*", which lets browsers offer formats WhatsApp
+// will reject at send time.
 const mediaAccept: Record<string, string> = {
-  send_image: "image/*",
-  send_video: "video/*",
-  send_audio: "audio/*",
-  send_document: "application/pdf,.doc,.docx,.xls,.xlsx",
+  send_image: "image/jpeg,image/png",
+  send_video: "video/mp4,video/3gpp",
+  send_audio: "audio/aac,audio/mp4,audio/mpeg,audio/amr,audio/ogg",
+  send_document: "application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt",
 };
 
 // Audio messages don't support a caption in the Cloud API.
@@ -224,7 +230,7 @@ export function AutomationActionsBuilder({
     setUploadProgress(0);
     setUploadError(null);
     onUploadingChange?.(true);
-    const result = await uploadWithProgress(file, setUploadProgress);
+    const result = await uploadWithProgress(file, actions[index].action_type, setUploadProgress);
     setUploadingIndex(null);
     onUploadingChange?.(false);
     if ("error" in result) {
