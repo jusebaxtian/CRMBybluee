@@ -6,6 +6,7 @@ import { sendMessage, sendChatMedia } from "@/app/actions/whatsapp";
 import type { OptimisticMessage } from "@/components/chat-pane";
 import { QuickReplyPicker } from "@/components/quick-reply-picker";
 import { AutomationPicker } from "@/components/automation-picker";
+import { mediaKindFromMime, validateMediaSize } from "@/lib/whatsapp/media-limits";
 
 type RecordingStatus = "idle" | "recording" | "reviewing";
 
@@ -116,6 +117,14 @@ export function MessageComposer({
 
   function enqueueUpload(file: File) {
     setUploadError(null);
+    // Catch an oversized file before even uploading it — WhatsApp's real
+    // limits (16MB video/audio, 5MB image, 100MB document); otherwise the
+    // upload "succeeds" and only fails later when actually sending.
+    const sizeError = validateMediaSize(mediaKindFromMime(file.type), file.size);
+    if (sizeError) {
+      setUploadError(sizeError);
+      return;
+    }
     fileQueueRef.current.push(file);
     drainFileQueue();
   }

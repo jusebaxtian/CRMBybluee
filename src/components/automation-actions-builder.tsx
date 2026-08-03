@@ -2,6 +2,14 @@
 
 import { useState } from "react";
 import { Trash2, Plus, Info, ChevronUp, ChevronDown, Clock, X, FileText } from "lucide-react";
+import { validateMediaSize, type MediaKind } from "@/lib/whatsapp/media-limits";
+
+const mediaKindByActionType: Record<string, MediaKind> = {
+  send_image: "image",
+  send_video: "video",
+  send_audio: "audio",
+  send_document: "document",
+};
 
 // Uploads via XHR (not the uploadAutomationActionMedia server action) so we
 // can report real progress — fetch/Server Actions don't expose upload
@@ -226,9 +234,19 @@ export function AutomationActionsBuilder({
   }
 
   async function handleFile(index: number, file: File) {
+    setUploadError(null);
+    // Catch an oversized file before spending an upload on it.
+    const actionType = actions[index].action_type;
+    const mediaKind = mediaKindByActionType[actionType];
+    if (mediaKind) {
+      const sizeError = validateMediaSize(mediaKind, file.size);
+      if (sizeError) {
+        setUploadError(sizeError);
+        return;
+      }
+    }
     setUploadingIndex(index);
     setUploadProgress(0);
-    setUploadError(null);
     onUploadingChange?.(true);
     const result = await uploadWithProgress(file, actions[index].action_type, setUploadProgress);
     setUploadingIndex(null);
