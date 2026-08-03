@@ -100,7 +100,10 @@ const mediaLabel: Record<string, string> = {
 // will reject at send time.
 const mediaAccept: Record<string, string> = {
   send_image: "image/jpeg,image/png",
-  send_video: "video/mp4,video/3gpp",
+  // Broader than what WhatsApp accepts — every video gets normalized to
+  // H.264/AAC server-side (see video-transcode.ts), so any common format
+  // (including iPhone's .mov/HEVC) is fine to pick here.
+  send_video: "video/mp4,video/quicktime,video/webm,video/3gpp,.mov,.mkv,.avi",
   send_audio: "audio/aac,audio/mp4,audio/mpeg,audio/amr,audio/ogg",
   send_document: "application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt",
 };
@@ -235,10 +238,12 @@ export function AutomationActionsBuilder({
 
   async function handleFile(index: number, file: File) {
     setUploadError(null);
-    // Catch an oversized file before spending an upload on it.
+    // Catch an oversized file before spending an upload on it — except
+    // video, which the server transcodes/compresses first, so its real
+    // size is only known (and checked) after that happens.
     const actionType = actions[index].action_type;
     const mediaKind = mediaKindByActionType[actionType];
-    if (mediaKind) {
+    if (mediaKind && mediaKind !== "video") {
       const sizeError = validateMediaSize(mediaKind, file.size);
       if (sizeError) {
         setUploadError(sizeError);

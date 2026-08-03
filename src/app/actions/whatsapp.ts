@@ -19,6 +19,7 @@ import {
   uploadMedia,
 } from "@/lib/whatsapp/graph";
 import { validateMediaMime, validateMediaSize } from "@/lib/whatsapp/media-limits";
+import { transcodeVideoToH264 } from "@/lib/whatsapp/video-transcode";
 import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
 
 const execFileAsync = promisify(execFile);
@@ -258,13 +259,15 @@ export async function sendChatMedia(formData: FormData) {
   // upload on it — without this, WhatsApp accepts the send and only rejects
   // it later via the async status webhook, days removed from the moment the
   // agent picked the file (see friendlyWhatsAppError in ingest.ts). Webm
-  // audio is exempt from the mime check — it gets transcoded to ogg/opus
-  // right below, which IS an allowed mime; only its size is checked here.
+  // audio and video are exempt from the size check here — both get
+  // transcoded below, so their real final size is only known afterward.
   const isWebmAudio = mediaType === "audio" && file.type.includes("webm");
-  const validationError =
-    (isWebmAudio ? null : validateMediaMime(mediaType, file.type)) ??
-    validateMediaSize(mediaType, file.size);
-  if (validationError) return { error: "No se pudo enviar: " + validationError };
+  const mimeError = isWebmAudio ? null : validateMediaMime(mediaType, file.type);
+  if (mimeError) return { error: "No se pudo enviar: " + mimeError };
+  if (mediaType !== "video") {
+    const sizeError = validateMediaSize(mediaType, file.size);
+    if (sizeError) return { error: "No se pudo enviar: " + sizeError };
+  }
 
   let uploadBuffer: Buffer | File = file;
   let uploadContentType = file.type;
@@ -289,6 +292,27 @@ export async function sendChatMedia(formData: FormData) {
           (err instanceof Error ? err.message : "error desconocido"),
       };
     }
+  }
+
+  // Every video gets normalized to H.264/AAC regardless of source
+  // codec/container — see the comment on transcodeVideoToH264 for why.
+  if (mediaType === "video") {
+    try {
+      const original = Buffer.from(await file.arrayBuffer());
+      const ext = file.name.split(".").pop() || "mp4";
+      uploadBuffer = await transcodeVideoToH264(original, ext);
+      uploadContentType = "video/mp4";
+      uploadFilename = file.name.replace(/\.[^.]+$/, "") + ".mp4";
+    } catch (err) {
+      return {
+        error:
+          "No se pudo procesar el video: " +
+          (err instanceof Error ? err.message : "error desconocido"),
+      };
+    }
+
+    const sizeError = validateMediaSize("video", (uploadBuffer as Buffer).length);
+    if (sizeError) return { error: "No se pudo enviar: " + sizeError };
   }
 
   const admin = createAdminClient();

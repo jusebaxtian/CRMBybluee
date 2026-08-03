@@ -9,7 +9,10 @@ export type MediaKind = "image" | "video" | "audio" | "document";
 
 export const allowedMimesByMediaKind: Record<MediaKind, string[]> = {
   image: ["image/jpeg", "image/png"],
-  video: ["video/mp4", "video/3gpp"],
+  // Broader than what WhatsApp itself accepts — every video gets
+  // transcoded to H.264/AAC mp4 (see video-transcode.ts) regardless of
+  // source container/codec, so anything ffmpeg can decode is fine here.
+  video: ["video/mp4", "video/quicktime", "video/webm", "video/3gpp", "video/x-matroska", "video/x-msvideo"],
   audio: ["audio/aac", "audio/mp4", "audio/mpeg", "audio/amr", "audio/ogg"],
   document: [
     "application/pdf",
@@ -44,6 +47,8 @@ export const mimeLabel: Record<string, string> = {
   "video/mp4": "un video MP4",
   "video/quicktime": "un video MOV",
   "video/webm": "un video WEBM",
+  "video/x-matroska": "un video MKV",
+  "video/x-msvideo": "un video AVI",
   "audio/wav": "un audio WAV",
 };
 

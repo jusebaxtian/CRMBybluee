@@ -119,11 +119,16 @@ export function MessageComposer({
     setUploadError(null);
     // Catch an oversized file before even uploading it — WhatsApp's real
     // limits (16MB video/audio, 5MB image, 100MB document); otherwise the
-    // upload "succeeds" and only fails later when actually sending.
-    const sizeError = validateMediaSize(mediaKindFromMime(file.type), file.size);
-    if (sizeError) {
-      setUploadError(sizeError);
-      return;
+    // upload "succeeds" and only fails later when actually sending. Video
+    // is exempt — it gets compressed server-side first, so its real final
+    // size is only known (and checked) after that happens.
+    const kind = mediaKindFromMime(file.type);
+    if (kind !== "video") {
+      const sizeError = validateMediaSize(kind, file.size);
+      if (sizeError) {
+        setUploadError(sizeError);
+        return;
+      }
     }
     fileQueueRef.current.push(file);
     drainFileQueue();
