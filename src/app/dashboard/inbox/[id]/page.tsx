@@ -11,6 +11,7 @@ import { ConversationDetailsSheet } from "@/components/conversation-details-shee
 import { ConversationWindowStatus } from "@/components/conversation-window-status";
 import { getWorkspaceId } from "@/lib/workspace";
 import { listWorkspaceAgents } from "@/lib/agents";
+import { isPhoneNumber } from "@/lib/whatsapp/identity";
 
 export default async function ConversationPage({
   params,
@@ -119,7 +120,8 @@ export default async function ConversationPage({
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-foreground">
-              {contact.name ?? contact.wa_id}
+              {isPhoneNumber(contact.wa_id) ? contact.wa_id : "Usuario"}
+              {contact.name && <span className="text-muted"> · {contact.name}</span>}
             </p>
             <ConversationWindowStatus lastInboundAt={lastInboundAt} />
           </div>
@@ -152,9 +154,11 @@ export default async function ConversationPage({
             {(contact.name ?? contact.wa_id).charAt(0).toUpperCase()}
           </div>
           <p className="mt-3 text-base font-semibold text-foreground">
-            {contact.name ?? contact.wa_id}
+            {contact.name ?? (isPhoneNumber(contact.wa_id) ? contact.wa_id : "Usuario")}
           </p>
-          <p className="text-sm text-muted">{contact.wa_id}</p>
+          <p className="text-sm text-muted">
+            {isPhoneNumber(contact.wa_id) ? contact.wa_id : "Usuario (sin número)"}
+          </p>
         </div>
 
         {agents.length > 0 && (
