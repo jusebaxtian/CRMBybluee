@@ -57,7 +57,12 @@ export default async function TagsPage() {
                   </span>
                 </span>
                 <TagFollowupsToggle tagId={tag.id} excludesFollowups={tag.excludes_followups} />
-                <EditTagButton tagId={tag.id} tagName={tag.name} tagColor={tag.color} />
+                <EditTagButton
+                  tagId={tag.id}
+                  tagName={tag.name}
+                  tagColor={tag.color}
+                  excludesFollowups={tag.excludes_followups}
+                />
                 <DeleteTagButton tagId={tag.id} tagName={tag.name} contactCount={contactCount} />
               </div>
             );

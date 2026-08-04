@@ -28,7 +28,10 @@ export async function createTag(_prevState: unknown, formData: FormData) {
   return { success: true };
 }
 
-export async function updateTag(tagId: string, input: { name: string; color: string }) {
+export async function updateTag(
+  tagId: string,
+  input: { name: string; color: string; excludesFollowups: boolean }
+) {
   const name = input.name.trim();
   const color = input.color.trim();
   if (!name) return { error: "El nombre es obligatorio." };
@@ -39,7 +42,7 @@ export async function updateTag(tagId: string, input: { name: string; color: str
 
   const { error } = await supabase
     .from("tags")
-    .update({ name, color })
+    .update({ name, color, excludes_followups: input.excludesFollowups })
     .eq("id", tagId)
     .eq("workspace_id", workspaceId);
   if (error) return { error: error.message };
