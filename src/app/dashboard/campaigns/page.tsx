@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Megaphone, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
-import { requireModule } from "@/lib/entitlements";
+import { requireModule, getEnabledModuleKeys } from "@/lib/entitlements";
 import { CampaignsTabs } from "@/components/campaigns-tabs";
 
 const statusLabel: Record<string, string> = {
@@ -16,6 +16,7 @@ export default async function CampaignsPage() {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
   await requireModule(supabase, workspaceId, "campaigns");
+  const enabledModules = await getEnabledModuleKeys(supabase, workspaceId);
 
   const { data: campaigns } = await supabase
     .from("campaigns")
@@ -25,7 +26,7 @@ export default async function CampaignsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <CampaignsTabs />
+      <CampaignsTabs enabledModules={enabledModules} />
 
       <div className="flex justify-end">
         <Link

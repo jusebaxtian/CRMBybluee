@@ -13,7 +13,7 @@ export default async function EditFollowupSequencePage({
   const { id } = await params;
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
-  await requireModule(supabase, workspaceId, "campaigns");
+  await requireModule(supabase, workspaceId, "followups");
 
   const { data: sequence } = await supabase
     .from("automations")

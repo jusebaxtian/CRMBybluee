@@ -3,14 +3,15 @@ import { History, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { AutomationRowActions } from "@/components/automation-row-actions";
 import { getWorkspaceId } from "@/lib/workspace";
-import { requireModule } from "@/lib/entitlements";
+import { requireModule, getEnabledModuleKeys } from "@/lib/entitlements";
 import { CampaignsTabs } from "@/components/campaigns-tabs";
 import { toggleFollowupSequenceActive, deleteFollowupSequence } from "@/app/actions/followups";
 
 export default async function FollowupsPage() {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
-  await requireModule(supabase, workspaceId, "campaigns");
+  await requireModule(supabase, workspaceId, "followups");
+  const enabledModules = await getEnabledModuleKeys(supabase, workspaceId);
 
   const { data: sequences } = await supabase
     .from("automations")
@@ -21,7 +22,7 @@ export default async function FollowupsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <CampaignsTabs />
+      <CampaignsTabs enabledModules={enabledModules} />
 
       <div className="flex justify-end">
         <Link

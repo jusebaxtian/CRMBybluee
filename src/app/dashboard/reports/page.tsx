@@ -2,10 +2,12 @@ import { redirect } from "next/navigation";
 import { Users, Download } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
+import { requireModule } from "@/lib/entitlements";
 
 export default async function ReportsPage() {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
+  await requireModule(supabase, workspaceId, "reports");
 
   const role = await getWorkspaceRole(supabase, workspaceId);
   if (role !== "owner" && role !== "admin") {

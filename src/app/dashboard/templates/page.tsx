@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { SyncTemplatesButton } from "@/components/sync-templates-button";
 import { CreateTemplateForm } from "@/components/create-template-form";
 import { getWorkspaceId } from "@/lib/workspace";
-import { requireModule } from "@/lib/entitlements";
+import { requireModule, getEnabledModuleKeys } from "@/lib/entitlements";
 import { CampaignsTabs } from "@/components/campaigns-tabs";
 
 const statusColor: Record<string, string> = {
@@ -15,7 +15,8 @@ const statusColor: Record<string, string> = {
 export default async function TemplatesPage() {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
-  await requireModule(supabase, workspaceId, "campaigns");
+  await requireModule(supabase, workspaceId, "templates");
+  const enabledModules = await getEnabledModuleKeys(supabase, workspaceId);
 
   const { data: templates } = await supabase
     .from("templates")
@@ -25,7 +26,7 @@ export default async function TemplatesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <CampaignsTabs />
+      <CampaignsTabs enabledModules={enabledModules} />
 
       <div className="rounded-xl border border-border bg-surface p-6">
         <h2 className="mb-4 text-sm font-semibold text-foreground">Crear nueva plantilla</h2>

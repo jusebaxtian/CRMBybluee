@@ -7,7 +7,7 @@ import { listWorkspaceAgents } from "@/lib/agents";
 export default async function NewFollowupSequencePage() {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
-  await requireModule(supabase, workspaceId, "campaigns");
+  await requireModule(supabase, workspaceId, "followups");
 
   const { data: tags } = await supabase
     .from("tags")
