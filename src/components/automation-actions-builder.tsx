@@ -109,7 +109,7 @@ const mediaAccept: Record<string, string> = {
   // (including iPhone's .mov/HEVC) is fine to pick here.
   send_video: "video/mp4,video/quicktime,video/webm,video/3gpp,.mov,.mkv,.avi",
   send_audio: "audio/aac,audio/mp4,audio/mpeg,audio/amr,audio/ogg",
-  send_document: "application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt",
+  send_document: "application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar",
 };
 
 // Audio messages don't support a caption in the Cloud API.

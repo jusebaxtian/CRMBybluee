@@ -23,6 +23,13 @@ export const allowedMimesByMediaKind: Record<MediaKind, string[]> = {
     "application/vnd.ms-powerpoint",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     "text/plain",
+    // Browsers report .zip/.rar under several different mime strings
+    // depending on OS/version, so all the common variants are allowed.
+    "application/zip",
+    "application/x-zip-compressed",
+    "application/vnd.rar",
+    "application/x-rar-compressed",
+    "application/x-rar",
   ],
 };
 
@@ -50,6 +57,11 @@ export const mimeLabel: Record<string, string> = {
   "video/x-matroska": "un video MKV",
   "video/x-msvideo": "un video AVI",
   "audio/wav": "un audio WAV",
+  "application/zip": "un archivo ZIP",
+  "application/x-zip-compressed": "un archivo ZIP",
+  "application/vnd.rar": "un archivo RAR",
+  "application/x-rar-compressed": "un archivo RAR",
+  "application/x-rar": "un archivo RAR",
 };
 
 export function formatMB(bytes: number): string {

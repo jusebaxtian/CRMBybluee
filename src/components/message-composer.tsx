@@ -342,7 +342,7 @@ export function MessageComposer({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx"
+          accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.zip,.rar"
           onChange={handleFilePicked}
           className="hidden"
         />
