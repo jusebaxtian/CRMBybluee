@@ -346,6 +346,11 @@ export async function runTagAddedAutomations(
   contactId: string,
   tagId: string
 ) {
+  // A contact tagged e.g. "Ya compró" (excludes_followups) shouldn't have any
+  // more automations fire on them, whether triggered by keyword or by
+  // another tag being added — only manual mass campaigns should still reach them.
+  if (await isContactExcludedFromAutomations(supabase, contactId)) return;
+
   const { data: automations } = await supabase
     .from("automations")
     .select("id, workspace_id")
@@ -359,11 +364,12 @@ export async function runTagAddedAutomations(
   }
 }
 
-// Re-checked right before a deferred follow-up step fires (in addition to
-// the DB trigger's check when the sequence was first scheduled) — a
-// "No interesados" tag or the conversation's own toggle may have been
-// applied any time during the wait.
-export async function isContactExcludedFromFollowups(
+// Shared exclusion check for every automation trigger type (tag_added,
+// keyword, and no_reply follow-ups) — a contact tagged "excludes_followups"
+// (e.g. "Ya compró", "No interesados") never gets another automation step,
+// regardless of what triggers it. Re-checked right before a deferred
+// follow-up step fires too, since the tag may have been added mid-wait.
+export async function isContactExcludedFromAutomations(
   supabase: SupabaseClient,
   contactId: string
 ): Promise<boolean> {
@@ -391,12 +397,18 @@ export async function isContactExcludedFromFollowups(
   );
 }
 
+// Kept as an alias — the scheduler only deals with no_reply follow-up runs,
+// so the old, narrower name still reads correctly there.
+export const isContactExcludedFromFollowups = isContactExcludedFromAutomations;
+
 export async function runKeywordAutomations(
   supabase: SupabaseClient,
   workspaceId: string,
   contactId: string,
   messageBody: string
 ) {
+  if (await isContactExcludedFromAutomations(supabase, contactId)) return;
+
   const { data: automations } = await supabase
     .from("automations")
     .select("id, workspace_id, trigger_keyword")

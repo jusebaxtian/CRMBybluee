@@ -49,10 +49,11 @@ export async function updateTag(tagId: string, input: { name: string; color: str
   return { success: true as const };
 }
 
-// Contacts with an "excludes_followups" tag (e.g. "No interesados") never
-// receive any follow-up sequence step, regardless of the sequence or the
-// conversation's own toggle — checked both when a sequence is first
-// scheduled and again right before each deferred step fires.
+// Contacts with an "excludes_followups" tag (e.g. "Ya compró", "No interesados")
+// never get another automation step — keyword, tag_added, or follow-up
+// sequences — regardless of the conversation's own toggle. Checked both when
+// a follow-up sequence is first scheduled and again right before it fires;
+// keyword/tag_added automations check it inline before running.
 export async function toggleTagExcludesFollowups(tagId: string, excludesFollowups: boolean) {
   const supabase = await createClient();
   const { error } = await supabase
