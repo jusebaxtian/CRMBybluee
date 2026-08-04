@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil } from "lucide-react";
 import { updateTag } from "@/app/actions/tags";
@@ -21,7 +21,6 @@ export function EditTagButton({
   const [color, setColor] = useState(tagColor);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
 
   function openEditor() {
     setName(tagName);
@@ -55,11 +54,13 @@ export function EditTagButton({
       </button>
 
       {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setOpen(false)}
+        >
           <div
-            ref={popoverRef}
-            className="absolute left-0 top-full z-50 mt-2 w-64 rounded-xl border border-border bg-surface p-3 shadow-lg"
+            className="w-full max-w-xs rounded-xl border border-border bg-surface p-4 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
           >
             <label className="mb-1 block text-xs font-medium text-muted">Nombre</label>
             <input
@@ -91,7 +92,7 @@ export function EditTagButton({
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
