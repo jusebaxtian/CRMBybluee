@@ -12,7 +12,7 @@ export default async function TagsPage() {
 
   const { data: tags } = await supabase
     .from("tags")
-    .select("id, name, color, excludes_followups")
+    .select("id, name, color, excludes_followups, contact_tags(count)")
     .eq("workspace_id", workspaceId ?? "")
     .order("name");
 
@@ -38,17 +38,25 @@ export default async function TagsPage() {
         </div>
       ) : (
         <div className="flex flex-wrap gap-2">
-          {tags.map((tag) => (
-            <div
-              key={tag.id}
-              className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm"
-              style={{ color: tag.color, borderColor: tag.color }}
-            >
-              {tag.name}
-              <TagFollowupsToggle tagId={tag.id} excludesFollowups={tag.excludes_followups} />
-              <DeleteTagButton tagId={tag.id} />
-            </div>
-          ))}
+          {tags.map((tag) => {
+            const contactCount = (tag.contact_tags as unknown as { count: number }[])[0]?.count ?? 0;
+            return (
+              <div
+                key={tag.id}
+                className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm"
+                style={{ color: tag.color, borderColor: tag.color }}
+              >
+                <span>
+                  {tag.name}{" "}
+                  <span className="text-muted" title={`${contactCount} contacto${contactCount === 1 ? "" : "s"} con esta etiqueta`}>
+                    {contactCount}
+                  </span>
+                </span>
+                <TagFollowupsToggle tagId={tag.id} excludesFollowups={tag.excludes_followups} />
+                <DeleteTagButton tagId={tag.id} tagName={tag.name} contactCount={contactCount} />
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
