@@ -37,6 +37,10 @@ export type WhatsAppWebhookPayload = {
           timestamp: string;
           recipient_id: string;
           errors?: { code: number; title: string; message?: string; error_data?: { details?: string } }[];
+          // Present on the "sent" status update — Meta's own conversation id
+          // plus how it was opened. "business_initiated" is the kind that
+          // counts against the account's daily messaging limit tier.
+          conversation?: { id: string; origin?: { type: string } };
         }[];
       };
     }[];

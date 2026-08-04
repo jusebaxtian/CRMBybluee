@@ -297,6 +297,24 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
         } else if (status.status === "delivered" || status.status === "read") {
           await resetContactReachability(supabase, conversation.contact_id);
         }
+
+        // Meta reports the same conversation.id on every status update for
+        // messages inside that conversation — insert once per conversation,
+        // ignoring the duplicate on later delivered/read updates. Only
+        // "business_initiated" conversations count against the daily
+        // messaging limit tier (250/1K/10K/...); user-initiated ones (a
+        // reply within the customer's 24h window) don't.
+        if (status.conversation?.id && status.conversation.origin?.type === "business_initiated") {
+          await supabase.from("conversation_opens").upsert(
+            {
+              workspace_id: workspaceId,
+              contact_id: conversation.contact_id,
+              meta_conversation_id: status.conversation.id,
+              origin_type: status.conversation.origin.type,
+            },
+            { onConflict: "meta_conversation_id", ignoreDuplicates: true }
+          );
+        }
       }
     }
   }

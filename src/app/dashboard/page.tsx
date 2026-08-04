@@ -122,6 +122,32 @@ export default async function DashboardPage({
     }
   }
 
+  // Meta's messaging limit is a rolling 24h window, not a calendar day —
+  // count business-initiated conversations opened in the last 24h to match.
+  const { count: conversationsOpenedCount } =
+    workspaceId && whatsappAccount
+      ? await supabase
+          .from("conversation_opens")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId)
+          .gte("opened_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+      : { count: null };
+
+  const messagingLimitValue: Record<string, number> = {
+    TIER_50: 50,
+    TIER_250: 250,
+    TIER_1K: 1000,
+    TIER_10K: 10000,
+    TIER_100K: 100000,
+  };
+  const dailyLimit = phoneStatus?.messaging_limit_tier
+    ? messagingLimitValue[phoneStatus.messaging_limit_tier]
+    : undefined;
+  const conversationsUsedPct =
+    dailyLimit && conversationsOpenedCount !== null
+      ? Math.min(100, (conversationsOpenedCount / dailyLimit) * 100)
+      : null;
+
   const { data: bannerSetting } = await supabase
     .from("platform_settings")
     .select("value")
@@ -321,6 +347,44 @@ export default async function DashboardPage({
                 <p className="mt-2 text-[11px] text-muted">
                   El límite de mensajes diarios lo define Meta según la calidad y antigüedad de tu número.
                 </p>
+              )}
+
+              {dailyLimit && conversationsOpenedCount !== null && (
+                <div className="mt-4 rounded-lg border border-border p-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-medium text-foreground">
+                      Conversaciones iniciadas (últimas 24h)
+                    </span>
+                    <span
+                      className={
+                        conversationsUsedPct !== null && conversationsUsedPct >= 90
+                          ? "font-semibold text-red-400"
+                          : conversationsUsedPct !== null && conversationsUsedPct >= 70
+                            ? "font-semibold text-warning"
+                            : "font-semibold text-foreground"
+                      }
+                    >
+                      {conversationsOpenedCount} / {dailyLimit.toLocaleString("es-CO")}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-hover">
+                    <div
+                      className={`h-full rounded-full ${
+                        conversationsUsedPct !== null && conversationsUsedPct >= 90
+                          ? "bg-red-400"
+                          : conversationsUsedPct !== null && conversationsUsedPct >= 70
+                            ? "bg-warning"
+                            : "bg-success"
+                      }`}
+                      style={{ width: `${conversationsUsedPct ?? 0}%` }}
+                    />
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-muted">
+                    Cuenta las conversaciones que tú iniciaste (campañas, plantillas fuera de la
+                    ventana de 24h) — las respuestas dentro de la ventana de atención no cuentan
+                    para este límite de Meta.
+                  </p>
+                </div>
               )}
             </>
           ) : (
