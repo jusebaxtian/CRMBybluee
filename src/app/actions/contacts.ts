@@ -139,3 +139,18 @@ export async function bulkAddTagToContacts(contactIds: string[], tagId: string) 
   revalidatePath("/dashboard/contacts");
   return { success: true };
 }
+
+// Manual override for the automatic "likely_blocked" flag (see
+// UNREACHABLE_ERROR_CODES in ingest.ts) — an agent may know the number is
+// actually fine (e.g. a typo got corrected) and want to resume automated
+// sends to it without waiting for a successful delivery to clear it.
+export async function resetContactBlockedStatus(contactId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("contacts")
+    .update({ consecutive_failures: 0, likely_blocked: false })
+    .eq("id", contactId);
+  if (error) return { error: error.message };
+  revalidatePath("/dashboard/inbox");
+  return { success: true as const };
+}

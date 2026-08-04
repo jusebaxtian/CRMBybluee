@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, SlidersHorizontal, X, Clock, Megaphone } from "lucide-react";
+import { Search, SlidersHorizontal, X, Clock, Megaphone, ShieldAlert } from "lucide-react";
 import { NewMessageButton } from "@/components/new-message-button";
 import { useMessageWindow } from "@/lib/use-message-window";
 
@@ -27,6 +27,7 @@ type Conversation = {
   lastInboundAt: string | null;
   fromAds: boolean;
   adHeadline: string | null;
+  likelyBlocked: boolean;
   contact: { name: string | null; wa_id: string };
   tags: Tag[];
 };
@@ -326,6 +327,11 @@ export function ConversationListPanel({
                         }
                       >
                         <Megaphone size={11} className="shrink-0 text-primary" />
+                      </span>
+                    )}
+                    {conv.likelyBlocked && (
+                      <span title="Posible bloqueo — no recibe seguimientos ni mensajes masivos">
+                        <ShieldAlert size={11} className="shrink-0 text-red-400" />
                       </span>
                     )}
                   </p>

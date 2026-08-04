@@ -27,6 +27,39 @@ function friendlyWhatsAppError(error: {
   }
 }
 
+// WhatsApp never tells a business when a customer has blocked them (privacy
+// by design) — the closest signal available is this error code, meaning
+// "recipient's number is not on WhatsApp or is otherwise unreachable".
+// Several of these in a row is the practical proxy for "likely blocked".
+const UNREACHABLE_ERROR_CODES = new Set([131026]);
+const LIKELY_BLOCKED_THRESHOLD = 3;
+
+async function recordUnreachableFailure(
+  supabase: ReturnType<typeof createAdminClient>,
+  contactId: string
+) {
+  const { data: contact } = await supabase
+    .from("contacts")
+    .select("consecutive_failures")
+    .eq("id", contactId)
+    .maybeSingle();
+  const next = (contact?.consecutive_failures ?? 0) + 1;
+  await supabase
+    .from("contacts")
+    .update({ consecutive_failures: next, likely_blocked: next >= LIKELY_BLOCKED_THRESHOLD })
+    .eq("id", contactId);
+}
+
+async function resetContactReachability(
+  supabase: ReturnType<typeof createAdminClient>,
+  contactId: string
+) {
+  await supabase
+    .from("contacts")
+    .update({ consecutive_failures: 0, likely_blocked: false })
+    .eq("id", contactId);
+}
+
 const extensionFromMime: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -144,6 +177,10 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
 
         if (!contact) continue;
 
+        // Any inbound message proves the number is reachable — clear
+        // whatever failure streak/likely_blocked flag it had.
+        await resetContactReachability(supabase, contact.id);
+
         const { data: conversation } = await supabase
           .from("conversations")
           .upsert(
@@ -229,17 +266,37 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
 
       for (const status of value.statuses ?? []) {
         let errorDetail: string | null = null;
+        let errorCode: number | null = null;
         if (status.status === "failed" && status.errors?.length) {
           console.error(
             `whatsapp delivery failed for wa_message_id=${status.id}:`,
             JSON.stringify(status.errors)
           );
           errorDetail = friendlyWhatsAppError(status.errors[0]);
+          errorCode = status.errors[0].code;
         }
-        await supabase
+
+        const { data: updatedMessages } = await supabase
           .from("messages")
           .update({ status: status.status, error_detail: errorDetail })
-          .eq("wa_message_id", status.id);
+          .eq("wa_message_id", status.id)
+          .select("conversation_id");
+
+        const conversationId = updatedMessages?.[0]?.conversation_id;
+        if (!conversationId) continue;
+
+        const { data: conversation } = await supabase
+          .from("conversations")
+          .select("contact_id")
+          .eq("id", conversationId)
+          .maybeSingle();
+        if (!conversation) continue;
+
+        if (status.status === "failed" && errorCode && UNREACHABLE_ERROR_CODES.has(errorCode)) {
+          await recordUnreachableFailure(supabase, conversation.contact_id);
+        } else if (status.status === "delivered" || status.status === "read") {
+          await resetContactReachability(supabase, conversation.contact_id);
+        }
       }
     }
   }

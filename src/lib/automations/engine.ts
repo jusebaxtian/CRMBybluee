@@ -374,6 +374,13 @@ export async function isContactExcludedFromFollowups(
     .maybeSingle();
   if (conversation && conversation.followups_enabled === false) return true;
 
+  const { data: contact } = await supabase
+    .from("contacts")
+    .select("likely_blocked")
+    .eq("id", contactId)
+    .maybeSingle();
+  if (contact?.likely_blocked) return true;
+
   const { data: tags } = await supabase
     .from("contact_tags")
     .select("tags(excludes_followups)")

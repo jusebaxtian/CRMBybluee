@@ -18,7 +18,7 @@ export default async function InboxLayout({
   const { data: conversationsRaw } = await supabase
     .from("conversations")
     .select(
-      "id, last_message_at, last_read_at, assigned_agent_id, ad_source_id, ad_headline, contacts(name, wa_id, contact_tags(tags(id, name, color)))"
+      "id, last_message_at, last_read_at, assigned_agent_id, ad_source_id, ad_headline, contacts(name, wa_id, likely_blocked, contact_tags(tags(id, name, color)))"
     )
     .eq("workspace_id", workspaceId ?? "")
     .order("last_message_at", { ascending: false });
@@ -83,6 +83,7 @@ export default async function InboxLayout({
     const contactRaw = c.contacts as unknown as {
       name: string | null;
       wa_id: string;
+      likely_blocked: boolean;
       contact_tags: { tags: { id: string; name: string; color: string } | null }[];
     };
 
@@ -96,6 +97,7 @@ export default async function InboxLayout({
       lastInboundAt: lastInboundAtByConversation.get(c.id) ?? null,
       fromAds: !!c.ad_source_id,
       adHeadline: c.ad_headline as string | null,
+      likelyBlocked: contactRaw.likely_blocked,
       contact: { name: contactRaw.name, wa_id: contactRaw.wa_id },
       tags: contactRaw.contact_tags.map((ct) => ct.tags).filter((t) => t !== null) as {
         id: string;

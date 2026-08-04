@@ -125,7 +125,14 @@ export async function createCampaign(_prevState: unknown, formData: FormData) {
 
   if (error || !campaign) return { error: error?.message ?? "Error al crear la campaña." };
 
-  let contactsQuery = supabase.from("contacts").select("id").eq("workspace_id", workspaceId);
+  // Never target a contact whose number has repeatedly failed to receive
+  // messages (likely blocked the business) — sending more just racks up
+  // failures against the account's quality rating for no benefit.
+  let contactsQuery = supabase
+    .from("contacts")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .eq("likely_blocked", false);
   if (audienceTagId) {
     const { data: taggedContacts } = await supabase
       .from("contact_tags")
@@ -189,7 +196,7 @@ export async function sendCampaign(campaignId: string) {
 
   const { data: recipients } = await supabase
     .from("campaign_recipients")
-    .select("id, contact_id, contacts(wa_id)")
+    .select("id, contact_id, contacts(wa_id, likely_blocked)")
     .eq("campaign_id", campaignId)
     .eq("status", "pending");
 
@@ -197,7 +204,23 @@ export async function sendCampaign(campaignId: string) {
   const mediaKind = campaign.media_url ? mediaKindFromMime(guessMimeFromFilename(campaign.media_filename)) : null;
 
   for (const recipient of recipients ?? []) {
-    const waId = (recipient.contacts as unknown as { wa_id: string }).wa_id;
+    const { wa_id: waId, likely_blocked: likelyBlocked } = recipient.contacts as unknown as {
+      wa_id: string;
+      likely_blocked: boolean;
+    };
+    // Re-check right before sending — a contact could have started failing
+    // (and gotten flagged) after this campaign was created.
+    if (likelyBlocked) {
+      failures += 1;
+      await supabase
+        .from("campaign_recipients")
+        .update({
+          status: "failed",
+          error_message: "Contacto marcado como posiblemente bloqueado — no se le envió.",
+        })
+        .eq("id", recipient.id);
+      continue;
+    }
     try {
       if (campaign.send_type === "template" && template) {
         const result = await sendTemplateMessage(
