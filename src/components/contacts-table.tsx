@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Trash2, Tag as TagIcon, X, Check, Megaphone } from "lucide-react";
+import { Pencil, Trash2, Tag as TagIcon, X, Check, Megaphone, Search, SlidersHorizontal } from "lucide-react";
 import { ContactTagPicker } from "@/components/contact-tag-picker";
 import { SendMessagePopover } from "@/components/send-message-popover";
 import { updateContact, bulkDeleteContacts, bulkAddTagToContacts } from "@/app/actions/contacts";
@@ -34,11 +34,44 @@ export function ContactsTable({
   const [error, setError] = useState<string | null>(null);
   const [tagMenuOpen, setTagMenuOpen] = useState(false);
 
-  const allSelected = contacts.length > 0 && selected.size === contacts.length;
+  const [search, setSearch] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [tagFilter, setTagFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
+  const filteredContacts = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    // Digits-only comparison so a search like "+57 300 123" still matches
+    // a stored wa_id of "573001234567".
+    const queryDigits = query.replace(/\D/g, "");
+
+    return contacts.filter((c) => {
+      if (query) {
+        const matchesName = c.name?.toLowerCase().includes(query);
+        const matchesNumber = queryDigits && c.wa_id.includes(queryDigits);
+        if (!matchesName && !matchesNumber) return false;
+      }
+      if (tagFilter && !c.assignedTagIds.includes(tagFilter)) return false;
+      if (dateFrom && c.created_at < dateFrom) return false;
+      if (dateTo && c.created_at.slice(0, 10) > dateTo) return false;
+      return true;
+    });
+  }, [contacts, search, tagFilter, dateFrom, dateTo]);
+
+  const activeFilterCount = (tagFilter ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0);
+
+  function clearFilters() {
+    setTagFilter("");
+    setDateFrom("");
+    setDateTo("");
+  }
+
+  const allSelected = filteredContacts.length > 0 && selected.size === filteredContacts.length;
   const someSelected = selected.size > 0 && !allSelected;
 
   function toggleAll() {
-    setSelected(allSelected ? new Set() : new Set(contacts.map((c) => c.id)));
+    setSelected(allSelected ? new Set() : new Set(filteredContacts.map((c) => c.id)));
   }
 
   function toggleOne(id: string) {
@@ -102,6 +135,90 @@ export function ContactsTable({
 
   return (
     <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por nombre o número..."
+            className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-sm text-foreground outline-none focus:border-primary"
+          />
+        </div>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((o) => !o)}
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm ${
+              activeFilterCount > 0
+                ? "border-primary text-primary"
+                : "border-border text-muted hover:text-foreground"
+            }`}
+          >
+            <SlidersHorizontal size={14} />
+            Filtros
+            {activeFilterCount > 0 && (
+              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] text-white">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+          {filtersOpen && (
+            <div className="absolute right-0 top-10 z-20 flex w-64 flex-col gap-3 rounded-lg border border-border bg-surface p-3 shadow-lg">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted">Etiqueta</label>
+                <select
+                  value={tagFilter}
+                  onChange={(e) => setTagFilter(e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
+                >
+                  <option value="">Todas</option>
+                  {allTags.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted">Creado desde</label>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted">Creado hasta</label>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
+                />
+              </div>
+              {activeFilterCount > 0 && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="self-start text-xs text-primary hover:underline"
+                >
+                  Limpiar filtros
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {(search || activeFilterCount > 0) && (
+        <p className="text-xs text-muted">
+          {filteredContacts.length} de {contacts.length} contacto{contacts.length === 1 ? "" : "s"}
+        </p>
+      )}
+
       {selected.size > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary/40 bg-primary/10 px-4 py-3">
           <span className="text-sm font-medium text-foreground">
@@ -200,7 +317,14 @@ export function ContactsTable({
             </tr>
           </thead>
           <tbody>
-            {contacts.map((c) => (
+            {filteredContacts.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-5 py-6 text-center text-muted">
+                  Sin resultados para estos filtros.
+                </td>
+              </tr>
+            )}
+            {filteredContacts.map((c) => (
               <tr key={c.id} className="border-b border-border last:border-b-0">
                 <td className="px-5 py-3">
                   <input
