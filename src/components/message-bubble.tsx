@@ -35,7 +35,7 @@ export function MessageBubble({ message: m }: { message: Message }) {
   return (
     <div className={`flex ${out ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[85%] rounded-lg px-3 py-2 text-sm sm:max-w-[70%] ${
+        className={`min-w-0 max-w-[85%] rounded-lg px-3 py-2 text-sm sm:max-w-[70%] ${
           out ? "bg-primary text-white" : "bg-surface-hover text-foreground"
         }`}
       >
@@ -71,7 +71,9 @@ export function MessageBubble({ message: m }: { message: Message }) {
           </a>
         )}
 
-        {m.body && m.message_type !== "document" && <p className="whitespace-pre-wrap">{m.body}</p>}
+        {m.body && m.message_type !== "document" && (
+          <p className="whitespace-pre-wrap break-words">{m.body}</p>
+        )}
 
         <p className="mt-1 flex items-center justify-end gap-1 text-[10px] opacity-70">
           {time}
