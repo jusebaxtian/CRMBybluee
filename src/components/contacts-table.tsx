@@ -42,14 +42,16 @@ export function ContactsTable({
 
   const filteredContacts = useMemo(() => {
     const query = search.trim().toLowerCase();
-    // Digits-only comparison so a search like "+57 300 123" still matches
-    // a stored wa_id of "573001234567".
-    const queryDigits = query.replace(/\D/g, "");
+    // Only treat the query as a phone search when it's actually phone-shaped
+    // (digits plus common punctuation like "+57 300 123") — otherwise a name
+    // like "Carlos1" would have its lone digit match almost any number.
+    const cleanedForPhone = search.trim().replace(/[\s()+-]/g, "");
+    const isPhoneQuery = cleanedForPhone.length > 0 && /^\d+$/.test(cleanedForPhone);
 
     return contacts.filter((c) => {
       if (query) {
         const matchesName = c.name?.toLowerCase().includes(query);
-        const matchesNumber = queryDigits && c.wa_id.includes(queryDigits);
+        const matchesNumber = isPhoneQuery && c.wa_id.includes(cleanedForPhone);
         if (!matchesName && !matchesNumber) return false;
       }
       if (tagFilter && !c.assignedTagIds.includes(tagFilter)) return false;
@@ -213,11 +215,11 @@ export function ContactsTable({
         </div>
       </div>
 
-      {(search || activeFilterCount > 0) && (
-        <p className="text-xs text-muted">
-          {filteredContacts.length} de {contacts.length} contacto{contacts.length === 1 ? "" : "s"}
-        </p>
-      )}
+      <p className="text-sm text-muted">
+        <span className="text-base font-semibold text-foreground">{filteredContacts.length}</span>{" "}
+        contacto{filteredContacts.length === 1 ? "" : "s"}
+        {(search || activeFilterCount > 0) && <span> de {contacts.length} en total</span>}
+      </p>
 
       {selected.size > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary/40 bg-primary/10 px-4 py-3">
