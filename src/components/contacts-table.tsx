@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Trash2, Tag as TagIcon, X, Check } from "lucide-react";
+import { Pencil, Trash2, Tag as TagIcon, X, Check, Megaphone } from "lucide-react";
 import { ContactTagPicker } from "@/components/contact-tag-picker";
 import { SendMessagePopover } from "@/components/send-message-popover";
 import { updateContact, bulkDeleteContacts, bulkAddTagToContacts } from "@/app/actions/contacts";
@@ -14,6 +14,8 @@ type Contact = {
   wa_id: string;
   created_at: string;
   assignedTagIds: string[];
+  fromAds: boolean;
+  adHeadline: string | null;
 };
 
 export function ContactsTable({
@@ -250,7 +252,22 @@ export function ContactsTable({
                   </>
                 ) : (
                   <>
-                    <td className="px-5 py-3 text-foreground">{c.name ?? "—"}</td>
+                    <td className="px-5 py-3 text-foreground">
+                      <span className="flex items-center gap-1.5">
+                        {c.name ?? "—"}
+                        {c.fromAds && (
+                          <span
+                            title={
+                              c.adHeadline
+                                ? `Llegó desde un anuncio de Meta Ads: ${c.adHeadline}`
+                                : "Llegó desde un anuncio de Meta Ads"
+                            }
+                          >
+                            <Megaphone size={12} className="shrink-0 text-primary" />
+                          </span>
+                        )}
+                      </span>
+                    </td>
                     <td className="px-5 py-3 text-foreground">{c.wa_id}</td>
                     <td className="px-5 py-3">
                       <ContactTagPicker

@@ -13,7 +13,7 @@ export default async function ContactsPage() {
 
   const { data: contacts } = await supabase
     .from("contacts")
-    .select("id, name, wa_id, created_at, contact_tags(tag_id)")
+    .select("id, name, wa_id, created_at, contact_tags(tag_id), conversations(ad_source_id, ad_headline)")
     .eq("workspace_id", workspaceId ?? "")
     .order("created_at", { ascending: false });
 
@@ -46,13 +46,20 @@ export default async function ContactsPage() {
     );
   }
 
-  const rows = contacts.map((c) => ({
-    id: c.id,
-    name: c.name,
-    wa_id: c.wa_id,
-    created_at: c.created_at,
-    assignedTagIds: (c.contact_tags as unknown as { tag_id: string }[]).map((ct) => ct.tag_id),
-  }));
+  const rows = contacts.map((c) => {
+    const conversation = (
+      c.conversations as unknown as { ad_source_id: string | null; ad_headline: string | null }[]
+    )[0];
+    return {
+      id: c.id,
+      name: c.name,
+      wa_id: c.wa_id,
+      created_at: c.created_at,
+      assignedTagIds: (c.contact_tags as unknown as { tag_id: string }[]).map((ct) => ct.tag_id),
+      fromAds: !!conversation?.ad_source_id,
+      adHeadline: conversation?.ad_headline ?? null,
+    };
+  });
 
   return (
     <div className="flex flex-col gap-4">
