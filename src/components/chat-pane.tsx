@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Paperclip } from "lucide-react";
 import { MessagesScrollArea } from "@/components/messages-scroll-area";
-import { MessageComposer } from "@/components/message-composer";
+import { MessageComposer, type MessageComposerHandle } from "@/components/message-composer";
 import { TemplateGatePicker } from "@/components/template-gate-picker";
 import { useMessageWindow } from "@/lib/use-message-window";
 
@@ -36,6 +37,12 @@ export function ChatPane({
   approvedTemplates?: ApprovedTemplate[];
 }) {
   const [pending, setPending] = useState<OptimisticMessage[]>([]);
+  const composerRef = useRef<MessageComposerHandle>(null);
+  const [dragActive, setDragActive] = useState(false);
+  // Counts nested dragenter/dragleave pairs (messages, bubbles, etc. all
+  // fire their own) so the overlay doesn't flicker off until the drag
+  // actually leaves the whole pane, not just a child element.
+  const dragCounter = useRef(0);
 
   // Once the server list changes (a realtime refresh landed), the message we
   // optimistically added is now included for real — drop the local copy.
@@ -52,11 +59,55 @@ export function ChatPane({
     .reduce<string | null>((latest, m) => (!latest || m.created_at > latest ? m.created_at : latest), null);
   const { open: windowOpen } = useMessageWindow(lastInboundAt);
 
+  function handleDragEnter(e: React.DragEvent) {
+    if (!windowOpen) return;
+    // Only react to actual files being dragged, not text/links.
+    if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+    e.preventDefault();
+    dragCounter.current += 1;
+    setDragActive(true);
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    if (!windowOpen) return;
+    e.preventDefault();
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    if (!windowOpen) return;
+    e.preventDefault();
+    dragCounter.current = Math.max(0, dragCounter.current - 1);
+    if (dragCounter.current === 0) setDragActive(false);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    if (!windowOpen) return;
+    e.preventDefault();
+    dragCounter.current = 0;
+    setDragActive(false);
+    for (const file of e.dataTransfer.files) {
+      composerRef.current?.enqueueUpload(file);
+    }
+  }
+
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col">
+    <div
+      className="relative flex min-h-0 flex-1 flex-col"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {dragActive && (
+        <div className="pointer-events-none absolute inset-0 z-40 flex flex-col items-center justify-center gap-2 border-4 border-dashed border-primary bg-background/90">
+          <Paperclip size={28} className="text-primary" />
+          <p className="text-sm font-medium text-foreground">Suelta el archivo para adjuntarlo</p>
+        </div>
+      )}
       <MessagesScrollArea messages={combined} />
       {windowOpen ? (
         <MessageComposer
+          ref={composerRef}
           conversationId={conversationId}
           contactId={contactId}
           quickReplies={quickReplies}

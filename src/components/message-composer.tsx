@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { Send, Paperclip, Mic, Square, X, Check, Play, Pause, RotateCcw } from "lucide-react";
 import { sendMessage, sendChatMedia } from "@/app/actions/whatsapp";
 import type { OptimisticMessage } from "@/components/chat-pane";
@@ -10,19 +10,27 @@ import { mediaKindFromMime, validateMediaSize } from "@/lib/whatsapp/media-limit
 
 type RecordingStatus = "idle" | "recording" | "reviewing";
 
-export function MessageComposer({
-  conversationId,
-  contactId,
-  quickReplies = [],
-  automations = [],
-  onOptimisticSend,
-}: {
+// Exposed so ChatPane can hand it a dropped file directly — drag-and-drop
+// is handled at the pane level (so dropping anywhere over the messages
+// works, not just over the composer bar itself), but the upload
+// queue/validation logic all lives here already.
+export type MessageComposerHandle = {
+  enqueueUpload: (file: File) => void;
+};
+
+export const MessageComposer = forwardRef<MessageComposerHandle, {
   conversationId: string;
   contactId: string;
   quickReplies?: { id: string; name: string }[];
   automations?: { id: string; name: string }[];
   onOptimisticSend?: (message: OptimisticMessage) => void;
-}) {
+}>(function MessageComposer({
+  conversationId,
+  contactId,
+  quickReplies = [],
+  automations = [],
+  onOptimisticSend,
+}, ref) {
   const formRef = useRef<HTMLFormElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -134,10 +142,30 @@ export function MessageComposer({
     drainFileQueue();
   }
 
+  useImperativeHandle(ref, () => ({ enqueueUpload }));
+
   function handleFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (file) enqueueUpload(file);
     e.target.value = "";
+  }
+
+  // Ctrl/Cmd+V with an image on the clipboard (a screenshot, a copied image
+  // from another app) attaches it like a picked file — text pastes are left
+  // completely alone so normal typing/pasting still works.
+  function handlePaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          enqueueUpload(file);
+        }
+        return;
+      }
+    }
   }
 
   async function startRecording() {
@@ -377,6 +405,7 @@ export function MessageComposer({
           placeholder="Escribe un mensaje..."
           autoComplete="off"
           required
+          onPaste={handlePaste}
           // 16px min font size on mobile — anything smaller makes iOS/Android
           // auto-zoom the page on focus, which pushes the send button off-screen.
           className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 text-base text-foreground outline-none focus:border-primary sm:h-10 sm:px-3 sm:text-sm"
@@ -399,4 +428,4 @@ export function MessageComposer({
       {uploadError && <p className="mt-2 text-xs text-red-400">{uploadError}</p>}
     </div>
   );
-}
+});
