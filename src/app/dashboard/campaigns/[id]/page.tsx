@@ -33,7 +33,7 @@ export default async function CampaignDetailPage({
 
   const { data: campaign } = await supabase
     .from("campaigns")
-    .select("id, name, status, templates(meta_template_name)")
+    .select("id, name, status, send_type, message_body, media_url, templates(meta_template_name)")
     .eq("id", id)
     .eq("workspace_id", workspaceId ?? "")
     .maybeSingle();
@@ -56,7 +56,10 @@ export default async function CampaignDetailPage({
         <div>
           <h1 className="text-lg font-semibold text-foreground">{campaign.name}</h1>
           <p className="text-xs text-muted">
-            Plantilla: {template?.meta_template_name ?? "—"} · {statusLabel[campaign.status]}
+            {campaign.send_type === "free_text"
+              ? `Mensaje libre${campaign.message_body ? `: "${campaign.message_body.slice(0, 60)}${campaign.message_body.length > 60 ? "..." : ""}"` : ""}${campaign.media_url ? " (con adjunto)" : ""}`
+              : `Plantilla: ${template?.meta_template_name ?? "—"}`}{" "}
+            · {statusLabel[campaign.status]}
           </p>
         </div>
       </div>

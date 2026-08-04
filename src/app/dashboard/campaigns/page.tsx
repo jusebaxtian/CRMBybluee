@@ -19,7 +19,7 @@ export default async function CampaignsPage() {
 
   const { data: campaigns } = await supabase
     .from("campaigns")
-    .select("id, name, status, created_at, templates(meta_template_name)")
+    .select("id, name, status, send_type, created_at, templates(meta_template_name)")
     .eq("workspace_id", workspaceId ?? "")
     .order("created_at", { ascending: false });
 
@@ -62,7 +62,9 @@ export default async function CampaignsPage() {
                 <div>
                   <p className="text-sm font-medium text-foreground">{c.name}</p>
                   <p className="text-xs text-muted">
-                    Plantilla: {template?.meta_template_name ?? "—"}
+                    {c.send_type === "free_text"
+                      ? "Mensaje libre"
+                      : `Plantilla: ${template?.meta_template_name ?? "—"}`}
                   </p>
                 </div>
                 <span className="text-xs text-muted">{statusLabel[c.status] ?? c.status}</span>
