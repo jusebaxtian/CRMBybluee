@@ -260,6 +260,9 @@ export async function sendCampaign(campaignId: string) {
             media_url: campaign.media_url,
             wa_message_id: result.messages[0]?.id,
             status: "sent",
+            // Mass campaigns run fully independent of follow-up sequences —
+            // this must not cancel/reset/start one (see the DB trigger).
+            exclude_from_followups: true,
           });
           await supabase
             .from("conversations")
