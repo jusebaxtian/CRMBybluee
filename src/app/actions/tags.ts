@@ -28,6 +28,27 @@ export async function createTag(_prevState: unknown, formData: FormData) {
   return { success: true };
 }
 
+export async function updateTag(tagId: string, input: { name: string; color: string }) {
+  const name = input.name.trim();
+  const color = input.color.trim();
+  if (!name) return { error: "El nombre es obligatorio." };
+
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+
+  const { error } = await supabase
+    .from("tags")
+    .update({ name, color })
+    .eq("id", tagId)
+    .eq("workspace_id", workspaceId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard/tags");
+  revalidatePath("/dashboard/contacts");
+  return { success: true as const };
+}
+
 // Contacts with an "excludes_followups" tag (e.g. "No interesados") never
 // receive any follow-up sequence step, regardless of the sequence or the
 // conversation's own toggle — checked both when a sequence is first

@@ -1,15 +1,15 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { createTag } from "@/app/actions/tags";
-
-const COLORS = ["#1ba84a", "#7c5cff", "#22c55e", "#eab308", "#ef4444", "#3b82f6", "#ec4899"];
+import { ColorSwatchPicker, TAG_COLORS } from "@/components/color-swatch-picker";
 
 export function CreateTagForm() {
   const [state, action, pending] = useActionState(createTag, undefined);
+  const [color, setColor] = useState(TAG_COLORS[0]);
 
   return (
-    <form action={action} className="flex flex-wrap items-center gap-2">
+    <form action={action} className="flex flex-wrap items-center gap-3">
       <input
         name="name"
         type="text"
@@ -17,17 +17,7 @@ export function CreateTagForm() {
         required
         className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
       />
-      <select
-        name="color"
-        defaultValue={COLORS[0]}
-        className="rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground outline-none focus:border-primary"
-      >
-        {COLORS.map((c) => (
-          <option key={c} value={c}>
-            {c}
-          </option>
-        ))}
-      </select>
+      <ColorSwatchPicker name="color" value={color} onChange={setColor} />
       <label className="flex items-center gap-1.5 text-xs text-muted">
         <input type="checkbox" name="excludesFollowups" className="accent-primary" />
         Excluir de seguimientos (ej: &quot;No interesados&quot;)
