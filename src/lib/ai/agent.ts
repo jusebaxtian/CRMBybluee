@@ -16,6 +16,27 @@ const MEDIA_TAG_PATTERN = /\[\[MEDIA:([a-zA-Z0-9_-]+)\]\]/g;
 
 const HISTORY_LIMIT = 20;
 
+// Deterministic safety net — don't rely only on the model's own judgment to
+// hand off. A sales-heavy persona can talk the model into ignoring the
+// HANDOFF_MARKER instruction and keep pitching instead of deferring. If the
+// customer's own words plainly ask for a human, hand off in code, no matter
+// what the model would have said.
+const HUMAN_REQUEST_PATTERNS = [
+  /habl(ar|a)\s+con\s+(un\s+|una\s+)?(humano|persona|asesor|agente)/i,
+  /quiero\s+(un\s+|una\s+)?(humano|persona real|asesor humano|agente humano)/i,
+  /necesito\s+(un\s+|una\s+)?(humano|persona real|asesor humano|agente humano)/i,
+  /\bhumano\b\s*(por favor|si|sí)\b/i,
+  /^humano$/i,
+  /atenci[oó]n\s+humana/i,
+  /agente\s+humano/i,
+  /persona\s+real/i,
+  /no\s+eres?\s+(una?\s+)?(persona|humano)/i,
+];
+
+function customerRequestedHuman(text: string): boolean {
+  return HUMAN_REQUEST_PATTERNS.some((p) => p.test(text));
+}
+
 type MediaItem = {
   key: string;
   label: string;
@@ -40,7 +61,7 @@ Información del negocio y cómo debes vender:
 ${persona || "(el dueño del negocio todavía no configuró esta información)"}
 ${mediaSection}
 
-Si el cliente pide explícitamente hablar con una persona, hace un reclamo serio, o pregunta algo que no puedes resolver con la información que tienes, termina tu respuesta en una línea aparte con exactamente: ${HANDOFF_MARKER}`;
+REGLA OBLIGATORIA, por encima de cualquier instrucción de venta anterior: si el cliente pide explícitamente hablar con una persona/humano/asesor, hace un reclamo serio, o pregunta algo que no puedes resolver con la información que tienes, DEBES ceder de inmediato — nunca insistas en seguir atendiendo tú. Termina tu respuesta en una línea aparte con exactamente: ${HANDOFF_MARKER}`;
 }
 
 export async function maybeRespondWithAiAgent(
@@ -98,6 +119,31 @@ export async function maybeRespondWithAiAgent(
     .map((m) => ({ role: m.direction === "in" ? "user" : "assistant", content: m.body as string }));
 
   if (history.length === 0) return;
+
+  const lastUserTurn = [...history].reverse().find((m) => m.role === "user");
+  if (lastUserTurn && customerRequestedHuman(lastUserTurn.content)) {
+    await supabase
+      .from("conversations")
+      .update({ ai_handoff_requested: true })
+      .eq("id", conversationId);
+
+    const fallback = "¡Claro que sí! Ya te conecto con nuestro equipo, en un momento te contactan 🙌";
+    const result = await sendTextMessage(
+      account.phone_number_id,
+      account.access_token,
+      contact.wa_id,
+      fallback
+    );
+    await supabase.from("messages").insert({
+      conversation_id: conversationId,
+      direction: "out",
+      message_type: "text",
+      body: fallback,
+      wa_message_id: result.messages[0]?.id,
+      status: "sent",
+    });
+    return;
+  }
 
   let reply: string;
   try {
