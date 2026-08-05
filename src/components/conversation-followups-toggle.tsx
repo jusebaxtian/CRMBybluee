@@ -49,8 +49,8 @@ export function ConversationFollowupsToggle({
           title={enabled ? "Desactivar seguimientos para este contacto" : "Activar seguimientos para este contacto"}
         >
           <span
-            className={`absolute top-1/2 h-4.5 w-4.5 -translate-y-1/2 rounded-full bg-white shadow-sm transition-transform ${
-              enabled ? "translate-x-[22px]" : "translate-x-1"
+            className={`absolute left-1 top-1/2 h-4.5 w-4.5 -translate-y-1/2 rounded-full bg-white shadow-sm transition-transform ${
+              enabled ? "translate-x-[18px]" : "translate-x-0"
             }`}
           />
         </button>
