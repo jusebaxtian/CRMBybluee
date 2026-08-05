@@ -25,13 +25,16 @@ export function ConversationFollowupsToggle({
   }
 
   return (
-    <div className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2">
-      <span className="flex items-center gap-1.5 text-xs text-foreground">
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2.5">
+      <span className="flex items-center gap-1.5 text-xs font-medium text-foreground">
         <History size={13} className="text-muted" />
         Seguimientos
       </span>
       {excludedByTag ? (
-        <span className="text-[11px] text-muted" title="Este contacto tiene una etiqueta que lo excluye de todos los seguimientos">
+        <span
+          className="rounded-full bg-surface-hover px-2 py-1 text-[11px] text-muted"
+          title="Este contacto tiene una etiqueta que lo excluye de todos los seguimientos"
+        >
           Excluido por etiqueta
         </span>
       ) : (
@@ -39,14 +42,15 @@ export function ConversationFollowupsToggle({
           type="button"
           onClick={handleToggle}
           disabled={pending}
-          className={`relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
-            enabled ? "bg-primary" : "bg-surface-hover"
+          aria-pressed={enabled}
+          className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors disabled:opacity-50 ${
+            enabled ? "border-primary bg-primary" : "border-border bg-surface-hover"
           }`}
           title={enabled ? "Desactivar seguimientos para este contacto" : "Activar seguimientos para este contacto"}
         >
           <span
-            className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
-              enabled ? "translate-x-4" : "translate-x-0.5"
+            className={`absolute top-1/2 h-4.5 w-4.5 -translate-y-1/2 rounded-full bg-white shadow-sm transition-transform ${
+              enabled ? "translate-x-[22px]" : "translate-x-1"
             }`}
           />
         </button>

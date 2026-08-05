@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Info, X, Zap } from "lucide-react";
+import { Info, X, Zap, Megaphone } from "lucide-react";
 import { ContactTagPicker } from "@/components/contact-tag-picker";
 import { NotesEditor } from "@/components/notes-editor";
 import { ConversationAssignmentControl } from "@/components/conversation-assignment-control";
+import { ConversationFollowupsToggle } from "@/components/conversation-followups-toggle";
+import { ContactBlockedNotice } from "@/components/contact-blocked-notice";
+import { AiHandoffNotice } from "@/components/ai-handoff-notice";
 
 type Agent = { id: string; name: string | null; email: string };
 type Tag = { id: string; name: string; color: string };
@@ -21,6 +24,13 @@ export function ConversationDetailsSheet({
   assignedTagIds,
   notes,
   automations,
+  likelyBlocked,
+  aiHandoffRequested,
+  followupsEnabled,
+  excludedFromFollowupsByTag,
+  adSourceId,
+  adHeadline,
+  adBody,
 }: {
   contactName: string | null;
   contactWaId: string;
@@ -32,6 +42,13 @@ export function ConversationDetailsSheet({
   assignedTagIds: string[];
   notes: string | null;
   automations: Automation[];
+  likelyBlocked: boolean;
+  aiHandoffRequested: boolean;
+  followupsEnabled: boolean;
+  excludedFromFollowupsByTag: boolean;
+  adSourceId: string | null;
+  adHeadline: string | null;
+  adBody: string | null;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -77,6 +94,20 @@ export function ConversationDetailsSheet({
               <p className="text-sm text-muted">{contactWaId}</p>
             </div>
 
+            {likelyBlocked && <ContactBlockedNotice contactId={contactId} />}
+            {aiHandoffRequested && <AiHandoffNotice conversationId={conversationId} />}
+
+            {adSourceId && (
+              <div className="mt-6 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                <p className="flex items-center gap-1.5 text-xs font-medium text-primary">
+                  <Megaphone size={13} />
+                  Vino de un anuncio de Meta Ads
+                </p>
+                {adHeadline && <p className="mt-1 text-xs text-foreground">{adHeadline}</p>}
+                {adBody && <p className="mt-0.5 text-xs text-muted">{adBody}</p>}
+              </div>
+            )}
+
             {agents.length > 0 && (
               <div className="mt-6">
                 <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
@@ -89,6 +120,14 @@ export function ConversationDetailsSheet({
                 />
               </div>
             )}
+
+            <div className="mt-6">
+              <ConversationFollowupsToggle
+                conversationId={conversationId}
+                enabled={followupsEnabled}
+                excludedByTag={excludedFromFollowupsByTag}
+              />
+            </div>
 
             <div className="mt-6">
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">

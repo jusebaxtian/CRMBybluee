@@ -151,6 +151,13 @@ export default async function ConversationPage({
             assignedTagIds={assignedTagIds}
             notes={contact.notes}
             automations={automations ?? []}
+            likelyBlocked={contact.likely_blocked}
+            aiHandoffRequested={conversation.ai_handoff_requested}
+            followupsEnabled={conversation.followups_enabled}
+            excludedFromFollowupsByTag={excludedFromFollowupsByTag}
+            adSourceId={conversation.ad_source_id}
+            adHeadline={conversation.ad_headline}
+            adBody={conversation.ad_body}
           />
         </div>
 
