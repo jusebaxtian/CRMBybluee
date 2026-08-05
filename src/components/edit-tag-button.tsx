@@ -84,7 +84,7 @@ export function EditTagButton({
                 onChange={(e) => setExcludes(e.target.checked)}
                 className="mt-0.5 accent-primary"
               />
-              Excluir de automatizaciones y seguimientos (ej: &quot;Ya compró&quot;, &quot;No interesados&quot;)
+              Excluir de automatizaciones, IA y seguimientos (ej: &quot;Ya compró&quot;, &quot;No interesados&quot;)
             </label>
             {error && <p className="mb-2 text-xs text-red-400">{error}</p>}
             <div className="flex justify-end gap-2">

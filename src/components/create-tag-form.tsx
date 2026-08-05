@@ -20,7 +20,7 @@ export function CreateTagForm() {
       <ColorSwatchPicker name="color" value={color} onChange={setColor} />
       <label className="flex items-center gap-1.5 text-xs text-muted">
         <input type="checkbox" name="excludesFollowups" className="accent-primary" />
-        Excluir de automatizaciones y seguimientos (ej: &quot;Ya compró&quot;, &quot;No interesados&quot;)
+        Excluir de automatizaciones, IA y seguimientos (ej: &quot;Ya compró&quot;, &quot;No interesados&quot;)
       </label>
       <button
         type="submit"
