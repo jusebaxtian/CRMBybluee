@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, SlidersHorizontal, X, Clock, Megaphone, ShieldAlert } from "lucide-react";
+import { Search, SlidersHorizontal, X, Clock, Megaphone, ShieldAlert, Bot } from "lucide-react";
 import { NewMessageButton } from "@/components/new-message-button";
 import { useMessageWindow } from "@/lib/use-message-window";
 
@@ -28,6 +28,7 @@ type Conversation = {
   fromAds: boolean;
   adHeadline: string | null;
   likelyBlocked: boolean;
+  needsHuman: boolean;
   contact: { name: string | null; wa_id: string };
   tags: Tag[];
 };
@@ -90,6 +91,7 @@ export function ConversationListPanel({
   const [assignedFilter, setAssignedFilter] = useState<string>(""); // "" = all, "unassigned", or agent id
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [expiringSoon, setExpiringSoon] = useState(false);
+  const [needsHumanOnly, setNeedsHumanOnly] = useState(false);
 
   // Only needed to keep the "por vencer" filter and its badges live —
   // ticks once a second so a conversation drops out of the list the moment
@@ -104,6 +106,7 @@ export function ConversationListPanel({
     return conversations.filter((c) => {
       if (query && !c.contact.wa_id.includes(query)) return false;
       if (unreadOnly && c.unreadCount === 0) return false;
+      if (needsHumanOnly && !c.needsHuman) return false;
       if (expiringSoon) {
         if (!c.lastInboundAt) return false;
         const remaining = msRemaining(c.lastInboundAt, now);
@@ -123,10 +126,23 @@ export function ConversationListPanel({
         return false;
       return true;
     });
-  }, [conversations, query, unreadOnly, expiringSoon, now, selectedTagIds, assignedFilter]);
+  }, [
+    conversations,
+    query,
+    unreadOnly,
+    expiringSoon,
+    needsHumanOnly,
+    now,
+    selectedTagIds,
+    assignedFilter,
+  ]);
 
   const activeFilterCount =
-    selectedTagIds.length + (assignedFilter ? 1 : 0) + (unreadOnly ? 1 : 0) + (expiringSoon ? 1 : 0);
+    selectedTagIds.length +
+    (assignedFilter ? 1 : 0) +
+    (unreadOnly ? 1 : 0) +
+    (expiringSoon ? 1 : 0) +
+    (needsHumanOnly ? 1 : 0);
 
   // Total chats with unread messages — independent of the active filters,
   // so this badge always reflects "how many I haven't opened yet".
@@ -146,6 +162,7 @@ export function ConversationListPanel({
     setAssignedFilter("");
     setUnreadOnly(false);
     setExpiringSoon(false);
+    setNeedsHumanOnly(false);
   }
 
   return (
@@ -220,6 +237,19 @@ export function ConversationListPanel({
             >
               <Clock size={12} />
               Por vencer (2h)
+            </button>
+            <button
+              type="button"
+              onClick={() => setNeedsHumanOnly((v) => !v)}
+              title="Chats donde la IA pidió que un humano tome el control"
+              className={`flex items-center gap-1 self-start rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                needsHumanOnly
+                  ? "border-red-400 bg-red-400 text-white"
+                  : "border-border text-muted hover:text-foreground"
+              }`}
+            >
+              <Bot size={12} />
+              Necesita humano
             </button>
           </div>
 
@@ -332,6 +362,15 @@ export function ConversationListPanel({
                     {conv.likelyBlocked && (
                       <span title="Posible bloqueo — no recibe seguimientos ni mensajes masivos">
                         <ShieldAlert size={11} className="shrink-0 text-red-400" />
+                      </span>
+                    )}
+                    {conv.needsHuman && (
+                      <span
+                        title="El cliente pidió hablar con una persona — la IA se pausó en este chat"
+                        className="flex shrink-0 items-center gap-0.5 rounded-full bg-red-400/15 px-1.5 py-0.5 text-[9px] font-semibold text-red-400"
+                      >
+                        <Bot size={9} />
+                        Humano
                       </span>
                     )}
                   </p>
