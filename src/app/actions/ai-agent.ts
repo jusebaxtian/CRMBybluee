@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getWorkspaceId } from "@/lib/workspace";
 import { callAiProvider } from "@/lib/ai/providers";
+import { mediaKindFromMime, validateMediaFile } from "@/lib/whatsapp/media-limits";
 
 const defaultModel: Record<"openai" | "anthropic", string> = {
   openai: "gpt-4o-mini",
@@ -64,6 +66,75 @@ export async function toggleAiAgentActive(isActive: boolean) {
     .eq("workspace_id", workspaceId);
   if (error) return { error: error.message };
 
+  revalidatePath("/dashboard/settings");
+  return { success: true as const };
+}
+
+const keySlugPattern = /^[a-z0-9_-]+$/;
+
+export async function addAiAgentMedia(_prevState: unknown, formData: FormData) {
+  const key = String(formData.get("key") ?? "").trim().toLowerCase();
+  const label = String(formData.get("label") ?? "").trim();
+  const triggerDescription = String(formData.get("triggerDescription") ?? "").trim();
+  const file = formData.get("file") as File | null;
+
+  if (!key || !keySlugPattern.test(key)) {
+    return { error: "La clave solo puede tener letras minúsculas, números, - y _ (ej: qr_pago)." };
+  }
+  if (!label) return { error: "Ponle un nombre." };
+  if (!triggerDescription) {
+    return { error: "Describe cuándo debe usarlo el agente (ej: \"pregunten cómo pagar\")." };
+  }
+  if (!file || file.size === 0) return { error: "Selecciona un archivo." };
+
+  const kind = mediaKindFromMime(file.type);
+  if (kind === "audio") return { error: "El agente solo puede enviar imágenes, videos o documentos." };
+  const validationError = validateMediaFile(kind, file);
+  if (validationError) return { error: validationError };
+
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+
+  const admin = createAdminClient();
+  const path = `${workspaceId}/ai-agent-media/${Date.now()}-${file.name}`;
+  const { error: uploadError } = await admin.storage
+    .from("chat-media")
+    .upload(path, file, { contentType: file.type });
+  if (uploadError) return { error: uploadError.message };
+
+  const {
+    data: { publicUrl },
+  } = admin.storage.from("chat-media").getPublicUrl(path);
+
+  const { error } = await supabase.from("ai_agent_media").insert({
+    workspace_id: workspaceId,
+    key,
+    label,
+    trigger_description: triggerDescription,
+    media_type: kind,
+    media_url: publicUrl,
+    media_mime_type: file.type,
+    filename: kind === "document" ? file.name : null,
+  });
+  if (error) {
+    return {
+      error: error.message.includes("duplicate")
+        ? `Ya existe un medio con la clave "${key}" — usa otra.`
+        : error.message,
+    };
+  }
+
+  revalidatePath("/dashboard/settings");
+  return { success: true as const };
+}
+
+export async function deleteAiAgentMedia(id: string) {
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+
+  await supabase.from("ai_agent_media").delete().eq("id", id).eq("workspace_id", workspaceId);
   revalidatePath("/dashboard/settings");
   return { success: true as const };
 }

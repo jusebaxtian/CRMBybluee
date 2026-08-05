@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { Bot, Sparkles } from "lucide-react";
 import { saveAiAgent, toggleAiAgentActive } from "@/app/actions/ai-agent";
+import { AiAgentMediaLibrary } from "@/components/ai-agent-media-library";
 
 type AiAgent = {
   provider: "openai" | "anthropic";
@@ -12,7 +13,22 @@ type AiAgent = {
   is_active: boolean;
 } | null;
 
-export function AiAgentPanel({ agent }: { agent: AiAgent }) {
+type MediaItem = {
+  id: string;
+  key: string;
+  label: string;
+  trigger_description: string;
+  media_type: "image" | "video" | "document";
+  media_url: string;
+};
+
+export function AiAgentPanel({
+  agent,
+  mediaItems = [],
+}: {
+  agent: AiAgent;
+  mediaItems?: MediaItem[];
+}) {
   const [state, action, pending] = useActionState(saveAiAgent, undefined);
   const [provider, setProvider] = useState<"openai" | "anthropic">(agent?.provider ?? "openai");
   const [active, setActive] = useState(agent?.is_active ?? false);
@@ -154,6 +170,8 @@ export function AiAgentPanel({ agent }: { agent: AiAgent }) {
           {pending ? "Validando y guardando..." : agent ? "Guardar cambios" : "Conectar"}
         </button>
       </form>
+
+      {agent && <AiAgentMediaLibrary items={mediaItems} />}
     </div>
   );
 }

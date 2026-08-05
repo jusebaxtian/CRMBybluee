@@ -81,7 +81,15 @@ export default async function SettingsPage() {
           .maybeSingle()
       : { data: null };
 
-    aiAgentSection = <AiAgentPanel agent={aiAgent} />;
+    const { data: aiAgentMedia } = workspaceId
+      ? await supabase
+          .from("ai_agent_media")
+          .select("id, key, label, trigger_description, media_type, media_url")
+          .eq("workspace_id", workspaceId)
+          .order("created_at")
+      : { data: [] };
+
+    aiAgentSection = <AiAgentPanel agent={aiAgent} mediaItems={aiAgentMedia ?? []} />;
   }
 
   return (

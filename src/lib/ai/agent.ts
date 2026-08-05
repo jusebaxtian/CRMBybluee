@@ -1,6 +1,6 @@
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { callAiProvider, type ChatTurn } from "@/lib/ai/providers";
-import { sendTextMessage } from "@/lib/whatsapp/graph";
+import { sendTextMessage, sendMediaMessage } from "@/lib/whatsapp/graph";
 import { isContactExcludedFromAutomations } from "@/lib/automations/engine";
 
 // The AI ends its reply with this marker on its own line when it decides the
@@ -8,13 +8,37 @@ import { isContactExcludedFromAutomations } from "@/lib/automations/engine";
 // customer, and used to flip conversations.ai_handoff_requested.
 const HANDOFF_MARKER = "|||HANDOFF|||";
 
+// The AI can drop one or more of these anywhere in its reply to attach a
+// media item from the workspace's library — e.g. "[[MEDIA:qr_pago]]".
+// Stripped from the text before it's sent; each match triggers a real
+// WhatsApp media send using that item's stored file.
+const MEDIA_TAG_PATTERN = /\[\[MEDIA:([a-zA-Z0-9_-]+)\]\]/g;
+
 const HISTORY_LIMIT = 20;
 
-function buildSystemPrompt(agentName: string, persona: string): string {
+type MediaItem = {
+  key: string;
+  label: string;
+  trigger_description: string;
+  media_type: "image" | "video" | "document";
+  media_url: string;
+  media_mime_type: string;
+  filename: string | null;
+};
+
+function buildSystemPrompt(agentName: string, persona: string, media: MediaItem[]): string {
+  const mediaSection =
+    media.length > 0
+      ? `\n\nMedios que puedes enviar (imágenes, videos, documentos). Para adjuntar uno a tu respuesta, incluye en cualquier parte del texto, en su propia línea, exactamente [[MEDIA:clave]] — puedes combinarlo con texto normal antes o después, y puedes usar varios si aplica:\n${media
+          .map((m) => `- clave "${m.key}" (${m.label}): úsala cuando ${m.trigger_description}`)
+          .join("\n")}`
+      : "";
+
   return `Eres ${agentName}, un vendedor de WhatsApp para este negocio. Respondes como una persona real: mensajes cortos, cercanos, en español, sin sonar robótico. Evita párrafos largos — preferí 2-3 mensajes cortos a uno largo, pero como esto es un solo campo de texto, usa saltos de línea entre ideas cortas en vez de un bloque.
 
 Información del negocio y cómo debes vender:
 ${persona || "(el dueño del negocio todavía no configuró esta información)"}
+${mediaSection}
 
 Si el cliente pide explícitamente hablar con una persona, hace un reclamo serio, o pregunta algo que no puedes resolver con la información que tienes, termina tu respuesta en una línea aparte con exactamente: ${HANDOFF_MARKER}`;
 }
@@ -56,6 +80,11 @@ export async function maybeRespondWithAiAgent(
     .maybeSingle();
   if (!contact || !account) return;
 
+  const { data: mediaLibrary } = await supabase
+    .from("ai_agent_media")
+    .select("key, label, trigger_description, media_type, media_url, media_mime_type, filename")
+    .eq("workspace_id", workspaceId);
+
   const { data: pastMessages } = await supabase
     .from("messages")
     .select("direction, body, message_type")
@@ -76,7 +105,7 @@ export async function maybeRespondWithAiAgent(
       agent.provider,
       agent.api_key,
       agent.model,
-      buildSystemPrompt(agent.agent_name, agent.persona),
+      buildSystemPrompt(agent.agent_name, agent.persona, mediaLibrary ?? []),
       history
     );
   } catch (err) {
@@ -86,13 +115,44 @@ export async function maybeRespondWithAiAgent(
   if (!reply) return;
 
   const handoff = reply.includes(HANDOFF_MARKER);
-  const customerReply = reply.replace(HANDOFF_MARKER, "").trim();
+  let customerReply = reply.replace(HANDOFF_MARKER, "").trim();
 
   if (handoff) {
     await supabase
       .from("conversations")
       .update({ ai_handoff_requested: true })
       .eq("id", conversationId);
+  }
+
+  const mediaByKey = new Map((mediaLibrary ?? []).map((m) => [m.key, m]));
+  const requestedKeys = [...customerReply.matchAll(MEDIA_TAG_PATTERN)].map((m) => m[1]);
+  customerReply = customerReply.replace(MEDIA_TAG_PATTERN, "").trim();
+
+  for (const key of requestedKeys) {
+    const item = mediaByKey.get(key);
+    if (!item) continue;
+
+    try {
+      const result = await sendMediaMessage(
+        account.phone_number_id,
+        account.access_token,
+        contact.wa_id,
+        item.media_type,
+        { link: item.media_url },
+        item.filename ?? undefined
+      );
+      await supabase.from("messages").insert({
+        conversation_id: conversationId,
+        direction: "out",
+        message_type: item.media_type,
+        media_url: item.media_url,
+        media_mime_type: item.media_mime_type,
+        wa_message_id: result.messages[0]?.id,
+        status: "sent",
+      });
+    } catch (err) {
+      console.error(`AI agent media send failed (key=${key}) for workspace=${workspaceId}:`, err);
+    }
   }
 
   if (!customerReply) return;
