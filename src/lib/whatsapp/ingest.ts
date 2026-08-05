@@ -3,6 +3,7 @@ import type { WhatsAppWebhookPayload } from "@/lib/whatsapp/webhook-types";
 import { runKeywordAutomations } from "@/lib/automations/engine";
 import { getMediaUrl, downloadMedia } from "@/lib/whatsapp/graph";
 import { notifyNewMessage } from "@/lib/push/send";
+import { maybeRespondWithAiAgent } from "@/lib/ai/agent";
 
 // Translates the most common Cloud API delivery-failure codes into a short,
 // actionable message an agent can actually understand — the raw error is
@@ -260,7 +261,15 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
         );
 
         if (message.text?.body) {
-          await runKeywordAutomations(supabase, workspaceId, contact.id, message.text.body);
+          const matchedKeyword = await runKeywordAutomations(
+            supabase,
+            workspaceId,
+            contact.id,
+            message.text.body
+          );
+          if (!matchedKeyword) {
+            await maybeRespondWithAiAgent(supabase, workspaceId, conversation.id, contact.id);
+          }
         }
       }
 

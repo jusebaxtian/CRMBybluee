@@ -2,18 +2,21 @@ import { redirect } from "next/navigation";
 import { Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
-import { requireModule } from "@/lib/entitlements";
+import { requireModule, getEnabledModuleKeys } from "@/lib/entitlements";
 import { listWorkspaceAgents } from "@/lib/agents";
 import { getPhoneNumberStatus } from "@/lib/whatsapp/graph";
 import { AgentProfileForm } from "@/components/agent-profile-form";
 import { AgentsList } from "@/components/agents-list";
 import { SettingsTabs } from "@/components/settings-tabs";
 import { WhatsAppApiPanel } from "@/components/whatsapp-api-panel";
+import { AiAgentPanel } from "@/components/ai-agent-panel";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
   await requireModule(supabase, workspaceId, "settings");
+  const enabledModules = await getEnabledModuleKeys(supabase, workspaceId);
+  const hasAiAgentModule = enabledModules.includes("ai_agent");
 
   const role = await getWorkspaceRole(supabase, workspaceId);
   if (role !== "owner" && role !== "admin") {
@@ -68,6 +71,19 @@ export default async function SettingsPage() {
     />
   );
 
+  let aiAgentSection: React.ReactNode = undefined;
+  if (hasAiAgentModule) {
+    const { data: aiAgent } = workspaceId
+      ? await supabase
+          .from("ai_agents")
+          .select("provider, model, agent_name, persona, is_active")
+          .eq("workspace_id", workspaceId)
+          .maybeSingle()
+      : { data: null };
+
+    aiAgentSection = <AiAgentPanel agent={aiAgent} />;
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -77,7 +93,11 @@ export default async function SettingsPage() {
         </p>
       </div>
 
-      <SettingsTabs agentsContent={agentsSection} whatsappContent={whatsappSection} />
+      <SettingsTabs
+        agentsContent={agentsSection}
+        whatsappContent={whatsappSection}
+        aiAgentContent={aiAgentSection}
+      />
     </div>
   );
 }

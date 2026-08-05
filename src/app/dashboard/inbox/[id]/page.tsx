@@ -11,6 +11,7 @@ import { ConversationDetailsSheet } from "@/components/conversation-details-shee
 import { ConversationWindowStatus } from "@/components/conversation-window-status";
 import { ConversationFollowupsToggle } from "@/components/conversation-followups-toggle";
 import { ContactBlockedNotice } from "@/components/contact-blocked-notice";
+import { AiHandoffNotice } from "@/components/ai-handoff-notice";
 import { getWorkspaceId } from "@/lib/workspace";
 import { listWorkspaceAgents } from "@/lib/agents";
 import { isPhoneNumber } from "@/lib/whatsapp/identity";
@@ -27,7 +28,7 @@ export default async function ConversationPage({
   const { data: conversation } = await supabase
     .from("conversations")
     .select(
-      "id, contact_id, last_read_at, assigned_agent_id, ad_source_id, ad_headline, ad_body, followups_enabled, contacts(name, wa_id, notes, likely_blocked, contact_tags(tag_id, tags(excludes_followups)))"
+      "id, contact_id, last_read_at, assigned_agent_id, ad_source_id, ad_headline, ad_body, followups_enabled, ai_handoff_requested, contacts(name, wa_id, notes, likely_blocked, contact_tags(tag_id, tags(excludes_followups)))"
     )
     .eq("id", id)
     .eq("workspace_id", workspaceId ?? "")
@@ -177,6 +178,7 @@ export default async function ConversationPage({
         </div>
 
         {contact.likely_blocked && <ContactBlockedNotice contactId={conversation.contact_id} />}
+        {conversation.ai_handoff_requested && <AiHandoffNotice conversationId={conversation.id} />}
 
         {conversation.ad_source_id && (
           <div className="mt-6 rounded-lg border border-primary/30 bg-primary/5 p-3">

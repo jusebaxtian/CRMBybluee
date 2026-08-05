@@ -401,13 +401,16 @@ export async function isContactExcludedFromAutomations(
 // so the old, narrower name still reads correctly there.
 export const isContactExcludedFromFollowups = isContactExcludedFromAutomations;
 
+// Returns whether any keyword automation actually matched and ran — the AI
+// sales agent skips replying when one did, so the customer doesn't get two
+// answers to the same message.
 export async function runKeywordAutomations(
   supabase: SupabaseClient,
   workspaceId: string,
   contactId: string,
   messageBody: string
-) {
-  if (await isContactExcludedFromAutomations(supabase, contactId)) return;
+): Promise<boolean> {
+  if (await isContactExcludedFromAutomations(supabase, contactId)) return false;
 
   const { data: automations } = await supabase
     .from("automations")
@@ -417,13 +420,17 @@ export async function runKeywordAutomations(
     .eq("is_active", true);
 
   const lowerBody = messageBody.toLowerCase();
+  let matched = false;
 
   for (const automation of automations ?? []) {
     if (
       automation.trigger_keyword &&
       lowerBody.includes(automation.trigger_keyword.toLowerCase())
     ) {
+      matched = true;
       await runActionsForAutomation(supabase, automation, contactId);
     }
   }
+
+  return matched;
 }
