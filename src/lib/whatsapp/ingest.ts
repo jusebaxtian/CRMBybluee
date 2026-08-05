@@ -4,6 +4,7 @@ import { runKeywordAutomations } from "@/lib/automations/engine";
 import { getMediaUrl, downloadMedia } from "@/lib/whatsapp/graph";
 import { notifyNewMessage } from "@/lib/push/send";
 import { maybeRespondWithAiAgent } from "@/lib/ai/agent";
+import { transcribeAudio } from "@/lib/ai/providers";
 
 // Translates the most common Cloud API delivery-failure codes into a short,
 // actionable message an agent can actually understand — the raw error is
@@ -150,6 +151,33 @@ async function persistIncomingMedia(
   }
 }
 
+// Whisper (transcription) only exists on OpenAI — reuses the workspace's own
+// AI agent key if they connected OpenAI. No Anthropic-only equivalent today,
+// so voice notes for those workspaces are still saved but not transcribed.
+async function transcribeIncomingAudio(
+  supabase: ReturnType<typeof createAdminClient>,
+  workspaceId: string,
+  mediaUrl: string
+): Promise<string | null> {
+  const { data: agent } = await supabase
+    .from("ai_agents")
+    .select("provider, api_key, is_active")
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (!agent || !agent.is_active || agent.provider !== "openai") return null;
+
+  try {
+    const res = await fetch(mediaUrl);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const text = await transcribeAudio(agent.api_key, blob, "audio.ogg");
+    return text || null;
+  } catch (err) {
+    console.error(`Audio transcription failed for workspace=${workspaceId}:`, err);
+    return null;
+  }
+}
+
 export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
   const supabase = createAdminClient();
 
@@ -234,10 +262,16 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           mediaMimeType = persisted?.mimeType ?? mediaPayload.mime_type;
         }
 
+        let audioTranscript: string | null = null;
+        if (message.type === "audio" && mediaUrl) {
+          audioTranscript = await transcribeIncomingAudio(supabase, workspaceId, mediaUrl);
+        }
+
         const messageBody =
           message.text?.body ??
           (message.image?.caption || message.video?.caption || message.document?.caption) ??
-          (message.document?.filename ?? null);
+          (message.document?.filename ?? null) ??
+          (audioTranscript ? `🎙️ ${audioTranscript}` : null);
 
         await supabase.from("messages").insert({
           conversation_id: conversation.id,
@@ -260,12 +294,13 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           messageBody || "Nuevo mensaje de WhatsApp"
         );
 
-        if (message.text?.body) {
+        const textForAutomations = message.text?.body ?? audioTranscript;
+        if (textForAutomations) {
           const matchedKeyword = await runKeywordAutomations(
             supabase,
             workspaceId,
             contact.id,
-            message.text.body
+            textForAutomations
           );
           if (!matchedKeyword) {
             await maybeRespondWithAiAgent(supabase, workspaceId, conversation.id, contact.id);
