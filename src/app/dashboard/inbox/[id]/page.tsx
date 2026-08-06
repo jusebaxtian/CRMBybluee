@@ -12,6 +12,7 @@ import { ConversationWindowStatus } from "@/components/conversation-window-statu
 import { ConversationFollowupsToggle } from "@/components/conversation-followups-toggle";
 import { ContactBlockedNotice } from "@/components/contact-blocked-notice";
 import { AiHandoffNotice } from "@/components/ai-handoff-notice";
+import { ConversationAiToggle } from "@/components/conversation-ai-toggle";
 import { getWorkspaceId } from "@/lib/workspace";
 import { listWorkspaceAgents } from "@/lib/agents";
 import { isPhoneNumber } from "@/lib/whatsapp/identity";
@@ -28,7 +29,7 @@ export default async function ConversationPage({
   const { data: conversation } = await supabase
     .from("conversations")
     .select(
-      "id, contact_id, last_read_at, assigned_agent_id, ad_source_id, ad_headline, ad_body, followups_enabled, ai_handoff_requested, contacts(name, wa_id, notes, likely_blocked, contact_tags(tag_id, tags(excludes_followups)))"
+      "id, contact_id, last_read_at, assigned_agent_id, ad_source_id, ad_headline, ad_body, followups_enabled, ai_handoff_requested, ai_manually_paused, contacts(name, wa_id, notes, likely_blocked, contact_tags(tag_id, tags(excludes_followups)))"
     )
     .eq("id", id)
     .eq("workspace_id", workspaceId ?? "")
@@ -82,6 +83,15 @@ export default async function ConversationPage({
     : { data: [] };
 
   const agents = await listWorkspaceAgents(supabase, workspaceId);
+
+  const { data: aiAgent } = workspaceId
+    ? await supabase
+        .from("ai_agents")
+        .select("is_active")
+        .eq("workspace_id", workspaceId)
+        .maybeSingle()
+    : { data: null };
+  const hasActiveAiAgent = !!aiAgent?.is_active;
 
   // All active automations, not just the ones triggered by this contact's
   // tags — the chat's floating menu lets an agent fire any flow manually,
@@ -153,6 +163,8 @@ export default async function ConversationPage({
             automations={automations ?? []}
             likelyBlocked={contact.likely_blocked}
             aiHandoffRequested={conversation.ai_handoff_requested}
+            hasActiveAiAgent={hasActiveAiAgent}
+            aiManuallyPaused={conversation.ai_manually_paused}
             followupsEnabled={conversation.followups_enabled}
             excludedFromFollowupsByTag={excludedFromFollowupsByTag}
             adSourceId={conversation.ad_source_id}
@@ -211,6 +223,15 @@ export default async function ConversationPage({
               conversationId={conversation.id}
               agents={agents}
               assignedAgentId={conversation.assigned_agent_id}
+            />
+          </div>
+        )}
+
+        {hasActiveAiAgent && (
+          <div className="mt-6">
+            <ConversationAiToggle
+              conversationId={conversation.id}
+              manuallyPaused={conversation.ai_manually_paused}
             />
           </div>
         )}

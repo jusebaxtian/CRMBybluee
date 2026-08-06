@@ -79,10 +79,10 @@ export async function maybeRespondWithAiAgent(
 
   const { data: conversation } = await supabase
     .from("conversations")
-    .select("ai_handoff_requested")
+    .select("ai_handoff_requested, ai_manually_paused")
     .eq("id", conversationId)
     .maybeSingle();
-  if (!conversation || conversation.ai_handoff_requested) return;
+  if (!conversation || conversation.ai_handoff_requested || conversation.ai_manually_paused) return;
 
   // A contact tagged "excluir de automatizaciones" (ej: "Ya compró") skips
   // the AI too — same rule as keyword/tag automations and follow-ups.

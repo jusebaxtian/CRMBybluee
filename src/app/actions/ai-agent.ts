@@ -139,6 +139,22 @@ export async function deleteAiAgentMedia(id: string) {
   return { success: true as const };
 }
 
+export async function setAiManuallyPaused(conversationId: string, paused: boolean) {
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+
+  const { error } = await supabase
+    .from("conversations")
+    .update({ ai_manually_paused: paused })
+    .eq("id", conversationId)
+    .eq("workspace_id", workspaceId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard/inbox");
+  return { success: true as const };
+}
+
 export async function clearAiHandoff(conversationId: string) {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);

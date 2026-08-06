@@ -8,6 +8,7 @@ import { ConversationAssignmentControl } from "@/components/conversation-assignm
 import { ConversationFollowupsToggle } from "@/components/conversation-followups-toggle";
 import { ContactBlockedNotice } from "@/components/contact-blocked-notice";
 import { AiHandoffNotice } from "@/components/ai-handoff-notice";
+import { ConversationAiToggle } from "@/components/conversation-ai-toggle";
 
 type Agent = { id: string; name: string | null; email: string };
 type Tag = { id: string; name: string; color: string };
@@ -26,6 +27,8 @@ export function ConversationDetailsSheet({
   automations,
   likelyBlocked,
   aiHandoffRequested,
+  hasActiveAiAgent,
+  aiManuallyPaused,
   followupsEnabled,
   excludedFromFollowupsByTag,
   adSourceId,
@@ -44,6 +47,8 @@ export function ConversationDetailsSheet({
   automations: Automation[];
   likelyBlocked: boolean;
   aiHandoffRequested: boolean;
+  hasActiveAiAgent: boolean;
+  aiManuallyPaused: boolean;
   followupsEnabled: boolean;
   excludedFromFollowupsByTag: boolean;
   adSourceId: string | null;
@@ -117,6 +122,15 @@ export function ConversationDetailsSheet({
                   conversationId={conversationId}
                   agents={agents}
                   assignedAgentId={assignedAgentId}
+                />
+              </div>
+            )}
+
+            {hasActiveAiAgent && (
+              <div className="mt-6">
+                <ConversationAiToggle
+                  conversationId={conversationId}
+                  manuallyPaused={aiManuallyPaused}
                 />
               </div>
             )}
