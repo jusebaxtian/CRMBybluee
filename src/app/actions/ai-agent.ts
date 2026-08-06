@@ -146,6 +146,59 @@ export async function addAiAgentMedia(_prevState: unknown, formData: FormData) {
   return { success: true as const };
 }
 
+export async function editAiAgentMedia(_prevState: unknown, formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const label = String(formData.get("label") ?? "").trim();
+  const triggerDescription = String(formData.get("triggerDescription") ?? "").trim();
+  const file = formData.get("file") as File | null;
+
+  if (!id) return { error: "Medio inválido." };
+  if (!label) return { error: "Ponle un nombre." };
+  if (!triggerDescription) {
+    return { error: "Describe cuándo debe usarlo el agente (ej: \"pregunten cómo pagar\")." };
+  }
+
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+
+  const update: Record<string, unknown> = { label, trigger_description: triggerDescription };
+
+  // Replacing the file is optional — leaving it empty keeps the file
+  // already uploaded and only updates the name/trigger text.
+  if (file && file.size > 0) {
+    const kind = mediaKindFromMime(file.type);
+    const validationError = validateMediaFile(kind, file);
+    if (validationError) return { error: validationError };
+
+    const admin = createAdminClient();
+    const path = `${workspaceId}/ai-agent-media/${Date.now()}-${file.name}`;
+    const { error: uploadError } = await admin.storage
+      .from("chat-media")
+      .upload(path, file, { contentType: file.type });
+    if (uploadError) return { error: uploadError.message };
+
+    const {
+      data: { publicUrl },
+    } = admin.storage.from("chat-media").getPublicUrl(path);
+
+    update.media_type = kind;
+    update.media_url = publicUrl;
+    update.media_mime_type = file.type;
+    update.filename = kind === "document" ? file.name : null;
+  }
+
+  const { error } = await supabase
+    .from("ai_agent_media")
+    .update(update)
+    .eq("id", id)
+    .eq("workspace_id", workspaceId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard/settings");
+  return { success: true as const };
+}
+
 export async function deleteAiAgentMedia(id: string) {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);

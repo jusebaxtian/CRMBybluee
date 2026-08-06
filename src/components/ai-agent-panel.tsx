@@ -82,7 +82,7 @@ export function AiAgentPanel({
       )}
 
       <div className="rounded-xl border border-border p-5">
-      <form action={action} className="flex flex-col gap-4">
+      <form id="ai-agent-config-form" action={action} className="flex flex-col gap-4">
         <div className="flex items-center gap-2">
           <Sparkles size={16} className="text-primary" />
           <h3 className="text-sm font-semibold text-foreground">
@@ -167,14 +167,6 @@ export function AiAgentPanel({
           </p>
         </div>
 
-        {state && "error" in state && <p className="text-sm text-red-400">{state.error}</p>}
-        {state && "success" in state && (
-          <p className="text-sm text-success">Guardado — probamos tu API key y funciona.</p>
-        )}
-
-        <Button type="submit" disabled={pending} className="self-start">
-          {pending ? "Validando y guardando..." : agent ? "Guardar cambios" : "Conectar"}
-        </Button>
       </form>
 
       {agent && (
@@ -182,6 +174,18 @@ export function AiAgentPanel({
           <AiAgentMediaLibrary items={mediaItems} />
         </div>
       )}
+
+      <div className="mt-5 border-t border-border pt-5">
+        {state && "error" in state && (
+          <p className="mb-3 text-sm text-red-400">{state.error}</p>
+        )}
+        {state && "success" in state && (
+          <p className="mb-3 text-sm text-success">Guardado — probamos tu API key y funciona.</p>
+        )}
+        <Button type="submit" form="ai-agent-config-form" disabled={pending}>
+          {pending ? "Validando y guardando..." : agent ? "Guardar cambios" : "Conectar"}
+        </Button>
+      </div>
       </div>
     </div>
   );
