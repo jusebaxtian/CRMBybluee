@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getWorkspaceId } from "@/lib/workspace";
-import { callAiProvider } from "@/lib/ai/providers";
+import { callAiProvider, type ChatTurn } from "@/lib/ai/providers";
+import { buildSystemPrompt, interpretAiReply, customerRequestedHuman } from "@/lib/ai/agent";
 import { mediaKindFromMime, validateMediaFile } from "@/lib/whatsapp/media-limits";
 
 const defaultModel: Record<"openai" | "anthropic", string> = {
@@ -71,6 +72,76 @@ export async function saveAiAgent(_prevState: unknown, formData: FormData) {
 
   revalidatePath("/dashboard/settings");
   return { success: true as const };
+}
+
+// Powers the "Probar el agente" test chat in Settings — runs the exact same
+// prompt-building and reply-parsing the real WhatsApp path uses, but never
+// touches WhatsApp or writes any conversation/message rows. Doesn't check
+// is_active or the human-request safety net's side effects (there's no real
+// conversation to flip a handoff flag on) — it does still surface handoff
+// and media triggers in the response so you can see what WOULD happen.
+export async function testAiAgentMessage(
+  history: { role: "user" | "assistant"; content: string }[],
+  message: string
+) {
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+
+  const { data: agent } = await supabase
+    .from("ai_agents")
+    .select("provider, api_key, model, agent_name, persona")
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (!agent) return { error: "Primero conecta y guarda tu agente." };
+
+  const { data: mediaLibrary } = await supabase
+    .from("ai_agent_media")
+    .select("key, label, trigger_description, media_type, media_url, media_mime_type, filename")
+    .eq("workspace_id", workspaceId);
+
+  if (customerRequestedHuman(message)) {
+    return {
+      success: true as const,
+      reply: "¡Claro que sí! Ya te conecto con nuestro equipo, en un momento te contactan 🙌",
+      handoff: true,
+      media: [] as { key: string; label: string }[],
+      handoffSource: "keyword" as const,
+    };
+  }
+
+  const chatHistory: ChatTurn[] = [...history, { role: "user", content: message }];
+
+  let rawReply: string;
+  try {
+    rawReply = await callAiProvider(
+      agent.provider,
+      agent.api_key,
+      agent.model,
+      buildSystemPrompt(agent.agent_name, agent.persona, mediaLibrary ?? []),
+      chatHistory
+    );
+  } catch (err) {
+    return {
+      error: `No se pudo consultar la IA: ${err instanceof Error ? err.message : "error desconocido"}`,
+    };
+  }
+  if (!rawReply) return { error: "La IA no devolvió ninguna respuesta." };
+
+  const { customerReply, handoff, mediaKeys } = interpretAiReply(rawReply);
+  const mediaByKey = new Map((mediaLibrary ?? []).map((m) => [m.key, m]));
+  const media = mediaKeys
+    .map((key) => mediaByKey.get(key))
+    .filter((m): m is NonNullable<typeof m> => !!m)
+    .map((m) => ({ key: m.key, label: m.label }));
+
+  return {
+    success: true as const,
+    reply: customerReply,
+    handoff,
+    media,
+    handoffSource: handoff ? ("model" as const) : undefined,
+  };
 }
 
 export async function toggleAiAgentActive(isActive: boolean) {

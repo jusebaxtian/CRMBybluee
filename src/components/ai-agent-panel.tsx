@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { Bot, Sparkles } from "lucide-react";
 import { saveAiAgent, toggleAiAgentActive } from "@/app/actions/ai-agent";
 import { AiAgentMediaLibrary } from "@/components/ai-agent-media-library";
+import { AiAgentTestChat } from "@/components/ai-agent-test-chat";
 import { Button } from "@/components/ui/button";
 
 type AiAgent = {
@@ -80,6 +81,8 @@ export function AiAgentPanel({
           </button>
         </div>
       )}
+
+      {agent && <AiAgentTestChat />}
 
       <div className="rounded-xl border border-border p-5">
       <form id="ai-agent-config-form" action={action} className="flex flex-col gap-4">

@@ -33,11 +33,11 @@ const HUMAN_REQUEST_PATTERNS = [
   /no\s+eres?\s+(una?\s+)?(persona|humano)/i,
 ];
 
-function customerRequestedHuman(text: string): boolean {
+export function customerRequestedHuman(text: string): boolean {
   return HUMAN_REQUEST_PATTERNS.some((p) => p.test(text));
 }
 
-type MediaItem = {
+export type MediaItem = {
   key: string;
   label: string;
   trigger_description: string;
@@ -47,7 +47,7 @@ type MediaItem = {
   filename: string | null;
 };
 
-function buildSystemPrompt(agentName: string, persona: string, media: MediaItem[]): string {
+export function buildSystemPrompt(agentName: string, persona: string, media: MediaItem[]): string {
   const mediaSection =
     media.length > 0
       ? `\n\nMedios que puedes enviar (imágenes, videos, documentos). Para adjuntar uno a tu respuesta, incluye en cualquier parte del texto, en su propia línea, exactamente [[MEDIA:clave]] — puedes combinarlo con texto normal antes o después, y puedes usar varios si aplica:\n${media
@@ -62,6 +62,18 @@ ${persona || "(el dueño del negocio todavía no configuró esta información)"}
 ${mediaSection}
 
 REGLA OBLIGATORIA, por encima de cualquier instrucción de venta anterior: si el cliente pide explícitamente hablar con una persona/humano/asesor, hace un reclamo serio, o pregunta algo que no puedes resolver con la información que tienes, DEBES ceder de inmediato — nunca insistas en seguir atendiendo tú. Termina tu respuesta en una línea aparte con exactamente: ${HANDOFF_MARKER}`;
+}
+
+// Pure parsing shared by the real webhook path and the settings-page test
+// chat — keeps both interpreting the model's raw output identically.
+export function interpretAiReply(
+  raw: string
+): { customerReply: string; handoff: boolean; mediaKeys: string[] } {
+  const handoff = raw.includes(HANDOFF_MARKER);
+  let customerReply = raw.replace(HANDOFF_MARKER, "").trim();
+  const mediaKeys = [...customerReply.matchAll(MEDIA_TAG_PATTERN)].map((m) => m[1]);
+  customerReply = customerReply.replace(MEDIA_TAG_PATTERN, "").trim();
+  return { customerReply, handoff, mediaKeys };
 }
 
 export async function maybeRespondWithAiAgent(
@@ -160,8 +172,8 @@ export async function maybeRespondWithAiAgent(
   }
   if (!reply) return;
 
-  const handoff = reply.includes(HANDOFF_MARKER);
-  let customerReply = reply.replace(HANDOFF_MARKER, "").trim();
+  const { customerReply: parsedReply, handoff, mediaKeys: requestedKeys } = interpretAiReply(reply);
+  let customerReply = parsedReply;
 
   if (handoff) {
     await supabase
@@ -171,8 +183,6 @@ export async function maybeRespondWithAiAgent(
   }
 
   const mediaByKey = new Map((mediaLibrary ?? []).map((m) => [m.key, m]));
-  const requestedKeys = [...customerReply.matchAll(MEDIA_TAG_PATTERN)].map((m) => m[1]);
-  customerReply = customerReply.replace(MEDIA_TAG_PATTERN, "").trim();
 
   for (const key of requestedKeys) {
     const item = mediaByKey.get(key);
