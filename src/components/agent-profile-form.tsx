@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { UserPlus } from "lucide-react";
 import { createAgentProfile } from "@/app/actions/agents";
+import { Button } from "@/components/ui/button";
 
 export function AgentProfileForm() {
   const [state, action, pending] = useActionState(createAgentProfile, undefined);
@@ -43,13 +44,9 @@ export function AgentProfileForm() {
         <p className="text-xs text-success">Agente creado correctamente.</p>
       )}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="self-start rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
-      >
+      <Button type="submit" disabled={pending} className="self-start">
         {pending ? "Creando..." : "Crear agente"}
-      </button>
+      </Button>
     </form>
   );
 }

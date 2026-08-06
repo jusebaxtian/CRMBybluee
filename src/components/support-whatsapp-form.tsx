@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { updateSupportWhatsapp } from "@/app/actions/admin";
+import { Button } from "@/components/ui/button";
 
 export function SupportWhatsappForm({
   currentNumber,
@@ -49,13 +50,9 @@ export function SupportWhatsappForm({
         <p className="text-sm text-success">Guardado. Ya está activo para todos los clientes.</p>
       )}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="self-start rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
-      >
+      <Button type="submit" disabled={pending} className="self-start">
         {pending ? "Guardando..." : "Guardar"}
-      </button>
+      </Button>
     </form>
   );
 }

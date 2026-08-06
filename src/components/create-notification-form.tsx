@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { createNotification } from "@/app/actions/notifications";
+import { Button } from "@/components/ui/button";
 
 type Workspace = { id: string; name: string };
 type Plan = { id: string; name: string };
@@ -89,13 +90,9 @@ export function CreateNotificationForm({
         <p className="text-sm text-success">Notificación enviada.</p>
       )}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="self-start rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
-      >
+      <Button type="submit" disabled={pending} className="self-start">
         {pending ? "Enviando..." : "Enviar notificación"}
-      </button>
+      </Button>
     </form>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { createTemplate } from "@/app/actions/templates";
+import { Button } from "@/components/ui/button";
 
 export function CreateTemplateForm() {
   const [state, action, pending] = useActionState(createTemplate, undefined);
@@ -109,13 +110,9 @@ export function CreateTemplateForm() {
         </p>
       )}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="self-start rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
-      >
+      <Button type="submit" disabled={pending} className="self-start">
         {pending ? "Enviando a Meta..." : "Enviar plantilla a aprobación"}
-      </button>
+      </Button>
     </form>
   );
 }

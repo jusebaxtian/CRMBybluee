@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { Bot, Sparkles } from "lucide-react";
 import { saveAiAgent, toggleAiAgentActive } from "@/app/actions/ai-agent";
 import { AiAgentMediaLibrary } from "@/components/ai-agent-media-library";
+import { Button } from "@/components/ui/button";
 
 type AiAgent = {
   provider: "openai" | "anthropic";
@@ -162,13 +163,9 @@ export function AiAgentPanel({
           <p className="text-sm text-success">Guardado — probamos tu API key y funciona.</p>
         )}
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="self-start rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
-        >
+        <Button type="submit" disabled={pending} className="self-start">
           {pending ? "Validando y guardando..." : agent ? "Guardar cambios" : "Conectar"}
-        </button>
+        </Button>
       </form>
 
       {agent && <AiAgentMediaLibrary items={mediaItems} />}

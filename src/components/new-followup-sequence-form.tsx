@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { Info } from "lucide-react";
 import { createFollowupSequence, updateFollowupSequence } from "@/app/actions/followups";
 import { AutomationActionsBuilder, type InitialAction } from "@/components/automation-actions-builder";
+import { Button } from "@/components/ui/button";
 
 type Tag = { id: string; name: string };
 type Template = { id: string; meta_template_name: string; language: string; status: string };
@@ -79,11 +80,7 @@ export function NewFollowupSequenceForm({
 
       {state && "error" in state && <p className="text-sm text-red-400">{state.error}</p>}
 
-      <button
-        type="submit"
-        disabled={pending || uploading}
-        className="self-start rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
-      >
+      <Button type="submit" disabled={pending || uploading} className="self-start">
         {uploading
           ? "Subiendo archivo..."
           : pending
@@ -91,7 +88,7 @@ export function NewFollowupSequenceForm({
             : sequence
               ? "Guardar cambios"
               : "Crear seguimiento"}
-      </button>
+      </Button>
     </form>
   );
 }

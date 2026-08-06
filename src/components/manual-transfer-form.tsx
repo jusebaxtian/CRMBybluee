@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { uploadPaymentProof } from "@/app/actions/billing";
+import { Button } from "@/components/ui/button";
 
 export function ManualTransferForm() {
   const router = useRouter();
@@ -64,13 +65,9 @@ export function ManualTransferForm() {
           {message.text}
         </p>
       )}
-      <button
-        type="submit"
-        disabled={pending}
-        className="self-start rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
-      >
+      <Button type="submit" disabled={pending} className="self-start">
         {pending ? "Enviando..." : "Enviar comprobante"}
-      </button>
+      </Button>
     </form>
   );
 }

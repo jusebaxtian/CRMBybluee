@@ -11,6 +11,19 @@
   --primary-hover: #159540;
   --success: #22c55e;
   --warning: #eab308;
+
+  /* No error/info/accent tokens existed before this — destructive and
+     "info" UI had been using raw Tailwind red, blue and purple palette
+     utilities directly, inconsistently (see design-system audit). These
+     alias the exact same Tailwind v4 palette variables already in use
+     everywhere (red 400/500/600, blue 400, purple 400), so introducing the
+     token is a no-op visually — nothing renders differently until a call
+     site is migrated to use it. */
+  --error: var(--color-red-400);
+  --error-hover: var(--color-red-500);
+  --error-active: var(--color-red-600);
+  --info: var(--color-blue-400);
+  --accent-purple: var(--color-purple-400);
 }
 
 @theme inline {
@@ -24,6 +37,11 @@
   --color-primary-hover: var(--primary-hover);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-error-hover: var(--error-hover);
+  --color-error-active: var(--error-active);
+  --color-info: var(--info);
+  --color-accent-purple: var(--accent-purple);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }

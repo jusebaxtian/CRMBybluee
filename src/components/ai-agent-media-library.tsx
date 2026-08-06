@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { Image as ImageIcon, Video, FileText, Trash2, Library } from "lucide-react";
 import { addAiAgentMedia, deleteAiAgentMedia } from "@/app/actions/ai-agent";
+import { Button } from "@/components/ui/button";
 
 type MediaItem = {
   id: string;
@@ -126,13 +127,9 @@ export function AiAgentMediaLibrary({ items }: { items: MediaItem[] }) {
 
         {state && "error" in state && <p className="text-sm text-red-400">{state.error}</p>}
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="self-start rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
-        >
+        <Button type="submit" disabled={pending} className="self-start">
           {pending ? "Subiendo..." : "Agregar medio"}
-        </button>
+        </Button>
       </form>
     </div>
   );
