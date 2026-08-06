@@ -100,7 +100,9 @@ export function ConversationDetailsSheet({
             </div>
 
             {likelyBlocked && <ContactBlockedNotice contactId={contactId} />}
-            {aiHandoffRequested && <AiHandoffNotice conversationId={conversationId} />}
+            {(aiHandoffRequested || aiManuallyPaused) && (
+              <AiHandoffNotice conversationId={conversationId} aiRequested={aiHandoffRequested} />
+            )}
 
             {adSourceId && (
               <div className="mt-6 rounded-lg border border-primary/30 bg-primary/5 p-3">

@@ -197,7 +197,12 @@ export default async function ConversationPage({
         </div>
 
         {contact.likely_blocked && <ContactBlockedNotice contactId={conversation.contact_id} />}
-        {conversation.ai_handoff_requested && <AiHandoffNotice conversationId={conversation.id} />}
+        {(conversation.ai_handoff_requested || conversation.ai_manually_paused) && (
+          <AiHandoffNotice
+            conversationId={conversation.id}
+            aiRequested={conversation.ai_handoff_requested}
+          />
+        )}
 
         {conversation.ad_source_id && (
           <div className="mt-6 rounded-lg border border-primary/30 bg-primary/5 p-3">

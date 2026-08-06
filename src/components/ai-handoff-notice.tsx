@@ -5,7 +5,15 @@ import { useRouter } from "next/navigation";
 import { Bot } from "lucide-react";
 import { clearAiHandoff } from "@/app/actions/ai-agent";
 
-export function AiHandoffNotice({ conversationId }: { conversationId: string }) {
+export function AiHandoffNotice({
+  conversationId,
+  aiRequested,
+}: {
+  conversationId: string;
+  // true = the AI itself decided it needed a human; false = an agent paused
+  // it manually. Same flag, same button clears both either way.
+  aiRequested: boolean;
+}) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
 
@@ -20,11 +28,12 @@ export function AiHandoffNotice({ conversationId }: { conversationId: string }) 
     <div className="mt-6 rounded-lg border border-warning/30 bg-warning/5 p-3">
       <p className="flex items-center gap-1.5 text-xs font-medium text-warning">
         <Bot size={13} />
-        La IA pidió ayuda humana
+        {aiRequested ? "La IA pidió ayuda humana" : "Pausaste la IA en este chat"}
       </p>
       <p className="mt-1 text-xs text-muted">
-        El cliente pidió hablar con una persona (o preguntó algo que la IA no pudo resolver). Se
-        pausó automáticamente para este chat — respóndele tú, o reactívala cuando ya no haga falta.
+        {aiRequested
+          ? "El cliente pidió hablar con una persona (o preguntó algo que la IA no pudo resolver). Se pausó automáticamente para este chat — respóndele tú, o reactívala cuando ya no haga falta."
+          : "La IA no va a responder en este chat hasta que la reactives — respóndele tú mientras tanto."}
       </p>
       <button
         type="button"

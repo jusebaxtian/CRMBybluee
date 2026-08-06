@@ -155,6 +155,9 @@ export async function setAiManuallyPaused(conversationId: string, paused: boolea
   return { success: true as const };
 }
 
+// Clears both the automatic handoff flag (AI asked for help) and the manual
+// pause flag (agent chose to take over) — one button reactivates the AI on
+// this chat regardless of which reason paused it.
 export async function clearAiHandoff(conversationId: string) {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
@@ -162,7 +165,7 @@ export async function clearAiHandoff(conversationId: string) {
 
   const { error } = await supabase
     .from("conversations")
-    .update({ ai_handoff_requested: false })
+    .update({ ai_handoff_requested: false, ai_manually_paused: false })
     .eq("id", conversationId)
     .eq("workspace_id", workspaceId);
   if (error) return { error: error.message };
