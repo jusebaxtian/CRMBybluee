@@ -14,7 +14,7 @@ const defaultModel: Record<"openai" | "anthropic", string> = {
 
 export async function saveAiAgent(_prevState: unknown, formData: FormData) {
   const provider = String(formData.get("provider") ?? "") as "openai" | "anthropic";
-  const apiKey = String(formData.get("apiKey") ?? "").trim();
+  const submittedApiKey = String(formData.get("apiKey") ?? "").trim();
   const model = String(formData.get("model") ?? "").trim() || defaultModel[provider];
   const agentName = String(formData.get("agentName") ?? "").trim() || "Asistente";
   const persona = String(formData.get("persona") ?? "").trim();
@@ -22,22 +22,40 @@ export async function saveAiAgent(_prevState: unknown, formData: FormData) {
   if (provider !== "openai" && provider !== "anthropic") {
     return { error: "Selecciona un proveedor válido." };
   }
-  if (!apiKey) return { error: "Pega tu API key." };
 
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
   if (!workspaceId) return { error: "No se encontró tu workspace." };
 
-  // Quick real call to catch a bad/expired key before saving it, instead of
-  // finding out only when a real customer message doesn't get a reply.
-  try {
-    await callAiProvider(provider, apiKey, model, "Responde solo con la palabra: ok", [
-      { role: "user", content: "test" },
-    ]);
-  } catch (err) {
-    return {
-      error: `No se pudo validar la API key: ${err instanceof Error ? err.message : "error desconocido"}`,
-    };
+  // Editing an already-connected agent doesn't require re-pasting the key —
+  // the field starts empty (we never send the stored key back to the
+  // browser), so a blank submit here means "keep the current one." Only
+  // re-validate against the provider when the key actually changed.
+  let apiKey = submittedApiKey;
+  let keyChanged = true;
+  if (!submittedApiKey) {
+    const { data: existing } = await supabase
+      .from("ai_agents")
+      .select("api_key, provider")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+    if (!existing) return { error: "Pega tu API key." };
+    apiKey = existing.api_key;
+    keyChanged = existing.provider !== provider;
+  }
+
+  if (keyChanged) {
+    // Quick real call to catch a bad/expired key before saving it, instead
+    // of finding out only when a real customer message doesn't get a reply.
+    try {
+      await callAiProvider(provider, apiKey, model, "Responde solo con la palabra: ok", [
+        { role: "user", content: "test" },
+      ]);
+    } catch (err) {
+      return {
+        error: `No se pudo validar la API key: ${err instanceof Error ? err.message : "error desconocido"}`,
+      };
+    }
   }
 
   const { error } = await supabase.from("ai_agents").upsert({
@@ -88,7 +106,6 @@ export async function addAiAgentMedia(_prevState: unknown, formData: FormData) {
   if (!file || file.size === 0) return { error: "Selecciona un archivo." };
 
   const kind = mediaKindFromMime(file.type);
-  if (kind === "audio") return { error: "El agente solo puede enviar imágenes, videos o documentos." };
   const validationError = validateMediaFile(kind, file);
   if (validationError) return { error: validationError };
 

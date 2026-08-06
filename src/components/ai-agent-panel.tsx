@@ -19,7 +19,7 @@ type MediaItem = {
   key: string;
   label: string;
   trigger_description: string;
-  media_type: "image" | "video" | "document";
+  media_type: "image" | "video" | "audio" | "document";
   media_url: string;
 };
 
@@ -81,7 +81,8 @@ export function AiAgentPanel({
         </div>
       )}
 
-      <form action={action} className="flex flex-col gap-4 rounded-xl border border-border p-5">
+      <div className="rounded-xl border border-border p-5">
+      <form action={action} className="flex flex-col gap-4">
         <div className="flex items-center gap-2">
           <Sparkles size={16} className="text-primary" />
           <h3 className="text-sm font-semibold text-foreground">
@@ -107,14 +108,22 @@ export function AiAgentPanel({
           <input
             name="apiKey"
             type="password"
-            required
-            placeholder={provider === "openai" ? "sk-..." : "sk-ant-..."}
+            required={!agent}
+            placeholder={
+              agent
+                ? "Déjalo vacío para mantener la llave guardada"
+                : provider === "openai"
+                  ? "sk-..."
+                  : "sk-ant-..."
+            }
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
           />
           <p className="mt-1 text-[11px] text-muted">
-            {provider === "openai"
-              ? "La consigues en platform.openai.com → API keys."
-              : "La consigues en console.anthropic.com → API keys."}
+            {agent
+              ? "Solo llénalo si quieres reemplazar la llave actual."
+              : provider === "openai"
+                ? "La consigues en platform.openai.com → API keys."
+                : "La consigues en console.anthropic.com → API keys."}
           </p>
         </div>
 
@@ -168,7 +177,12 @@ export function AiAgentPanel({
         </Button>
       </form>
 
-      {agent && <AiAgentMediaLibrary items={mediaItems} />}
+      {agent && (
+        <div className="mt-5 border-t border-border pt-5">
+          <AiAgentMediaLibrary items={mediaItems} />
+        </div>
+      )}
+      </div>
     </div>
   );
 }

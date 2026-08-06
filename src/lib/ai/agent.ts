@@ -41,7 +41,7 @@ type MediaItem = {
   key: string;
   label: string;
   trigger_description: string;
-  media_type: "image" | "video" | "document";
+  media_type: "image" | "video" | "audio" | "document";
   media_url: string;
   media_mime_type: string;
   filename: string | null;

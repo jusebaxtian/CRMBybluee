@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Image as ImageIcon, Video, FileText, Trash2, Library } from "lucide-react";
+import { Image as ImageIcon, Video, Music, FileText, Trash2, Library } from "lucide-react";
 import { addAiAgentMedia, deleteAiAgentMedia } from "@/app/actions/ai-agent";
 import { Button } from "@/components/ui/button";
 
@@ -10,11 +10,11 @@ type MediaItem = {
   key: string;
   label: string;
   trigger_description: string;
-  media_type: "image" | "video" | "document";
+  media_type: "image" | "video" | "audio" | "document";
   media_url: string;
 };
 
-const typeIcon = { image: ImageIcon, video: Video, document: FileText };
+const typeIcon = { image: ImageIcon, video: Video, audio: Music, document: FileText };
 
 function DeleteButton({ id }: { id: string }) {
   const [pending, setPending] = useState(false);
@@ -39,15 +39,15 @@ export function AiAgentMediaLibrary({ items }: { items: MediaItem[] }) {
   const [state, action, pending] = useActionState(addAiAgentMedia, undefined);
 
   return (
-    <div className="flex flex-col gap-4 rounded-xl border border-border p-5">
+    <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
         <Library size={16} className="text-primary" />
-        <h3 className="text-sm font-semibold text-foreground">Biblioteca de medios</h3>
+        <h3 className="text-sm font-semibold text-foreground">Adjuntos que puede enviar</h3>
       </div>
       <p className="text-xs text-muted">
-        Súbele al agente imágenes, videos o documentos (QR de pago, video demostrativo, catálogo...)
-        y explícale en qué momento usar cada uno. Él decide solo cuándo enviarlo según lo que
-        pregunte el cliente.
+        Súbele al agente imágenes, videos, audios o documentos (QR de pago, video demostrativo,
+        nota de voz, catálogo...) y explícale en qué momento usar cada uno. Él decide solo cuándo
+        enviarlo según lo que pregunte el cliente.
       </p>
 
       {items.length > 0 && (
@@ -120,7 +120,7 @@ export function AiAgentMediaLibrary({ items }: { items: MediaItem[] }) {
             name="file"
             type="file"
             required
-            accept="image/jpeg,image/png,video/mp4,video/quicktime,application/pdf"
+            accept="image/jpeg,image/png,video/mp4,video/quicktime,audio/aac,audio/mp4,audio/mpeg,audio/amr,audio/ogg,application/pdf"
             className="w-full text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-surface-hover file:px-3 file:py-1.5 file:text-xs file:text-foreground"
           />
         </div>
