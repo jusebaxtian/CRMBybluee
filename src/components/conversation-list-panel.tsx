@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, SlidersHorizontal, X, Clock, Megaphone, ShieldAlert, Bot } from "lucide-react";
+import { Search, SlidersHorizontal, X, Clock, Megaphone, ShieldAlert, Bot, Check } from "lucide-react";
 import { NewMessageButton } from "@/components/new-message-button";
 import { useMessageWindow } from "@/lib/use-message-window";
 
@@ -400,8 +400,15 @@ export function ConversationListPanel({
                   </div>
                 )}
                 <div className="flex items-center justify-between gap-2">
-                  <p className="truncate text-xs text-muted">
-                    {conv.lastMessagePreview ?? "Sin mensajes"}
+                  <p className="flex min-w-0 items-center gap-1 truncate text-xs text-muted">
+                    {conv.answered && (
+                      <Check
+                        size={12}
+                        className="shrink-0 text-primary"
+                        aria-label="Último mensaje enviado por ti"
+                      />
+                    )}
+                    <span className="truncate">{conv.lastMessagePreview ?? "Sin mensajes"}</span>
                   </p>
                   {conv.unreadCount > 0 && (
                     <span className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-white">
