@@ -144,10 +144,27 @@ export async function testAiAgentMessage(
   };
 }
 
+// The AI and keyword/tag automations both react to inbound messages, and
+// keyword automations already win over the AI when both are on — which
+// meant an active automation could silently make the AI look "broken"
+// (never replying) for that keyword. To keep it simple for the business
+// owner, only one system answers at a time: turning the AI on pauses every
+// currently-active automation (tagged disabled_by_ai so we know which ones
+// to restore), and turning it off brings back exactly those.
 export async function toggleAiAgentActive(isActive: boolean) {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
   if (!workspaceId) return { error: "No se encontró tu workspace." };
+
+  if (isActive) {
+    const { error: pauseError } = await supabase
+      .from("automations")
+      .update({ is_active: false, disabled_by_ai: true })
+      .eq("workspace_id", workspaceId)
+      .eq("is_active", true)
+      .in("trigger_type", ["keyword", "tag_added"]);
+    if (pauseError) return { error: pauseError.message };
+  }
 
   const { error } = await supabase
     .from("ai_agents")
@@ -155,7 +172,17 @@ export async function toggleAiAgentActive(isActive: boolean) {
     .eq("workspace_id", workspaceId);
   if (error) return { error: error.message };
 
+  if (!isActive) {
+    const { error: restoreError } = await supabase
+      .from("automations")
+      .update({ is_active: true, disabled_by_ai: false })
+      .eq("workspace_id", workspaceId)
+      .eq("disabled_by_ai", true);
+    if (restoreError) return { error: restoreError.message };
+  }
+
   revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard/automations");
   return { success: true as const };
 }
 

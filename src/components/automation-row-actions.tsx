@@ -14,6 +14,7 @@ export function AutomationRowActions({
   itemLabel = "la automatización",
   onToggle,
   onDelete,
+  lockedByAi = false,
 }: {
   automationId: string;
   automationName: string;
@@ -22,13 +23,20 @@ export function AutomationRowActions({
   itemLabel?: string;
   onToggle?: (id: string, active: boolean) => Promise<unknown>;
   onDelete?: (id: string) => Promise<unknown>;
+  lockedByAi?: boolean;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleToggle() {
+    if (lockedByAi && !isActive) return;
     setPending(true);
-    await (onToggle ?? toggleAutomationActive)(automationId, !isActive);
+    setError(null);
+    const result = await (onToggle ?? toggleAutomationActive)(automationId, !isActive);
+    if (result && typeof result === "object" && "error" in result && result.error) {
+      setError(String(result.error));
+    }
     setPending(false);
     router.refresh();
   }
@@ -46,18 +54,26 @@ export function AutomationRowActions({
 
   return (
     <div className="flex items-center gap-3">
-      <button
-        type="button"
-        onClick={handleToggle}
-        disabled={pending}
-        className={`rounded-full px-2.5 py-1 text-xs disabled:opacity-50 ${
-          isActive
-            ? "bg-success/15 text-success"
-            : "bg-surface-hover text-muted"
-        }`}
-      >
-        {isActive ? "Activa" : "Pausada"}
-      </button>
+      <div className="flex flex-col items-end">
+        <button
+          type="button"
+          onClick={handleToggle}
+          disabled={pending || (lockedByAi && !isActive)}
+          title={
+            lockedByAi && !isActive
+              ? "Apaga el agente de IA para poder activar automatizaciones"
+              : undefined
+          }
+          className={`rounded-full px-2.5 py-1 text-xs disabled:opacity-50 ${
+            isActive
+              ? "bg-success/15 text-success"
+              : "bg-surface-hover text-muted"
+          }`}
+        >
+          {isActive ? "Activa" : lockedByAi ? "Bloqueada (IA activa)" : "Pausada"}
+        </button>
+        {error && <p className="mt-1 max-w-40 text-right text-[10px] text-red-400">{error}</p>}
+      </div>
       <Link
         href={editHref ?? `/dashboard/automations/${automationId}`}
         className="text-muted hover:text-foreground"

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Zap, Plus } from "lucide-react";
+import { Zap, Plus, Bot } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { AutomationRowActions } from "@/components/automation-row-actions";
 import { getWorkspaceId } from "@/lib/workspace";
@@ -18,9 +18,32 @@ export default async function AutomationsPage() {
     .eq("workspace_id", workspaceId ?? "")
     .order("created_at", { ascending: false });
 
+  const { data: aiAgent } = workspaceId
+    ? await supabase
+        .from("ai_agents")
+        .select("is_active")
+        .eq("workspace_id", workspaceId)
+        .maybeSingle()
+    : { data: null };
+  const aiAgentActive = !!aiAgent?.is_active;
+
   return (
     <div className="flex flex-col gap-6">
       <CampaignsTabs enabledModules={enabledModules} />
+
+      {aiAgentActive && (
+        <div className="flex items-center gap-3 rounded-xl border border-warning/30 bg-warning/10 p-4">
+          <Bot size={18} className="shrink-0 text-warning" />
+          <p className="text-sm text-foreground">
+            El agente de IA está activo, así que las automatizaciones quedaron pausadas
+            automáticamente para evitar que compitan por responder los mensajes. Apaga la IA en{" "}
+            <Link href="/dashboard/settings" className="text-primary hover:underline">
+              Configuración
+            </Link>{" "}
+            para poder activarlas de nuevo.
+          </p>
+        </div>
+      )}
 
       <div className="flex justify-end">
         <Link
@@ -66,6 +89,7 @@ export default async function AutomationsPage() {
                   automationId={a.id}
                   automationName={a.name}
                   isActive={a.is_active}
+                  lockedByAi={aiAgentActive}
                 />
               </div>
             );

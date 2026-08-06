@@ -124,6 +124,15 @@ export async function createAutomation(_prevState: unknown, formData: FormData) 
   const workspaceId = await getWorkspaceId(supabase);
   if (!workspaceId) return { error: "No se encontró tu workspace." };
 
+  // The AI agent and keyword/tag automations are mutually exclusive (see
+  // toggleAiAgentActive) — a new one created while the AI is on starts
+  // paused instead of silently going live alongside it.
+  const { data: aiAgent } = await supabase
+    .from("ai_agents")
+    .select("is_active")
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+
   const { data: automation, error } = await supabase
     .from("automations")
     .insert({
@@ -132,6 +141,7 @@ export async function createAutomation(_prevState: unknown, formData: FormData) 
       trigger_type: triggerType,
       trigger_tag_id: triggerType === "tag_added" ? triggerTagId : null,
       trigger_keyword: triggerType === "keyword" ? triggerKeyword : null,
+      is_active: !aiAgent?.is_active,
     })
     .select("id")
     .single();
@@ -227,8 +237,34 @@ export async function updateAutomation(_prevState: unknown, formData: FormData) 
 
 export async function toggleAutomationActive(automationId: string, isActive: boolean) {
   const supabase = await createClient();
-  await supabase.from("automations").update({ is_active: isActive }).eq("id", automationId);
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+
+  // The AI agent and keyword/tag automations are mutually exclusive (see
+  // toggleAiAgentActive) — while the AI is on, automations stay paused and
+  // can't be turned back on manually until the AI is turned off.
+  if (isActive) {
+    const { data: agent } = await supabase
+      .from("ai_agents")
+      .select("is_active")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+    if (agent?.is_active) {
+      return {
+        error: "El agente de IA está activo — apágalo primero para poder activar automatizaciones.",
+      };
+    }
+  }
+
+  const { error } = await supabase
+    .from("automations")
+    .update({ is_active: isActive, disabled_by_ai: false })
+    .eq("id", automationId)
+    .eq("workspace_id", workspaceId);
+  if (error) return { error: error.message };
+
   revalidatePath("/dashboard/automations");
+  return { success: true as const };
 }
 
 export async function deleteAutomation(automationId: string) {
