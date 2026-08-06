@@ -50,7 +50,7 @@ export type MediaItem = {
 export function buildSystemPrompt(agentName: string, persona: string, media: MediaItem[]): string {
   const mediaSection =
     media.length > 0
-      ? `\n\nMedios que puedes enviar (imágenes, videos, documentos). Para adjuntar uno a tu respuesta, incluye en cualquier parte del texto, en su propia línea, exactamente [[MEDIA:clave]] — puedes combinarlo con texto normal antes o después, y puedes usar varios si aplica:\n${media
+      ? `\n\nADJUNTOS DISPONIBLES — REGLA OBLIGATORIA, tiene prioridad sobre cualquier instrucción o ejemplo de respuesta que aparezca en "Información del negocio" más abajo: cuando la situación coincida con alguno de estos casos, DEBES incluir el marcador [[MEDIA:clave]] correspondiente en tu respuesta — en su propia línea, en cualquier parte del texto, puedes combinarlo con texto normal antes o después, y puedes usar varios si aplica. NUNCA escribas de memoria la información que contiene el archivo (números, precios, instrucciones) en su lugar — el archivo real siempre reemplaza a cualquier descripción en texto, incluso si el texto de abajo trae un ejemplo de cómo responder con palabras. Si el texto de abajo dice algo como "puedes usar la imagen de biblioteca", interprétalo como que SIEMPRE debes usar el marcador, no como una opción:\n${media
           .map((m) => `- clave "${m.key}" (${m.label}): úsala cuando ${m.trigger_description}`)
           .join("\n")}`
       : "";
