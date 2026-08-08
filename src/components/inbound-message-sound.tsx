@@ -30,6 +30,29 @@ function playChime(ctx: AudioContext) {
   }
 }
 
+// Deliberately different from playChime: a sawtooth (harsher timbre than the
+// sine "ding"), three short repeated beeps instead of two rising notes, and
+// louder — meant to stand out as "stop and look" rather than "new message",
+// since this only fires when the AI hands a chat off and needs a human now.
+function playAlert(ctx: AudioContext) {
+  const now = ctx.currentTime;
+  const beepStarts = [now, now + 0.18, now + 0.36];
+
+  for (const start of beepStarts) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sawtooth";
+    osc.frequency.value = 660;
+    gain.gain.setValueAtTime(0, start);
+    gain.gain.linearRampToValueAtTime(0.28, start + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + 0.15);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(start);
+    osc.stop(start + 0.16);
+  }
+}
+
 export function InboundMessageSound() {
   const audioCtxRef = useRef<AudioContext | null>(null);
 
@@ -75,6 +98,24 @@ export function InboundMessageSound() {
               const ctx = ensureContext();
               if (ctx.state === "suspended") ctx.resume();
               playChime(ctx);
+            } catch {
+              // Autoplay blocked (no user gesture yet) — silently skip.
+            }
+          }
+        )
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "conversations" },
+          (payload) => {
+            const before = payload.old as { ai_handoff_requested?: boolean };
+            const after = payload.new as { ai_handoff_requested?: boolean };
+            // Only the false → true transition — an update caused by clearing
+            // the handoff (or any unrelated column change) must stay silent.
+            if (before.ai_handoff_requested === true || after.ai_handoff_requested !== true) return;
+            try {
+              const ctx = ensureContext();
+              if (ctx.state === "suspended") ctx.resume();
+              playAlert(ctx);
             } catch {
               // Autoplay blocked (no user gesture yet) — silently skip.
             }
