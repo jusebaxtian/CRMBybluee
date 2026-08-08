@@ -4,9 +4,18 @@ import { useActionState, useState } from "react";
 import { createTemplate } from "@/app/actions/templates";
 import { Button } from "@/components/ui/button";
 
+const headerAccept: Record<string, string> = {
+  image: "image/jpeg,image/png",
+  video: "video/mp4,video/quicktime",
+  document: "application/pdf",
+};
+
 export function CreateTemplateForm() {
   const [state, action, pending] = useActionState(createTemplate, undefined);
   const [bodyText, setBodyText] = useState("");
+  const [headerKind, setHeaderKind] = useState<"none" | "text" | "image" | "video" | "document">(
+    "none"
+  );
 
   return (
     <form action={action} className="flex flex-col gap-4">
@@ -59,16 +68,50 @@ export function CreateTemplateForm() {
       </div>
 
       <div>
-        <label htmlFor="headerText" className="mb-1 block text-sm font-medium text-muted">
+        <label htmlFor="headerKind" className="mb-1 block text-sm font-medium text-muted">
           Encabezado (opcional)
         </label>
-        <input
-          id="headerText"
-          name="headerText"
-          type="text"
-          maxLength={60}
+        <select
+          id="headerKind"
+          name="headerKind"
+          value={headerKind}
+          onChange={(e) => setHeaderKind(e.target.value as typeof headerKind)}
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-        />
+        >
+          <option value="none">Sin encabezado</option>
+          <option value="text">Texto</option>
+          <option value="image">Imagen</option>
+          <option value="video">Video</option>
+          <option value="document">Documento</option>
+        </select>
+        <p className="mt-1 text-xs text-muted">
+          El audio no está permitido como encabezado de plantilla — es una limitación de WhatsApp, no del CRM.
+        </p>
+
+        {headerKind === "text" && (
+          <input
+            name="headerText"
+            type="text"
+            maxLength={60}
+            placeholder="Texto del encabezado"
+            className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+          />
+        )}
+
+        {["image", "video", "document"].includes(headerKind) && (
+          <div className="mt-2">
+            <input
+              name="headerFile"
+              type="file"
+              accept={headerAccept[headerKind]}
+              className="w-full text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-surface-hover file:px-3 file:py-1.5 file:text-xs file:text-foreground"
+            />
+            <p className="mt-1 text-xs text-muted">
+              Este archivo se usa como ejemplo para que Meta apruebe la plantilla, y también es el
+              que se envía cada vez que la uses.
+            </p>
+          </div>
+        )}
       </div>
 
       <div>

@@ -18,7 +18,13 @@ export type AutomationAction = {
   delay_seconds: number;
   target_agent_id: string | null;
   agent_distribution: { agent_id: string; percent: number }[] | null;
-  templates: { meta_template_name: string; language: string; body_text: string | null } | null;
+  templates: {
+    meta_template_name: string;
+    language: string;
+    body_text: string | null;
+    header_format: "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | null;
+    header_media_url: string | null;
+  } | null;
 };
 
 // Picks one agent from a weighted list (weights don't need to sum to 100 —
@@ -75,7 +81,7 @@ export async function executeAction(
     const { data: qrActions } = await supabase
       .from("quick_reply_actions")
       .select(
-        "position, action_type, message_body, tag_id, media_url, media_filename, template_id, templates(meta_template_name, language, body_text)"
+        "position, action_type, message_body, tag_id, media_url, media_filename, template_id, templates(meta_template_name, language, body_text, header_format, header_media_url)"
       )
       .eq("quick_reply_id", action.quick_reply_id)
       .order("position");
@@ -211,20 +217,32 @@ export async function executeAction(
   }
 
   if (action.action_type === "send_template" && action.template_id && action.templates) {
+    const headerFormat = action.templates.header_format;
+    const headerMedia =
+      headerFormat && headerFormat !== "TEXT" && action.templates.header_media_url
+        ? {
+            type: headerFormat.toLowerCase() as "image" | "video" | "document",
+            link: action.templates.header_media_url,
+          }
+        : undefined;
+
     const result = await sendTemplateMessage(
       account.phone_number_id,
       account.access_token,
       contact.wa_id,
       action.templates.meta_template_name,
-      action.templates.language
+      action.templates.language,
+      undefined,
+      headerMedia
     );
 
     if (conversationId) {
       await supabase.from("messages").insert({
         conversation_id: conversationId,
         direction: "out",
-        message_type: "template",
+        message_type: headerMedia ? headerMedia.type : "template",
         body: action.templates.body_text || `[Plantilla: ${action.templates.meta_template_name}]`,
+        media_url: headerMedia?.link ?? null,
         wa_message_id: result.messages[0]?.id,
         status: "sent",
         via_automation_id: automation.id,
@@ -247,7 +265,7 @@ async function fetchActions(
   const { data } = await supabase
     .from("automation_actions")
     .select(
-      "position, action_type, message_body, tag_id, media_url, media_filename, template_id, quick_reply_id, delay_seconds, target_agent_id, agent_distribution, templates(meta_template_name, language, body_text)"
+      "position, action_type, message_body, tag_id, media_url, media_filename, template_id, quick_reply_id, delay_seconds, target_agent_id, agent_distribution, templates(meta_template_name, language, body_text, header_format, header_media_url)"
     )
     .eq("automation_id", automationId)
     .order("position");

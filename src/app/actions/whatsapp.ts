@@ -455,7 +455,7 @@ export async function sendTemplateToConversation(input: {
       .single(),
     supabase
       .from("templates")
-      .select("meta_template_name, language, body_text")
+      .select("meta_template_name, language, body_text, header_format, header_media_url")
       .eq("id", input.templateId)
       .single(),
   ]);
@@ -472,21 +472,33 @@ export async function sendTemplateToConversation(input: {
 
   const contactWaId = (conversation.contacts as unknown as { wa_id: string }).wa_id;
 
+  const headerFormat = template.header_format as "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | null;
+  const headerMedia =
+    headerFormat && headerFormat !== "TEXT" && template.header_media_url
+      ? {
+          type: headerFormat.toLowerCase() as "image" | "video" | "document",
+          link: template.header_media_url,
+        }
+      : undefined;
+
   try {
     const result = await sendTemplateMessage(
       account.phone_number_id,
       account.access_token,
       contactWaId,
       template.meta_template_name,
-      template.language
+      template.language,
+      undefined,
+      headerMedia
     );
 
     await Promise.all([
       supabase.from("messages").insert({
         conversation_id: input.conversationId,
         direction: "out",
-        message_type: "template",
+        message_type: headerMedia ? headerMedia.type : "template",
         body: template.body_text || `[Plantilla: ${template.meta_template_name}]`,
+        media_url: headerMedia?.link ?? null,
         wa_message_id: result.messages[0]?.id,
         status: "sent",
       }),

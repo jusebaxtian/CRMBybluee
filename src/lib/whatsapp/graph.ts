@@ -104,13 +104,20 @@ export async function createMetaTemplate(
     language: string;
     category: "MARKETING" | "UTILITY" | "AUTHENTICATION";
     headerText?: string;
+    headerMedia?: { format: "IMAGE" | "VIDEO" | "DOCUMENT"; handle: string };
     bodyText: string;
     footerText?: string;
   }
 ): Promise<{ id: string; status: string; category: string }> {
   const components: Record<string, unknown>[] = [];
 
-  if (input.headerText) {
+  if (input.headerMedia) {
+    components.push({
+      type: "HEADER",
+      format: input.headerMedia.format,
+      example: { header_handle: [input.headerMedia.handle] },
+    });
+  } else if (input.headerText) {
     components.push({ type: "HEADER", format: "TEXT", text: input.headerText });
   }
   components.push({ type: "BODY", text: input.bodyText });
@@ -131,6 +138,42 @@ export async function createMetaTemplate(
       components,
     }),
   });
+}
+
+// Template media headers require the file to already exist on Meta's side
+// as an "example" before the template can be submitted for review — done via
+// the app-level Resumable Upload API (distinct from the phone-number media
+// endpoint used for regular chat sends). Two steps: open a session sized for
+// the file, then upload the bytes in one shot and get back a reusable handle.
+export async function uploadTemplateHeaderExample(
+  appId: string,
+  accessToken: string,
+  buffer: Buffer,
+  mimeType: string,
+  filename: string
+): Promise<string> {
+  const sessionRes = await fetch(
+    `${GRAPH_BASE}/${appId}/uploads?file_name=${encodeURIComponent(filename)}&file_length=${buffer.byteLength}&file_type=${encodeURIComponent(mimeType)}&access_token=${encodeURIComponent(accessToken)}`,
+    { method: "POST" }
+  );
+  const session = await sessionRes.json();
+  if (!sessionRes.ok || !session.id) {
+    throw new Error(session?.error?.message ?? "No se pudo iniciar la subida del archivo de ejemplo.");
+  }
+
+  const uploadRes = await fetch(`${GRAPH_BASE}/${session.id}`, {
+    method: "POST",
+    headers: {
+      Authorization: `OAuth ${accessToken}`,
+      "file_offset": "0",
+    },
+    body: new Uint8Array(buffer),
+  });
+  const uploaded = await uploadRes.json();
+  if (!uploadRes.ok || !uploaded.h) {
+    throw new Error(uploaded?.error?.message ?? "No se pudo subir el archivo de ejemplo a Meta.");
+  }
+  return uploaded.h as string;
 }
 
 // Uploads a file straight to Meta's media storage and returns its media id.
@@ -211,17 +254,25 @@ export async function sendTemplateMessage(
   to: string,
   templateName: string,
   language: string,
-  bodyParams?: string[]
+  bodyParams?: string[],
+  headerMedia?: { type: "image" | "video" | "document"; link: string }
 ): Promise<{ messages: { id: string }[] }> {
   const template: Record<string, unknown> = { name: templateName, language: { code: language } };
-  if (bodyParams && bodyParams.length > 0) {
-    template.components = [
-      {
-        type: "body",
-        parameters: bodyParams.map((text) => ({ type: "text", text })),
-      },
-    ];
+  const components: Record<string, unknown>[] = [];
+
+  if (headerMedia) {
+    components.push({
+      type: "header",
+      parameters: [{ type: headerMedia.type, [headerMedia.type]: { link: headerMedia.link } }],
+    });
   }
+  if (bodyParams && bodyParams.length > 0) {
+    components.push({
+      type: "body",
+      parameters: bodyParams.map((text) => ({ type: "text", text })),
+    });
+  }
+  if (components.length > 0) template.components = components;
 
   return graphFetch(`/${phoneNumberId}/messages`, {
     method: "POST",

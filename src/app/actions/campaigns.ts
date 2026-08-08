@@ -178,12 +178,31 @@ export async function sendCampaign(campaignId: string) {
 
   const { data: campaign } = await supabase
     .from("campaigns")
-    .select("id, send_type, message_body, media_url, media_filename, templates(meta_template_name, language)")
+    .select(
+      "id, send_type, message_body, media_url, media_filename, templates(meta_template_name, language, body_text, header_format, header_media_url, header_media_mime_type)"
+    )
     .eq("id", campaignId)
     .single();
   if (!campaign) return { error: "Campaña no encontrada." };
 
-  const template = campaign.templates as unknown as { meta_template_name: string; language: string } | null;
+  const template = campaign.templates as unknown as {
+    meta_template_name: string;
+    language: string;
+    body_text: string | null;
+    header_format: "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | null;
+    header_media_url: string | null;
+    header_media_mime_type: string | null;
+  } | null;
+
+  const templateHeaderMedia =
+    template?.header_format &&
+    template.header_format !== "TEXT" &&
+    template.header_media_url
+      ? {
+          type: template.header_format.toLowerCase() as "image" | "video" | "document",
+          link: template.header_media_url,
+        }
+      : undefined;
 
   const { data: account } = await supabase
     .from("whatsapp_accounts")
@@ -228,13 +247,36 @@ export async function sendCampaign(campaignId: string) {
           account.access_token,
           waId,
           template.meta_template_name,
-          template.language
+          template.language,
+          undefined,
+          templateHeaderMedia
         );
+
+        // This insert was missing entirely before — the template send
+        // reached Meta and campaign_recipients showed "sent", but nothing
+        // ever appeared in the conversation because no message row existed.
+        const conversationId = await getOrCreateConversation(supabase, workspaceId, recipient.contact_id);
+        if (conversationId) {
+          await supabase.from("messages").insert({
+            conversation_id: conversationId,
+            direction: "out",
+            message_type: templateHeaderMedia ? templateHeaderMedia.type : "template",
+            body: template.body_text,
+            media_url: templateHeaderMedia?.link ?? null,
+            wa_message_id: result.messages[0]?.id,
+            status: "sent",
+            exclude_from_followups: true,
+          });
+          await supabase
+            .from("conversations")
+            .update({ last_message_at: new Date().toISOString() })
+            .eq("id", conversationId);
+        }
+
         await supabase
           .from("campaign_recipients")
           .update({ status: "sent", sent_at: new Date().toISOString() })
           .eq("id", recipient.id);
-        void result;
       } else {
         // Free-form send — re-check the window right before sending, since
         // it may have closed since the campaign was created.
