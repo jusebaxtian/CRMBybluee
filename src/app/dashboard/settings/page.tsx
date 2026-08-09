@@ -76,7 +76,9 @@ export default async function SettingsPage() {
     const { data: aiAgent } = workspaceId
       ? await supabase
           .from("ai_agents")
-          .select("provider, model, agent_name, persona, is_active")
+          .select(
+            "provider, model, agent_name, persona, is_active, followup_enabled, followup_delay_minutes, followup_max_attempts, followup_template_id"
+          )
           .eq("workspace_id", workspaceId)
           .maybeSingle()
       : { data: null };
@@ -89,7 +91,18 @@ export default async function SettingsPage() {
           .order("created_at")
       : { data: [] };
 
-    aiAgentSection = <AiAgentPanel agent={aiAgent} mediaItems={aiAgentMedia ?? []} />;
+    const { data: followupTemplates } = workspaceId
+      ? await supabase
+          .from("templates")
+          .select("id, meta_template_name, language")
+          .eq("workspace_id", workspaceId)
+          .eq("status", "APPROVED")
+          .order("meta_template_name")
+      : { data: [] };
+
+    aiAgentSection = (
+      <AiAgentPanel agent={aiAgent} mediaItems={aiAgentMedia ?? []} templates={followupTemplates ?? []} />
+    );
   }
 
   return (

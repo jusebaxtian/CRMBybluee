@@ -19,9 +19,22 @@ export async function saveAiAgent(_prevState: unknown, formData: FormData) {
   const model = String(formData.get("model") ?? "").trim() || defaultModel[provider];
   const agentName = String(formData.get("agentName") ?? "").trim() || "Asistente";
   const persona = String(formData.get("persona") ?? "").trim();
+  const followupEnabled = formData.get("followupEnabled") === "on";
+  const followupDelayMinutes = Math.max(
+    1,
+    Math.round(Number(formData.get("followupDelayHours") ?? 24) * 60)
+  );
+  const followupMaxAttempts = Math.max(1, parseInt(String(formData.get("followupMaxAttempts") ?? "1"), 10) || 1);
+  const followupTemplateId = String(formData.get("followupTemplateId") ?? "").trim() || null;
 
   if (provider !== "openai" && provider !== "anthropic") {
     return { error: "Selecciona un proveedor válido." };
+  }
+  if (followupEnabled && !followupTemplateId) {
+    return {
+      error:
+        "Elige una plantilla de seguimiento — se usa cuando pasan más de 24h sin respuesta y WhatsApp exige una plantilla aprobada.",
+    };
   }
 
   const supabase = await createClient();
@@ -66,6 +79,10 @@ export async function saveAiAgent(_prevState: unknown, formData: FormData) {
     model,
     agent_name: agentName,
     persona,
+    followup_enabled: followupEnabled,
+    followup_delay_minutes: followupDelayMinutes,
+    followup_max_attempts: followupMaxAttempts,
+    followup_template_id: followupTemplateId,
     updated_at: new Date().toISOString(),
   });
   if (error) return { error: error.message };

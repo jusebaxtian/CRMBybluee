@@ -13,6 +13,10 @@ type AiAgent = {
   agent_name: string;
   persona: string;
   is_active: boolean;
+  followup_enabled?: boolean;
+  followup_delay_minutes?: number;
+  followup_max_attempts?: number;
+  followup_template_id?: string | null;
 } | null;
 
 type MediaItem = {
@@ -24,17 +28,26 @@ type MediaItem = {
   media_url: string;
 };
 
+type TemplateOption = {
+  id: string;
+  meta_template_name: string;
+  language: string;
+};
+
 export function AiAgentPanel({
   agent,
   mediaItems = [],
+  templates = [],
 }: {
   agent: AiAgent;
   mediaItems?: MediaItem[];
+  templates?: TemplateOption[];
 }) {
   const [state, action, pending] = useActionState(saveAiAgent, undefined);
   const [provider, setProvider] = useState<"openai" | "anthropic">(agent?.provider ?? "openai");
   const [active, setActive] = useState(agent?.is_active ?? false);
   const [togglePending, setTogglePending] = useState(false);
+  const [followupEnabled, setFollowupEnabled] = useState(agent?.followup_enabled ?? false);
 
   async function handleToggle() {
     setTogglePending(true);
@@ -168,6 +181,79 @@ export function AiAgentPanel({
           <p className="mt-1 text-[11px] text-muted">
             Entre más detalle des (productos, precios, políticas, tono), mejor va a vender.
           </p>
+        </div>
+
+        <div className="rounded-lg border border-border p-4">
+          <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <input
+              type="checkbox"
+              name="followupEnabled"
+              checked={followupEnabled}
+              onChange={(e) => setFollowupEnabled(e.target.checked)}
+              className="h-4 w-4 rounded border-border"
+            />
+            Seguimientos automáticos
+          </label>
+          <p className="mt-1 text-[11px] text-muted">
+            Si el cliente no responde, la IA escribe un seguimiento por su cuenta. Dentro de las 24h
+            desde el último mensaje del cliente escribe texto libre; pasadas las 24h, WhatsApp exige
+            usar una plantilla aprobada.
+          </p>
+
+          {followupEnabled && (
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted">
+                  Esperar sin respuesta (horas)
+                </label>
+                <input
+                  name="followupDelayHours"
+                  type="number"
+                  min={1}
+                  step={0.5}
+                  defaultValue={
+                    agent?.followup_delay_minutes ? agent.followup_delay_minutes / 60 : 24
+                  }
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted">
+                  Máximo de intentos
+                </label>
+                <input
+                  name="followupMaxAttempts"
+                  type="number"
+                  min={1}
+                  max={10}
+                  defaultValue={agent?.followup_max_attempts ?? 1}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-xs font-medium text-muted">
+                  Plantilla para reabrir tras 24h
+                </label>
+                <select
+                  name="followupTemplateId"
+                  defaultValue={agent?.followup_template_id ?? ""}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+                >
+                  <option value="">Selecciona una plantilla aprobada</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.meta_template_name} ({t.language})
+                    </option>
+                  ))}
+                </select>
+                {templates.length === 0 && (
+                  <p className="mt-1 text-[11px] text-red-400">
+                    No tienes plantillas aprobadas todavía — crea una en Plantillas.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
       </form>

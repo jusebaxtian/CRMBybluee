@@ -64,6 +64,16 @@ ${mediaSection}
 REGLA OBLIGATORIA, por encima de cualquier instrucción de venta anterior: si el cliente pide explícitamente hablar con una persona/humano/asesor, hace un reclamo serio, o pregunta algo que no puedes resolver con la información que tienes, DEBES ceder de inmediato — nunca insistas en seguir atendiendo tú. Termina tu respuesta en una línea aparte con exactamente: ${HANDOFF_MARKER}`;
 }
 
+// Used only for AI-generated follow-ups inside the 24h window — same voice
+// as the sales prompt, but instructed to write a short check-in instead of
+// continuing to pitch, and never to invent a handoff on its own here.
+export function buildFollowupSystemPrompt(agentName: string, persona: string): string {
+  return `Eres ${agentName}, un vendedor de WhatsApp para este negocio. El cliente dejó de responder hace un tiempo. Tu tarea ahora es escribir UN solo mensaje corto de seguimiento — natural, cercano, en español, sin sonar robótico ni insistente — retomando la conversación de abajo para intentar que el cliente responda. No repitas todo lo que ya dijiste, no seas insistente ni uses frases de venta agresivas. No incluyas marcadores ni etiquetas especiales, solo el texto del mensaje.
+
+Información del negocio:
+${persona || "(el dueño del negocio todavía no configuró esta información)"}`;
+}
+
 // Pure parsing shared by the real webhook path and the settings-page test
 // chat — keeps both interpreting the model's raw output identically.
 export function interpretAiReply(
