@@ -19,6 +19,7 @@ export default async function NewFollowupSequencePage() {
     .from("templates")
     .select("id, meta_template_name, language, status")
     .eq("workspace_id", workspaceId ?? "")
+    .neq("status", "DELETED")
     .order("meta_template_name");
 
   const { data: quickReplies } = await supabase

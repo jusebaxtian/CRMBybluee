@@ -48,6 +48,28 @@ export async function syncTemplates() {
       );
     }
 
+    // Templates removed directly in Meta (or deleted here but orphaned by a
+    // failed follow-up) never disappear on their own — prune anything local
+    // that Meta no longer reports for this WABA.
+    const metaNames = new Set(metaTemplates.map((t) => `${t.name}::${t.language}`));
+    const { data: localTemplates } = await supabase
+      .from("templates")
+      .select("id, meta_template_name, language")
+      .eq("workspace_id", workspaceId);
+
+    const staleIds = (localTemplates ?? [])
+      .filter((t) => !metaNames.has(`${t.meta_template_name}::${t.language}`))
+      .map((t) => t.id);
+    if (staleIds.length > 0) {
+      const { error: deleteError } = await supabase.from("templates").delete().in("id", staleIds);
+      if (deleteError) {
+        // Some of the stale rows are referenced by past campaigns and can't
+        // be hard-deleted — mark those as removed instead so they stop
+        // showing a stale APPROVED status.
+        await supabase.from("templates").update({ status: "DELETED" }).in("id", staleIds);
+      }
+    }
+
     revalidatePath("/dashboard/templates");
     return { success: true, count: metaTemplates.length };
   } catch (err) {
@@ -203,7 +225,13 @@ export async function deleteTemplate(templateId: string) {
     return { error: err instanceof Error ? err.message : "No se pudo eliminar la plantilla en Meta." };
   }
 
-  await supabase.from("templates").delete().eq("id", templateId);
+  // Campaigns keep a reference to the template they were sent with, so a
+  // template that was ever used in one can't be hard-deleted — fall back to
+  // marking it removed so it stops showing as usable.
+  const { error: deleteError } = await supabase.from("templates").delete().eq("id", templateId);
+  if (deleteError) {
+    await supabase.from("templates").update({ status: "DELETED" }).eq("id", templateId);
+  }
 
   revalidatePath("/dashboard/templates");
   return { success: true };

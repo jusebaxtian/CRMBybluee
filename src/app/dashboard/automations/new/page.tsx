@@ -18,6 +18,7 @@ export default async function NewAutomationPage() {
     .from("templates")
     .select("id, meta_template_name, language, status")
     .eq("workspace_id", workspaceId ?? "")
+    .neq("status", "DELETED")
     .order("meta_template_name");
 
   const agents = await listWorkspaceAgents(supabase, workspaceId);

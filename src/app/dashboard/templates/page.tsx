@@ -11,6 +11,7 @@ const statusColor: Record<string, string> = {
   APPROVED: "text-success border-success",
   PENDING: "text-warning border-warning",
   REJECTED: "text-red-400 border-red-400",
+  DELETED: "text-muted border-border line-through",
 };
 
 export default async function TemplatesPage() {
@@ -74,9 +75,11 @@ export default async function TemplatesPage() {
               {t.body_text && (
                 <p className="mt-3 text-sm text-foreground">{t.body_text}</p>
               )}
-              <div className="mt-3">
-                <DeleteTemplateButton templateId={t.id} templateName={t.meta_template_name} />
-              </div>
+              {t.status !== "DELETED" && (
+                <div className="mt-3">
+                  <DeleteTemplateButton templateId={t.id} templateName={t.meta_template_name} />
+                </div>
+              )}
             </div>
           ))}
         </div>
