@@ -7,6 +7,8 @@ import { AiAgentMediaLibrary } from "@/components/ai-agent-media-library";
 import { AiAgentTestChat } from "@/components/ai-agent-test-chat";
 import { Button } from "@/components/ui/button";
 
+type FollowupStep = { delay_minutes: number; focus: string };
+
 type AiAgent = {
   provider: "openai" | "anthropic";
   model: string;
@@ -14,8 +16,7 @@ type AiAgent = {
   persona: string;
   is_active: boolean;
   followup_enabled?: boolean;
-  followup_delay_minutes?: number;
-  followup_max_attempts?: number;
+  followup_steps?: FollowupStep[];
   followup_template_id?: string | null;
 } | null;
 
@@ -34,14 +35,34 @@ type TemplateOption = {
   language: string;
 };
 
+type DelayUnit = "minutes" | "hours" | "days";
+type StepDraft = { delayValue: number; delayUnit: DelayUnit; focus: string };
+
+const MINUTES_PER_UNIT: Record<DelayUnit, number> = { minutes: 1, hours: 60, days: 1440 };
+
 // Picks the cleanest unit to show an existing delay in (e.g. 2880 minutes
 // reads better as "2 días" than "2880 minutos").
-function minutesToDisplay(minutes: number | undefined): { value: number; unit: "minutes" | "hours" | "days" } {
-  const m = minutes ?? 1440;
-  if (m % 1440 === 0) return { value: m / 1440, unit: "days" };
-  if (m % 60 === 0) return { value: m / 60, unit: "hours" };
-  return { value: m, unit: "minutes" };
+function minutesToParts(minutes: number): { value: number; unit: DelayUnit } {
+  if (minutes % 1440 === 0) return { value: minutes / 1440, unit: "days" };
+  if (minutes % 60 === 0) return { value: minutes / 60, unit: "hours" };
+  return { value: minutes, unit: "minutes" };
 }
+
+const DEFAULT_STEPS: StepDraft[] = [
+  { delayValue: 5, delayUnit: "minutes", focus: "Invitar al cliente a unirse al grupo/comunidad." },
+  { delayValue: 1, delayUnit: "hours", focus: "Enviar testimonios de otros clientes satisfechos." },
+  {
+    delayValue: 3,
+    delayUnit: "hours",
+    focus: "Persuadir tocando el dolor/problema del cliente y generar deseo de resolverlo.",
+  },
+  {
+    delayValue: 24,
+    delayUnit: "hours",
+    focus:
+      "Generar deseo de seguir la conversación haciendo una pregunta con la que el cliente se identifique.",
+  },
+];
 
 export function AiAgentPanel({
   agent,
@@ -57,7 +78,28 @@ export function AiAgentPanel({
   const [active, setActive] = useState(agent?.is_active ?? false);
   const [togglePending, setTogglePending] = useState(false);
   const [followupEnabled, setFollowupEnabled] = useState(agent?.followup_enabled ?? false);
-  const defaultDelay = minutesToDisplay(agent?.followup_delay_minutes);
+  const [steps, setSteps] = useState<StepDraft[]>(() => {
+    if (agent?.followup_steps && agent.followup_steps.length > 0) {
+      return agent.followup_steps.map((s) => {
+        const { value, unit } = minutesToParts(s.delay_minutes);
+        return { delayValue: value, delayUnit: unit, focus: s.focus };
+      });
+    }
+    return DEFAULT_STEPS;
+  });
+
+  function updateStep(index: number, patch: Partial<StepDraft>) {
+    setSteps((prev) => prev.map((s, i) => (i === index ? { ...s, ...patch } : s)));
+  }
+  function addStep() {
+    setSteps((prev) => [...prev, { delayValue: 1, delayUnit: "hours", focus: "" }]);
+  }
+  function removeStep(index: number) {
+    setSteps((prev) => prev.filter((_, i) => i !== index));
+  }
+  const stepsJson = JSON.stringify(
+    steps.map((s) => ({ delay_minutes: s.delayValue * MINUTES_PER_UNIT[s.delayUnit], focus: s.focus }))
+  );
 
   async function handleToggle() {
     setTogglePending(true);
@@ -211,45 +253,74 @@ export function AiAgentPanel({
           </p>
 
           {followupEnabled && (
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="mt-4 flex flex-col gap-4">
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted">
-                  Esperar sin respuesta
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    name="followupDelayValue"
-                    type="number"
-                    min={1}
-                    step={1}
-                    defaultValue={defaultDelay.value}
-                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-                  />
-                  <select
-                    name="followupDelayUnit"
-                    defaultValue={defaultDelay.unit}
-                    className="rounded-md border border-border bg-background px-2 py-2 text-sm text-foreground outline-none focus:border-primary"
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="text-xs font-medium text-muted">
+                    Pasos del seguimiento (en orden)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={addStep}
+                    className="text-xs font-medium text-primary hover:underline"
                   >
-                    <option value="minutes">Minutos</option>
-                    <option value="hours">Horas</option>
-                    <option value="days">Días</option>
-                  </select>
+                    + Agregar paso
+                  </button>
                 </div>
+                <div className="flex flex-col gap-3">
+                  {steps.map((step, i) => (
+                    <div key={i} className="rounded-md border border-border p-3">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted">Paso {i + 1}</span>
+                        {steps.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeStep(i)}
+                            className="text-[11px] text-red-400 hover:underline"
+                          >
+                            Quitar
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <div className="flex shrink-0 gap-2">
+                          <input
+                            type="number"
+                            min={1}
+                            step={1}
+                            value={step.delayValue}
+                            onChange={(e) => updateStep(i, { delayValue: Number(e.target.value) })}
+                            className="w-20 rounded-md border border-border bg-background px-2 py-2 text-sm text-foreground outline-none focus:border-primary"
+                          />
+                          <select
+                            value={step.delayUnit}
+                            onChange={(e) => updateStep(i, { delayUnit: e.target.value as DelayUnit })}
+                            className="rounded-md border border-border bg-background px-2 py-2 text-sm text-foreground outline-none focus:border-primary"
+                          >
+                            <option value="minutes">Minutos</option>
+                            <option value="hours">Horas</option>
+                            <option value="days">Días</option>
+                          </select>
+                        </div>
+                        <input
+                          type="text"
+                          value={step.focus}
+                          onChange={(e) => updateStep(i, { focus: e.target.value })}
+                          placeholder="Enfoque de este seguimiento (ej: invitar al grupo, enviar testimonios...)"
+                          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-2 text-[11px] text-muted">
+                  Cada paso se cuenta desde que el cliente dejó de responder (no desde el paso
+                  anterior). La IA redacta el mensaje siguiendo ese enfoque.
+                </p>
+                <input type="hidden" name="followupSteps" value={stepsJson} />
               </div>
+
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted">
-                  Máximo de intentos
-                </label>
-                <input
-                  name="followupMaxAttempts"
-                  type="number"
-                  min={1}
-                  max={10}
-                  defaultValue={agent?.followup_max_attempts ?? 1}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-                />
-              </div>
-              <div className="sm:col-span-2">
                 <label className="mb-1 block text-xs font-medium text-muted">
                   Plantilla para reabrir tras 24h
                 </label>
@@ -265,6 +336,11 @@ export function AiAgentPanel({
                     </option>
                   ))}
                 </select>
+                <p className="mt-1 text-[11px] text-muted">
+                  WhatsApp exige una plantilla aprobada para reabrir la conversación pasadas las 24h
+                  sin respuesta del cliente — este es el mensaje que se usa en ese caso, sin importar
+                  cuál paso corresponda.
+                </p>
                 {templates.length === 0 && (
                   <p className="mt-1 text-[11px] text-red-400">
                     No tienes plantillas aprobadas todavía — crea una en Plantillas.

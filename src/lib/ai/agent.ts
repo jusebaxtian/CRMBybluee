@@ -67,8 +67,10 @@ REGLA OBLIGATORIA, por encima de cualquier instrucción de venta anterior: si el
 // Used only for AI-generated follow-ups inside the 24h window — same voice
 // as the sales prompt, but instructed to write a short check-in instead of
 // continuing to pitch, and never to invent a handoff on its own here.
-export function buildFollowupSystemPrompt(agentName: string, persona: string): string {
+export function buildFollowupSystemPrompt(agentName: string, persona: string, focus: string): string {
   return `Eres ${agentName}, un vendedor de WhatsApp para este negocio. El cliente dejó de responder hace un tiempo. Tu tarea ahora es escribir UN solo mensaje corto de seguimiento — natural, cercano, en español, sin sonar robótico ni insistente — retomando la conversación de abajo para intentar que el cliente responda. No repitas todo lo que ya dijiste, no seas insistente ni uses frases de venta agresivas. No incluyas marcadores ni etiquetas especiales, solo el texto del mensaje.
+
+Enfoque de ESTE seguimiento en particular (síguelo, es la estrategia para este intento): ${focus || "retomar el contacto de forma natural"}
 
 Información del negocio:
 ${persona || "(el dueño del negocio todavía no configuró esta información)"}`;

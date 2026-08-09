@@ -20,18 +20,30 @@ export async function saveAiAgent(_prevState: unknown, formData: FormData) {
   const agentName = String(formData.get("agentName") ?? "").trim() || "Asistente";
   const persona = String(formData.get("persona") ?? "").trim();
   const followupEnabled = formData.get("followupEnabled") === "on";
-  const followupDelayUnit = String(formData.get("followupDelayUnit") ?? "hours");
-  const followupDelayValue = Number(formData.get("followupDelayValue") ?? 24);
-  const minutesPerUnit: Record<string, number> = { minutes: 1, hours: 60, days: 1440 };
-  const followupDelayMinutes = Math.max(
-    1,
-    Math.round(followupDelayValue * (minutesPerUnit[followupDelayUnit] ?? 60))
-  );
-  const followupMaxAttempts = Math.max(1, parseInt(String(formData.get("followupMaxAttempts") ?? "1"), 10) || 1);
   const followupTemplateId = String(formData.get("followupTemplateId") ?? "").trim() || null;
+
+  let followupSteps: { delay_minutes: number; focus: string }[] = [];
+  const followupStepsRaw = String(formData.get("followupSteps") ?? "[]");
+  try {
+    const parsed = JSON.parse(followupStepsRaw);
+    if (Array.isArray(parsed)) {
+      followupSteps = parsed
+        .map((s) => ({
+          delay_minutes: Math.max(1, Math.round(Number(s.delay_minutes))),
+          focus: String(s.focus ?? "").trim(),
+        }))
+        .filter((s) => Number.isFinite(s.delay_minutes) && s.focus.length > 0)
+        .sort((a, b) => a.delay_minutes - b.delay_minutes);
+    }
+  } catch {
+    followupSteps = [];
+  }
 
   if (provider !== "openai" && provider !== "anthropic") {
     return { error: "Selecciona un proveedor válido." };
+  }
+  if (followupEnabled && followupSteps.length === 0) {
+    return { error: "Agrega al menos un paso de seguimiento (tiempo de espera + enfoque)." };
   }
   if (followupEnabled && !followupTemplateId) {
     return {
@@ -83,8 +95,7 @@ export async function saveAiAgent(_prevState: unknown, formData: FormData) {
     agent_name: agentName,
     persona,
     followup_enabled: followupEnabled,
-    followup_delay_minutes: followupDelayMinutes,
-    followup_max_attempts: followupMaxAttempts,
+    followup_steps: followupSteps,
     followup_template_id: followupTemplateId,
     updated_at: new Date().toISOString(),
   });
