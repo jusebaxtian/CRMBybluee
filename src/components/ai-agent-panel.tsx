@@ -34,6 +34,15 @@ type TemplateOption = {
   language: string;
 };
 
+// Picks the cleanest unit to show an existing delay in (e.g. 2880 minutes
+// reads better as "2 días" than "2880 minutos").
+function minutesToDisplay(minutes: number | undefined): { value: number; unit: "minutes" | "hours" | "days" } {
+  const m = minutes ?? 1440;
+  if (m % 1440 === 0) return { value: m / 1440, unit: "days" };
+  if (m % 60 === 0) return { value: m / 60, unit: "hours" };
+  return { value: m, unit: "minutes" };
+}
+
 export function AiAgentPanel({
   agent,
   mediaItems = [],
@@ -48,6 +57,7 @@ export function AiAgentPanel({
   const [active, setActive] = useState(agent?.is_active ?? false);
   const [togglePending, setTogglePending] = useState(false);
   const [followupEnabled, setFollowupEnabled] = useState(agent?.followup_enabled ?? false);
+  const defaultDelay = minutesToDisplay(agent?.followup_delay_minutes);
 
   async function handleToggle() {
     setTogglePending(true);
@@ -204,18 +214,27 @@ export function AiAgentPanel({
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted">
-                  Esperar sin respuesta (horas)
+                  Esperar sin respuesta
                 </label>
-                <input
-                  name="followupDelayHours"
-                  type="number"
-                  min={1}
-                  step={0.5}
-                  defaultValue={
-                    agent?.followup_delay_minutes ? agent.followup_delay_minutes / 60 : 24
-                  }
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-                />
+                <div className="flex gap-2">
+                  <input
+                    name="followupDelayValue"
+                    type="number"
+                    min={1}
+                    step={1}
+                    defaultValue={defaultDelay.value}
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+                  />
+                  <select
+                    name="followupDelayUnit"
+                    defaultValue={defaultDelay.unit}
+                    className="rounded-md border border-border bg-background px-2 py-2 text-sm text-foreground outline-none focus:border-primary"
+                  >
+                    <option value="minutes">Minutos</option>
+                    <option value="hours">Horas</option>
+                    <option value="days">Días</option>
+                  </select>
+                </div>
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted">

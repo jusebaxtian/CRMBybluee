@@ -20,9 +20,12 @@ export async function saveAiAgent(_prevState: unknown, formData: FormData) {
   const agentName = String(formData.get("agentName") ?? "").trim() || "Asistente";
   const persona = String(formData.get("persona") ?? "").trim();
   const followupEnabled = formData.get("followupEnabled") === "on";
+  const followupDelayUnit = String(formData.get("followupDelayUnit") ?? "hours");
+  const followupDelayValue = Number(formData.get("followupDelayValue") ?? 24);
+  const minutesPerUnit: Record<string, number> = { minutes: 1, hours: 60, days: 1440 };
   const followupDelayMinutes = Math.max(
     1,
-    Math.round(Number(formData.get("followupDelayHours") ?? 24) * 60)
+    Math.round(followupDelayValue * (minutesPerUnit[followupDelayUnit] ?? 60))
   );
   const followupMaxAttempts = Math.max(1, parseInt(String(formData.get("followupMaxAttempts") ?? "1"), 10) || 1);
   const followupTemplateId = String(formData.get("followupTemplateId") ?? "").trim() || null;
