@@ -3,7 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createMetaTemplate, listTemplates, uploadTemplateHeaderExample } from "@/lib/whatsapp/graph";
+import {
+  createMetaTemplate,
+  deleteMetaTemplate,
+  listTemplates,
+  uploadTemplateHeaderExample,
+} from "@/lib/whatsapp/graph";
 import { getWorkspaceId } from "@/lib/workspace";
 import { validateMediaFile } from "@/lib/whatsapp/media-limits";
 
@@ -170,4 +175,36 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Error desconocido." };
   }
+}
+
+export async function deleteTemplate(templateId: string) {
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+
+  const { data: template } = await supabase
+    .from("templates")
+    .select("meta_template_name")
+    .eq("id", templateId)
+    .eq("workspace_id", workspaceId)
+    .single();
+  if (!template) return { error: "Plantilla no encontrada." };
+
+  const { data: account } = await supabase
+    .from("whatsapp_accounts")
+    .select("waba_id, access_token")
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (!account) return { error: "Este workspace no tiene WhatsApp conectado." };
+
+  try {
+    await deleteMetaTemplate(account.waba_id, account.access_token, template.meta_template_name);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "No se pudo eliminar la plantilla en Meta." };
+  }
+
+  await supabase.from("templates").delete().eq("id", templateId);
+
+  revalidatePath("/dashboard/templates");
+  return { success: true };
 }

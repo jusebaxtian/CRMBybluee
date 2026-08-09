@@ -140,6 +140,17 @@ export async function createMetaTemplate(
   });
 }
 
+export async function deleteMetaTemplate(
+  wabaId: string,
+  accessToken: string,
+  templateName: string
+): Promise<void> {
+  await graphFetch(`/${wabaId}/message_templates?name=${encodeURIComponent(templateName)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+}
+
 // Template media headers require the file to already exist on Meta's side
 // as an "example" before the template can be submitted for review — done via
 // the app-level Resumable Upload API (distinct from the phone-number media

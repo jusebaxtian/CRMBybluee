@@ -5,6 +5,7 @@ import { CreateTemplateForm } from "@/components/create-template-form";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule, getEnabledModuleKeys } from "@/lib/entitlements";
 import { CampaignsTabs } from "@/components/campaigns-tabs";
+import { DeleteTemplateButton } from "@/components/delete-template-button";
 
 const statusColor: Record<string, string> = {
   APPROVED: "text-success border-success",
@@ -73,6 +74,9 @@ export default async function TemplatesPage() {
               {t.body_text && (
                 <p className="mt-3 text-sm text-foreground">{t.body_text}</p>
               )}
+              <div className="mt-3">
+                <DeleteTemplateButton templateId={t.id} templateName={t.meta_template_name} />
+              </div>
             </div>
           ))}
         </div>
