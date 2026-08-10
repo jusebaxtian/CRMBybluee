@@ -326,6 +326,15 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           .eq("wa_message_id", status.id)
           .select("conversation_id");
 
+        // Campaign sends are only ever marked "sent" at API-accept time —
+        // this is what later corrects that to the real outcome (delivered,
+        // read, or a genuine failure like Meta's ecosystem-health throttling)
+        // once the async status webhook actually confirms it.
+        await supabase
+          .from("campaign_recipients")
+          .update({ status: status.status, error_message: errorDetail })
+          .eq("wa_message_id", status.id);
+
         const conversationId = updatedMessages?.[0]?.conversation_id;
         if (!conversationId) continue;
 

@@ -275,7 +275,11 @@ export async function sendCampaign(campaignId: string) {
 
         await supabase
           .from("campaign_recipients")
-          .update({ status: "sent", sent_at: new Date().toISOString() })
+          .update({
+            status: "sent",
+            sent_at: new Date().toISOString(),
+            wa_message_id: result.messages[0]?.id,
+          })
           .eq("id", recipient.id);
       } else {
         // Free-form send — re-check the window right before sending, since
@@ -337,7 +341,11 @@ export async function sendCampaign(campaignId: string) {
 
         await supabase
           .from("campaign_recipients")
-          .update({ status: "sent", sent_at: new Date().toISOString() })
+          .update({
+            status: "sent",
+            sent_at: new Date().toISOString(),
+            wa_message_id: result.messages[0]?.id,
+          })
           .eq("id", recipient.id);
       }
     } catch (err) {
