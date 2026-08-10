@@ -11,17 +11,20 @@ export function EditTagButton({
   tagName,
   tagColor,
   excludesFollowups,
+  marksPurchase = false,
 }: {
   tagId: string;
   tagName: string;
   tagColor: string;
   excludesFollowups: boolean;
+  marksPurchase?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(tagName);
   const [color, setColor] = useState(tagColor);
   const [excludes, setExcludes] = useState(excludesFollowups);
+  const [marksPurchaseState, setMarksPurchaseState] = useState(marksPurchase);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,6 +32,7 @@ export function EditTagButton({
     setName(tagName);
     setColor(tagColor);
     setExcludes(excludesFollowups);
+    setMarksPurchaseState(marksPurchase);
     setError(null);
     setOpen(true);
   }
@@ -36,7 +40,12 @@ export function EditTagButton({
   async function handleSave() {
     setPending(true);
     setError(null);
-    const result = await updateTag(tagId, { name, color, excludesFollowups: excludes });
+    const result = await updateTag(tagId, {
+      name,
+      color,
+      excludesFollowups: excludes,
+      marksPurchase: marksPurchaseState,
+    });
     setPending(false);
     if (result?.error) {
       setError(result.error);
@@ -85,6 +94,15 @@ export function EditTagButton({
                 className="mt-0.5 accent-primary"
               />
               Excluir de automatizaciones, IA y seguimientos (ej: &quot;Ya compró&quot;, &quot;No interesados&quot;)
+            </label>
+            <label className="mb-3 flex items-start gap-1.5 text-xs text-muted">
+              <input
+                type="checkbox"
+                checked={marksPurchaseState}
+                onChange={(e) => setMarksPurchaseState(e.target.checked)}
+                className="mt-0.5 accent-primary"
+              />
+              Reportar compra a Meta Ads (Conversions API) al usar esta etiqueta
             </label>
             {error && <p className="mb-2 text-xs text-red-400">{error}</p>}
             <div className="flex justify-end gap-2">

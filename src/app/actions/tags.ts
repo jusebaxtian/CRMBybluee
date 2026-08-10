@@ -4,11 +4,13 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
 import { runTagAddedAutomations } from "@/lib/automations/engine";
+import { maybeTrackPurchaseFromTag } from "@/lib/meta/conversions";
 
 export async function createTag(_prevState: unknown, formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const color = String(formData.get("color") ?? "#1ba84a");
   const excludesFollowups = formData.get("excludesFollowups") === "on";
+  const marksPurchase = formData.get("marksPurchase") === "on";
   if (!name) return { error: "El nombre es obligatorio." };
 
   const supabase = await createClient();
@@ -20,6 +22,7 @@ export async function createTag(_prevState: unknown, formData: FormData) {
     name,
     color,
     excludes_followups: excludesFollowups,
+    marks_purchase: marksPurchase,
   });
 
   if (error) return { error: error.message };
@@ -30,7 +33,7 @@ export async function createTag(_prevState: unknown, formData: FormData) {
 
 export async function updateTag(
   tagId: string,
-  input: { name: string; color: string; excludesFollowups: boolean }
+  input: { name: string; color: string; excludesFollowups: boolean; marksPurchase?: boolean }
 ) {
   const name = input.name.trim();
   const color = input.color.trim();
@@ -42,7 +45,12 @@ export async function updateTag(
 
   const { error } = await supabase
     .from("tags")
-    .update({ name, color, excludes_followups: input.excludesFollowups })
+    .update({
+      name,
+      color,
+      excludes_followups: input.excludesFollowups,
+      ...(input.marksPurchase !== undefined ? { marks_purchase: input.marksPurchase } : {}),
+    })
     .eq("id", tagId)
     .eq("workspace_id", workspaceId);
   if (error) return { error: error.message };
@@ -63,6 +71,17 @@ export async function toggleTagExcludesFollowups(tagId: string, excludesFollowup
     .from("tags")
     .update({ excludes_followups: excludesFollowups })
     .eq("id", tagId);
+  if (error) return { error: error.message };
+  revalidatePath("/dashboard/tags");
+  return { success: true as const };
+}
+
+// Contacts tagged with a "marks_purchase" tag (e.g. "Compró") report a
+// Purchase event back to Meta's Conversions API using their conversation's
+// ctwa_clid, if they came from a Click-to-WhatsApp ad — see src/lib/meta/conversions.ts.
+export async function toggleTagMarksPurchase(tagId: string, marksPurchase: boolean) {
+  const supabase = await createClient();
+  const { error } = await supabase.from("tags").update({ marks_purchase: marksPurchase }).eq("id", tagId);
   if (error) return { error: error.message };
   revalidatePath("/dashboard/tags");
   return { success: true as const };
@@ -90,6 +109,7 @@ export async function toggleContactTag(input: {
     const workspaceId = await getWorkspaceId(supabase);
     if (workspaceId) {
       await runTagAddedAutomations(supabase, workspaceId, input.contactId, input.tagId);
+      await maybeTrackPurchaseFromTag(supabase, workspaceId, input.contactId, input.tagId);
     }
   } else {
     await supabase

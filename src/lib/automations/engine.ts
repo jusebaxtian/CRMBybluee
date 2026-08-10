@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendTextMessage, sendMediaMessage, sendTemplateMessage, uploadMedia } from "@/lib/whatsapp/graph";
+import { maybeTrackPurchaseFromTag } from "@/lib/meta/conversions";
 
 export type Automation = {
   id: string;
@@ -107,6 +108,7 @@ export async function executeAction(
 
   if (action.action_type === "add_tag" && action.tag_id) {
     await supabase.from("contact_tags").upsert({ contact_id: contactId, tag_id: action.tag_id });
+    await maybeTrackPurchaseFromTag(supabase, automation.workspace_id, contactId, action.tag_id);
     return;
   }
 

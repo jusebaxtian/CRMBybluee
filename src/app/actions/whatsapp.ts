@@ -515,3 +515,20 @@ export async function sendTemplateToConversation(input: {
     return { error: err instanceof Error ? err.message : "Error desconocido." };
   }
 }
+
+// The Dataset ID from Events Manager that Click-to-WhatsApp Conversions API
+// events get sent to — see src/lib/meta/conversions.ts for where it's used.
+export async function saveCtwaDatasetId(datasetId: string) {
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+
+  const { error } = await supabase
+    .from("whatsapp_accounts")
+    .update({ ctwa_dataset_id: datasetId.trim() || null })
+    .eq("workspace_id", workspaceId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard/settings");
+  return { success: true as const };
+}

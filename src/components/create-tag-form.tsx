@@ -22,6 +22,10 @@ export function CreateTagForm() {
         <input type="checkbox" name="excludesFollowups" className="accent-primary" />
         Excluir de automatizaciones, IA y seguimientos (ej: &quot;Ya compró&quot;, &quot;No interesados&quot;)
       </label>
+      <label className="flex items-center gap-1.5 text-xs text-muted">
+        <input type="checkbox" name="marksPurchase" className="accent-primary" />
+        Reportar compra a Meta Ads (Conversions API) al usar esta etiqueta
+      </label>
       <button
         type="submit"
         disabled={pending}

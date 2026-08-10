@@ -16,7 +16,7 @@ export default async function TagsPage() {
 
   const { data: tags } = await supabase
     .from("tags")
-    .select("id, name, color, excludes_followups, contact_tags(count)")
+    .select("id, name, color, excludes_followups, marks_purchase, contact_tags(count)")
     .eq("workspace_id", workspaceId ?? "")
     .order("name");
 
@@ -62,6 +62,7 @@ export default async function TagsPage() {
                   tagName={tag.name}
                   tagColor={tag.color}
                   excludesFollowups={tag.excludes_followups}
+                  marksPurchase={tag.marks_purchase}
                 />
                 <DeleteTagButton tagId={tag.id} tagName={tag.name} contactCount={contactCount} />
               </div>

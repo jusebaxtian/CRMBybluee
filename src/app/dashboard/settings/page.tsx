@@ -10,6 +10,7 @@ import { AgentsList } from "@/components/agents-list";
 import { SettingsTabs } from "@/components/settings-tabs";
 import { WhatsAppApiPanel } from "@/components/whatsapp-api-panel";
 import { AiAgentPanel } from "@/components/ai-agent-panel";
+import { CtwaDatasetForm } from "@/components/ctwa-dataset-form";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -28,7 +29,7 @@ export default async function SettingsPage() {
   const { data: whatsappAccount } = workspaceId
     ? await supabase
         .from("whatsapp_accounts")
-        .select("waba_id, phone_number_id, access_token, display_phone_number, status")
+        .select("waba_id, phone_number_id, access_token, display_phone_number, status, ctwa_dataset_id")
         .eq("workspace_id", workspaceId)
         .maybeSingle()
     : { data: null };
@@ -65,10 +66,15 @@ export default async function SettingsPage() {
   );
 
   const whatsappSection = (
-    <WhatsAppApiPanel
-      account={whatsappAccount ? { ...whatsappAccount } : null}
-      phoneStatus={phoneStatus}
-    />
+    <div className="flex flex-col gap-5">
+      <WhatsAppApiPanel
+        account={whatsappAccount ? { ...whatsappAccount } : null}
+        phoneStatus={phoneStatus}
+      />
+      {whatsappAccount && (
+        <CtwaDatasetForm datasetId={whatsappAccount.ctwa_dataset_id ?? ""} />
+      )}
+    </div>
   );
 
   let aiAgentSection: React.ReactNode = undefined;

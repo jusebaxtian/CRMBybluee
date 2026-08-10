@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
+import { maybeTrackPurchaseFromTag } from "@/lib/meta/conversions";
 
 function parseCsv(text: string): { name: string; phone: string }[] {
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
@@ -136,6 +137,11 @@ export async function bulkAddTagToContacts(contactIds: string[], tagId: string) 
     );
 
   if (error) return { error: error.message };
+
+  await Promise.all(
+    contactIds.map((contactId) => maybeTrackPurchaseFromTag(supabase, workspaceId, contactId, tagId))
+  );
+
   revalidatePath("/dashboard/contacts");
   return { success: true };
 }
