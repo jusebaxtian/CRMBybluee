@@ -24,6 +24,8 @@ function friendlyWhatsAppError(error: {
       return "No se pudo enviar: el número no tiene WhatsApp o no puede recibir mensajes.";
     case 131031:
       return "No se pudo enviar: tu cuenta de WhatsApp Business fue restringida por Meta.";
+    case 131049:
+      return "No se pudo enviar: Meta bloqueó este mensaje de marketing para proteger al usuario de spam (no es un problema de tu cuenta ni del CRM). Este contacto no recibe bien mensajes de marketing.";
     default:
       return error.error_data?.details || error.message || error.title || "No se pudo enviar el mensaje.";
   }
@@ -60,6 +62,41 @@ async function resetContactReachability(
     .from("contacts")
     .update({ consecutive_failures: 0, likely_blocked: false })
     .eq("id", contactId);
+}
+
+// Error 131049 means Meta itself blocked a MARKETING-category message to
+// protect this specific user from ad/promo spam — it's a per-recipient
+// signal from Meta, not something retrying or fixing our side changes.
+// Tagging it automatically lets the workspace spot and eventually prune
+// these contacts from future remarketing sends (they'd likely need a
+// UTILITY-category template instead, which isn't subject to this limit).
+const MARKETING_BLOCKED_ERROR_CODE = 131049;
+const MARKETING_BLOCKED_TAG_NAME = "No apta para Marketing (Meta)";
+
+async function tagContactAsMarketingBlocked(
+  supabase: ReturnType<typeof createAdminClient>,
+  workspaceId: string,
+  contactId: string
+) {
+  const { data: existingTag } = await supabase
+    .from("tags")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .eq("name", MARKETING_BLOCKED_TAG_NAME)
+    .maybeSingle();
+
+  let tagId = existingTag?.id;
+  if (!tagId) {
+    const { data: newTag } = await supabase
+      .from("tags")
+      .insert({ workspace_id: workspaceId, name: MARKETING_BLOCKED_TAG_NAME, color: "#e05252" })
+      .select("id")
+      .single();
+    tagId = newTag?.id;
+  }
+  if (!tagId) return;
+
+  await supabase.from("contact_tags").upsert({ contact_id: contactId, tag_id: tagId });
 }
 
 const extensionFromMime: Record<string, string> = {
@@ -349,6 +386,10 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           await recordUnreachableFailure(supabase, conversation.contact_id);
         } else if (status.status === "delivered" || status.status === "read") {
           await resetContactReachability(supabase, conversation.contact_id);
+        }
+
+        if (status.status === "failed" && errorCode === MARKETING_BLOCKED_ERROR_CODE) {
+          await tagContactAsMarketingBlocked(supabase, workspaceId, conversation.contact_id);
         }
 
         // Meta reports the same conversation.id on every status update for
