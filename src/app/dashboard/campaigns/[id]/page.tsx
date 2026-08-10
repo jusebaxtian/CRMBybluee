@@ -21,6 +21,14 @@ const recipientStatusColor: Record<string, string> = {
   failed: "text-red-400 border-red-400",
 };
 
+const recipientStatusLabel: Record<string, string> = {
+  pending: "Pendiente",
+  sent: "Enviado",
+  delivered: "Entregado",
+  read: "Leído",
+  failed: "Falló",
+};
+
 export default async function CampaignDetailPage({
   params,
 }: {
@@ -89,7 +97,7 @@ export default async function CampaignDetailPage({
                       }`}
                       title={r.error_message ?? undefined}
                     >
-                      {r.status}
+                      {recipientStatusLabel[r.status] ?? r.status}
                     </span>
                   </td>
                 </tr>
