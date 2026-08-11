@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
 import { InboundMessageSound } from "@/components/inbound-message-sound";
+import { NotificationSound } from "@/components/notification-sound";
 import { PushNotifications } from "@/components/push-notifications";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 
@@ -13,6 +14,8 @@ type Notification = {
   body: string;
   created_at: string;
   read: boolean;
+  cta_label?: string | null;
+  cta_url?: string | null;
 };
 
 export function DashboardChrome({
@@ -26,6 +29,9 @@ export function DashboardChrome({
   supportWhatsappMessage,
   userEmail,
   notifications,
+  workspaceId = null,
+  planId = null,
+  workspaceStatus = null,
   banner,
   children,
 }: {
@@ -39,6 +45,9 @@ export function DashboardChrome({
   supportWhatsappMessage?: string | null;
   userEmail: string;
   notifications: Notification[];
+  workspaceId?: string | null;
+  planId?: string | null;
+  workspaceStatus?: string | null;
   banner: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -47,6 +56,11 @@ export function DashboardChrome({
   return (
     <div className="flex bg-background">
       <InboundMessageSound />
+      <NotificationSound
+        workspaceId={workspaceId}
+        planId={planId}
+        workspaceStatus={workspaceStatus}
+      />
       <PushNotifications />
       {mobileNavOpen && (
         <button

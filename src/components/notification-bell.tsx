@@ -11,6 +11,8 @@ type Notification = {
   body: string;
   created_at: string;
   read: boolean;
+  cta_label?: string | null;
+  cta_url?: string | null;
 };
 
 export function NotificationBell({ notifications }: { notifications: Notification[] }) {
@@ -67,6 +69,17 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
                 <p className="mt-1 text-[10px] text-muted">
                   {new Date(n.created_at).toLocaleString("es-CO")}
                 </p>
+                {n.cta_label && n.cta_url && (
+                  <a
+                    href={n.cta_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="mt-2 inline-block rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-white hover:bg-primary-hover"
+                  >
+                    {n.cta_label}
+                  </a>
+                )}
               </div>
             ))}
           </div>

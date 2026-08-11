@@ -6,6 +6,7 @@ export async function register() {
   const { processDueAutomationRuns } = await import("@/lib/automations/scheduler");
   const { expireTrials } = await import("@/lib/billing/scheduler");
   const { processAiFollowups } = await import("@/lib/ai/followups");
+  const { cleanupOldNotifications } = await import("@/lib/notifications/scheduler");
 
   setInterval(() => {
     processDueAutomationRuns().catch((err) => {
@@ -24,4 +25,10 @@ export async function register() {
       console.error("trial expiry scheduler tick failed:", err);
     });
   }, 5 * 60_000);
+
+  setInterval(() => {
+    cleanupOldNotifications().catch((err) => {
+      console.error("notifications cleanup scheduler tick failed:", err);
+    });
+  }, 60 * 60_000);
 }

@@ -67,14 +67,25 @@ export default async function DashboardLayout({
 
   // Explicit scope filter — RLS also allows platform admins to read every notification,
   // which would otherwise leak other clients' targeted notifications into an admin's own dashboard.
-  const scopeFilter = workspace?.plan_id
-    ? `scope.eq.all,and(scope.eq.workspace,target_workspace_id.eq.${workspaceId}),and(scope.eq.plan,target_plan_id.eq.${workspace.plan_id})`
-    : `scope.eq.all,and(scope.eq.workspace,target_workspace_id.eq.${workspaceId})`;
+  const scopeParts = [
+    "scope.eq.all",
+    `and(scope.eq.workspace,target_workspace_id.eq.${workspaceId})`,
+  ];
+  if (workspace?.plan_id) {
+    scopeParts.push(`and(scope.eq.plan,target_plan_id.eq.${workspace.plan_id})`);
+  }
+  if (workspace?.status) {
+    scopeParts.push(`and(scope.eq.status,target_status.eq.${workspace.status})`);
+  }
+  const scopeFilter = scopeParts.join(",");
 
+  const nowIso = new Date().toISOString();
   const { data: notifications } = await supabase
     .from("notifications")
-    .select("id, title, body, created_at")
+    .select("id, title, body, created_at, cta_label, cta_url")
     .or(scopeFilter)
+    .lte("starts_at", nowIso)
+    .or(`ends_at.is.null,ends_at.gte.${nowIso}`)
     .order("created_at", { ascending: false })
     .limit(20);
 
@@ -135,6 +146,9 @@ export default async function DashboardLayout({
       supportWhatsappMessage={supportWhatsappMessage}
       userEmail={user.email ?? ""}
       notifications={notificationsWithRead}
+      workspaceId={workspaceId}
+      planId={workspace?.plan_id ?? null}
+      workspaceStatus={workspace?.status ?? null}
       banner={
         impersonatedWorkspaceId ? <ImpersonationBanner workspaceName={workspaceName} /> : null
       }

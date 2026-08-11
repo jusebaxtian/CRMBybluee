@@ -10,6 +10,8 @@ type Notification = {
   body: string;
   created_at: string;
   read: boolean;
+  cta_label?: string | null;
+  cta_url?: string | null;
 };
 
 export function Topbar({
