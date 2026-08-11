@@ -89,6 +89,7 @@ function validateSequenceActions(actions: ActionInput[]): string | null {
 export async function createFollowupSequence(_prevState: unknown, formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const actionsJson = String(formData.get("actionsJson") ?? "[]");
+  const requiredTagId = String(formData.get("requiredTagId") ?? "").trim() || null;
   if (!name) return { error: "El nombre es obligatorio." };
 
   let actions: ActionInput[];
@@ -106,7 +107,7 @@ export async function createFollowupSequence(_prevState: unknown, formData: Form
 
   const { data: sequence, error } = await supabase
     .from("automations")
-    .insert({ workspace_id: workspaceId, name, trigger_type: "no_reply" })
+    .insert({ workspace_id: workspaceId, name, trigger_type: "no_reply", required_tag_id: requiredTagId })
     .select("id")
     .single();
   if (error || !sequence) return { error: error?.message ?? "No se pudo crear." };
@@ -127,6 +128,7 @@ export async function updateFollowupSequence(_prevState: unknown, formData: Form
   const sequenceId = String(formData.get("sequenceId") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const actionsJson = String(formData.get("actionsJson") ?? "[]");
+  const requiredTagId = String(formData.get("requiredTagId") ?? "").trim() || null;
   if (!sequenceId) return { error: "Secuencia inválida." };
   if (!name) return { error: "El nombre es obligatorio." };
 
@@ -145,7 +147,7 @@ export async function updateFollowupSequence(_prevState: unknown, formData: Form
 
   const { error } = await supabase
     .from("automations")
-    .update({ name })
+    .update({ name, required_tag_id: requiredTagId })
     .eq("id", sequenceId)
     .eq("workspace_id", workspaceId)
     .eq("trigger_type", "no_reply");

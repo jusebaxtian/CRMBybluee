@@ -17,7 +17,7 @@ export default async function EditFollowupSequencePage({
 
   const { data: sequence } = await supabase
     .from("automations")
-    .select("id, name")
+    .select("id, name, required_tag_id")
     .eq("id", id)
     .eq("workspace_id", workspaceId ?? "")
     .eq("trigger_type", "no_reply")
@@ -68,6 +68,7 @@ export default async function EditFollowupSequencePage({
             id: sequence.id,
             name: sequence.name,
             actions: actions ?? [],
+            requiredTagId: sequence.required_tag_id,
           }}
         />
       </div>

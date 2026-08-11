@@ -15,6 +15,7 @@ type ExistingSequence = {
   id: string;
   name: string;
   actions: InitialAction[];
+  requiredTagId?: string | null;
 };
 
 export function NewFollowupSequenceForm({
@@ -53,6 +54,25 @@ export function NewFollowupSequenceForm({
           placeholder="Seguimiento estándar"
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
         />
+      </div>
+
+      <div>
+        <label htmlFor="requiredTagId" className="mb-1 block text-sm font-medium text-muted">
+          Solo activar para contactos con esta etiqueta (opcional)
+        </label>
+        <select
+          id="requiredTagId"
+          name="requiredTagId"
+          defaultValue={sequence?.requiredTagId ?? ""}
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+        >
+          <option value="">Todos los contactos</option>
+          {tags.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <p className="flex items-start gap-1.5 rounded-lg border border-border bg-background p-3 text-xs text-muted">

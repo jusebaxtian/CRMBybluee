@@ -15,7 +15,7 @@ export default async function FollowupsPage() {
 
   const { data: sequences } = await supabase
     .from("automations")
-    .select("id, name, is_active, automation_actions(delay_seconds)")
+    .select("id, name, is_active, required_tag_id, tags(name), automation_actions(delay_seconds)")
     .eq("workspace_id", workspaceId ?? "")
     .eq("trigger_type", "no_reply")
     .order("created_at", { ascending: false });
@@ -56,6 +56,7 @@ export default async function FollowupsPage() {
             const summary = steps
               .map((st) => formatDelay(st.delay_seconds))
               .join(" · ");
+            const requiredTag = (s.tags as unknown as { name: string } | null)?.name ?? null;
             return (
               <div
                 key={s.id}
@@ -66,6 +67,15 @@ export default async function FollowupsPage() {
                   <p className="text-xs text-muted">
                     {steps.length} paso{steps.length === 1 ? "" : "s"}
                     {summary && ` · ${summary}`}
+                  </p>
+                  <p className="mt-1 text-xs text-muted">
+                    {requiredTag ? (
+                      <span className="rounded-full border border-border px-2 py-0.5">
+                        Solo etiqueta: {requiredTag}
+                      </span>
+                    ) : (
+                      "Todos los contactos"
+                    )}
                   </p>
                 </div>
                 <AutomationRowActions
