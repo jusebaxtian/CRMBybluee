@@ -94,28 +94,20 @@ export default async function AdminOverviewPage({
   if (fromDate) filteredRows = filteredRows.filter((r) => new Date(r.createdAt) >= fromDate);
   if (toDate) filteredRows = filteredRows.filter((r) => new Date(r.createdAt) <= toDate);
 
-  // KPI cards always reflect the current calendar month, independent of the
-  // date/email filters above (which only affect the table below).
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-  const monthLabel = now.toLocaleDateString("es-CO", { month: "long", year: "numeric" });
-
-  const monthRows = rows.filter((r) => r.createdAt >= monthStart);
-  const totalClients = monthRows.length;
-  const activePaidClients = monthRows.filter((r) => r.status === "active").length;
-  const trialingClients = monthRows.filter((r) => r.status === "trialing").length;
-  const unpaidClients = monthRows.filter((r) => r.status === "past_due").length;
+  // KPI cards always reflect all-time totals, independent of the date/email
+  // filters above (which only affect the table below) — use those filters
+  // to narrow down to a specific period if needed.
+  const totalClients = rows.length;
+  const activePaidClients = rows.filter((r) => r.status === "active").length;
+  const trialingClients = rows.filter((r) => r.status === "trialing").length;
+  const unpaidClients = rows.filter((r) => r.status === "past_due").length;
 
   const [{ count: connectedWhatsappCount }, { count: sentMessagesCount }] = await Promise.all([
-    supabase
-      .from("whatsapp_accounts")
-      .select("id", { count: "exact", head: true })
-      .gte("connected_at", monthStart),
+    supabase.from("whatsapp_accounts").select("id", { count: "exact", head: true }),
     supabase
       .from("messages")
       .select("id", { count: "exact", head: true })
-      .eq("direction", "out")
-      .gte("created_at", monthStart),
+      .eq("direction", "out"),
   ]);
 
   const kpis = [
@@ -135,7 +127,7 @@ export default async function AdminOverviewPage({
       </div>
 
       <p className="-mb-2 text-xs text-muted">
-        Tarjetas del mes actual ({monthLabel})
+        Totales acumulados — usa el filtro de fechas abajo para acotar la tabla a un periodo.
       </p>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         {kpis.map(({ label, value, icon: Icon, color }) => (
