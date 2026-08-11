@@ -3,6 +3,7 @@
 import { ChevronDown, Menu } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { NotificationBell } from "@/components/notification-bell";
+import { ChangePasswordButton } from "@/components/change-password-button";
 
 type Notification = {
   id: string;
@@ -54,6 +55,7 @@ export function Topbar({
           </div>
           <div className="invisible absolute right-0 z-10 mt-2 w-56 rounded-lg border border-border bg-surface p-2 opacity-0 shadow-lg transition-opacity group-hover:visible group-hover:opacity-100">
             <p className="truncate px-2 py-1 text-xs text-muted">{userEmail}</p>
+            <ChangePasswordButton />
             <form action={logout}>
               <button
                 type="submit"
