@@ -45,6 +45,18 @@ export async function getWorkspaceRole(
 ) {
   if (!workspaceId) return null;
 
+  // A platform admin browsing a client's workspace via "modo soporte" isn't
+  // a member of that workspace's workspace_members — without this they'd
+  // read back a null role and get redirected out of any owner/admin-gated
+  // page (e.g. /dashboard/settings), even though support mode is meant to
+  // give them full visibility into what the client sees.
+  const cookieStore = await cookies();
+  const impersonatedId = cookieStore.get(IMPERSONATION_COOKIE)?.value;
+  if (impersonatedId && impersonatedId === workspaceId) {
+    const isAdmin = await isPlatformAdmin(supabase);
+    if (isAdmin) return "owner";
+  }
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
