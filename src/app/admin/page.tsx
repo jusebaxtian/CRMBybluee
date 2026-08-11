@@ -28,7 +28,7 @@ export default async function AdminOverviewPage({
 
   const { data: workspaces } = await supabase
     .from("workspaces")
-    .select("id, name, status, access_disabled, created_at, trial_ends_at, signup_ip, plans(name)")
+    .select("id, name, phone, status, access_disabled, created_at, trial_ends_at, signup_ip, plans(name)")
     .order("created_at", { ascending: false });
 
   const ipCounts = new Map<string, number>();
@@ -75,6 +75,7 @@ export default async function AdminOverviewPage({
         accessDisabled: w.access_disabled,
         createdAt: w.created_at,
         renewalDate: subscription?.current_period_end ?? w.trial_ends_at ?? null,
+        phone: w.phone ?? null,
         signupIp: w.signup_ip,
         sharedIp: w.signup_ip ? (ipCounts.get(w.signup_ip) ?? 0) > 1 : false,
         lastSignInAt,
@@ -189,6 +190,7 @@ export default async function AdminOverviewPage({
           <thead>
             <tr className="border-b border-border text-muted">
               <th className="px-5 py-3 font-medium">Cliente</th>
+              <th className="px-5 py-3 font-medium">Teléfono</th>
               <th className="px-5 py-3 font-medium">Plan</th>
               <th className="px-5 py-3 font-medium">Estado</th>
               <th className="px-5 py-3 font-medium">IP de registro</th>
@@ -205,6 +207,7 @@ export default async function AdminOverviewPage({
                   <p className="text-foreground">{r.email}</p>
                   <p className="text-xs text-muted">{r.name}</p>
                 </td>
+                <td className="px-5 py-3 text-foreground">{r.phone ?? "—"}</td>
                 <td className="px-5 py-3 text-foreground">{r.plan}</td>
                 <td className="px-5 py-3">
                   <div className="flex flex-col gap-1">
@@ -267,7 +270,7 @@ export default async function AdminOverviewPage({
             ))}
             {filteredRows.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-5 py-6 text-center text-muted">
+                <td colSpan={9} className="px-5 py-6 text-center text-muted">
                   {query ? "Sin resultados para esa búsqueda." : "Sin clientes registrados."}
                 </td>
               </tr>
