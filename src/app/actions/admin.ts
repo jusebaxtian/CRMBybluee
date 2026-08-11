@@ -131,6 +131,63 @@ export async function updateWorkspacePhone(workspaceId: string, phone: string) {
   return { success: true };
 }
 
+// Edits the date that gates access for this workspace — trial_ends_at while
+// they're on a trial (so a trial can be extended or shortened and the
+// scheduler in src/lib/billing/scheduler.ts picks up the new date as-is,
+// no extra recompute needed), or the active subscription's current_period_end
+// once they're a paying customer.
+export async function updateWorkspaceRenewalDate(workspaceId: string, newDate: string) {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
+  if (!newDate) return { error: "Selecciona una fecha válida." };
+
+  const isoDate = new Date(`${newDate}T23:59:59`).toISOString();
+
+  const { data: workspace } = await supabase
+    .from("workspaces")
+    .select("status")
+    .eq("id", workspaceId)
+    .maybeSingle();
+  if (!workspace) return { error: "Workspace no encontrado." };
+
+  if (workspace.status === "trialing") {
+    const { error } = await supabase
+      .from("workspaces")
+      .update({ trial_ends_at: isoDate })
+      .eq("id", workspaceId);
+    if (error) return { error: error.message };
+  } else {
+    const { data: subscription } = await supabase
+      .from("subscriptions")
+      .select("id")
+      .eq("workspace_id", workspaceId)
+      .eq("status", "active")
+      .order("current_period_end", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (subscription) {
+      const { error } = await supabase
+        .from("subscriptions")
+        .update({ current_period_end: isoDate })
+        .eq("id", subscription.id);
+      if (error) return { error: error.message };
+    } else {
+      const { error } = await supabase.from("subscriptions").insert({
+        workspace_id: workspaceId,
+        provider: "manual",
+        status: "active",
+        current_period_end: isoDate,
+      });
+      if (error) return { error: error.message };
+    }
+  }
+
+  revalidatePath("/admin");
+  revalidatePath(`/admin/workspaces/${workspaceId}`);
+  return { success: true as const };
+}
+
 export async function updateOwnerEmail(userId: string, email: string, workspaceId: string) {
   const supabase = await createClient();
   if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };

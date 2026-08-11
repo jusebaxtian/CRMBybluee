@@ -23,7 +23,7 @@ export function CreatePlanForm() {
       </div>
       <div>
         <label htmlFor="price" className="mb-1 block text-xs font-medium text-muted">
-          Precio (COP/mes)
+          Precio (COP)
         </label>
         <input
           id="price"
@@ -34,7 +34,21 @@ export function CreatePlanForm() {
           className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
         />
       </div>
-      <input type="hidden" name="billingCycle" value="monthly" />
+      <div>
+        <label htmlFor="billingCycle" className="mb-1 block text-xs font-medium text-muted">
+          Ciclo de facturación
+        </label>
+        <select
+          id="billingCycle"
+          name="billingCycle"
+          defaultValue="monthly"
+          className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+        >
+          <option value="monthly">Mensual (1 mes)</option>
+          <option value="semiannual">Semestral (6 meses)</option>
+          <option value="yearly">Anual (1 año)</option>
+        </select>
+      </div>
       <button
         type="submit"
         disabled={pending}

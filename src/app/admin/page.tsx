@@ -2,6 +2,7 @@ import { Users, CreditCard, Clock, AlertTriangle, Plug, Send } from "lucide-reac
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { WorkspaceRowActions } from "@/components/workspace-row-actions";
+import { EditRenewalDateButton } from "@/components/edit-renewal-date-button";
 
 function daysSince(dateStr: string): number {
   return Math.max(
@@ -253,11 +254,14 @@ export default async function AdminOverviewPage({
                 </td>
                 <td className="px-5 py-3 text-muted">
                   <p>{new Date(r.createdAt).toLocaleDateString("es-CO")}</p>
-                  <p className="mt-1 text-xs">
-                    {r.renewalDate
-                      ? `Renueva: ${new Date(r.renewalDate).toLocaleDateString("es-CO")}`
-                      : "Sin renovación"}
-                  </p>
+                  <div className="mt-1 flex items-center gap-1.5 text-xs">
+                    <span>
+                      {r.renewalDate
+                        ? `Renueva: ${new Date(r.renewalDate).toLocaleDateString("es-CO")}`
+                        : "Sin renovación"}
+                    </span>
+                    <EditRenewalDateButton workspaceId={r.id} currentDate={r.renewalDate} />
+                  </div>
                 </td>
                 <td className="px-5 py-3">
                   <WorkspaceRowActions

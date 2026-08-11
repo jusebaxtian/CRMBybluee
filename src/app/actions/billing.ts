@@ -5,7 +5,22 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPlatformAdmin } from "@/lib/admin";
 import { getWorkspaceId } from "@/lib/workspace";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { generateBoldIntegritySignature, getBoldTransactionStatus } from "@/lib/bold";
+import { addBillingCycle } from "@/lib/billing/cycle";
+
+async function getWorkspaceBillingCycle(
+  supabase: SupabaseClient,
+  workspaceId: string
+): Promise<string> {
+  const { data } = await supabase
+    .from("workspaces")
+    .select("plans(billing_cycle)")
+    .eq("id", workspaceId)
+    .maybeSingle();
+  const plan = data?.plans as unknown as { billing_cycle: string } | null;
+  return plan?.billing_cycle ?? "monthly";
+}
 
 type BoldOrderResult =
   | { error: string }
@@ -101,12 +116,13 @@ export async function confirmBoldPayment(orderId: string, txStatus: string | nul
 
   await admin.from("payments").update({ status: "approved" }).eq("id", payment.id);
 
+  const cycle = await getWorkspaceBillingCycle(admin, payment.workspace_id);
   await admin.from("subscriptions").insert({
     workspace_id: payment.workspace_id,
     provider: "bold",
     external_id: orderId,
     status: "active",
-    current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    current_period_end: addBillingCycle(new Date(), cycle).toISOString(),
   });
 
   await admin.from("workspaces").update({ status: "active" }).eq("id", payment.workspace_id);
@@ -172,11 +188,12 @@ export async function approvePayment(paymentId: string) {
     .update({ status: "approved", reviewed_by: user?.id, reviewed_at: new Date().toISOString() })
     .eq("id", paymentId);
 
+  const cycle = await getWorkspaceBillingCycle(supabase, payment.workspace_id);
   await supabase.from("subscriptions").insert({
     workspace_id: payment.workspace_id,
     provider: payment.provider,
     status: "active",
-    current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    current_period_end: addBillingCycle(new Date(), cycle).toISOString(),
   });
 
   await supabase

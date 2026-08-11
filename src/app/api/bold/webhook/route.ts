@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyBoldWebhookSignature } from "@/lib/bold";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { addBillingCycle } from "@/lib/billing/cycle";
 
 type BoldWebhookPayload = {
   id: string;
@@ -30,12 +31,20 @@ export async function POST(request: NextRequest) {
     if (payment && payment.status === "pending") {
       await supabase.from("payments").update({ status: "approved" }).eq("id", payment.id);
 
+      const { data: workspaceRow } = await supabase
+        .from("workspaces")
+        .select("plans(billing_cycle)")
+        .eq("id", payment.workspace_id)
+        .maybeSingle();
+      const plan = workspaceRow?.plans as unknown as { billing_cycle: string } | null;
+      const cycle = plan?.billing_cycle ?? "monthly";
+
       await supabase.from("subscriptions").insert({
         workspace_id: payment.workspace_id,
         provider: "bold",
         external_id: payload.subject,
         status: "active",
-        current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        current_period_end: addBillingCycle(new Date(), cycle).toISOString(),
       });
 
       await supabase
