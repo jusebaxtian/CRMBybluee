@@ -60,11 +60,29 @@ export async function togglePlanModule(planId: string, moduleKey: string, enable
   return { success: true };
 }
 
+export async function updatePlanDescription(planId: string, description: string[]) {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
+
+  const cleaned = description.map((line) => line.trim()).filter(Boolean);
+
+  const { error } = await supabase
+    .from("plans")
+    .update({ description: cleaned })
+    .eq("id", planId);
+
+  if (error) return { error: error.message };
+  revalidatePath("/admin/plans");
+  revalidatePath("/dashboard/billing");
+  return { success: true as const };
+}
+
 export async function togglePlanActive(planId: string, isActive: boolean) {
   const supabase = await createClient();
   if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
 
   await supabase.from("plans").update({ is_active: isActive }).eq("id", planId);
   revalidatePath("/admin/plans");
+  revalidatePath("/dashboard/billing");
   return { success: true };
 }

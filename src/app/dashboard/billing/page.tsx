@@ -4,6 +4,37 @@ import { getWorkspaceId } from "@/lib/workspace";
 import { createBoldOrder, confirmBoldPayment } from "@/app/actions/billing";
 import { BoldCheckoutButton } from "@/components/bold-checkout-button";
 import { ManualTransferForm } from "@/components/manual-transfer-form";
+import { PlanPicker } from "@/components/plan-picker";
+
+async function buildPlansForPicker(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const [{ data: plans }, { data: modules }, { data: planModules }] = await Promise.all([
+    supabase
+      .from("plans")
+      .select("id, name, price_cents, currency, billing_cycle, description")
+      .eq("is_active", true)
+      .order("price_cents"),
+    supabase.from("modules").select("key, name"),
+    supabase.from("plan_modules").select("plan_id, module_key"),
+  ]);
+
+  const moduleNameByKey = new Map((modules ?? []).map((m) => [m.key, m.name]));
+  const modulesByPlan = new Map<string, string[]>();
+  for (const pm of planModules ?? []) {
+    if (!modulesByPlan.has(pm.plan_id)) modulesByPlan.set(pm.plan_id, []);
+    const name = moduleNameByKey.get(pm.module_key);
+    if (name) modulesByPlan.get(pm.plan_id)!.push(name);
+  }
+
+  return (plans ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    price_cents: p.price_cents,
+    currency: p.currency,
+    billing_cycle: p.billing_cycle,
+    description: p.description ?? [],
+    modules: modulesByPlan.get(p.id) ?? [],
+  }));
+}
 
 const statusLabel: Record<string, string> = {
   trialing: "En periodo de prueba",
@@ -30,13 +61,18 @@ export default async function BillingPage({
   const { data: workspaceRow } = workspaceId
     ? await supabase
         .from("workspaces")
-        .select("status, trial_ends_at, plans(name, price_cents)")
+        .select("status, trial_ends_at, plan_id, plans(name, price_cents)")
         .eq("id", workspaceId)
         .maybeSingle()
     : { data: null };
 
   const workspace = workspaceRow as unknown as
-    | { status: string; trial_ends_at: string; plans: { name: string; price_cents: number } | null }
+    | {
+        status: string;
+        trial_ends_at: string;
+        plan_id: string | null;
+        plans: { name: string; price_cents: number } | null;
+      }
     | null;
 
   const { data: payments } = await supabase
@@ -69,6 +105,11 @@ export default async function BillingPage({
 
   const amountCents = workspace?.plans?.price_cents ?? 0;
   const boldOrder = canPay && amountCents > 0 ? await createBoldOrder(amountCents) : null;
+
+  let plansForPicker: Awaited<ReturnType<typeof buildPlansForPicker>> = [];
+  if (canPay) {
+    plansForPicker = await buildPlansForPicker(supabase);
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -105,6 +146,13 @@ export default async function BillingPage({
             Tu plan está pagado y activo. Se habilitará el pago para renovar 2 días antes del{" "}
             {renewalDate.toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" })}.
           </p>
+        </div>
+      )}
+
+      {canPay && plansForPicker.length > 0 && (
+        <div>
+          <p className="mb-3 text-sm font-medium text-foreground">Elige tu plan</p>
+          <PlanPicker plans={plansForPicker} currentPlanId={workspace?.plan_id ?? null} />
         </div>
       )}
 

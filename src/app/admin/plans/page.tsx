@@ -2,13 +2,15 @@ import { createClient } from "@/lib/supabase/server";
 import { CreatePlanForm } from "@/components/create-plan-form";
 import { PlanPriceEditor } from "@/components/plan-price-editor";
 import { PlanModuleToggle } from "@/components/plan-module-toggle";
+import { PlanActiveToggle } from "@/components/plan-active-toggle";
+import { PlanDescriptionEditor } from "@/components/plan-description-editor";
 
 export default async function AdminPlansPage() {
   const supabase = await createClient();
 
   const { data: plans } = await supabase
     .from("plans")
-    .select("id, name, price_cents, is_active")
+    .select("id, name, price_cents, is_active, description")
     .order("price_cents");
 
   const { data: modules } = await supabase
@@ -28,7 +30,9 @@ export default async function AdminPlansPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Planes</h1>
-        <p className="text-sm text-muted">Define precios y qué módulos incluye cada plan</p>
+        <p className="text-sm text-muted">
+          Define precios, beneficios visibles y qué módulos incluye cada plan
+        </p>
       </div>
 
       <div className="rounded-xl border border-border bg-surface p-5">
@@ -41,10 +45,18 @@ export default async function AdminPlansPage() {
           const enabled = enabledByPlan.get(plan.id) ?? new Set();
           return (
             <div key={plan.id} className="rounded-xl border border-border bg-surface p-5">
-              <div className="mb-4 flex items-center justify-between">
+              <div className="mb-4 flex items-center justify-between gap-3">
                 <p className="text-lg font-semibold text-foreground">{plan.name}</p>
-                <PlanPriceEditor planId={plan.id} initialPriceCents={plan.price_cents} />
+                <div className="flex items-center gap-3">
+                  <PlanActiveToggle planId={plan.id} isActive={plan.is_active} />
+                  <PlanPriceEditor planId={plan.id} initialPriceCents={plan.price_cents} />
+                </div>
               </div>
+
+              <div className="mb-4">
+                <PlanDescriptionEditor planId={plan.id} initialDescription={plan.description ?? []} />
+              </div>
+
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
                 Módulos incluidos
               </p>

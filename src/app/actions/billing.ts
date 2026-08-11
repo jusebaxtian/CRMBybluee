@@ -33,6 +33,32 @@ type BoldOrderResult =
       apiKey: string;
     };
 
+// Lets a client pick which plan they want before paying — the billing page
+// recomputes the amount to charge from whatever plan is now on the
+// workspace, so this must run before createBoldOrder/manual transfer.
+export async function selectWorkspacePlan(planId: string) {
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+
+  const { data: plan } = await supabase
+    .from("plans")
+    .select("id")
+    .eq("id", planId)
+    .eq("is_active", true)
+    .maybeSingle();
+  if (!plan) return { error: "Plan no encontrado o no disponible." };
+
+  const { error } = await supabase
+    .from("workspaces")
+    .update({ plan_id: planId })
+    .eq("id", workspaceId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard/billing");
+  return { success: true as const };
+}
+
 export async function createBoldOrder(amountCents: number): Promise<BoldOrderResult> {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
