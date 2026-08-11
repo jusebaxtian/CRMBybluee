@@ -32,6 +32,7 @@ export function DashboardChrome({
   workspaceId = null,
   planId = null,
   workspaceStatus = null,
+  impersonatedOwnerId = null,
   banner,
   children,
 }: {
@@ -48,6 +49,7 @@ export function DashboardChrome({
   workspaceId?: string | null;
   planId?: string | null;
   workspaceStatus?: string | null;
+  impersonatedOwnerId?: string | null;
   banner: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -95,6 +97,8 @@ export function DashboardChrome({
           workspaceName={workspaceName}
           userEmail={userEmail}
           notifications={notifications}
+          workspaceId={workspaceId}
+          impersonatedOwnerId={impersonatedOwnerId}
           onMenuClick={() => setMobileNavOpen(true)}
         />
         <main className="flex-1 p-4 pb-20 sm:p-5 sm:pb-20 lg:pb-5">{children}</main>

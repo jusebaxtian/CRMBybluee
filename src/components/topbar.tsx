@@ -19,11 +19,15 @@ export function Topbar({
   workspaceName,
   userEmail,
   notifications,
+  workspaceId = null,
+  impersonatedOwnerId = null,
   onMenuClick,
 }: {
   workspaceName: string;
   userEmail: string;
   notifications: Notification[];
+  workspaceId?: string | null;
+  impersonatedOwnerId?: string | null;
   onMenuClick?: () => void;
 }) {
   return (
@@ -55,7 +59,10 @@ export function Topbar({
           </div>
           <div className="invisible absolute right-0 z-10 mt-2 w-56 rounded-lg border border-border bg-surface p-2 opacity-0 shadow-lg transition-opacity group-hover:visible group-hover:opacity-100">
             <p className="truncate px-2 py-1 text-xs text-muted">{userEmail}</p>
-            <ChangePasswordButton />
+            <ChangePasswordButton
+              impersonatedOwnerId={impersonatedOwnerId}
+              workspaceId={workspaceId}
+            />
             <form action={logout}>
               <button
                 type="submit"

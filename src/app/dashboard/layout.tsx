@@ -25,6 +25,22 @@ export default async function DashboardLayout({
   const workspaceId = await getWorkspaceId(supabase);
   const workspaceRole = await getWorkspaceRole(supabase, workspaceId);
 
+  // While impersonating, "Cambiar contraseña" must target the client being
+  // viewed, not the admin's own login — otherwise an admin in modo soporte
+  // would silently change their own password while thinking it was the
+  // client's.
+  let impersonatedOwnerId: string | null = null;
+  if (impersonatedWorkspaceId) {
+    const { data: ownerRow } = await supabase
+      .from("workspace_members")
+      .select("user_id")
+      .eq("workspace_id", impersonatedWorkspaceId)
+      .eq("role", "owner")
+      .limit(1)
+      .maybeSingle();
+    impersonatedOwnerId = ownerRow?.user_id ?? null;
+  }
+
   const { data: workspace } = workspaceId
     ? await supabase
         .from("workspaces")
@@ -149,6 +165,7 @@ export default async function DashboardLayout({
       workspaceId={workspaceId}
       planId={workspace?.plan_id ?? null}
       workspaceStatus={workspace?.status ?? null}
+      impersonatedOwnerId={impersonatedOwnerId}
       banner={
         impersonatedWorkspaceId ? <ImpersonationBanner workspaceName={workspaceName} /> : null
       }
