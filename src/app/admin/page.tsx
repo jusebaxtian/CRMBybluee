@@ -191,12 +191,10 @@ export default async function AdminOverviewPage({
             <tr className="border-b border-border text-muted">
               <th className="px-5 py-3 font-medium">Cliente</th>
               <th className="px-5 py-3 font-medium">Teléfono</th>
-              <th className="px-5 py-3 font-medium">Plan</th>
-              <th className="px-5 py-3 font-medium">Estado</th>
+              <th className="px-5 py-3 font-medium">Plan / Estado</th>
               <th className="px-5 py-3 font-medium">IP de registro</th>
               <th className="px-5 py-3 font-medium">Última conexión</th>
-              <th className="px-5 py-3 font-medium">Creado</th>
-              <th className="px-5 py-3 font-medium">Renovación</th>
+              <th className="px-5 py-3 font-medium">Creado / Renovación</th>
               <th className="px-5 py-3 font-medium"></th>
             </tr>
           </thead>
@@ -208,9 +206,9 @@ export default async function AdminOverviewPage({
                   <p className="text-xs text-muted">{r.name}</p>
                 </td>
                 <td className="px-5 py-3 text-foreground">{r.phone ?? "—"}</td>
-                <td className="px-5 py-3 text-foreground">{r.plan}</td>
                 <td className="px-5 py-3">
-                  <div className="flex flex-col gap-1">
+                  <p className="text-foreground">{r.plan}</p>
+                  <div className="mt-1 flex flex-col gap-1">
                     <span
                       className={`w-fit rounded-full border px-2 py-0.5 text-xs ${statusColor[r.status] ?? ""}`}
                     >
@@ -254,10 +252,12 @@ export default async function AdminOverviewPage({
                   )}
                 </td>
                 <td className="px-5 py-3 text-muted">
-                  {new Date(r.createdAt).toLocaleDateString("es-CO")}
-                </td>
-                <td className="px-5 py-3 text-muted">
-                  {r.renewalDate ? new Date(r.renewalDate).toLocaleDateString("es-CO") : "—"}
+                  <p>{new Date(r.createdAt).toLocaleDateString("es-CO")}</p>
+                  <p className="mt-1 text-xs">
+                    {r.renewalDate
+                      ? `Renueva: ${new Date(r.renewalDate).toLocaleDateString("es-CO")}`
+                      : "Sin renovación"}
+                  </p>
                 </td>
                 <td className="px-5 py-3">
                   <WorkspaceRowActions
@@ -270,7 +270,7 @@ export default async function AdminOverviewPage({
             ))}
             {filteredRows.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-5 py-6 text-center text-muted">
+                <td colSpan={7} className="px-5 py-6 text-center text-muted">
                   {query ? "Sin resultados para esa búsqueda." : "Sin clientes registrados."}
                 </td>
               </tr>
