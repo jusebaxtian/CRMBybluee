@@ -22,7 +22,7 @@ export default function SignupPage() {
           Crea tu cuenta
         </h1>
         <p className="mb-6 text-sm text-muted">
-          7 días de prueba gratis, sin tarjeta.
+          Crea tu cuenta y empieza a vender por WhatsApp.
         </p>
         <form action={action} className="flex flex-col gap-4">
           <div>
@@ -83,7 +83,7 @@ export default function SignupPage() {
             disabled={pending}
             className="mt-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
           >
-            {pending ? "Creando cuenta..." : "Empezar prueba gratis"}
+            {pending ? "Creando cuenta..." : "Crear cuenta"}
           </button>
         </form>
         <p className="mt-4 text-center text-sm text-muted">

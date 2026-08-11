@@ -76,7 +76,7 @@ export default async function Home() {
               rel="noopener noreferrer"
               className="hidden rounded-md bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover sm:block"
             >
-              Prueba gratis
+              Quiero mi CRM
             </a>
           </div>
         </div>
@@ -118,7 +118,7 @@ export default async function Home() {
                   rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/25 transition-colors hover:bg-primary-hover"
                 >
-                  Empezar prueba gratis
+                  Quiero mi CRM
                   <ArrowRight size={16} />
                 </a>
                 <Link
@@ -325,7 +325,7 @@ export default async function Home() {
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/25 transition-colors hover:bg-primary-hover"
             >
-              Empezar prueba gratis
+              Quiero activar mi CRM
               <ArrowRight size={16} />
             </a>
             <Link

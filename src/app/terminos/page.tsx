@@ -29,8 +29,7 @@ export default function TermsPage() {
           <p>
             Cada cuenta (&quot;workspace&quot;) tiene un plan asociado que define los módulos
             disponibles (bandeja, campañas, automatizaciones, agente de IA, etc.) y sus límites.
-            Ofrecemos un período de prueba gratuito de 7 días; al finalizar, se requiere una
-            suscripción activa para conservar el acceso.
+            Se requiere una suscripción activa para conservar el acceso.
           </p>
         </section>
 

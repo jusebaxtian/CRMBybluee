@@ -92,7 +92,7 @@ export default async function BillingPage({
           <AlertTriangle size={20} className="shrink-0 text-red-400" />
           <p className="text-sm text-foreground">
             {workspace.status === "past_due"
-              ? "Tu período de prueba o suscripción venció. Compra un plan para recuperar el acceso a tu cuenta."
+              ? "Activa un plan para empezar a usar tu cuenta."
               : "Tu suscripción está cancelada. Compra un plan para reactivar tu cuenta."}
           </p>
         </div>
