@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { WorkspaceRowActions } from "@/components/workspace-row-actions";
 import { EditRenewalDateButton } from "@/components/edit-renewal-date-button";
+import { WhatsAppIcon } from "@/components/whatsapp-icon";
 
 function daysSince(dateStr: string): number {
   return Math.max(
@@ -31,6 +32,9 @@ export default async function AdminOverviewPage({
     .from("workspaces")
     .select("id, name, phone, status, access_disabled, created_at, trial_ends_at, signup_ip, plans(name)")
     .order("created_at", { ascending: false });
+
+  const { data: connectedAccounts } = await supabase.from("whatsapp_accounts").select("workspace_id");
+  const connectedWorkspaceIds = new Set((connectedAccounts ?? []).map((a) => a.workspace_id));
 
   const ipCounts = new Map<string, number>();
   for (const w of workspaces ?? []) {
@@ -77,6 +81,7 @@ export default async function AdminOverviewPage({
         createdAt: w.created_at,
         renewalDate: subscription?.current_period_end ?? w.trial_ends_at ?? null,
         phone: w.phone ?? null,
+        hasWhatsapp: connectedWorkspaceIds.has(w.id),
         signupIp: w.signup_ip,
         sharedIp: w.signup_ip ? (ipCounts.get(w.signup_ip) ?? 0) > 1 : false,
         lastSignInAt,
@@ -198,7 +203,18 @@ export default async function AdminOverviewPage({
                   <p className="text-foreground">{r.email}</p>
                   <p className="text-xs text-muted">{r.name}</p>
                 </td>
-                <td className="px-5 py-3 text-foreground">{r.phone ?? "—"}</td>
+                <td className="px-5 py-3 text-foreground">
+                  <p>{r.phone ?? "—"}</p>
+                  <span
+                    title={r.hasWhatsapp ? "API de WhatsApp conectada" : "Sin API de WhatsApp conectada"}
+                    className="mt-1 inline-block"
+                  >
+                    <WhatsAppIcon
+                      size={16}
+                      className={r.hasWhatsapp ? "text-success" : "text-muted opacity-50"}
+                    />
+                  </span>
+                </td>
                 <td className="px-5 py-3">
                   <p className="text-foreground">{r.plan}</p>
                   <div className="mt-1 flex flex-col gap-1">
