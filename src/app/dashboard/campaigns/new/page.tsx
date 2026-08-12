@@ -17,7 +17,7 @@ export default async function NewCampaignPage() {
 
   const { data: tags } = await supabase
     .from("tags")
-    .select("id, name")
+    .select("id, name, excludes_followups")
     .eq("workspace_id", workspaceId ?? "")
     .order("name");
 

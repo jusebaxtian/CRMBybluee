@@ -5,7 +5,7 @@ import { Info } from "lucide-react";
 import { createCampaign, uploadCampaignMedia } from "@/app/actions/campaigns";
 
 type Template = { id: string; meta_template_name: string; status: string };
-type Tag = { id: string; name: string };
+type Tag = { id: string; name: string; excludes_followups: boolean };
 type SendType = "template" | "free_text";
 type MediaKind = "" | "image" | "video" | "document";
 
@@ -29,6 +29,12 @@ export function NewCampaignForm({
   const [mediaFilename, setMediaFilename] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [includeTagIds, setIncludeTagIds] = useState<string[]>([]);
+  const [excludeTagIds, setExcludeTagIds] = useState<string[]>([]);
+
+  function toggleTag(list: string[], setList: (ids: string[]) => void, tagId: string) {
+    setList(list.includes(tagId) ? list.filter((id) => id !== tagId) : [...list, tagId]);
+  }
 
   async function handleFile(file: File, kind: Exclude<MediaKind, "">) {
     setUploading(true);
@@ -152,22 +158,97 @@ export function NewCampaignForm({
         </div>
       )}
 
-      <div>
-        <label htmlFor="audienceTagId" className="mb-1 block text-sm font-medium text-muted">
-          Audiencia
-        </label>
-        <select
-          id="audienceTagId"
-          name="audienceTagId"
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-        >
-          <option value="">Todos los contactos</option>
-          {tags.map((t) => (
-            <option key={t.id} value={t.id}>
-              Etiqueta: {t.name}
-            </option>
+      <div className="flex flex-col gap-3 rounded-lg border border-border p-3">
+        <p className="text-sm font-medium text-foreground">Audiencia</p>
+
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted">
+            Incluir por etiqueta (vacío = todos los contactos)
+          </label>
+          {tags.length === 0 ? (
+            <p className="text-xs text-muted">No tienes etiquetas creadas.</p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {tags.map((t) => {
+                const active = includeTagIds.includes(t.id);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => toggleTag(includeTagIds, setIncludeTagIds, t.id)}
+                    className={`rounded-full border px-2.5 py-1 text-xs ${
+                      active
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border text-muted hover:bg-surface-hover"
+                    }`}
+                  >
+                    {t.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {includeTagIds.map((id) => (
+            <input key={id} type="hidden" name="includeTagIds" value={id} />
           ))}
-        </select>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted">
+            Excluir por etiqueta (gana sobre la inclusión si un contacto tiene ambas)
+          </label>
+          {tags.length === 0 ? (
+            <p className="text-xs text-muted">No tienes etiquetas creadas.</p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {tags.map((t) => {
+                const active = excludeTagIds.includes(t.id);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => toggleTag(excludeTagIds, setExcludeTagIds, t.id)}
+                    className={`rounded-full border px-2.5 py-1 text-xs ${
+                      active
+                        ? "border-red-400 bg-red-400/10 text-red-400"
+                        : "border-border text-muted hover:bg-surface-hover"
+                    }`}
+                  >
+                    {t.excludes_followups ? `${t.name} (sin seguimientos)` : t.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {excludeTagIds.map((id) => (
+            <input key={id} type="hidden" name="excludeTagIds" value={id} />
+          ))}
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label htmlFor="createdFrom" className="mb-1 block text-xs font-medium text-muted">
+              Creados desde
+            </label>
+            <input
+              id="createdFrom"
+              name="createdFrom"
+              type="date"
+              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
+            />
+          </div>
+          <div>
+            <label htmlFor="createdTo" className="mb-1 block text-xs font-medium text-muted">
+              Creados hasta
+            </label>
+            <input
+              id="createdTo"
+              name="createdTo"
+              type="date"
+              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
+            />
+          </div>
+        </div>
       </div>
 
       {sendType === "template" && (

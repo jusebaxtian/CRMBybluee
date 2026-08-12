@@ -89,7 +89,10 @@ export async function createCampaign(_prevState: unknown, formData: FormData) {
   const messageBody = String(formData.get("messageBody") ?? "").trim() || null;
   const mediaUrl = String(formData.get("mediaUrl") ?? "") || null;
   const mediaFilename = String(formData.get("mediaFilename") ?? "") || null;
-  const audienceTagId = String(formData.get("audienceTagId") ?? "") || null;
+  const includeTagIds = formData.getAll("includeTagIds").map(String).filter(Boolean);
+  const excludeTagIds = formData.getAll("excludeTagIds").map(String).filter(Boolean);
+  const createdFromRaw = String(formData.get("createdFrom") ?? "") || null;
+  const createdToRaw = String(formData.get("createdTo") ?? "") || null;
   // Free-form messages only work within the 24h window — forcing this
   // avoids creating a campaign that would fail on every single recipient.
   const audienceWindow =
@@ -117,7 +120,10 @@ export async function createCampaign(_prevState: unknown, formData: FormData) {
       message_body: sendType === "free_text" ? messageBody : null,
       media_url: sendType === "free_text" ? mediaUrl : null,
       media_filename: sendType === "free_text" ? mediaFilename : null,
-      audience_tag_id: audienceTagId,
+      audience_tag_ids: includeTagIds.length > 0 ? includeTagIds : null,
+      audience_exclude_tag_ids: excludeTagIds.length > 0 ? excludeTagIds : null,
+      audience_created_from: createdFromRaw ? new Date(createdFromRaw).toISOString() : null,
+      audience_created_to: createdToRaw ? new Date(`${createdToRaw}T23:59:59.999`).toISOString() : null,
       audience_window: audienceWindow,
     })
     .select("id")
@@ -133,17 +139,31 @@ export async function createCampaign(_prevState: unknown, formData: FormData) {
     .select("id")
     .eq("workspace_id", workspaceId)
     .eq("likely_blocked", false);
-  if (audienceTagId) {
+
+  if (createdFromRaw) contactsQuery = contactsQuery.gte("created_at", new Date(createdFromRaw).toISOString());
+  if (createdToRaw) contactsQuery = contactsQuery.lte("created_at", new Date(`${createdToRaw}T23:59:59.999`).toISOString());
+
+  if (includeTagIds.length > 0) {
     const { data: taggedContacts } = await supabase
       .from("contact_tags")
       .select("contact_id")
-      .eq("tag_id", audienceTagId);
-    const ids = (taggedContacts ?? []).map((c) => c.contact_id);
+      .in("tag_id", includeTagIds);
+    const ids = Array.from(new Set((taggedContacts ?? []).map((c) => c.contact_id)));
     contactsQuery = contactsQuery.in("id", ids.length > 0 ? ids : ["00000000-0000-0000-0000-000000000000"]);
   }
 
   const { data: contacts } = await contactsQuery;
   let contactIds = (contacts ?? []).map((c) => c.id);
+
+  if (excludeTagIds.length > 0 && contactIds.length > 0) {
+    const { data: excludedContacts } = await supabase
+      .from("contact_tags")
+      .select("contact_id")
+      .in("tag_id", excludeTagIds)
+      .in("contact_id", contactIds);
+    const excludedIds = new Set((excludedContacts ?? []).map((c) => c.contact_id));
+    contactIds = contactIds.filter((id) => !excludedIds.has(id));
+  }
 
   if (audienceWindow === "open") {
     contactIds = await filterContactsWithOpenWindow(supabase, workspaceId, contactIds);
