@@ -15,7 +15,9 @@ export default async function FollowupsPage() {
 
   const { data: sequences } = await supabase
     .from("automations")
-    .select("id, name, is_active, required_tag_id, tags(name), automation_actions(delay_seconds)")
+    .select(
+      "id, name, is_active, required_tag_id, tags!automations_required_tag_id_fkey(name), automation_actions(delay_seconds)"
+    )
     .eq("workspace_id", workspaceId ?? "")
     .eq("trigger_type", "no_reply")
     .order("created_at", { ascending: false });

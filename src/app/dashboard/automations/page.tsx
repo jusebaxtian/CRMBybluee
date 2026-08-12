@@ -14,7 +14,9 @@ export default async function AutomationsPage() {
 
   const { data: automations } = await supabase
     .from("automations")
-    .select("id, name, trigger_type, trigger_keyword, is_active, tags(name)")
+    .select(
+      "id, name, trigger_type, trigger_keyword, is_active, tags!automations_trigger_tag_id_fkey(name)"
+    )
     .eq("workspace_id", workspaceId ?? "")
     .order("created_at", { ascending: false });
 
