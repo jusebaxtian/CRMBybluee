@@ -165,15 +165,34 @@ export async function createCampaign(_prevState: unknown, formData: FormData) {
     contactIds = contactIds.filter((id) => !excludedIds.has(id));
   }
 
+  const matchedBeforeWindow = contactIds.length;
   if (audienceWindow === "open") {
     contactIds = await filterContactsWithOpenWindow(supabase, workspaceId, contactIds);
   }
 
-  if (contactIds.length > 0) {
-    await supabase.from("campaign_recipients").insert(
-      contactIds.map((id) => ({ campaign_id: campaign.id, contact_id: id }))
-    );
+  // Creating a campaign with 0 recipients is never useful and, for
+  // free-text sends, almost always means the audience matched contacts
+  // but none had an open 24h window (e.g. a freshly imported list that
+  // never wrote in) — surface that instead of leaving a silent empty draft.
+  if (contactIds.length === 0) {
+    await supabase.from("campaigns").delete().eq("id", campaign.id);
+    if (matchedBeforeWindow === 0) {
+      return {
+        error:
+          "Ningún contacto coincide con la audiencia elegida (etiquetas/fechas). Revisa los filtros.",
+      };
+    }
+    return {
+      error:
+        `La audiencia tiene ${matchedBeforeWindow} contacto(s), pero ninguno tiene la ventana de 24h abierta ` +
+        "(mensaje libre solo se puede enviar a quien te escribió en las últimas 24h). " +
+        "Usa una plantilla aprobada para llegar a contactos que nunca te han escrito, como los que acabas de importar.",
+    };
   }
+
+  await supabase.from("campaign_recipients").insert(
+    contactIds.map((id) => ({ campaign_id: campaign.id, contact_id: id }))
+  );
 
   redirect(`/dashboard/campaigns/${campaign.id}`);
 }
