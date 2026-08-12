@@ -39,7 +39,7 @@ export default async function ContactsPage() {
           </h2>
           <p className="mt-1 max-w-md text-sm text-muted">
             Los contactos se crean automáticamente cuando alguien te escribe por WhatsApp,
-            o impórtalos desde un CSV con columnas &quot;name&quot; y &quot;phone&quot;.
+            o impórtalos desde un archivo Excel — descarga la plantilla arriba para ver el formato exacto.
           </p>
         </div>
       </div>

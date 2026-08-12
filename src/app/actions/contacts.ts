@@ -1,56 +1,196 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import ExcelJS from "exceljs";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
 import { maybeTrackPurchaseFromTag } from "@/lib/meta/conversions";
+import { normalizeWaId } from "@/lib/phone";
 
-function parseCsv(text: string): { name: string; phone: string }[] {
+type ImportRow = {
+  phone: string;
+  name: string | null;
+  tagNames: string[];
+};
+
+function normalizeHeader(h: string): string {
+  return h
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .trim();
+}
+
+function matchColumn(headers: string[], candidates: string[]): number {
+  for (const candidate of candidates) {
+    const idx = headers.indexOf(candidate);
+    if (idx !== -1) return idx;
+  }
+  return -1;
+}
+
+function parseTagNames(value: unknown): string[] {
+  if (!value) return [];
+  return String(value)
+    .split(/[,;]/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+}
+
+function rowsFromCsv(text: string): ImportRow[] {
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length === 0) return [];
 
-  const header = lines[0].toLowerCase().split(",").map((h) => h.trim());
-  const nameIdx = header.indexOf("name") !== -1 ? header.indexOf("name") : header.indexOf("nombre");
-  const phoneIdx = header.indexOf("phone") !== -1 ? header.indexOf("phone") : header.indexOf("telefono");
+  const headers = lines[0].split(",").map((h) => normalizeHeader(h));
+  const phoneIdx = matchColumn(headers, ["celular", "telefono", "phone", "numero"]);
+  const nameIdx = matchColumn(headers, ["nombre", "name"]);
+  const tagsIdx = matchColumn(headers, ["etiquetas", "tags", "etiqueta"]);
 
-  const dataLines = nameIdx === -1 && phoneIdx === -1 ? lines : lines.slice(1);
-  const effectiveNameIdx = nameIdx === -1 ? 0 : nameIdx;
-  const effectivePhoneIdx = phoneIdx === -1 ? 1 : phoneIdx;
+  const hasHeader = phoneIdx !== -1 || nameIdx !== -1 || tagsIdx !== -1;
+  const dataLines = hasHeader ? lines.slice(1) : lines;
+  const effectivePhoneIdx = phoneIdx === -1 ? 0 : phoneIdx;
+  const effectiveNameIdx = nameIdx === -1 ? 1 : nameIdx;
 
-  return dataLines
-    .map((line) => {
-      const cols = line.split(",").map((c) => c.trim());
-      return {
-        name: cols[effectiveNameIdx] ?? "",
-        phone: (cols[effectivePhoneIdx] ?? "").replace(/[^0-9]/g, ""),
-      };
-    })
-    .filter((row) => row.phone.length >= 8);
+  return dataLines.map((line) => {
+    const cols = line.split(",").map((c) => c.trim());
+    return {
+      phone: cols[effectivePhoneIdx] ?? "",
+      name: cols[effectiveNameIdx] || null,
+      tagNames: tagsIdx !== -1 ? parseTagNames(cols[tagsIdx]) : [],
+    };
+  });
 }
 
-export async function importContactsCsv(csvText: string) {
+async function rowsFromExcel(buffer: ArrayBuffer): Promise<ImportRow[]> {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  const sheet = workbook.worksheets[0];
+  if (!sheet) return [];
+
+  const headerRow = sheet.getRow(1);
+  const headers: string[] = [];
+  headerRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+    headers[colNumber - 1] = normalizeHeader(String(cell.value ?? ""));
+  });
+
+  const phoneIdx = matchColumn(headers, ["celular", "telefono", "phone", "numero"]);
+  const nameIdx = matchColumn(headers, ["nombre", "name"]);
+  const tagsIdx = matchColumn(headers, ["etiquetas", "tags", "etiqueta"]);
+
+  if (phoneIdx === -1) return [];
+
+  const rows: ImportRow[] = [];
+  sheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) return;
+    const phoneCell = row.getCell(phoneIdx + 1).value;
+    const phone = phoneCell == null ? "" : String(phoneCell).trim();
+    if (!phone) return;
+
+    const nameCell = nameIdx !== -1 ? row.getCell(nameIdx + 1).value : null;
+    const tagsCell = tagsIdx !== -1 ? row.getCell(tagsIdx + 1).value : null;
+
+    rows.push({
+      phone,
+      name: nameCell ? String(nameCell).trim() || null : null,
+      tagNames: parseTagNames(tagsCell),
+    });
+  });
+
+  return rows;
+}
+
+export async function importContactsFile(formData: FormData) {
+  const file = formData.get("file") as File | null;
+  if (!file) return { error: "No se recibió ningún archivo." };
+
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
   if (!workspaceId) return { error: "No se encontró tu workspace." };
 
-  const rows = parseCsv(csvText);
+  const isExcel = file.name.toLowerCase().endsWith(".xlsx");
+  const rawRows = isExcel
+    ? await rowsFromExcel(await file.arrayBuffer())
+    : rowsFromCsv(await file.text());
+
+  const invalidCount = rawRows.length === 0 ? 0 : rawRows.filter((r) => !normalizeWaId(r.phone)).length;
+
+  const byPhone = new Map<string, ImportRow>();
+  for (const row of rawRows) {
+    const normalized = normalizeWaId(row.phone);
+    if (!normalized) continue;
+    byPhone.set(normalized, { ...row, phone: normalized });
+  }
+  const rows = Array.from(byPhone.values());
+
   if (rows.length === 0) {
-    return { error: "No se encontraron filas válidas (se esperan columnas name/nombre y phone/telefono)." };
+    return {
+      error:
+        "No se encontraron celulares válidos. Revisa que la columna \"Celular\" exista y tenga números de al menos 8 dígitos.",
+    };
   }
 
-  const { error } = await supabase.from("contacts").upsert(
+  const phones = rows.map((r) => r.phone);
+
+  const { error: upsertError } = await supabase.from("contacts").upsert(
     rows.map((r) => ({
       workspace_id: workspaceId,
       wa_id: r.phone,
-      name: r.name || null,
+      name: r.name,
     })),
     { onConflict: "workspace_id,wa_id", ignoreDuplicates: false }
   );
+  if (upsertError) return { error: upsertError.message };
 
-  if (error) return { error: error.message };
+  const uniqueTagNames = Array.from(new Set(rows.flatMap((r) => r.tagNames)));
+  if (uniqueTagNames.length > 0) {
+    const { data: tagRows, error: tagError } = await supabase
+      .from("tags")
+      .upsert(
+        uniqueTagNames.map((name) => ({ workspace_id: workspaceId, name })),
+        { onConflict: "workspace_id,name", ignoreDuplicates: true }
+      )
+      .select("id, name");
+
+    let tagIdByName = new Map((tagRows ?? []).map((t) => [t.name, t.id]));
+    if (tagError || tagIdByName.size < uniqueTagNames.length) {
+      const { data: allTags } = await supabase
+        .from("tags")
+        .select("id, name")
+        .eq("workspace_id", workspaceId)
+        .in("name", uniqueTagNames);
+      tagIdByName = new Map((allTags ?? []).map((t) => [t.name, t.id]));
+    }
+
+    const { data: contactRows } = await supabase
+      .from("contacts")
+      .select("id, wa_id")
+      .eq("workspace_id", workspaceId)
+      .in("wa_id", phones);
+    const contactIdByPhone = new Map((contactRows ?? []).map((c) => [c.wa_id, c.id]));
+
+    const contactTagRows: { contact_id: string; tag_id: string }[] = [];
+    for (const row of rows) {
+      const contactId = contactIdByPhone.get(row.phone);
+      if (!contactId) continue;
+      for (const tagName of row.tagNames) {
+        const tagId = tagIdByName.get(tagName);
+        if (tagId) contactTagRows.push({ contact_id: contactId, tag_id: tagId });
+      }
+    }
+
+    if (contactTagRows.length > 0) {
+      await supabase
+        .from("contact_tags")
+        .upsert(contactTagRows, { onConflict: "contact_id,tag_id", ignoreDuplicates: true });
+    }
+  }
 
   revalidatePath("/dashboard/contacts");
-  return { success: true, count: rows.length };
+  return {
+    success: true,
+    count: rows.length,
+    skipped: invalidCount,
+  };
 }
 
 export async function createContact(_prevState: unknown, formData: FormData) {
