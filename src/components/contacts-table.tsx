@@ -2,7 +2,17 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Trash2, Tag as TagIcon, X, Check, Megaphone, Search, SlidersHorizontal } from "lucide-react";
+import {
+  Pencil,
+  Trash2,
+  Tag as TagIcon,
+  X,
+  Check,
+  Megaphone,
+  Search,
+  SlidersHorizontal,
+  AlertTriangle,
+} from "lucide-react";
 import { ContactTagPicker } from "@/components/contact-tag-picker";
 import { SendMessagePopover } from "@/components/send-message-popover";
 import { updateContact, bulkDeleteContacts, bulkAddTagToContacts } from "@/app/actions/contacts";
@@ -33,6 +43,8 @@ export function ContactsTable({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tagMenuOpen, setTagMenuOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   const [search, setSearch] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -105,11 +117,7 @@ export function ContactsTable({
     router.refresh();
   }
 
-  async function handleBulkDelete() {
-    const confirmed = window.confirm(
-      `¿Eliminar ${selected.size} contacto(s) seleccionado(s)? Esta acción no se puede deshacer.`
-    );
-    if (!confirmed) return;
+  async function confirmBulkDelete() {
     setPending(true);
     setError(null);
     const result = await bulkDeleteContacts(Array.from(selected));
@@ -119,6 +127,8 @@ export function ContactsTable({
       return;
     }
     setSelected(new Set());
+    setDeleteModalOpen(false);
+    setDeleteConfirmText("");
     router.refresh();
   }
 
@@ -277,7 +287,7 @@ export function ContactsTable({
 
           <button
             type="button"
-            onClick={handleBulkDelete}
+            onClick={() => setDeleteModalOpen(true)}
             disabled={pending}
             className="flex items-center gap-1.5 rounded-md border border-red-400 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-50"
           >
@@ -425,6 +435,56 @@ export function ContactsTable({
           </tbody>
         </table>
       </div>
+
+      {deleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-lg">
+            <div className="flex items-center gap-2 text-red-400">
+              <AlertTriangle size={18} />
+              <h3 className="text-base font-semibold">Eliminar contactos</h3>
+            </div>
+            <p className="mt-3 text-sm text-muted">
+              Vas a eliminar{" "}
+              <span className="font-semibold text-foreground">{selected.size}</span> contacto
+              {selected.size === 1 ? "" : "s"} de forma permanente, junto con su conversación e
+              historial de mensajes. Esta acción no se puede deshacer.
+            </p>
+            <p className="mt-3 text-xs text-muted">
+              Escribe <span className="font-mono font-semibold text-foreground">ELIMINAR</span> para
+              confirmar.
+            </p>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="ELIMINAR"
+              autoFocus
+              className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-red-400"
+            />
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteModalOpen(false);
+                  setDeleteConfirmText("");
+                }}
+                disabled={pending}
+                className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground hover:bg-surface-hover disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmBulkDelete}
+                disabled={pending || deleteConfirmText.trim().toUpperCase() !== "ELIMINAR"}
+                className="rounded-md bg-red-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {pending ? "Eliminando..." : `Eliminar ${selected.size} contacto(s)`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
