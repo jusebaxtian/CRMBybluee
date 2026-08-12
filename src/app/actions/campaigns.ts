@@ -391,11 +391,22 @@ export async function sendCampaign(campaignId: string) {
 
 // media_filename doesn't carry a mime type — infer a close-enough one from
 // its extension just to pick the right WhatsApp media kind (image/video/
-// document) for sending; this never touches file content or validation.
+// audio/document) for sending; this never touches file content or
+// validation, only which sendMediaMessage(type) call gets made.
 function guessMimeFromFilename(filename: string | null): string {
   const ext = (filename ?? "").split(".").pop()?.toLowerCase();
   if (ext === "png") return "image/png";
   if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
   if (ext === "mp4") return "video/mp4";
+  if (ext === "mov") return "video/quicktime";
+  if (ext === "webm") return "video/webm";
+  if (ext === "3gp") return "video/3gpp";
+  if (ext === "mkv") return "video/x-matroska";
+  if (ext === "avi") return "video/x-msvideo";
+  if (ext === "mp3") return "audio/mpeg";
+  if (ext === "m4a") return "audio/mp4";
+  if (ext === "aac") return "audio/aac";
+  if (ext === "ogg" || ext === "oga") return "audio/ogg";
+  if (ext === "amr") return "audio/amr";
   return "application/pdf";
 }
