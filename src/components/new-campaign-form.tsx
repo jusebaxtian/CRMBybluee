@@ -7,11 +7,12 @@ import { createCampaign, uploadCampaignMedia } from "@/app/actions/campaigns";
 type Template = { id: string; meta_template_name: string; status: string };
 type Tag = { id: string; name: string; excludes_followups: boolean };
 type SendType = "template" | "free_text";
-type MediaKind = "" | "image" | "video" | "document";
+type MediaKind = "" | "image" | "video" | "audio" | "document";
 
 const mediaAccept: Record<Exclude<MediaKind, "">, string> = {
   image: "image/jpeg,image/png",
   video: "video/mp4,video/quicktime,video/webm,video/3gpp,.mov,.mkv,.avi",
+  audio: "audio/aac,audio/mp4,audio/mpeg,audio/amr,audio/ogg,.mp3,.m4a,.ogg,.amr",
   document: "application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt",
 };
 
@@ -136,6 +137,7 @@ export function NewCampaignForm({
               <option value="">Ninguno</option>
               <option value="image">Imagen</option>
               <option value="video">Video</option>
+              <option value="audio">Audio</option>
               <option value="document">Documento</option>
             </select>
             {mediaKind && (
