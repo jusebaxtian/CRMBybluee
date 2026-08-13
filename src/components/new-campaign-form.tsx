@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { Info } from "lucide-react";
-import { createCampaign, uploadCampaignMedia } from "@/app/actions/campaigns";
+import { useActionState, useEffect, useState } from "react";
+import { Info, Users } from "lucide-react";
+import { createCampaign, updateCampaign, uploadCampaignMedia, previewAudienceCount } from "@/app/actions/campaigns";
 
 type Template = { id: string; meta_template_name: string; status: string };
 type Tag = { id: string; name: string; excludes_followups: boolean };
@@ -16,26 +16,85 @@ const mediaAccept: Record<Exclude<MediaKind, "">, string> = {
   document: "application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt",
 };
 
+export type CampaignInitialValues = {
+  name: string;
+  sendType: SendType;
+  templateId: string | null;
+  messageBody: string | null;
+  mediaUrl: string | null;
+  mediaFilename: string | null;
+  includeTagIds: string[];
+  excludeTagIds: string[];
+  createdFrom: string | null;
+  createdTo: string | null;
+  audienceWindow: "all" | "open";
+  scheduledAt: string | null; // ISO
+};
+
+// Local (browser) datetime for a <input type="datetime-local"> from an ISO string.
+function toLocalInputValue(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export function NewCampaignForm({
   templates,
   tags,
+  mode = "create",
+  campaignId,
+  initialValues,
 }: {
   templates: Template[];
   tags: Tag[];
+  mode?: "create" | "edit";
+  campaignId?: string;
+  initialValues?: CampaignInitialValues;
 }) {
-  const [state, action, pending] = useActionState(createCampaign, undefined);
-  const [sendType, setSendType] = useState<SendType>("template");
+  const boundAction = mode === "edit" && campaignId ? updateCampaign.bind(null, campaignId) : createCampaign;
+  const [state, action, pending] = useActionState(boundAction, undefined);
+
+  const [sendType, setSendType] = useState<SendType>(initialValues?.sendType ?? "template");
   const [mediaKind, setMediaKind] = useState<MediaKind>("");
-  const [mediaUrl, setMediaUrl] = useState("");
-  const [mediaFilename, setMediaFilename] = useState("");
+  const [mediaUrl, setMediaUrl] = useState(initialValues?.mediaUrl ?? "");
+  const [mediaFilename, setMediaFilename] = useState(initialValues?.mediaFilename ?? "");
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [includeTagIds, setIncludeTagIds] = useState<string[]>([]);
-  const [excludeTagIds, setExcludeTagIds] = useState<string[]>([]);
+  const [includeTagIds, setIncludeTagIds] = useState<string[]>(initialValues?.includeTagIds ?? []);
+  const [excludeTagIds, setExcludeTagIds] = useState<string[]>(initialValues?.excludeTagIds ?? []);
+  const [createdFrom, setCreatedFrom] = useState(initialValues?.createdFrom ?? "");
+  const [createdTo, setCreatedTo] = useState(initialValues?.createdTo ?? "");
+  const [windowOnly, setWindowOnly] = useState(initialValues?.audienceWindow === "open");
+  const [sendMode, setSendMode] = useState<"now" | "schedule">(initialValues?.scheduledAt ? "schedule" : "now");
+  const [scheduledAt, setScheduledAt] = useState(toLocalInputValue(initialValues?.scheduledAt ?? null));
+
+  const [audienceCount, setAudienceCount] = useState<number | null>(null);
+  const [countLoading, setCountLoading] = useState(false);
 
   function toggleTag(list: string[], setList: (ids: string[]) => void, tagId: string) {
     setList(list.includes(tagId) ? list.filter((id) => id !== tagId) : [...list, tagId]);
   }
+
+  // Live recipient counter — recomputes whenever any audience filter
+  // changes, using the exact same resolution logic the real send uses.
+  useEffect(() => {
+    const formData = new FormData();
+    formData.set("sendType", sendType);
+    includeTagIds.forEach((id) => formData.append("includeTagIds", id));
+    excludeTagIds.forEach((id) => formData.append("excludeTagIds", id));
+    if (createdFrom) formData.set("createdFrom", createdFrom);
+    if (createdTo) formData.set("createdTo", createdTo);
+    if (sendType === "template" && windowOnly) formData.set("audienceWindow", "open");
+
+    setCountLoading(true);
+    const timeout = setTimeout(() => {
+      previewAudienceCount(formData)
+        .then((result) => setAudienceCount("count" in result && typeof result.count === "number" ? result.count : null))
+        .finally(() => setCountLoading(false));
+    }, 350);
+    return () => clearTimeout(timeout);
+  }, [sendType, includeTagIds, excludeTagIds, createdFrom, createdTo, windowOnly]);
 
   async function handleFile(file: File, kind: Exclude<MediaKind, "">) {
     setUploading(true);
@@ -58,6 +117,7 @@ export function NewCampaignForm({
       <input type="hidden" name="sendType" value={sendType} />
       <input type="hidden" name="mediaUrl" value={mediaUrl} />
       <input type="hidden" name="mediaFilename" value={mediaFilename} />
+      <input type="hidden" name="sendMode" value={sendMode} />
 
       <div>
         <label htmlFor="name" className="mb-1 block text-sm font-medium text-muted">
@@ -68,6 +128,7 @@ export function NewCampaignForm({
           name="name"
           type="text"
           required
+          defaultValue={initialValues?.name ?? ""}
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
         />
       </div>
@@ -98,6 +159,7 @@ export function NewCampaignForm({
               id="templateId"
               name="templateId"
               required
+              defaultValue={initialValues?.templateId ?? undefined}
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
             >
               {templates.map((t) => (
@@ -119,6 +181,7 @@ export function NewCampaignForm({
             name="messageBody"
             rows={3}
             placeholder="Escribe el mensaje..."
+            defaultValue={initialValues?.messageBody ?? ""}
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
           />
           <div>
@@ -236,6 +299,8 @@ export function NewCampaignForm({
               id="createdFrom"
               name="createdFrom"
               type="date"
+              value={createdFrom}
+              onChange={(e) => setCreatedFrom(e.target.value)}
               className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
             />
           </div>
@@ -247,18 +312,91 @@ export function NewCampaignForm({
               id="createdTo"
               name="createdTo"
               type="date"
+              value={createdTo}
+              onChange={(e) => setCreatedTo(e.target.value)}
               className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
             />
           </div>
         </div>
+
+        {sendType === "template" && (
+          <label className="flex items-center gap-1.5 text-xs text-muted">
+            <input
+              type="checkbox"
+              checked={windowOnly}
+              onChange={(e) => setWindowOnly(e.target.checked)}
+              className="accent-primary"
+            />
+            Enviar solo a contactos con la ventana de 24h abierta
+          </label>
+        )}
+        {sendType === "template" && windowOnly && (
+          <input type="hidden" name="audienceWindow" value="open" />
+        )}
+
+        <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+          <Users size={15} className="shrink-0 text-primary" />
+          <span className="text-foreground">
+            {countLoading
+              ? "Calculando..."
+              : audienceCount === null
+                ? "—"
+                : `Se enviará a ${audienceCount} contacto${audienceCount === 1 ? "" : "s"}`}
+          </span>
+        </div>
       </div>
 
-      {sendType === "template" && (
-        <label className="flex items-center gap-1.5 text-xs text-muted">
-          <input type="checkbox" name="audienceWindow" value="open" className="accent-primary" />
-          Enviar solo a contactos con la ventana de 24h abierta
-        </label>
-      )}
+      <div className="flex flex-col gap-3 rounded-lg border border-border p-3">
+        <p className="text-sm font-medium text-foreground">Envío</p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setSendMode("now")}
+            className={`flex-1 rounded-md border px-3 py-2 text-xs font-medium ${
+              sendMode === "now"
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border text-muted hover:bg-surface-hover"
+            }`}
+          >
+            Envío inmediato
+          </button>
+          <button
+            type="button"
+            onClick={() => setSendMode("schedule")}
+            className={`flex-1 rounded-md border px-3 py-2 text-xs font-medium ${
+              sendMode === "schedule"
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border text-muted hover:bg-surface-hover"
+            }`}
+          >
+            Programar envío
+          </button>
+        </div>
+        {sendMode === "now" ? (
+          <p className="text-xs text-muted">
+            La campaña queda en borrador — la envías cuando quieras con el botón &quot;Enviar&quot;.
+          </p>
+        ) : (
+          <div>
+            <label htmlFor="scheduledAt" className="mb-1 block text-xs font-medium text-muted">
+              Fecha y hora de envío
+            </label>
+            <input
+              id="scheduledAt"
+              name="scheduledAt"
+              type="datetime-local"
+              value={scheduledAt}
+              onChange={(e) => setScheduledAt(e.target.value)}
+              min={toLocalInputValue(new Date().toISOString())}
+              required={sendMode === "schedule"}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            />
+            <p className="mt-1 text-xs text-muted">
+              Se enviará sola a esa hora, sin que tengas que volver a entrar.
+            </p>
+          </div>
+        )}
+      </div>
 
       {state && "error" in state && <p className="text-sm text-red-400">{state.error}</p>}
 
@@ -267,7 +405,7 @@ export function NewCampaignForm({
         disabled={pending || uploading || (sendType === "template" && templates.length === 0)}
         className="mt-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
       >
-        {pending ? "Creando..." : "Crear campaña"}
+        {pending ? "Guardando..." : mode === "edit" ? "Guardar cambios" : "Crear campaña"}
       </button>
     </form>
   );

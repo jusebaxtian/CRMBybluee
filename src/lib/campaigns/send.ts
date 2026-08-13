@@ -1,0 +1,238 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { sendTemplateMessage, sendTextMessage, sendMediaMessage } from "@/lib/whatsapp/graph";
+import { mediaKindFromMime } from "@/lib/whatsapp/media-limits";
+
+const WINDOW_MS = 24 * 60 * 60 * 1000;
+
+// media_filename doesn't carry a mime type — infer a close-enough one from
+// its extension just to pick the right WhatsApp media kind (image/video/
+// audio/document) for sending; this never touches file content or
+// validation, only which sendMediaMessage(type) call gets made.
+function guessMimeFromFilename(filename: string | null): string {
+  const ext = (filename ?? "").toLowerCase().split(".").pop() ?? "";
+  const map: Record<string, string> = {
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    mp4: "video/mp4",
+    mov: "video/quicktime",
+    webm: "video/webm",
+    mp3: "audio/mpeg",
+    m4a: "audio/mp4",
+    ogg: "audio/ogg",
+    amr: "audio/amr",
+    aac: "audio/aac",
+  };
+  return map[ext] ?? "application/pdf";
+}
+
+async function getOrCreateConversation(
+  supabase: SupabaseClient,
+  workspaceId: string,
+  contactId: string
+): Promise<string | null> {
+  const { data } = await supabase
+    .from("conversations")
+    .upsert({ workspace_id: workspaceId, contact_id: contactId }, { onConflict: "workspace_id,contact_id" })
+    .select("id")
+    .single();
+  return data?.id ?? null;
+}
+
+// Shared by the manual "Enviar" button and the scheduler tick — both need
+// the exact same send/record-keeping logic, just triggered differently.
+// Callers pass either the session-scoped client (manual send, RLS-checked)
+// or the admin client (scheduler, no session to check against).
+export async function executeCampaignSend(
+  supabase: SupabaseClient,
+  workspaceId: string,
+  campaignId: string
+): Promise<{ error: string } | { success: true }> {
+  const { data: campaign } = await supabase
+    .from("campaigns")
+    .select(
+      "id, send_type, message_body, media_url, media_filename, templates(meta_template_name, language, body_text, header_format, header_media_url, header_media_mime_type)"
+    )
+    .eq("id", campaignId)
+    .single();
+  if (!campaign) return { error: "Campaña no encontrada." };
+
+  const template = campaign.templates as unknown as {
+    meta_template_name: string;
+    language: string;
+    body_text: string | null;
+    header_format: "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | null;
+    header_media_url: string | null;
+    header_media_mime_type: string | null;
+  } | null;
+
+  const templateHeaderMedia =
+    template?.header_format &&
+    template.header_format !== "TEXT" &&
+    template.header_media_url
+      ? {
+          type: template.header_format.toLowerCase() as "image" | "video" | "document",
+          link: template.header_media_url,
+        }
+      : undefined;
+
+  const { data: account } = await supabase
+    .from("whatsapp_accounts")
+    .select("phone_number_id, access_token")
+    .eq("workspace_id", workspaceId)
+    .single();
+  if (!account) return { error: "Este workspace no tiene WhatsApp conectado." };
+
+  await supabase.from("campaigns").update({ status: "sending" }).eq("id", campaignId);
+
+  const { data: recipients } = await supabase
+    .from("campaign_recipients")
+    .select("id, contact_id, contacts(wa_id, likely_blocked)")
+    .eq("campaign_id", campaignId)
+    .eq("status", "pending");
+
+  let failures = 0;
+  const mediaKind = campaign.media_url ? mediaKindFromMime(guessMimeFromFilename(campaign.media_filename)) : null;
+
+  for (const recipient of recipients ?? []) {
+    const { wa_id: waId, likely_blocked: likelyBlocked } = recipient.contacts as unknown as {
+      wa_id: string;
+      likely_blocked: boolean;
+    };
+    // Re-check right before sending — a contact could have started failing
+    // (and gotten flagged) after this campaign was created.
+    if (likelyBlocked) {
+      failures += 1;
+      await supabase
+        .from("campaign_recipients")
+        .update({
+          status: "failed",
+          error_message: "Contacto marcado como posiblemente bloqueado — no se le envió.",
+        })
+        .eq("id", recipient.id);
+      continue;
+    }
+    try {
+      if (campaign.send_type === "template" && template) {
+        const result = await sendTemplateMessage(
+          account.phone_number_id,
+          account.access_token,
+          waId,
+          template.meta_template_name,
+          template.language,
+          undefined,
+          templateHeaderMedia
+        );
+
+        const conversationId = await getOrCreateConversation(supabase, workspaceId, recipient.contact_id);
+        if (conversationId) {
+          await supabase.from("messages").insert({
+            conversation_id: conversationId,
+            direction: "out",
+            message_type: templateHeaderMedia ? templateHeaderMedia.type : "template",
+            body: template.body_text,
+            media_url: templateHeaderMedia?.link ?? null,
+            wa_message_id: result.messages[0]?.id,
+            status: "sent",
+            exclude_from_followups: true,
+          });
+          await supabase
+            .from("conversations")
+            .update({ last_message_at: new Date().toISOString() })
+            .eq("id", conversationId);
+        }
+
+        await supabase
+          .from("campaign_recipients")
+          .update({
+            status: "sent",
+            sent_at: new Date().toISOString(),
+            wa_message_id: result.messages[0]?.id,
+          })
+          .eq("id", recipient.id);
+      } else {
+        // Free-form send — re-check the window right before sending, since
+        // it may have closed since the campaign was created.
+        const conversationId = await getOrCreateConversation(supabase, workspaceId, recipient.contact_id);
+        const { data: lastInbound } = await supabase
+          .from("messages")
+          .select("created_at")
+          .eq("conversation_id", conversationId ?? "")
+          .eq("direction", "in")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const windowOpen =
+          !!lastInbound && Date.now() - new Date(lastInbound.created_at).getTime() < WINDOW_MS;
+        if (!windowOpen) {
+          throw new Error("La ventana de 24h se cerró para este contacto antes del envío.");
+        }
+
+        let result;
+        if (campaign.media_url && mediaKind) {
+          result = await sendMediaMessage(
+            account.phone_number_id,
+            account.access_token,
+            waId,
+            mediaKind,
+            { link: campaign.media_url },
+            campaign.media_filename ?? undefined,
+            mediaKind !== "audio" ? campaign.message_body ?? undefined : undefined
+          );
+        } else {
+          result = await sendTextMessage(
+            account.phone_number_id,
+            account.access_token,
+            waId,
+            campaign.message_body ?? ""
+          );
+        }
+
+        if (conversationId) {
+          await supabase.from("messages").insert({
+            conversation_id: conversationId,
+            direction: "out",
+            message_type: mediaKind ?? "text",
+            body: campaign.message_body,
+            media_url: campaign.media_url,
+            wa_message_id: result.messages[0]?.id,
+            status: "sent",
+            // Mass campaigns run fully independent of follow-up sequences —
+            // this must not cancel/reset/start one (see the DB trigger).
+            exclude_from_followups: true,
+          });
+          await supabase
+            .from("conversations")
+            .update({ last_message_at: new Date().toISOString() })
+            .eq("id", conversationId);
+        }
+
+        await supabase
+          .from("campaign_recipients")
+          .update({
+            status: "sent",
+            sent_at: new Date().toISOString(),
+            wa_message_id: result.messages[0]?.id,
+          })
+          .eq("id", recipient.id);
+      }
+    } catch (err) {
+      failures += 1;
+      await supabase
+        .from("campaign_recipients")
+        .update({
+          status: "failed",
+          error_message: err instanceof Error ? err.message : "Error desconocido.",
+        })
+        .eq("id", recipient.id);
+    }
+  }
+
+  await supabase
+    .from("campaigns")
+    .update({ status: failures > 0 && recipients?.length === failures ? "failed" : "completed" })
+    .eq("id", campaignId);
+
+  return { success: true };
+}

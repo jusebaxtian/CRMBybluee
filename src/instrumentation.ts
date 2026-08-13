@@ -7,6 +7,7 @@ export async function register() {
   const { expireTrials } = await import("@/lib/billing/scheduler");
   const { processAiFollowups } = await import("@/lib/ai/followups");
   const { cleanupOldNotifications } = await import("@/lib/notifications/scheduler");
+  const { processDueCampaigns } = await import("@/lib/campaigns/scheduler");
 
   setInterval(() => {
     processDueAutomationRuns().catch((err) => {
@@ -31,4 +32,10 @@ export async function register() {
       console.error("notifications cleanup scheduler tick failed:", err);
     });
   }, 60 * 60_000);
+
+  setInterval(() => {
+    processDueCampaigns().catch((err) => {
+      console.error("campaign scheduler tick failed:", err);
+    });
+  }, 30_000);
 }

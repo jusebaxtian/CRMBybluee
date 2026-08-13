@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Users, Clock, Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { SendCampaignButton } from "@/components/send-campaign-button";
 import { getWorkspaceId } from "@/lib/workspace";
@@ -41,7 +41,7 @@ export default async function CampaignDetailPage({
 
   const { data: campaign } = await supabase
     .from("campaigns")
-    .select("id, name, status, send_type, message_body, media_url, templates(meta_template_name)")
+    .select("id, name, status, send_type, message_body, media_url, scheduled_at, templates(meta_template_name)")
     .eq("id", id)
     .eq("workspace_id", workspaceId ?? "")
     .maybeSingle();
@@ -55,21 +55,55 @@ export default async function CampaignDetailPage({
     .select("id, status, error_message, contacts(name, wa_id)")
     .eq("campaign_id", id);
 
+  const isScheduled = campaign.status === "draft" && !!campaign.scheduled_at;
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-3">
-        <Link href="/dashboard/campaigns" className="text-muted hover:text-foreground">
-          <ArrowLeft size={18} />
-        </Link>
-        <div>
-          <h1 className="text-lg font-semibold text-foreground">{campaign.name}</h1>
-          <p className="text-xs text-muted">
-            {campaign.send_type === "free_text"
-              ? `Mensaje libre${campaign.message_body ? `: "${campaign.message_body.slice(0, 60)}${campaign.message_body.length > 60 ? "..." : ""}"` : ""}${campaign.media_url ? " (con adjunto)" : ""}`
-              : `Plantilla: ${template?.meta_template_name ?? "—"}`}{" "}
-            · {statusLabel[campaign.status]}
-          </p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard/campaigns" className="text-muted hover:text-foreground">
+            <ArrowLeft size={18} />
+          </Link>
+          <div>
+            <h1 className="text-lg font-semibold text-foreground">{campaign.name}</h1>
+            <p className="text-xs text-muted">
+              {campaign.send_type === "free_text"
+                ? `Mensaje libre${campaign.message_body ? `: "${campaign.message_body.slice(0, 60)}${campaign.message_body.length > 60 ? "..." : ""}"` : ""}${campaign.media_url ? " (con adjunto)" : ""}`
+                : `Plantilla: ${template?.meta_template_name ?? "—"}`}{" "}
+              · {isScheduled ? "Programada" : statusLabel[campaign.status]}
+            </p>
+          </div>
         </div>
+        {campaign.status === "draft" && (
+          <Link
+            href={`/dashboard/campaigns/${campaign.id}/edit`}
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-surface-hover"
+          >
+            <Pencil size={13} />
+            Editar
+          </Link>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+          <Users size={15} className="shrink-0 text-primary" />
+          <span className="text-foreground">
+            {recipients?.length ?? 0} contacto{(recipients?.length ?? 0) === 1 ? "" : "s"} en total
+          </span>
+        </div>
+        {isScheduled && campaign.scheduled_at && (
+          <div className="flex items-center gap-2 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
+            <Clock size={15} className="shrink-0" />
+            Se enviará el{" "}
+            {new Date(campaign.scheduled_at).toLocaleString("es-CO", {
+              day: "2-digit",
+              month: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </div>
+        )}
       </div>
 
       {campaign.status === "draft" && <SendCampaignButton campaignId={campaign.id} />}

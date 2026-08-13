@@ -4,55 +4,39 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendTemplateMessage, sendTextMessage, sendMediaMessage } from "@/lib/whatsapp/graph";
-import { mediaKindFromMime, validateMediaMime, validateMediaSize } from "@/lib/whatsapp/media-limits";
+import { validateMediaMime, validateMediaSize } from "@/lib/whatsapp/media-limits";
 import { getWorkspaceId } from "@/lib/workspace";
+import { resolveCampaignAudience, type AudienceParams } from "@/lib/campaigns/audience";
+import { executeCampaignSend } from "@/lib/campaigns/send";
 
-const WINDOW_MS = 24 * 60 * 60 * 1000;
+function readAudienceParams(formData: FormData, sendType: "template" | "free_text"): AudienceParams {
+  return {
+    includeTagIds: formData.getAll("includeTagIds").map(String).filter(Boolean),
+    excludeTagIds: formData.getAll("excludeTagIds").map(String).filter(Boolean),
+    createdFromRaw: String(formData.get("createdFrom") ?? "") || null,
+    createdToRaw: String(formData.get("createdTo") ?? "") || null,
+    // Free-form messages only work within the 24h window — forcing this
+    // avoids creating a campaign that would fail on every single recipient.
+    audienceWindow:
+      sendType === "free_text" ? "open" : (String(formData.get("audienceWindow") ?? "all") as "all" | "open"),
+  };
+}
 
-// Contacts whose most recent inbound message is still within the 24h
-// window — i.e. WhatsApp will accept a free-form (non-template) message to
-// them right now. Loads every conversation for the given contacts and their
-// most recent inbound message, same approach the inbox list uses.
-async function filterContactsWithOpenWindow(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  workspaceId: string,
-  contactIds: string[]
-): Promise<string[]> {
-  if (contactIds.length === 0) return [];
+// Reads the "send now" vs "schedule for later" choice from the form.
+// Returns null (send now, no scheduling) or an ISO string in the future.
+function readScheduledAt(formData: FormData): { scheduledAt: string | null; error?: string } {
+  const sendMode = String(formData.get("sendMode") ?? "now");
+  if (sendMode !== "schedule") return { scheduledAt: null };
 
-  const { data: conversations } = await supabase
-    .from("conversations")
-    .select("id, contact_id")
-    .eq("workspace_id", workspaceId)
-    .in("contact_id", contactIds);
-  if (!conversations || conversations.length === 0) return [];
+  const raw = String(formData.get("scheduledAt") ?? "");
+  if (!raw) return { scheduledAt: null, error: "Elige la fecha y hora de envío." };
 
-  const conversationIds = conversations.map((c) => c.id);
-  const { data: messages } = await supabase
-    .from("messages")
-    .select("conversation_id, created_at")
-    .in("conversation_id", conversationIds)
-    .eq("direction", "in")
-    .order("created_at", { ascending: false });
-
-  const lastInboundByConversation = new Map<string, string>();
-  for (const m of messages ?? []) {
-    if (!lastInboundByConversation.has(m.conversation_id)) {
-      lastInboundByConversation.set(m.conversation_id, m.created_at);
-    }
+  const date = new Date(raw);
+  if (isNaN(date.getTime())) return { scheduledAt: null, error: "Fecha y hora inválidas." };
+  if (date.getTime() <= Date.now()) {
+    return { scheduledAt: null, error: "La fecha programada debe ser en el futuro." };
   }
-
-  const now = Date.now();
-  const openContactIds = new Set<string>();
-  for (const c of conversations) {
-    const lastInboundAt = lastInboundByConversation.get(c.id);
-    if (lastInboundAt && now - new Date(lastInboundAt).getTime() < WINDOW_MS) {
-      openContactIds.add(c.contact_id);
-    }
-  }
-
-  return contactIds.filter((id) => openContactIds.has(id));
+  return { scheduledAt: date.toISOString() };
 }
 
 export async function uploadCampaignMedia(formData: FormData) {
@@ -82,6 +66,19 @@ export async function uploadCampaignMedia(formData: FormData) {
   return { success: true as const, url: publicUrl, filename: file.name };
 }
 
+// Lets the campaign form show a live "se enviará a N contactos" count
+// before creating anything — same audience resolution the real create/edit
+// actions use, so the number never lies.
+export async function previewAudienceCount(formData: FormData) {
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+
+  const sendType = String(formData.get("sendType") ?? "template") as "template" | "free_text";
+  const { contactIds } = await resolveCampaignAudience(supabase, workspaceId, readAudienceParams(formData, sendType));
+  return { count: contactIds.length };
+}
+
 export async function createCampaign(_prevState: unknown, formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const sendType = String(formData.get("sendType") ?? "template") as "template" | "free_text";
@@ -89,14 +86,7 @@ export async function createCampaign(_prevState: unknown, formData: FormData) {
   const messageBody = String(formData.get("messageBody") ?? "").trim() || null;
   const mediaUrl = String(formData.get("mediaUrl") ?? "") || null;
   const mediaFilename = String(formData.get("mediaFilename") ?? "") || null;
-  const includeTagIds = formData.getAll("includeTagIds").map(String).filter(Boolean);
-  const excludeTagIds = formData.getAll("excludeTagIds").map(String).filter(Boolean);
-  const createdFromRaw = String(formData.get("createdFrom") ?? "") || null;
-  const createdToRaw = String(formData.get("createdTo") ?? "") || null;
-  // Free-form messages only work within the 24h window — forcing this
-  // avoids creating a campaign that would fail on every single recipient.
-  const audienceWindow =
-    sendType === "free_text" ? "open" : (String(formData.get("audienceWindow") ?? "all") as "all" | "open");
+  const audienceParams = readAudienceParams(formData, sendType);
 
   if (!name) return { error: "El nombre es obligatorio." };
   if (sendType === "template" && !templateId) {
@@ -105,6 +95,9 @@ export async function createCampaign(_prevState: unknown, formData: FormData) {
   if (sendType === "free_text" && !messageBody && !mediaUrl) {
     return { error: "Escribe un mensaje o adjunta un archivo." };
   }
+
+  const { scheduledAt, error: scheduleError } = readScheduledAt(formData);
+  if (scheduleError) return { error: scheduleError };
 
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
@@ -120,55 +113,23 @@ export async function createCampaign(_prevState: unknown, formData: FormData) {
       message_body: sendType === "free_text" ? messageBody : null,
       media_url: sendType === "free_text" ? mediaUrl : null,
       media_filename: sendType === "free_text" ? mediaFilename : null,
-      audience_tag_ids: includeTagIds.length > 0 ? includeTagIds : null,
-      audience_exclude_tag_ids: excludeTagIds.length > 0 ? excludeTagIds : null,
-      audience_created_from: createdFromRaw ? new Date(createdFromRaw).toISOString() : null,
-      audience_created_to: createdToRaw ? new Date(`${createdToRaw}T23:59:59.999`).toISOString() : null,
-      audience_window: audienceWindow,
+      audience_tag_ids: audienceParams.includeTagIds.length > 0 ? audienceParams.includeTagIds : null,
+      audience_exclude_tag_ids: audienceParams.excludeTagIds.length > 0 ? audienceParams.excludeTagIds : null,
+      audience_created_from: audienceParams.createdFromRaw
+        ? new Date(audienceParams.createdFromRaw).toISOString()
+        : null,
+      audience_created_to: audienceParams.createdToRaw
+        ? new Date(`${audienceParams.createdToRaw}T23:59:59.999`).toISOString()
+        : null,
+      audience_window: audienceParams.audienceWindow,
+      scheduled_at: scheduledAt,
     })
     .select("id")
     .single();
 
   if (error || !campaign) return { error: error?.message ?? "Error al crear la campaña." };
 
-  // Never target a contact whose number has repeatedly failed to receive
-  // messages (likely blocked the business) — sending more just racks up
-  // failures against the account's quality rating for no benefit.
-  let contactsQuery = supabase
-    .from("contacts")
-    .select("id")
-    .eq("workspace_id", workspaceId)
-    .eq("likely_blocked", false);
-
-  if (createdFromRaw) contactsQuery = contactsQuery.gte("created_at", new Date(createdFromRaw).toISOString());
-  if (createdToRaw) contactsQuery = contactsQuery.lte("created_at", new Date(`${createdToRaw}T23:59:59.999`).toISOString());
-
-  if (includeTagIds.length > 0) {
-    const { data: taggedContacts } = await supabase
-      .from("contact_tags")
-      .select("contact_id")
-      .in("tag_id", includeTagIds);
-    const ids = Array.from(new Set((taggedContacts ?? []).map((c) => c.contact_id)));
-    contactsQuery = contactsQuery.in("id", ids.length > 0 ? ids : ["00000000-0000-0000-0000-000000000000"]);
-  }
-
-  const { data: contacts } = await contactsQuery;
-  let contactIds = (contacts ?? []).map((c) => c.id);
-
-  if (excludeTagIds.length > 0 && contactIds.length > 0) {
-    const { data: excludedContacts } = await supabase
-      .from("contact_tags")
-      .select("contact_id")
-      .in("tag_id", excludeTagIds)
-      .in("contact_id", contactIds);
-    const excludedIds = new Set((excludedContacts ?? []).map((c) => c.contact_id));
-    contactIds = contactIds.filter((id) => !excludedIds.has(id));
-  }
-
-  const matchedBeforeWindow = contactIds.length;
-  if (audienceWindow === "open") {
-    contactIds = await filterContactsWithOpenWindow(supabase, workspaceId, contactIds);
-  }
+  const { contactIds, matchedBeforeWindow } = await resolveCampaignAudience(supabase, workspaceId, audienceParams);
 
   // Creating a campaign with 0 recipients is never useful and, for
   // free-text sends, almost always means the audience matched contacts
@@ -197,17 +158,91 @@ export async function createCampaign(_prevState: unknown, formData: FormData) {
   redirect(`/dashboard/campaigns/${campaign.id}`);
 }
 
-async function getOrCreateConversation(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  workspaceId: string,
-  contactId: string
-): Promise<string | null> {
-  const { data } = await supabase
-    .from("conversations")
-    .upsert({ workspace_id: workspaceId, contact_id: contactId }, { onConflict: "workspace_id,contact_id" })
-    .select("id")
-    .single();
-  return data?.id ?? null;
+// Edits a still-draft campaign — recomputes the audience from scratch since
+// the filters may have changed. Only allowed while status is "draft" (once
+// it's sending/completed/failed, editing wouldn't reach anyone new).
+export async function updateCampaign(campaignId: string, _prevState: unknown, formData: FormData) {
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+
+  const { data: existing } = await supabase
+    .from("campaigns")
+    .select("id, status")
+    .eq("id", campaignId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (!existing) return { error: "Campaña no encontrada." };
+  if (existing.status !== "draft") {
+    return { error: "Esta campaña ya no se puede editar porque no está en borrador." };
+  }
+
+  const name = String(formData.get("name") ?? "").trim();
+  const sendType = String(formData.get("sendType") ?? "template") as "template" | "free_text";
+  const templateId = String(formData.get("templateId") ?? "") || null;
+  const messageBody = String(formData.get("messageBody") ?? "").trim() || null;
+  const mediaUrl = String(formData.get("mediaUrl") ?? "") || null;
+  const mediaFilename = String(formData.get("mediaFilename") ?? "") || null;
+  const audienceParams = readAudienceParams(formData, sendType);
+
+  if (!name) return { error: "El nombre es obligatorio." };
+  if (sendType === "template" && !templateId) {
+    return { error: "Selecciona una plantilla." };
+  }
+  if (sendType === "free_text" && !messageBody && !mediaUrl) {
+    return { error: "Escribe un mensaje o adjunta un archivo." };
+  }
+
+  const { scheduledAt, error: scheduleError } = readScheduledAt(formData);
+  if (scheduleError) return { error: scheduleError };
+
+  const { contactIds, matchedBeforeWindow } = await resolveCampaignAudience(supabase, workspaceId, audienceParams);
+  if (contactIds.length === 0) {
+    if (matchedBeforeWindow === 0) {
+      return {
+        error:
+          "Ningún contacto coincide con la audiencia elegida (etiquetas/fechas). Revisa los filtros.",
+      };
+    }
+    return {
+      error:
+        `La audiencia tiene ${matchedBeforeWindow} contacto(s), pero ninguno tiene la ventana de 24h abierta ` +
+        "(mensaje libre solo se puede enviar a quien te escribió en las últimas 24h). " +
+        "Usa una plantilla aprobada para llegar a contactos que nunca te han escrito.",
+    };
+  }
+
+  const { error } = await supabase
+    .from("campaigns")
+    .update({
+      name,
+      send_type: sendType,
+      template_id: sendType === "template" ? templateId : null,
+      message_body: sendType === "free_text" ? messageBody : null,
+      media_url: sendType === "free_text" ? mediaUrl : null,
+      media_filename: sendType === "free_text" ? mediaFilename : null,
+      audience_tag_ids: audienceParams.includeTagIds.length > 0 ? audienceParams.includeTagIds : null,
+      audience_exclude_tag_ids: audienceParams.excludeTagIds.length > 0 ? audienceParams.excludeTagIds : null,
+      audience_created_from: audienceParams.createdFromRaw
+        ? new Date(audienceParams.createdFromRaw).toISOString()
+        : null,
+      audience_created_to: audienceParams.createdToRaw
+        ? new Date(`${audienceParams.createdToRaw}T23:59:59.999`).toISOString()
+        : null,
+      audience_window: audienceParams.audienceWindow,
+      scheduled_at: scheduledAt,
+    })
+    .eq("id", campaignId);
+  if (error) return { error: error.message };
+
+  // Recipients are recomputed from scratch — the old list may no longer
+  // match the (possibly changed) audience filters.
+  await supabase.from("campaign_recipients").delete().eq("campaign_id", campaignId);
+  await supabase.from("campaign_recipients").insert(
+    contactIds.map((id) => ({ campaign_id: campaignId, contact_id: id }))
+  );
+
+  redirect(`/dashboard/campaigns/${campaignId}`);
 }
 
 export async function sendCampaign(campaignId: string) {
@@ -215,217 +250,7 @@ export async function sendCampaign(campaignId: string) {
   const workspaceId = await getWorkspaceId(supabase);
   if (!workspaceId) return { error: "No autenticado." };
 
-  const { data: campaign } = await supabase
-    .from("campaigns")
-    .select(
-      "id, send_type, message_body, media_url, media_filename, templates(meta_template_name, language, body_text, header_format, header_media_url, header_media_mime_type)"
-    )
-    .eq("id", campaignId)
-    .single();
-  if (!campaign) return { error: "Campaña no encontrada." };
-
-  const template = campaign.templates as unknown as {
-    meta_template_name: string;
-    language: string;
-    body_text: string | null;
-    header_format: "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | null;
-    header_media_url: string | null;
-    header_media_mime_type: string | null;
-  } | null;
-
-  const templateHeaderMedia =
-    template?.header_format &&
-    template.header_format !== "TEXT" &&
-    template.header_media_url
-      ? {
-          type: template.header_format.toLowerCase() as "image" | "video" | "document",
-          link: template.header_media_url,
-        }
-      : undefined;
-
-  const { data: account } = await supabase
-    .from("whatsapp_accounts")
-    .select("phone_number_id, access_token")
-    .eq("workspace_id", workspaceId)
-    .single();
-  if (!account) return { error: "Este workspace no tiene WhatsApp conectado." };
-
-  await supabase.from("campaigns").update({ status: "sending" }).eq("id", campaignId);
-
-  const { data: recipients } = await supabase
-    .from("campaign_recipients")
-    .select("id, contact_id, contacts(wa_id, likely_blocked)")
-    .eq("campaign_id", campaignId)
-    .eq("status", "pending");
-
-  let failures = 0;
-  const mediaKind = campaign.media_url ? mediaKindFromMime(guessMimeFromFilename(campaign.media_filename)) : null;
-
-  for (const recipient of recipients ?? []) {
-    const { wa_id: waId, likely_blocked: likelyBlocked } = recipient.contacts as unknown as {
-      wa_id: string;
-      likely_blocked: boolean;
-    };
-    // Re-check right before sending — a contact could have started failing
-    // (and gotten flagged) after this campaign was created.
-    if (likelyBlocked) {
-      failures += 1;
-      await supabase
-        .from("campaign_recipients")
-        .update({
-          status: "failed",
-          error_message: "Contacto marcado como posiblemente bloqueado — no se le envió.",
-        })
-        .eq("id", recipient.id);
-      continue;
-    }
-    try {
-      if (campaign.send_type === "template" && template) {
-        const result = await sendTemplateMessage(
-          account.phone_number_id,
-          account.access_token,
-          waId,
-          template.meta_template_name,
-          template.language,
-          undefined,
-          templateHeaderMedia
-        );
-
-        // This insert was missing entirely before — the template send
-        // reached Meta and campaign_recipients showed "sent", but nothing
-        // ever appeared in the conversation because no message row existed.
-        const conversationId = await getOrCreateConversation(supabase, workspaceId, recipient.contact_id);
-        if (conversationId) {
-          await supabase.from("messages").insert({
-            conversation_id: conversationId,
-            direction: "out",
-            message_type: templateHeaderMedia ? templateHeaderMedia.type : "template",
-            body: template.body_text,
-            media_url: templateHeaderMedia?.link ?? null,
-            wa_message_id: result.messages[0]?.id,
-            status: "sent",
-            exclude_from_followups: true,
-          });
-          await supabase
-            .from("conversations")
-            .update({ last_message_at: new Date().toISOString() })
-            .eq("id", conversationId);
-        }
-
-        await supabase
-          .from("campaign_recipients")
-          .update({
-            status: "sent",
-            sent_at: new Date().toISOString(),
-            wa_message_id: result.messages[0]?.id,
-          })
-          .eq("id", recipient.id);
-      } else {
-        // Free-form send — re-check the window right before sending, since
-        // it may have closed since the campaign was created.
-        const conversationId = await getOrCreateConversation(supabase, workspaceId, recipient.contact_id);
-        const { data: lastInbound } = await supabase
-          .from("messages")
-          .select("created_at")
-          .eq("conversation_id", conversationId ?? "")
-          .eq("direction", "in")
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        const windowOpen =
-          !!lastInbound && Date.now() - new Date(lastInbound.created_at).getTime() < WINDOW_MS;
-        if (!windowOpen) {
-          throw new Error("La ventana de 24h se cerró para este contacto antes del envío.");
-        }
-
-        let result;
-        if (campaign.media_url && mediaKind) {
-          result = await sendMediaMessage(
-            account.phone_number_id,
-            account.access_token,
-            waId,
-            mediaKind,
-            { link: campaign.media_url },
-            campaign.media_filename ?? undefined,
-            mediaKind !== "audio" ? campaign.message_body ?? undefined : undefined
-          );
-        } else {
-          result = await sendTextMessage(
-            account.phone_number_id,
-            account.access_token,
-            waId,
-            campaign.message_body ?? ""
-          );
-        }
-
-        if (conversationId) {
-          await supabase.from("messages").insert({
-            conversation_id: conversationId,
-            direction: "out",
-            message_type: mediaKind ?? "text",
-            body: campaign.message_body,
-            media_url: campaign.media_url,
-            wa_message_id: result.messages[0]?.id,
-            status: "sent",
-            // Mass campaigns run fully independent of follow-up sequences —
-            // this must not cancel/reset/start one (see the DB trigger).
-            exclude_from_followups: true,
-          });
-          await supabase
-            .from("conversations")
-            .update({ last_message_at: new Date().toISOString() })
-            .eq("id", conversationId);
-        }
-
-        await supabase
-          .from("campaign_recipients")
-          .update({
-            status: "sent",
-            sent_at: new Date().toISOString(),
-            wa_message_id: result.messages[0]?.id,
-          })
-          .eq("id", recipient.id);
-      }
-    } catch (err) {
-      failures += 1;
-      await supabase
-        .from("campaign_recipients")
-        .update({
-          status: "failed",
-          error_message: err instanceof Error ? err.message : "Error desconocido.",
-        })
-        .eq("id", recipient.id);
-    }
-  }
-
-  await supabase
-    .from("campaigns")
-    .update({ status: failures > 0 && recipients?.length === failures ? "failed" : "completed" })
-    .eq("id", campaignId);
-
+  const result = await executeCampaignSend(supabase, workspaceId, campaignId);
   revalidatePath(`/dashboard/campaigns/${campaignId}`);
-  return { success: true };
-}
-
-// media_filename doesn't carry a mime type — infer a close-enough one from
-// its extension just to pick the right WhatsApp media kind (image/video/
-// audio/document) for sending; this never touches file content or
-// validation, only which sendMediaMessage(type) call gets made.
-function guessMimeFromFilename(filename: string | null): string {
-  const ext = (filename ?? "").split(".").pop()?.toLowerCase();
-  if (ext === "png") return "image/png";
-  if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
-  if (ext === "mp4") return "video/mp4";
-  if (ext === "mov") return "video/quicktime";
-  if (ext === "webm") return "video/webm";
-  if (ext === "3gp") return "video/3gpp";
-  if (ext === "mkv") return "video/x-matroska";
-  if (ext === "avi") return "video/x-msvideo";
-  if (ext === "mp3") return "audio/mpeg";
-  if (ext === "m4a") return "audio/mp4";
-  if (ext === "aac") return "audio/aac";
-  if (ext === "ogg" || ext === "oga") return "audio/ogg";
-  if (ext === "amr") return "audio/amr";
-  return "application/pdf";
+  return result;
 }
