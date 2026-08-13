@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Reveal } from "@/components/reveal";
 import { HeroInboxMockup } from "@/components/hero-inbox-mockup";
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
+import { SocialLinks } from "@/components/social-links";
 import { features, includedItems, painPoints } from "@/lib/landing-content";
 
 const trustBadges = [
@@ -363,6 +364,7 @@ export default async function ByBlueeLanding() {
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-5 text-center sm:px-8">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="ByBluee" className="h-9 w-9 rounded-lg" />
+          <SocialLinks />
           <p className="text-xs text-muted">
             © {new Date().getFullYear()} BYBLUEE CRM — Automatización inteligente para
             WhatsApp

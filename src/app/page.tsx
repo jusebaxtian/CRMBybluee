@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Reveal } from "@/components/reveal";
 import { HeroInboxMockup } from "@/components/hero-inbox-mockup";
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
+import { SocialLinks } from "@/components/social-links";
 import { features, steps } from "@/lib/landing-content";
 
 const sectors = [
@@ -63,7 +64,8 @@ export default async function Home() {
             </a>
           </nav>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <SocialLinks className="hidden md:flex" />
             <Link
               href="/login"
               className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface"
@@ -343,6 +345,7 @@ export default async function Home() {
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-5 text-center sm:px-8">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="ByBluee" className="h-9 w-9 rounded-lg" />
+          <SocialLinks />
           <p className="text-xs text-muted">
             © {new Date().getFullYear()} ByBluee. Todos los derechos reservados.
           </p>
