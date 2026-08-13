@@ -23,50 +23,39 @@ export default async function InboxLayout({
     .eq("workspace_id", workspaceId ?? "")
     .order("last_message_at", { ascending: false });
 
-  const conversationIds = (conversationsRaw ?? []).map((c) => c.id);
+  // Per-conversation summary (last message, last inbound time, unread
+  // count) computed in the DB via lateral joins — scales with conversation
+  // count instead of total message count. The previous approach fetched
+  // recent messages globally ordered and grouped them in JS, which silently
+  // dropped conversations past PostgREST's 1000-row default cap once a
+  // workspace's total message volume grew past it (showed "Sin mensajes"
+  // for conversations that actually had messages, just not recent enough
+  // relative to the rest of the workspace).
+  type ConversationSummaryRow = {
+    conversation_id: string;
+    last_body: string | null;
+    last_message_type: string | null;
+    last_direction: string | null;
+    last_inbound_at: string | null;
+    unread_count: number;
+  };
 
-  const { data: recentMessages } = conversationIds.length
-    ? await supabase
-        .from("messages")
-        .select("conversation_id, body, message_type, direction, created_at")
-        .in("conversation_id", conversationIds)
-        .order("created_at", { ascending: false })
-    : { data: [] };
+  const { data: summaries } = workspaceId
+    ? await supabase.rpc("inbox_conversation_summaries", { p_workspace_id: workspaceId })
+    : { data: [] as ConversationSummaryRow[] };
 
-  const lastReadAtByConversation = new Map(
-    (conversationsRaw ?? []).map((c) => [c.id, c.last_read_at as string | null])
+  const summaryByConversation = new Map(
+    ((summaries ?? []) as ConversationSummaryRow[]).map((s) => [
+      s.conversation_id,
+      {
+        body: s.last_body as string | null,
+        message_type: s.last_message_type as string | null,
+        direction: s.last_direction as string | null,
+        lastInboundAt: s.last_inbound_at as string | null,
+        unreadCount: Number(s.unread_count),
+      },
+    ])
   );
-
-  const lastMessageByConversation = new Map<
-    string,
-    { body: string | null; message_type: string; direction: string }
-  >();
-  const unreadCountByConversation = new Map<string, number>();
-  const lastInboundAtByConversation = new Map<string, string>();
-
-  for (const m of recentMessages ?? []) {
-    if (!lastMessageByConversation.has(m.conversation_id)) {
-      lastMessageByConversation.set(m.conversation_id, {
-        body: m.body,
-        message_type: m.message_type,
-        direction: m.direction,
-      });
-    }
-    if (m.direction === "in") {
-      // recentMessages is ordered newest-first, so the first "in" row seen
-      // per conversation is its most recent inbound message.
-      if (!lastInboundAtByConversation.has(m.conversation_id)) {
-        lastInboundAtByConversation.set(m.conversation_id, m.created_at);
-      }
-      const lastRead = lastReadAtByConversation.get(m.conversation_id);
-      if (!lastRead || new Date(m.created_at) > new Date(lastRead)) {
-        unreadCountByConversation.set(
-          m.conversation_id,
-          (unreadCountByConversation.get(m.conversation_id) ?? 0) + 1
-        );
-      }
-    }
-  }
 
   const mediaLabel: Record<string, string> = {
     image: "📷 Foto",
@@ -76,9 +65,9 @@ export default async function InboxLayout({
   };
 
   const conversations = (conversationsRaw ?? []).map((c) => {
-    const last = lastMessageByConversation.get(c.id);
-    const lastMessagePreview = last
-      ? last.body ?? mediaLabel[last.message_type] ?? "Mensaje"
+    const summary = summaryByConversation.get(c.id);
+    const lastMessagePreview = summary
+      ? summary.body ?? mediaLabel[summary.message_type ?? ""] ?? "Mensaje"
       : null;
     const contactRaw = c.contacts as unknown as {
       name: string | null;
@@ -91,10 +80,10 @@ export default async function InboxLayout({
       id: c.id,
       last_message_at: c.last_message_at,
       lastMessagePreview,
-      answered: last ? last.direction === "out" : true,
-      unreadCount: unreadCountByConversation.get(c.id) ?? 0,
+      answered: summary ? summary.direction === "out" : true,
+      unreadCount: summary?.unreadCount ?? 0,
       assignedAgentId: c.assigned_agent_id as string | null,
-      lastInboundAt: lastInboundAtByConversation.get(c.id) ?? null,
+      lastInboundAt: summary?.lastInboundAt ?? null,
       fromAds: !!c.ad_source_id,
       adHeadline: c.ad_headline as string | null,
       likelyBlocked: contactRaw.likely_blocked,
