@@ -334,8 +334,8 @@ export function ConversationListPanel({
               }`}
             >
               <div className="relative shrink-0">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
-                  {conv.contact.wa_id.charAt(0).toUpperCase()}
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/15 text-sm font-semibold text-success">
+                  {(conv.contact.name ?? conv.contact.wa_id).charAt(0).toUpperCase()}
                 </div>
                 {!conv.answered && (
                   <span
@@ -347,7 +347,7 @@ export function ConversationListPanel({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between">
                   <p className="flex min-w-0 items-center gap-1 truncate text-sm font-medium text-foreground">
-                    <span className="truncate">{conv.contact.wa_id}</span>
+                    <span className="truncate">{conv.contact.name || conv.contact.wa_id}</span>
                     {conv.fromAds && (
                       <span
                         title={
@@ -385,6 +385,9 @@ export function ConversationListPanel({
                     </span>
                   </span>
                 </div>
+                {conv.contact.name && (
+                  <p className="truncate text-xs text-muted">{conv.contact.wa_id}</p>
+                )}
                 {conv.tags.length > 0 && (
                   <div className="mt-0.5 flex flex-wrap gap-1">
                     {conv.tags.map((tag) => (
