@@ -440,16 +440,29 @@ export async function runKeywordAutomations(
     .eq("is_active", true);
 
   const lowerBody = messageBody.toLowerCase();
-  let matched = false;
+  const candidates = (automations ?? []).filter(
+    (a) => a.trigger_keyword && lowerBody.includes(a.trigger_keyword.toLowerCase())
+  );
+  if (candidates.length === 0) return false;
 
-  for (const automation of automations ?? []) {
-    if (
-      automation.trigger_keyword &&
-      lowerBody.includes(automation.trigger_keyword.toLowerCase())
-    ) {
-      matched = true;
-      await runActionsForAutomation(supabase, automation, contactId);
-    }
+  // A keyword flow (e.g. "hola") runs once per contact, ever — otherwise a
+  // customer who greets you daily retriggers the whole welcome sequence
+  // every single time. Claim each candidate via automation_starts before
+  // running it; on conflict (already started) it's skipped.
+  const { data: claimed } = await supabase
+    .from("automation_starts")
+    .upsert(
+      candidates.map((a) => ({ automation_id: a.id, contact_id: contactId })),
+      { onConflict: "automation_id,contact_id", ignoreDuplicates: true }
+    )
+    .select("automation_id");
+  const claimedIds = new Set((claimed ?? []).map((c) => c.automation_id));
+
+  let matched = false;
+  for (const automation of candidates) {
+    if (!claimedIds.has(automation.id)) continue;
+    matched = true;
+    await runActionsForAutomation(supabase, automation, contactId);
   }
 
   return matched;
