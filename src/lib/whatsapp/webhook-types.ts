@@ -21,6 +21,12 @@ export type WhatsAppWebhookPayload = {
           audio?: { id: string; mime_type: string };
           video?: { id: string; mime_type: string; caption?: string };
           document?: { id: string; mime_type: string; filename?: string; caption?: string };
+          // A tap-and-hold reaction (👍/❤️/etc.) on one of our messages.
+          // emoji is "" when the customer removed a previously-set reaction.
+          reaction?: { message_id: string; emoji: string };
+          // Present when the customer replied by swiping/quoting a specific
+          // earlier message instead of sending a plain message.
+          context?: { from: string; id: string };
           // Present only on the first inbound message of a "Click to
           // WhatsApp" ad conversation — identifies which Meta ad it came from.
           referral?: {

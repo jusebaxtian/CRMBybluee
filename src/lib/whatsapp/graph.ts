@@ -60,7 +60,10 @@ export async function sendTextMessage(
   phoneNumberId: string,
   accessToken: string,
   to: string,
-  body: string
+  body: string,
+  // Quotes an earlier message ("swipe to reply") when set — Meta shows it
+  // as a small reply preview above this message, same as the WhatsApp app.
+  replyToWaMessageId?: string
 ): Promise<{ messages: { id: string }[] }> {
   return graphFetch(`/${phoneNumberId}/messages`, {
     method: "POST",
@@ -73,6 +76,7 @@ export async function sendTextMessage(
       to,
       type: "text",
       text: { body },
+      ...(replyToWaMessageId ? { context: { message_id: replyToWaMessageId } } : {}),
     }),
   });
 }

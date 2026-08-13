@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useImperativeHandle, useRef, useState } from "react";
-import { Send, Paperclip, Mic, Square, X, Check, Play, Pause, RotateCcw } from "lucide-react";
+import { Send, Paperclip, Mic, Square, X, Check, Play, Pause, RotateCcw, Reply } from "lucide-react";
 import { sendMessage, sendChatMedia } from "@/app/actions/whatsapp";
 import type { OptimisticMessage } from "@/components/chat-pane";
 import { QuickReplyPicker } from "@/components/quick-reply-picker";
@@ -23,12 +23,16 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
   contactId: string;
   quickReplies?: { id: string; name: string }[];
   automations?: { id: string; name: string }[];
+  replyingTo?: { waMessageId: string; preview: string } | null;
+  onClearReply?: () => void;
   onOptimisticSend?: (message: OptimisticMessage) => void;
 }>(function MessageComposer({
   conversationId,
   contactId,
   quickReplies = [],
   automations = [],
+  replyingTo,
+  onClearReply,
   onOptimisticSend,
 }, ref) {
   const formRef = useRef<HTMLFormElement>(null);
@@ -54,7 +58,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
   // sent — queue each submit and drain it in the background, one at a time
   // (order matters for a conversation), instead of blocking the input/button
   // on the in-flight request.
-  const queueRef = useRef<string[]>([]);
+  const queueRef = useRef<{ body: string; replyToWaMessageId?: string }[]>([]);
   const draining = useRef(false);
 
   function drainQueue() {
@@ -62,8 +66,8 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
     draining.current = true;
     (async () => {
       while (queueRef.current.length > 0) {
-        const body = queueRef.current.shift()!;
-        const result = await sendMessage({ conversationId, body });
+        const item = queueRef.current.shift()!;
+        const result = await sendMessage({ conversationId, ...item });
         if (result && "error" in result) {
           setSendError(result.error ?? "No se pudo enviar el mensaje.");
         }
@@ -78,10 +82,13 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
     const body = String(formData.get("body") ?? "").trim();
     if (!body) return;
 
+    const replyToWaMessageId = replyingTo?.waMessageId;
+
     // Show the message immediately (WhatsApp-style) instead of waiting on
     // the round trip to Meta's Graph API before anything appears.
     formRef.current?.reset();
     setSendError(null);
+    onClearReply?.();
     onOptimisticSend?.({
       id: `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       direction: "out",
@@ -90,10 +97,11 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
       message_type: "text",
       media_url: null,
       media_mime_type: null,
+      context_wa_message_id: replyToWaMessageId ?? null,
       created_at: new Date().toISOString(),
     });
 
-    queueRef.current.push(body);
+    queueRef.current.push({ body, replyToWaMessageId });
     drainQueue();
   }
 
@@ -394,6 +402,22 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
         </button>
       </div>
 
+      {replyingTo && (
+        <div className="mb-2 flex items-center gap-2 rounded-lg border-l-2 border-primary bg-background px-3 py-1.5">
+          <Reply size={14} className="shrink-0 text-primary" />
+          <p className="min-w-0 flex-1 truncate text-xs text-muted">
+            Respondiendo a: <span className="text-foreground">{replyingTo.preview}</span>
+          </p>
+          <button
+            type="button"
+            onClick={onClearReply}
+            className="shrink-0 text-muted hover:text-foreground"
+            title="Cancelar respuesta"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
       <form
         ref={formRef}
         onSubmit={handleSubmit}

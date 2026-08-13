@@ -304,11 +304,22 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           audioTranscript = await transcribeIncomingAudio(supabase, workspaceId, mediaUrl);
         }
 
-        const messageBody =
-          message.text?.body ??
-          (message.image?.caption || message.video?.caption || message.document?.caption) ??
-          (message.document?.filename ?? null) ??
-          (audioTranscript ? `🎙️ ${audioTranscript}` : null);
+        // A tap-and-hold reaction has no text body of its own — the emoji
+        // *is* the content, and it points at the message being reacted to
+        // instead of being a message in its own right. Kept out of the
+        // normal messageBody chain below so a removed reaction (emoji: "")
+        // doesn't fall through to "no content" placeholders meant for real
+        // messages.
+        const isReaction = message.type === "reaction";
+        const reactionEmoji = message.reaction?.emoji ?? null;
+        const contextWaMessageId = isReaction ? message.reaction?.message_id ?? null : message.context?.id ?? null;
+
+        const messageBody = isReaction
+          ? reactionEmoji || null
+          : message.text?.body ??
+            (message.image?.caption || message.video?.caption || message.document?.caption) ??
+            (message.document?.filename ?? null) ??
+            (audioTranscript ? `🎙️ ${audioTranscript}` : null);
 
         await supabase.from("messages").insert({
           conversation_id: conversation.id,
@@ -318,9 +329,16 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           media_url: mediaUrl,
           media_mime_type: mediaMimeType,
           wa_message_id: message.id,
+          context_wa_message_id: contextWaMessageId,
           status: "delivered",
           created_at: new Date(Number(message.timestamp) * 1000).toISOString(),
         });
+
+        const notificationPreview = isReaction
+          ? reactionEmoji
+            ? `Reaccionó ${reactionEmoji} a un mensaje`
+            : "Quitó una reacción"
+          : messageBody || "Nuevo mensaje de WhatsApp";
 
         await notifyNewMessage(
           supabase,
@@ -329,10 +347,12 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           conversation.assigned_agent_id,
           profileName ?? null,
           message.from,
-          messageBody || "Nuevo mensaje de WhatsApp"
+          notificationPreview
         );
 
-        const textForAutomations = message.text?.body ?? audioTranscript;
+        // A reaction isn't something to auto-reply to — running keyword
+        // automations or the AI agent off an emoji would be nonsensical.
+        const textForAutomations = isReaction ? null : message.text?.body ?? audioTranscript;
         if (textForAutomations) {
           const matchedKeyword = await runKeywordAutomations(
             supabase,

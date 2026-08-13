@@ -16,6 +16,8 @@ export type OptimisticMessage = {
   media_url: string | null;
   media_mime_type: string | null;
   error_detail?: string | null;
+  wa_message_id?: string | null;
+  context_wa_message_id?: string | null;
   created_at: string;
 };
 
@@ -37,6 +39,7 @@ export function ChatPane({
   approvedTemplates?: ApprovedTemplate[];
 }) {
   const [pending, setPending] = useState<OptimisticMessage[]>([]);
+  const [replyingTo, setReplyingTo] = useState<{ waMessageId: string; preview: string } | null>(null);
   const composerRef = useRef<MessageComposerHandle>(null);
   const [dragActive, setDragActive] = useState(false);
   // Counts nested dragenter/dragleave pairs (messages, bubbles, etc. all
@@ -104,7 +107,7 @@ export function ChatPane({
           <p className="text-sm font-medium text-foreground">Suelta el archivo para adjuntarlo</p>
         </div>
       )}
-      <MessagesScrollArea messages={combined} />
+      <MessagesScrollArea messages={combined} onReply={setReplyingTo} />
       {windowOpen ? (
         <MessageComposer
           ref={composerRef}
@@ -112,6 +115,8 @@ export function ChatPane({
           contactId={contactId}
           quickReplies={quickReplies}
           automations={automations}
+          replyingTo={replyingTo}
+          onClearReply={() => setReplyingTo(null)}
           onOptimisticSend={(message) => setPending((p) => [...p, message])}
         />
       ) : (

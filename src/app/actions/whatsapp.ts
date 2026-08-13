@@ -176,7 +176,8 @@ async function sendToConversation(
   conversationId: string,
   workspaceId: string,
   contactWaId: string,
-  body: string
+  body: string,
+  replyToWaMessageId?: string
 ) {
   const { data: account } = await supabase
     .from("whatsapp_accounts")
@@ -191,7 +192,8 @@ async function sendToConversation(
       account.phone_number_id,
       account.access_token,
       contactWaId,
-      body
+      body,
+      replyToWaMessageId
     );
 
     // Independent writes — no need to wait on one before starting the other.
@@ -202,6 +204,7 @@ async function sendToConversation(
         message_type: "text",
         body,
         wa_message_id: result.messages[0]?.id,
+        context_wa_message_id: replyToWaMessageId ?? null,
         status: "sent",
       }),
       supabase
@@ -378,7 +381,11 @@ export async function sendChatMedia(formData: FormData) {
   }
 }
 
-export async function sendMessage(input: { conversationId: string; body: string }) {
+export async function sendMessage(input: {
+  conversationId: string;
+  body: string;
+  replyToWaMessageId?: string;
+}) {
   const supabase = await createClient();
 
   // Independent reads — run them together instead of one after another.
@@ -406,7 +413,8 @@ export async function sendMessage(input: { conversationId: string; body: string 
     conversation.id,
     conversation.workspace_id,
     contactWaId,
-    input.body
+    input.body,
+    input.replyToWaMessageId
   );
 }
 

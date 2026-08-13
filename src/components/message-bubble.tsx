@@ -1,4 +1,4 @@
-import { FileText, Download, Check, CheckCheck, AlertCircle, Clock } from "lucide-react";
+import { FileText, Download, Check, CheckCheck, AlertCircle, Clock, Reply } from "lucide-react";
 
 type Message = {
   id: string;
@@ -9,6 +9,8 @@ type Message = {
   media_url: string | null;
   media_mime_type: string | null;
   error_detail?: string | null;
+  wa_message_id?: string | null;
+  context_wa_message_id?: string | null;
   created_at: string;
 };
 
@@ -25,20 +27,72 @@ function StatusTicks({ status, errorDetail }: { status: string; errorDetail?: st
   return <Clock size={12} className="opacity-70" />;
 }
 
-export function MessageBubble({ message: m }: { message: Message }) {
+// Short one-line summary of any message, used both for the quoted-reply
+// preview inside a bubble and for the composer's "replying to" strip.
+function summarize(m: Pick<Message, "message_type" | "body">): string {
+  if (m.message_type === "image") return m.body || "📷 Foto";
+  if (m.message_type === "video") return "🎥 Video";
+  if (m.message_type === "audio") return "🎤 Nota de voz";
+  if (m.message_type === "document") return m.body || "📄 Documento";
+  if (m.message_type === "reaction") return m.body ? `Reaccionó ${m.body}` : "Reacción";
+  return m.body || "Mensaje";
+}
+
+export function MessageBubble({
+  message: m,
+  quotedMessage,
+  onReply,
+}: {
+  message: Message;
+  quotedMessage?: Message | null;
+  onReply?: (target: { waMessageId: string; preview: string }) => void;
+}) {
   const out = m.direction === "out";
   const time = new Date(m.created_at).toLocaleTimeString("es-CO", {
     hour: "2-digit",
     minute: "2-digit",
   });
 
+  if (m.message_type === "reaction") {
+    return (
+      <div className={`flex ${out ? "justify-end" : "justify-start"}`}>
+        <p className="max-w-[85%] rounded-full border border-border bg-surface px-3 py-1 text-xs italic text-muted sm:max-w-[70%]">
+          {out ? "Reaccionaste" : "Reaccionó"} {m.body ? m.body : "(quitó su reacción)"}
+          {quotedMessage && <> a &quot;{summarize(quotedMessage).slice(0, 40)}&quot;</>}
+        </p>
+      </div>
+    );
+  }
+
+  const canReply = !!m.wa_message_id;
+
   return (
-    <div className={`flex ${out ? "justify-end" : "justify-start"}`}>
+    <div className={`group flex items-center gap-1.5 ${out ? "justify-end" : "justify-start"}`}>
+      {canReply && out && (
+        <button
+          type="button"
+          onClick={() => onReply?.({ waMessageId: m.wa_message_id!, preview: summarize(m) })}
+          title="Responder citando este mensaje"
+          className="shrink-0 rounded-full p-1.5 text-muted opacity-0 hover:bg-surface-hover hover:text-foreground group-hover:opacity-100"
+        >
+          <Reply size={14} />
+        </button>
+      )}
       <div
         className={`min-w-0 max-w-[85%] rounded-lg px-3 py-2 text-sm sm:max-w-[70%] ${
           out ? "bg-primary text-white" : "bg-surface-hover text-foreground"
         }`}
       >
+        {quotedMessage && (
+          <div
+            className={`mb-1.5 rounded border-l-2 px-2 py-1 text-xs ${
+              out ? "border-white/50 bg-white/10 text-white/80" : "border-primary/50 bg-background/60 text-muted"
+            }`}
+          >
+            {summarize(quotedMessage).slice(0, 80)}
+          </div>
+        )}
+
         {m.message_type === "image" && m.media_url && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -85,6 +139,16 @@ export function MessageBubble({ message: m }: { message: Message }) {
           <p className="mt-1 text-[11px] text-red-200">{m.error_detail}</p>
         )}
       </div>
+      {canReply && !out && (
+        <button
+          type="button"
+          onClick={() => onReply?.({ waMessageId: m.wa_message_id!, preview: summarize(m) })}
+          title="Responder citando este mensaje"
+          className="shrink-0 rounded-full p-1.5 text-muted opacity-0 hover:bg-surface-hover hover:text-foreground group-hover:opacity-100"
+        >
+          <Reply size={14} />
+        </button>
+      )}
     </div>
   );
 }
