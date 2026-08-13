@@ -328,6 +328,7 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           conversation.id,
           conversation.assigned_agent_id,
           profileName ?? null,
+          message.from,
           messageBody || "Nuevo mensaje de WhatsApp"
         );
 

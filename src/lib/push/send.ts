@@ -59,6 +59,7 @@ export async function notifyNewMessage(
   conversationId: string,
   assignedAgentId: string | null,
   contactName: string | null,
+  contactPhone: string,
   messagePreview: string
 ) {
   let recipientIds: string[] = [];
@@ -74,8 +75,13 @@ export async function notifyNewMessage(
     recipientIds = (members ?? []).map((m) => m.user_id as string);
   }
 
+  // Title shows both the saved name and the raw number (e.g. "María González — 573215118640")
+  // so the notification is identifiable even before opening the app, same as
+  // the inbox list's name-then-phone layout.
+  const title = contactName ? `${contactName} — ${contactPhone}` : contactPhone;
+
   await sendPushToUsers(supabase, recipientIds, {
-    title: contactName || "Nuevo mensaje",
+    title,
     body: messagePreview.slice(0, 120),
     url: `/dashboard/inbox/${conversationId}`,
     conversationId,
