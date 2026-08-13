@@ -245,6 +245,29 @@ export async function updateCampaign(campaignId: string, _prevState: unknown, fo
   redirect(`/dashboard/campaigns/${campaignId}`);
 }
 
+export async function deleteCampaign(campaignId: string) {
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+
+  const { data: existing } = await supabase
+    .from("campaigns")
+    .select("id, status")
+    .eq("id", campaignId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (!existing) return { error: "Campaña no encontrada." };
+  if (existing.status !== "draft") {
+    return { error: "Solo se pueden eliminar campañas en borrador." };
+  }
+
+  const { error } = await supabase.from("campaigns").delete().eq("id", campaignId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard/campaigns");
+  redirect("/dashboard/campaigns");
+}
+
 export async function sendCampaign(campaignId: string) {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);

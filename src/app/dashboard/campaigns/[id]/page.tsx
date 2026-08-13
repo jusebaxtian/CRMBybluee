@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, Users, Clock, Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { SendCampaignButton } from "@/components/send-campaign-button";
+import { DeleteCampaignButton } from "@/components/delete-campaign-button";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
 
@@ -75,13 +76,16 @@ export default async function CampaignDetailPage({
           </div>
         </div>
         {campaign.status === "draft" && (
-          <Link
-            href={`/dashboard/campaigns/${campaign.id}/edit`}
-            className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-surface-hover"
-          >
-            <Pencil size={13} />
-            Editar
-          </Link>
+          <div className="flex shrink-0 items-center gap-2">
+            <Link
+              href={`/dashboard/campaigns/${campaign.id}/edit`}
+              className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-surface-hover"
+            >
+              <Pencil size={13} />
+              Editar
+            </Link>
+            <DeleteCampaignButton campaignId={campaign.id} />
+          </div>
         )}
       </div>
 
