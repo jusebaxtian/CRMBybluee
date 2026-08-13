@@ -24,19 +24,22 @@ const trustBadges = [
 
 const pricingPlans = [
   {
-    name: "CRM Bybluee Anual (1 Año)",
-    priceLabel: "$150.000",
+    name: "Plan Inicial",
+    cycleLabel: "6 meses",
+    priceLabel: "$160.000",
     featured: false,
-    message: "Hola, quiero el plan Anual (1 año) de CRM ByBluee por $150.000 COP.",
+    message: "Hola, quiero el Plan Inicial (6 meses) de CRM ByBluee por $160.000 COP.",
   },
   {
-    name: "CRM Bybluee Vitalicio",
-    priceLabel: "$300.000",
+    name: "Plan Anual",
+    cycleLabel: "12 meses",
+    priceLabel: "$220.000",
     featured: true,
-    message: "Hola, quiero el plan Vitalicio de CRM ByBluee por $300.000 COP.",
+    message: "Hola, quiero el Plan Anual (12 meses) de CRM ByBluee por $220.000 COP.",
   },
   {
     name: "Plan Emprendedor",
+    cycleLabel: "12 meses",
     priceLabel: "$700.000",
     featured: false,
     message: "Hola, quiero el Plan Emprendedor de CRM ByBluee por $700.000 COP.",
@@ -301,7 +304,7 @@ export default async function ByBlueeLanding() {
                       </span>
                       <span className="text-sm text-muted">COP</span>
                     </div>
-                    <p className="text-xs text-muted">Pago único • Acceso de por vida</p>
+                    <p className="text-xs text-muted">Renovación cada {plan.cycleLabel}</p>
                     <ul className="mt-5 flex flex-1 flex-col gap-2 text-sm text-muted">
                       {pricingFeatures.map((item) => (
                         <li key={item} className="flex items-center gap-2">
