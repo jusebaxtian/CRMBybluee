@@ -19,6 +19,13 @@ const statusColor: Record<string, string> = {
   canceled: "text-muted border-border",
 };
 
+const statusLabel: Record<string, string> = {
+  trialing: "En prueba",
+  active: "Activo",
+  past_due: "Pago pendiente",
+  canceled: "Cancelado",
+};
+
 export default async function AdminOverviewPage({
   searchParams,
 }: {
@@ -221,7 +228,7 @@ export default async function AdminOverviewPage({
                     <span
                       className={`w-fit rounded-full border px-2 py-0.5 text-xs ${statusColor[r.status] ?? ""}`}
                     >
-                      {r.status}
+                      {statusLabel[r.status] ?? r.status}
                     </span>
                     {r.accessDisabled && (
                       <span className="w-fit rounded-full border border-red-400 px-2 py-0.5 text-xs text-red-400">
