@@ -8,6 +8,7 @@ export async function register() {
   const { processAiFollowups } = await import("@/lib/ai/followups");
   const { cleanupOldNotifications } = await import("@/lib/notifications/scheduler");
   const { processDueCampaigns } = await import("@/lib/campaigns/scheduler");
+  const { deleteStaleUnactivatedWorkspaces } = await import("@/lib/billing/cleanup");
 
   setInterval(() => {
     processDueAutomationRuns().catch((err) => {
@@ -38,4 +39,10 @@ export async function register() {
       console.error("campaign scheduler tick failed:", err);
     });
   }, 30_000);
+
+  setInterval(() => {
+    deleteStaleUnactivatedWorkspaces().catch((err) => {
+      console.error("stale workspace cleanup tick failed:", err);
+    });
+  }, 60 * 60_000);
 }
