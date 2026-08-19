@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Search, SlidersHorizontal, X, Clock, Megaphone, ShieldAlert, Bot, Check } from "lucide-react";
 import { NewMessageButton } from "@/components/new-message-button";
+import { PullToRefresh } from "@/components/pull-to-refresh";
 import { useMessageWindow } from "@/lib/use-message-window";
 
 const WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -319,7 +320,7 @@ export function ConversationListPanel({
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto">
+      <PullToRefresh className="flex-1">
         {filtered.length === 0 && (
           <p className="p-6 text-center text-sm text-muted">Sin resultados.</p>
         )}
@@ -423,7 +424,7 @@ export function ConversationListPanel({
             </Link>
           );
         })}
-      </div>
+      </PullToRefresh>
     </aside>
   );
 }
