@@ -97,6 +97,30 @@ export async function resolveCampaignAudience(
     contactIds = contactIds.filter((id) => !excludedIds.has(id));
   }
 
+  // Hard, non-optional rule: a contact carrying ANY "excludes_followups"
+  // tag (e.g. "No seguimientos") must never receive a mass campaign,
+  // regardless of what the admin picked in the include/exclude tag
+  // pickers — mass sends are opt-out-proof by design. Only manual chat
+  // messages/templates sent from the inbox are allowed to reach them.
+  if (contactIds.length > 0) {
+    const { data: noFollowupTags } = await supabase
+      .from("tags")
+      .select("id")
+      .eq("workspace_id", workspaceId)
+      .eq("excludes_followups", true);
+    const noFollowupTagIds = (noFollowupTags ?? []).map((t) => t.id);
+
+    if (noFollowupTagIds.length > 0) {
+      const { data: excludedContacts } = await supabase
+        .from("contact_tags")
+        .select("contact_id")
+        .in("tag_id", noFollowupTagIds)
+        .in("contact_id", contactIds);
+      const excludedIds = new Set((excludedContacts ?? []).map((c) => c.contact_id));
+      contactIds = contactIds.filter((id) => !excludedIds.has(id));
+    }
+  }
+
   const matchedBeforeWindow = contactIds.length;
   if (audienceWindow === "open") {
     contactIds = await filterContactsWithOpenWindow(supabase, workspaceId, contactIds);

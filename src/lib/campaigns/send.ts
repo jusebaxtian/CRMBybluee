@@ -91,6 +91,29 @@ export async function executeCampaignSend(
     .eq("campaign_id", campaignId)
     .eq("status", "pending");
 
+  // Last-line guard, independent of whatever the audience filters computed
+  // at creation time: a contact carrying any "excludes_followups" tag must
+  // never receive a mass send, no exceptions — covers both campaigns
+  // created before this rule existed and a contact getting tagged after
+  // the campaign was already built (e.g. a scheduled send).
+  const noFollowupContactIds = new Set<string>();
+  if (recipients && recipients.length > 0) {
+    const { data: noFollowupTags } = await supabase
+      .from("tags")
+      .select("id")
+      .eq("workspace_id", workspaceId)
+      .eq("excludes_followups", true);
+    const noFollowupTagIds = (noFollowupTags ?? []).map((t) => t.id);
+    if (noFollowupTagIds.length > 0) {
+      const { data: excluded } = await supabase
+        .from("contact_tags")
+        .select("contact_id")
+        .in("tag_id", noFollowupTagIds)
+        .in("contact_id", recipients.map((r) => r.contact_id));
+      for (const row of excluded ?? []) noFollowupContactIds.add(row.contact_id);
+    }
+  }
+
   let failures = 0;
   const mediaKind = campaign.media_url ? mediaKindFromMime(guessMimeFromFilename(campaign.media_filename)) : null;
 
@@ -99,6 +122,18 @@ export async function executeCampaignSend(
       wa_id: string;
       likely_blocked: boolean;
     };
+
+    if (noFollowupContactIds.has(recipient.contact_id)) {
+      await supabase
+        .from("campaign_recipients")
+        .update({
+          status: "failed",
+          error_message: "Contacto tiene una etiqueta de \"no seguimientos\" — excluido de envíos masivos.",
+        })
+        .eq("id", recipient.id);
+      continue;
+    }
+
     // Re-check right before sending — a contact could have started failing
     // (and gotten flagged) after this campaign was created.
     if (likelyBlocked) {
