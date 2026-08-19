@@ -73,7 +73,7 @@ export function MessageBubble({
           type="button"
           onClick={() => onReply?.({ waMessageId: m.wa_message_id!, preview: summarize(m) })}
           title="Responder citando este mensaje"
-          className="shrink-0 rounded-full p-1.5 text-muted opacity-0 hover:bg-surface-hover hover:text-foreground group-hover:opacity-100"
+          className="shrink-0 rounded-full p-1.5 text-muted opacity-60 hover:bg-surface-hover hover:text-foreground hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
         >
           <Reply size={14} />
         </button>
@@ -144,7 +144,7 @@ export function MessageBubble({
           type="button"
           onClick={() => onReply?.({ waMessageId: m.wa_message_id!, preview: summarize(m) })}
           title="Responder citando este mensaje"
-          className="shrink-0 rounded-full p-1.5 text-muted opacity-0 hover:bg-surface-hover hover:text-foreground group-hover:opacity-100"
+          className="shrink-0 rounded-full p-1.5 text-muted opacity-60 hover:bg-surface-hover hover:text-foreground hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
         >
           <Reply size={14} />
         </button>
