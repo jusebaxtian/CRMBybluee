@@ -4,7 +4,7 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
   const { processDueAutomationRuns } = await import("@/lib/automations/scheduler");
-  const { expireTrials } = await import("@/lib/billing/scheduler");
+  const { expireTrials, expireLapsedActiveSubscriptions } = await import("@/lib/billing/scheduler");
   const { processAiFollowups } = await import("@/lib/ai/followups");
   const { cleanupOldNotifications } = await import("@/lib/notifications/scheduler");
   const { processDueCampaigns } = await import("@/lib/campaigns/scheduler");
@@ -25,6 +25,12 @@ export async function register() {
   setInterval(() => {
     expireTrials().catch((err) => {
       console.error("trial expiry scheduler tick failed:", err);
+    });
+  }, 5 * 60_000);
+
+  setInterval(() => {
+    expireLapsedActiveSubscriptions().catch((err) => {
+      console.error("active subscription expiry scheduler tick failed:", err);
     });
   }, 5 * 60_000);
 
