@@ -100,6 +100,10 @@ export default async function FollowupsPage() {
 
 function formatDelay(seconds: number): string {
   if (seconds < 3600) return `${Math.round(seconds / 60)}min`;
-  const hours = seconds / 3600;
-  return `${hours % 1 === 0 ? hours : hours.toFixed(1)}h`;
+  if (seconds < 86400) {
+    const hours = seconds / 3600;
+    return `${hours % 1 === 0 ? hours : hours.toFixed(1)}h`;
+  }
+  const days = seconds / 86400;
+  return `${days % 1 === 0 ? days : days.toFixed(1)}d`;
 }

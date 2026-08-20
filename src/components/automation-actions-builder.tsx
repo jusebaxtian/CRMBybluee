@@ -75,7 +75,7 @@ type ActionRow = {
   target_agent_id: string;
   agent_distribution: AgentShare[];
   delay_value: number;
-  delay_unit: "seconds" | "minutes";
+  delay_unit: "seconds" | "minutes" | "hours" | "days";
 };
 
 export type InitialAction = {
@@ -131,11 +131,22 @@ function emptyRow(defaultTagId: string): ActionRow {
   };
 }
 
-function toDelayValueUnit(seconds: number | null | undefined): { value: number; unit: "seconds" | "minutes" } {
+function toDelayValueUnit(
+  seconds: number | null | undefined
+): { value: number; unit: "seconds" | "minutes" | "hours" | "days" } {
   const s = seconds ?? 0;
+  if (s > 0 && s % 86400 === 0) return { value: s / 86400, unit: "days" };
+  if (s > 0 && s % 3600 === 0) return { value: s / 3600, unit: "hours" };
   if (s > 0 && s % 60 === 0) return { value: s / 60, unit: "minutes" };
   return { value: s, unit: "seconds" };
 }
+
+const delaySecondsPerUnit: Record<"seconds" | "minutes" | "hours" | "days", number> = {
+  seconds: 1,
+  minutes: 60,
+  hours: 3600,
+  days: 86400,
+};
 
 export function AutomationActionsBuilder({
   tags,
@@ -281,7 +292,7 @@ export function AutomationActionsBuilder({
     quick_reply_id: a.action_type === "send_quick_reply" ? a.quick_reply_id : undefined,
     target_agent_id: a.action_type === "assign_agent" ? a.target_agent_id : undefined,
     agent_distribution: a.action_type === "assign_agent_random" ? a.agent_distribution : undefined,
-    delay_seconds: a.delay_value > 0 ? a.delay_value * (a.delay_unit === "minutes" ? 60 : 1) : 0,
+    delay_seconds: a.delay_value > 0 ? a.delay_value * delaySecondsPerUnit[a.delay_unit] : 0,
   }));
 
   return (
@@ -623,11 +634,17 @@ export function AutomationActionsBuilder({
               />
               <select
                 value={action.delay_unit}
-                onChange={(e) => updateAction(index, { delay_unit: e.target.value as "seconds" | "minutes" })}
+                onChange={(e) =>
+                  updateAction(index, {
+                    delay_unit: e.target.value as "seconds" | "minutes" | "hours" | "days",
+                  })
+                }
                 className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:border-primary"
               >
                 <option value="seconds">segundos</option>
                 <option value="minutes">minutos</option>
+                <option value="hours">horas</option>
+                <option value="days">días</option>
               </select>
               <span className="text-xs text-muted">antes de esta acción</span>
             </div>
