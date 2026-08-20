@@ -95,22 +95,17 @@ export async function executeCampaignSend(
   // at creation time: a contact carrying any "excludes_followups" tag must
   // never receive a mass send, no exceptions — covers both campaigns
   // created before this rule existed and a contact getting tagged after
-  // the campaign was already built (e.g. a scheduled send).
+  // the campaign was already built (e.g. a scheduled send). Resolved via a
+  // campaign_id-scoped RPC rather than an `?contact_id=in.(...)` list — a
+  // large recipient list can build a query string long enough to trip
+  // nginx's URL-length limit (silently returns no rows, not an error).
   const noFollowupContactIds = new Set<string>();
   if (recipients && recipients.length > 0) {
-    const { data: noFollowupTags } = await supabase
-      .from("tags")
-      .select("id")
-      .eq("workspace_id", workspaceId)
-      .eq("excludes_followups", true);
-    const noFollowupTagIds = (noFollowupTags ?? []).map((t) => t.id);
-    if (noFollowupTagIds.length > 0) {
-      const { data: excluded } = await supabase
-        .from("contact_tags")
-        .select("contact_id")
-        .in("tag_id", noFollowupTagIds)
-        .in("contact_id", recipients.map((r) => r.contact_id));
-      for (const row of excluded ?? []) noFollowupContactIds.add(row.contact_id);
+    const { data: excluded } = await supabase.rpc("campaign_no_followup_recipient_ids", {
+      p_campaign_id: campaignId,
+    });
+    for (const row of (excluded ?? []) as { contact_id: string }[]) {
+      noFollowupContactIds.add(row.contact_id);
     }
   }
 
