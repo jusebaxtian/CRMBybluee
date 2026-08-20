@@ -37,7 +37,9 @@ export default async function AdminOverviewPage({
 
   const { data: workspaces } = await supabase
     .from("workspaces")
-    .select("id, name, phone, status, access_disabled, created_at, trial_ends_at, signup_ip, plans(name)")
+    .select(
+      "id, name, phone, status, ever_activated, access_disabled, created_at, trial_ends_at, signup_ip, plans(name)"
+    )
     .order("created_at", { ascending: false });
 
   const { data: connectedAccounts } = await supabase.from("whatsapp_accounts").select("workspace_id");
@@ -84,6 +86,7 @@ export default async function AdminOverviewPage({
         email,
         plan: plan?.name ?? "—",
         status: w.status,
+        everActivated: w.ever_activated,
         accessDisabled: w.access_disabled,
         createdAt: w.created_at,
         renewalDate: subscription?.current_period_end ?? w.trial_ends_at ?? null,
@@ -228,7 +231,9 @@ export default async function AdminOverviewPage({
                     <span
                       className={`w-fit rounded-full border px-2 py-0.5 text-xs ${statusColor[r.status] ?? ""}`}
                     >
-                      {statusLabel[r.status] ?? r.status}
+                      {r.status === "past_due" && !r.everActivated
+                        ? "Prueba vencida"
+                        : statusLabel[r.status] ?? r.status}
                     </span>
                     {r.accessDisabled && (
                       <span className="w-fit rounded-full border border-red-400 px-2 py-0.5 text-xs text-red-400">
