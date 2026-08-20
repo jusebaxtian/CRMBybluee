@@ -12,6 +12,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   exchangeCodeForToken,
   subscribeAppToWaba,
+  registerPhoneNumber,
   getPhoneNumberDetails,
   sendTextMessage,
   sendMediaMessage,
@@ -110,6 +111,16 @@ export async function connectWhatsApp(input: {
   try {
     const accessToken = await exchangeCodeForToken(input.code);
     await subscribeAppToWaba(input.wabaId, accessToken);
+    // Required for the number to actually send/receive via the Cloud API —
+    // Embedded Signup's own verification alone isn't enough (see comment on
+    // registerPhoneNumber). Best-effort: some numbers arrive already
+    // registered and this call 4xxs on those; not worth failing the whole
+    // connection over.
+    try {
+      await registerPhoneNumber(input.phoneNumberId, accessToken);
+    } catch (err) {
+      console.error("registerPhoneNumber failed (continuing):", err);
+    }
     const phoneDetails = await getPhoneNumberDetails(
       input.phoneNumberId,
       accessToken

@@ -7,6 +7,7 @@ import { isPlatformAdmin } from "@/lib/admin";
 import {
   exchangeCodeForToken,
   subscribeAppToWaba,
+  registerPhoneNumber,
   getPhoneNumberDetails,
   listTemplates,
   sendTemplateMessage,
@@ -42,6 +43,15 @@ export async function connectPlatformWhatsApp(input: {
   try {
     const accessToken = await exchangeCodeForToken(input.code);
     await subscribeAppToWaba(input.wabaId, accessToken);
+    // Required for the number to actually send/receive via the Cloud API —
+    // see the comment on registerPhoneNumber. Best-effort: some numbers
+    // arrive already registered and 4xx here; not worth failing the
+    // connection over.
+    try {
+      await registerPhoneNumber(input.phoneNumberId, accessToken);
+    } catch (err) {
+      console.error("registerPhoneNumber failed (continuing):", err);
+    }
     const phoneDetails = await getPhoneNumberDetails(input.phoneNumberId, accessToken);
 
     const admin = createAdminClient();

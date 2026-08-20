@@ -27,6 +27,24 @@ export async function subscribeAppToWaba(wabaId: string, accessToken: string) {
   });
 }
 
+// Embedded Signup's own OTP check (code_verification_status: VERIFIED)
+// confirms the business owns the number, but that's a separate thing from
+// actually *registering* it on the Cloud API — skip this and every send
+// fails with "Registra este número de teléfono con la API de registro..."
+// even though the number looks fully connected everywhere else. A fixed PIN
+// is fine here: nothing in this app's flow ever re-registers the number
+// interactively, so there's no real 2FA challenge to remember it for.
+export async function registerPhoneNumber(phoneNumberId: string, accessToken: string) {
+  return graphFetch(`/${phoneNumberId}/register`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ messaging_product: "whatsapp", pin: "246813" }),
+  });
+}
+
 export async function getPhoneNumberDetails(
   phoneNumberId: string,
   accessToken: string
