@@ -235,6 +235,20 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
       const workspaceId = account.workspace_id as string;
 
       for (const message of value.messages ?? []) {
+        // Meta's webhook delivery is at-least-once — it resends the same
+        // notification (same message.id) if it doesn't get a fast enough
+        // response, so this fires more often than it looks like it should.
+        // Without this check a single customer message could get inserted,
+        // notified, and run through automations/the AI agent multiple times
+        // — exactly what happened for 573112646990's "Es una extensión de
+        // Chrome?" (saved 4x with the identical wa_message_id and second).
+        const { data: existing } = await supabase
+          .from("messages")
+          .select("id")
+          .eq("wa_message_id", message.id)
+          .maybeSingle();
+        if (existing) continue;
+
         const contactEntry = value.contacts?.find((c) => c.wa_id === message.from);
         const profileName = contactEntry?.profile?.name;
         const bsuid = message.user_id ?? contactEntry?.user_id ?? null;
