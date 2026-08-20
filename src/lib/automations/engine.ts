@@ -179,20 +179,30 @@ export async function executeAction(
   }
 
   if (mediaType && action.media_url) {
-    // Audio is sent by uploaded media id, not by link — see uploadMedia's
-    // comment: link-based audio can show "delivered" yet be unplayable.
-    const source =
-      mediaType === "audio"
-        ? {
-            id: await uploadMedia(
-              account.phone_number_id,
-              account.access_token,
-              Buffer.from(await (await fetch(action.media_url)).arrayBuffer()),
-              "audio/ogg",
-              action.media_filename ?? "audio.ogg"
-            ),
-          }
-        : { link: action.media_url };
+    // Sending by { link } makes Meta fetch the file over HTTP itself — any
+    // blip on that fetch (confirmed in production for campaigns: a burst of
+    // "DNS resolution timed out" failures under load, not a real DNS
+    // outage) fails the send outright, and for audio specifically it can
+    // even show "delivered" while leaving an unplayable voice note. Upload
+    // once and send by { id } instead whenever possible; only fall back to
+    // { link } if the upload itself fails.
+    let source: { id: string } | { link: string } = { link: action.media_url };
+    try {
+      const fileRes = await fetch(action.media_url);
+      if (!fileRes.ok) throw new Error(`descarga falló (${fileRes.status})`);
+      const buffer = Buffer.from(await fileRes.arrayBuffer());
+      const mimeType = mediaType === "audio" ? "audio/ogg" : fileRes.headers.get("content-type") ?? "application/octet-stream";
+      const mediaId = await uploadMedia(
+        account.phone_number_id,
+        account.access_token,
+        buffer,
+        mimeType,
+        action.media_filename ?? "archivo"
+      );
+      source = { id: mediaId };
+    } catch (err) {
+      console.error("media pre-upload failed, falling back to link:", err);
+    }
 
     const result = await sendMediaMessage(
       account.phone_number_id,

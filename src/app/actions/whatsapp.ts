@@ -321,22 +321,25 @@ export async function sendChatMedia(formData: FormData) {
   const admin = createAdminClient();
   const storagePath = `${conversation.workspace_id}/${conversationId}/${Date.now()}-${uploadFilename}`;
 
-  // Audio specifically is sent by uploaded media id, not by link — see the
-  // comment on uploadMedia for why (link-based audio can show "delivered"
-  // yet be unplayable for the recipient). Neither upload depends on the
-  // other's result, so run them together instead of one after another.
-  const metaBuffer =
-    mediaType === "audio"
-      ? Buffer.isBuffer(uploadBuffer)
-        ? uploadBuffer
-        : Buffer.from(await (uploadBuffer as File).arrayBuffer())
-      : null;
+  // Every media type is sent by uploaded media id, not by link — link-based
+  // sends make Meta fetch the file back from our own storage over HTTP, and
+  // any blip on that fetch fails the send outright (confirmed in
+  // production for campaigns: a burst of "DNS resolution timed out"
+  // failures under load — audio specifically can even show "delivered"
+  // while leaving an unplayable voice note; see uploadMedia's comment).
+  // Neither upload depends on the other's result, so run them together.
+  const metaBuffer = Buffer.isBuffer(uploadBuffer)
+    ? uploadBuffer
+    : Buffer.from(await (uploadBuffer as File).arrayBuffer());
 
   const [{ error: uploadError }, metaMediaId] = await Promise.all([
     admin.storage.from("chat-media").upload(storagePath, uploadBuffer, { contentType: uploadContentType }),
-    metaBuffer
-      ? uploadMedia(account.phone_number_id, account.access_token, metaBuffer, uploadContentType, uploadFilename)
-      : Promise.resolve(null),
+    uploadMedia(account.phone_number_id, account.access_token, metaBuffer, uploadContentType, uploadFilename).catch(
+      (err) => {
+        console.error("media pre-upload to Meta failed, falling back to link:", err);
+        return null;
+      }
+    ),
   ]);
   if (uploadError) return { error: uploadError.message };
 
