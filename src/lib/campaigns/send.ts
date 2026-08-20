@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { sendTemplateMessage, sendTextMessage, sendMediaMessage } from "@/lib/whatsapp/graph";
+import { sendTemplateMessage, sendTextMessage, sendMediaMessage, uploadMedia } from "@/lib/whatsapp/graph";
 import { mediaKindFromMime } from "@/lib/whatsapp/media-limits";
 
 const WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -112,6 +112,33 @@ export async function executeCampaignSend(
   let failures = 0;
   const mediaKind = campaign.media_url ? mediaKindFromMime(guessMimeFromFilename(campaign.media_filename)) : null;
 
+  // Sending by { link } makes Meta re-fetch the file over HTTP for EVERY
+  // recipient — with dozens of recipients that's dozens of independent
+  // fetches back to our own server, and any blip (confirmed in production:
+  // Meta returning "DNS resolution timed out" on a chunk of them, not all —
+  // classic overload/flakiness, not a real DNS outage) fails that one send
+  // outright. Uploading once and sending by { id } instead means Meta only
+  // ever fetches the file once, then serves its own stored copy to every
+  // recipient — eliminates this whole failure mode.
+  let mediaId: string | null = null;
+  if (campaign.media_url && mediaKind) {
+    try {
+      const fileRes = await fetch(campaign.media_url);
+      if (!fileRes.ok) throw new Error(`No se pudo descargar el adjunto (${fileRes.status}).`);
+      const buffer = Buffer.from(await fileRes.arrayBuffer());
+      const mimeType = fileRes.headers.get("content-type") ?? "application/octet-stream";
+      mediaId = await uploadMedia(
+        account.phone_number_id,
+        account.access_token,
+        buffer,
+        mimeType,
+        campaign.media_filename ?? "archivo"
+      );
+    } catch (err) {
+      console.error(`campaign ${campaignId}: media pre-upload failed, falling back to link:`, err);
+    }
+  }
+
   for (const recipient of recipients ?? []) {
     const { wa_id: waId, likely_blocked: likelyBlocked } = recipient.contacts as unknown as {
       wa_id: string;
@@ -206,7 +233,7 @@ export async function executeCampaignSend(
             account.access_token,
             waId,
             mediaKind,
-            { link: campaign.media_url },
+            mediaId ? { id: mediaId } : { link: campaign.media_url },
             campaign.media_filename ?? undefined,
             mediaKind !== "audio" ? campaign.message_body ?? undefined : undefined
           );
