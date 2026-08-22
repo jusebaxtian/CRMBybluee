@@ -129,11 +129,10 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
       return { error: `La URL del botón "${b.text}" debe empezar con https:// o http://.` };
     }
   }
-  const hasQuickReplyButton = buttons.some((b) => b.type === "QUICK_REPLY");
-  const hasUrlButton = buttons.some((b) => b.type === "URL");
-  if (hasQuickReplyButton && hasUrlButton) {
-    return { error: "No puedes mezclar botones de respuesta rápida con botones de sitio web en la misma plantilla." };
-  }
+  // Meta allows mixing Quick Reply and URL buttons in one template, but
+  // requires each type to be grouped contiguously (e.g. QR, QR, URL is fine;
+  // QR, URL, QR is rejected) — reorder rather than trust the UI's order.
+  buttons.sort((a, b) => (a.type === b.type ? 0 : a.type === "QUICK_REPLY" ? -1 : 1));
 
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);

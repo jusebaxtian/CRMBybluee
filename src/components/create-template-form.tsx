@@ -26,12 +26,6 @@ export function CreateTemplateForm() {
   const [footerText, setFooterText] = useState("");
   const [buttons, setButtons] = useState<TemplateButton[]>([]);
   const urlButtonCount = buttons.filter((b) => b.type === "URL").length;
-  const quickReplyButtonCount = buttons.filter((b) => b.type === "QUICK_REPLY").length;
-  // Meta rejects a template that mixes Quick Reply buttons with Call-to-Action
-  // (URL) buttons in the same BUTTONS component — a template can have one
-  // family or the other, never both.
-  const hasQuickReply = quickReplyButtonCount > 0;
-  const hasUrl = urlButtonCount > 0;
 
   useEffect(() => {
     if (state && "success" in state) {
@@ -185,10 +179,6 @@ export function CreateTemplateForm() {
 
       <div>
         <label className="mb-1 block text-sm font-medium text-muted">Botones (opcional)</label>
-        <p className="mb-2 text-xs text-muted">
-          Meta no permite mezclar botones de respuesta rápida con botones de sitio web en la misma
-          plantilla — usa solo uno de los dos tipos.
-        </p>
         <input type="hidden" name="buttonsJson" value={JSON.stringify(buttons)} />
         <div className="flex flex-col gap-2">
           {buttons.map((btn, i) => (
@@ -202,16 +192,8 @@ export function CreateTemplateForm() {
                   }}
                   className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:border-primary"
                 >
-                  <option
-                    value="QUICK_REPLY"
-                    disabled={hasUrl && btn.type !== "QUICK_REPLY"}
-                  >
-                    Respuesta rápida
-                  </option>
-                  <option
-                    value="URL"
-                    disabled={(urlButtonCount >= 2 && btn.type !== "URL") || (hasQuickReply && btn.type !== "URL")}
-                  >
+                  <option value="QUICK_REPLY">Respuesta rápida</option>
+                  <option value="URL" disabled={urlButtonCount >= 2 && btn.type !== "URL"}>
                     Ir a un sitio web
                   </option>
                 </select>

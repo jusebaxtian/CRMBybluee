@@ -5,7 +5,13 @@ async function graphFetch(path: string, init?: RequestInit) {
   const res = await fetch(`${GRAPH_BASE}${path}`, init);
   const data = await res.json();
   if (!res.ok) {
-    throw new Error(data?.error?.message ?? "Meta Graph API request failed");
+    // Meta's top-level error.message is often a generic label ("Invalid
+    // parameter") — error_user_msg / error_data.details carry the actual
+    // reason and are worth surfacing when present.
+    const err = data?.error;
+    const detail = err?.error_user_msg || err?.error_data?.details;
+    const message = detail ? `${err.message}: ${detail}` : err?.message ?? "Meta Graph API request failed";
+    throw new Error(message);
   }
   return data;
 }
