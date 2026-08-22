@@ -20,6 +20,7 @@ type ActionInput = {
   media_url?: string;
   media_filename?: string;
   template_id?: string;
+  buttons?: { id: string; title: string }[];
 };
 
 const mediaTypes = new Set(["send_image", "send_video", "send_audio", "send_document"]);
@@ -35,6 +36,7 @@ function actionRow(a: ActionInput, quickReplyId: string, index: number) {
     media_url: mediaTypes.has(a.action_type) ? a.media_url : null,
     media_filename: a.action_type === "send_document" ? a.media_filename : null,
     template_id: a.action_type === "send_template" ? a.template_id : null,
+    buttons: a.action_type === "send_message" && a.buttons?.length ? a.buttons : null,
   };
 }
 
@@ -153,7 +155,7 @@ export async function sendQuickReply(quickReplyId: string, contactId: string) {
   const { data: actionsRaw } = await supabase
     .from("quick_reply_actions")
     .select(
-      "position, action_type, message_body, tag_id, media_url, media_filename, template_id, templates(meta_template_name, language, body_text, header_format, header_media_url)"
+      "position, action_type, message_body, tag_id, media_url, media_filename, template_id, buttons, templates(meta_template_name, language, body_text, header_format, header_media_url, variable_count, buttons)"
     )
     .eq("quick_reply_id", quickReplyId)
     .order("position");

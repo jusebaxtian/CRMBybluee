@@ -1,6 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { WhatsAppWebhookPayload } from "@/lib/whatsapp/webhook-types";
-import { runKeywordAutomations } from "@/lib/automations/engine";
+import { runKeywordAutomations, runButtonTapAutomations } from "@/lib/automations/engine";
 import { getMediaUrl, downloadMedia } from "@/lib/whatsapp/graph";
 import { notifyNewMessage } from "@/lib/push/send";
 import { maybeRespondWithAiAgent } from "@/lib/ai/agent";
@@ -326,19 +326,38 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
         // messages.
         const isReaction = message.type === "reaction";
         const reactionEmoji = message.reaction?.emoji ?? null;
+
+        // A template Quick Reply tap arrives as type "button"; a session
+        // (non-template) interactive button tap arrives as type
+        // "interactive" with button_reply. Both carry an id/payload that's
+        // what a "button_tap" automation matches against — the visible
+        // title is just for display, same treatment as a reaction: it's
+        // not free text to run keyword automations/the AI agent against.
+        const tappedButtonPayload =
+          message.type === "button"
+            ? message.button?.payload ?? null
+            : message.interactive?.type === "button_reply"
+              ? message.interactive.button_reply?.id ?? null
+              : null;
+        const tappedButtonTitle =
+          message.type === "button" ? message.button?.text ?? null : message.interactive?.button_reply?.title ?? null;
+        const isButtonTap = tappedButtonPayload !== null;
+
         const contextWaMessageId = isReaction ? message.reaction?.message_id ?? null : message.context?.id ?? null;
 
         const messageBody = isReaction
           ? reactionEmoji || null
-          : message.text?.body ??
-            (message.image?.caption || message.video?.caption || message.document?.caption) ??
-            (message.document?.filename ?? null) ??
-            (audioTranscript ? `🎙️ ${audioTranscript}` : null);
+          : isButtonTap
+            ? tappedButtonTitle
+            : message.text?.body ??
+              (message.image?.caption || message.video?.caption || message.document?.caption) ??
+              (message.document?.filename ?? null) ??
+              (audioTranscript ? `🎙️ ${audioTranscript}` : null);
 
         await supabase.from("messages").insert({
           conversation_id: conversation.id,
           direction: "in",
-          message_type: message.type,
+          message_type: isButtonTap ? "button" : message.type,
           body: messageBody,
           media_url: mediaUrl,
           media_mime_type: mediaMimeType,
@@ -352,7 +371,9 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           ? reactionEmoji
             ? `Reaccionó ${reactionEmoji} a un mensaje`
             : "Quitó una reacción"
-          : messageBody || "Nuevo mensaje de WhatsApp";
+          : isButtonTap
+            ? `Tocó el botón "${tappedButtonTitle}"`
+            : messageBody || "Nuevo mensaje de WhatsApp";
 
         await notifyNewMessage(
           supabase,
@@ -364,9 +385,15 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           notificationPreview
         );
 
+        if (isButtonTap && tappedButtonPayload) {
+          await runButtonTapAutomations(supabase, workspaceId, contact.id, tappedButtonPayload);
+        }
+
         // A reaction isn't something to auto-reply to — running keyword
         // automations or the AI agent off an emoji would be nonsensical.
-        const textForAutomations = isReaction ? null : message.text?.body ?? audioTranscript;
+        // Same for a button tap: it already ran its own trigger above.
+        const textForAutomations =
+          isReaction || isButtonTap ? null : message.text?.body ?? audioTranscript;
         if (textForAutomations) {
           const matchedKeyword = await runKeywordAutomations(
             supabase,

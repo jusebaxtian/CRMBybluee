@@ -8,6 +8,7 @@ import {
   deleteMetaTemplate,
   listTemplates,
   uploadTemplateHeaderExample,
+  type TemplateButtonInput,
 } from "@/lib/whatsapp/graph";
 import { getWorkspaceId } from "@/lib/workspace";
 import { validateMediaFile } from "@/lib/whatsapp/media-limits";
@@ -94,6 +95,7 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
   const headerFile = formData.get("headerFile") as File | null;
   const bodyText = String(formData.get("bodyText") ?? "").trim();
   const footerText = String(formData.get("footerText") ?? "").trim();
+  const buttonsJson = String(formData.get("buttonsJson") ?? "[]");
 
   if (!/^[a-z0-9_]+$/.test(name)) {
     return { error: "El nombre solo puede tener minúsculas, números y guiones bajos (_)." };
@@ -104,6 +106,25 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
   }
   if (["image", "video", "document"].includes(headerKind) && (!headerFile || headerFile.size === 0)) {
     return { error: "Sube el archivo de ejemplo para el encabezado." };
+  }
+
+  let rawButtons: { type: "URL" | "QUICK_REPLY"; text: string; url: string }[];
+  try {
+    rawButtons = JSON.parse(buttonsJson);
+  } catch {
+    return { error: "Botones inválidos." };
+  }
+  const buttons: TemplateButtonInput[] = rawButtons
+    .filter((b) => b.text.trim())
+    .map((b) =>
+      b.type === "URL"
+        ? { type: "URL" as const, text: b.text.trim(), url: b.url.trim() }
+        : { type: "QUICK_REPLY" as const, text: b.text.trim() }
+    );
+  for (const b of buttons) {
+    if (b.type === "URL" && !b.url) {
+      return { error: `Escribe la URL del botón "${b.text}".` };
+    }
   }
 
   const supabase = await createClient();
@@ -170,6 +191,7 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
       headerMedia,
       bodyText,
       footerText: footerText || undefined,
+      buttons: buttons.length > 0 ? buttons : undefined,
     });
 
     const variableCount = (bodyText.match(/\{\{\d+\}\}/g) ?? []).length;
@@ -182,6 +204,7 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
         category,
         status: result.status,
         body_text: bodyText,
+        buttons: buttons.length > 0 ? buttons : null,
         variable_count: variableCount,
         header_format: headerKind === "none" ? null : (headerKind.toUpperCase() as string),
         header_text: headerKind === "text" ? headerText : null,

@@ -22,6 +22,7 @@ import {
 import { validateMediaMime, validateMediaSize } from "@/lib/whatsapp/media-limits";
 import { transcodeVideoToH264 } from "@/lib/whatsapp/video-transcode";
 import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
+import { buildTemplateSendParams } from "@/lib/whatsapp/variables";
 
 const execFileAsync = promisify(execFile);
 
@@ -472,12 +473,12 @@ export async function sendTemplateToConversation(input: {
   const [{ data: conversation }, { data: template }] = await Promise.all([
     supabase
       .from("conversations")
-      .select("id, workspace_id, contacts(wa_id)")
+      .select("id, workspace_id, contacts(wa_id, name)")
       .eq("id", input.conversationId)
       .single(),
     supabase
       .from("templates")
-      .select("meta_template_name, language, body_text, header_format, header_media_url")
+      .select("meta_template_name, language, body_text, header_format, header_media_url, variable_count, buttons")
       .eq("id", input.templateId)
       .single(),
   ]);
@@ -492,7 +493,7 @@ export async function sendTemplateToConversation(input: {
     .single();
   if (!account) return { error: "Este workspace no tiene WhatsApp conectado." };
 
-  const contactWaId = (conversation.contacts as unknown as { wa_id: string }).wa_id;
+  const contact = conversation.contacts as unknown as { wa_id: string; name: string | null };
 
   const headerFormat = template.header_format as "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | null;
   const headerMedia =
@@ -504,14 +505,16 @@ export async function sendTemplateToConversation(input: {
       : undefined;
 
   try {
+    const { bodyParams, buttonUrlParam } = buildTemplateSendParams(template, contact);
     const result = await sendTemplateMessage(
       account.phone_number_id,
       account.access_token,
-      contactWaId,
+      contact.wa_id,
       template.meta_template_name,
       template.language,
-      undefined,
-      headerMedia
+      bodyParams,
+      headerMedia,
+      buttonUrlParam
     );
 
     await Promise.all([

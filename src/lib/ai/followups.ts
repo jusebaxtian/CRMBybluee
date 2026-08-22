@@ -3,6 +3,7 @@ import { callAiProvider, type ChatTurn } from "@/lib/ai/providers";
 import { sendTextMessage, sendTemplateMessage } from "@/lib/whatsapp/graph";
 import { buildFollowupSystemPrompt } from "@/lib/ai/agent";
 import { isContactExcludedFromAutomations } from "@/lib/automations/engine";
+import { buildTemplateSendParams } from "@/lib/whatsapp/variables";
 
 const HISTORY_LIMIT = 20;
 // WhatsApp's customer-service window: free text is only allowed within 24h
@@ -91,11 +92,13 @@ async function processWorkspaceFollowups(
     body_text: string | null;
     header_format: "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | null;
     header_media_url: string | null;
+    variable_count: number;
+    buttons: { type: "URL" | "QUICK_REPLY"; text: string; url?: string }[] | null;
   } | null = null;
   if (agent.followup_template_id) {
     const { data } = await supabase
       .from("templates")
-      .select("meta_template_name, language, body_text, header_format, header_media_url")
+      .select("meta_template_name, language, body_text, header_format, header_media_url, variable_count, buttons")
       .eq("id", agent.followup_template_id)
       .maybeSingle();
     template = data;
@@ -140,10 +143,12 @@ async function sendFollowup(
     body_text: string | null;
     header_format: "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | null;
     header_media_url: string | null;
+    variable_count: number;
+    buttons: { type: "URL" | "QUICK_REPLY"; text: string; url?: string }[] | null;
   } | null,
   step: FollowupStep
 ) {
-  const { data: contact } = await supabase.from("contacts").select("wa_id").eq("id", contactId).single();
+  const { data: contact } = await supabase.from("contacts").select("wa_id, name").eq("id", contactId).single();
   if (!contact) return;
 
   const { data: lastInbound } = await supabase
@@ -209,14 +214,16 @@ async function sendFollowup(
           }
         : undefined;
 
+    const { bodyParams, buttonUrlParam } = buildTemplateSendParams(template, contact);
     const result = await sendTemplateMessage(
       account.phone_number_id,
       account.access_token,
       contact.wa_id,
       template.meta_template_name,
       template.language,
-      undefined,
-      headerMedia
+      bodyParams,
+      headerMedia,
+      buttonUrlParam
     );
     await supabase.from("messages").insert({
       conversation_id: conversationId,

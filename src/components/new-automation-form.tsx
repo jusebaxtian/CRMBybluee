@@ -13,7 +13,7 @@ type QuickReply = { id: string; name: string };
 type ExistingAutomation = {
   id: string;
   name: string;
-  trigger_type: "tag_added" | "keyword";
+  trigger_type: "tag_added" | "keyword" | "button_tap";
   trigger_tag_id: string | null;
   trigger_keyword: string | null;
   actions: InitialAction[];
@@ -36,7 +36,7 @@ export function NewAutomationForm({
     automation ? updateAutomation : createAutomation,
     undefined
   );
-  const [triggerType, setTriggerType] = useState<"tag_added" | "keyword">(
+  const [triggerType, setTriggerType] = useState<"tag_added" | "keyword" | "button_tap">(
     automation?.trigger_type ?? "tag_added"
   );
   const [uploading, setUploading] = useState(false);
@@ -65,11 +65,12 @@ export function NewAutomationForm({
         <select
           name="triggerType"
           value={triggerType}
-          onChange={(e) => setTriggerType(e.target.value as "tag_added" | "keyword")}
+          onChange={(e) => setTriggerType(e.target.value as "tag_added" | "keyword" | "button_tap")}
           className="mb-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
         >
           <option value="tag_added">Cuando se asigna una etiqueta</option>
           <option value="keyword">Cuando llega un mensaje con una palabra clave</option>
+          <option value="button_tap">Cuando se toca un botón</option>
         </select>
 
         {triggerType === "tag_added" ? (
@@ -86,6 +87,21 @@ export function NewAutomationForm({
               </option>
             ))}
           </select>
+        ) : triggerType === "button_tap" ? (
+          <div>
+            <input
+              name="triggerKeyword"
+              type="text"
+              required
+              defaultValue={automation?.trigger_keyword ?? ""}
+              placeholder="Texto exacto del botón (ej: Sí, me interesa)"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            />
+            <p className="mt-1 text-xs text-muted">
+              Debe coincidir exactamente con el texto del botón que configuraste en una plantilla, automatización
+              o respuesta rápida.
+            </p>
+          </div>
         ) : (
           <input
             name="triggerKeyword"

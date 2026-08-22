@@ -28,6 +28,7 @@ type ActionInput = {
   target_agent_id?: string;
   agent_distribution?: { agent_id: string; percent: number }[];
   delay_seconds?: number;
+  buttons?: { id: string; title: string }[];
 };
 
 const mediaTypes = new Set(["send_image", "send_video", "send_audio", "send_document"]);
@@ -50,7 +51,10 @@ function actionRow(a: ActionInput, automationId: string, index: number) {
       a.action_type === "assign_agent_random"
         ? (a.agent_distribution ?? []).filter((d) => d.agent_id && d.percent > 0)
         : null,
-    delay_seconds: Math.max(0, Math.min(86400, Math.floor(a.delay_seconds ?? 0))),
+    // 30 days — generous ceiling for a "días" delay step, still bounded so a
+    // typo can't schedule something absurdly far out.
+    delay_seconds: Math.max(0, Math.min(30 * 86400, Math.floor(a.delay_seconds ?? 0))),
+    buttons: a.action_type === "send_message" && a.buttons?.length ? a.buttons : null,
   };
 }
 
@@ -79,7 +83,7 @@ export async function uploadAutomationActionMedia(formData: FormData) {
 
 export async function createAutomation(_prevState: unknown, formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
-  const triggerType = String(formData.get("triggerType") ?? "") as "tag_added" | "keyword";
+  const triggerType = String(formData.get("triggerType") ?? "") as "tag_added" | "keyword" | "button_tap";
   const triggerTagId = String(formData.get("triggerTagId") ?? "") || null;
   const triggerKeyword = String(formData.get("triggerKeyword") ?? "").trim() || null;
   const actionsJson = String(formData.get("actionsJson") ?? "[]");
@@ -90,6 +94,9 @@ export async function createAutomation(_prevState: unknown, formData: FormData) 
   }
   if (triggerType === "keyword" && !triggerKeyword) {
     return { error: "Escribe la palabra clave que activa la automatización." };
+  }
+  if (triggerType === "button_tap" && !triggerKeyword) {
+    return { error: "Escribe el texto exacto del botón que activa la automatización." };
   }
 
   let actions: ActionInput[];
@@ -140,7 +147,7 @@ export async function createAutomation(_prevState: unknown, formData: FormData) 
       name,
       trigger_type: triggerType,
       trigger_tag_id: triggerType === "tag_added" ? triggerTagId : null,
-      trigger_keyword: triggerType === "keyword" ? triggerKeyword : null,
+      trigger_keyword: triggerType === "keyword" || triggerType === "button_tap" ? triggerKeyword : null,
       is_active: !aiAgent?.is_active,
     })
     .select("id")
@@ -166,7 +173,7 @@ export async function createAutomation(_prevState: unknown, formData: FormData) 
 export async function updateAutomation(_prevState: unknown, formData: FormData) {
   const automationId = String(formData.get("automationId") ?? "");
   const name = String(formData.get("name") ?? "").trim();
-  const triggerType = String(formData.get("triggerType") ?? "") as "tag_added" | "keyword";
+  const triggerType = String(formData.get("triggerType") ?? "") as "tag_added" | "keyword" | "button_tap";
   const triggerTagId = String(formData.get("triggerTagId") ?? "") || null;
   const triggerKeyword = String(formData.get("triggerKeyword") ?? "").trim() || null;
   const actionsJson = String(formData.get("actionsJson") ?? "[]");
@@ -178,6 +185,9 @@ export async function updateAutomation(_prevState: unknown, formData: FormData) 
   }
   if (triggerType === "keyword" && !triggerKeyword) {
     return { error: "Escribe la palabra clave que activa la automatización." };
+  }
+  if (triggerType === "button_tap" && !triggerKeyword) {
+    return { error: "Escribe el texto exacto del botón que activa la automatización." };
   }
 
   let actions: ActionInput[];
@@ -218,7 +228,7 @@ export async function updateAutomation(_prevState: unknown, formData: FormData) 
       name,
       trigger_type: triggerType,
       trigger_tag_id: triggerType === "tag_added" ? triggerTagId : null,
-      trigger_keyword: triggerType === "keyword" ? triggerKeyword : null,
+      trigger_keyword: triggerType === "keyword" || triggerType === "button_tap" ? triggerKeyword : null,
     })
     .eq("id", automationId)
     .eq("workspace_id", workspaceId);

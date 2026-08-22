@@ -76,7 +76,10 @@ type ActionRow = {
   agent_distribution: AgentShare[];
   delay_value: number;
   delay_unit: "seconds" | "minutes" | "hours" | "days";
+  buttons: ButtonRow[];
 };
+
+type ButtonRow = { id: string; title: string };
 
 export type InitialAction = {
   action_type: ActionType;
@@ -89,6 +92,7 @@ export type InitialAction = {
   target_agent_id?: string | null;
   agent_distribution?: AgentShare[] | null;
   delay_seconds?: number | null;
+  buttons?: ButtonRow[] | null;
 };
 
 const mediaLabel: Record<string, string> = {
@@ -128,6 +132,7 @@ function emptyRow(defaultTagId: string): ActionRow {
     agent_distribution: [],
     delay_value: 0,
     delay_unit: "seconds",
+    buttons: [],
   };
 }
 
@@ -183,6 +188,7 @@ export function AutomationActionsBuilder({
             agent_distribution: a.agent_distribution ?? [],
             delay_value: value,
             delay_unit: unit,
+            buttons: a.buttons ?? [],
           };
         })
       : [emptyRow(tags[0]?.id ?? "")]
@@ -293,6 +299,7 @@ export function AutomationActionsBuilder({
     target_agent_id: a.action_type === "assign_agent" ? a.target_agent_id : undefined,
     agent_distribution: a.action_type === "assign_agent_random" ? a.agent_distribution : undefined,
     delay_seconds: a.delay_value > 0 ? a.delay_value * delaySecondsPerUnit[a.delay_unit] : 0,
+    buttons: a.action_type === "send_message" ? a.buttons.filter((b) => b.title.trim()) : undefined,
   }));
 
   return (
@@ -375,13 +382,73 @@ export function AutomationActionsBuilder({
           </div>
 
           {action.action_type === "send_message" && (
-            <textarea
-              value={action.message_body}
-              onChange={(e) => updateAction(index, { message_body: e.target.value })}
-              rows={2}
-              placeholder="Mensaje a enviar..."
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-            />
+            <div className="flex flex-col gap-1.5">
+              <textarea
+                value={action.message_body}
+                onChange={(e) => updateAction(index, { message_body: e.target.value })}
+                rows={2}
+                placeholder="Mensaje a enviar... usa {{nombre}} para el nombre del contacto"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+              />
+              <p className="text-[11px] text-muted">
+                Escribe <code className="rounded bg-surface-hover px-1">{"{{nombre}}"}</code> donde quieras que
+                aparezca el nombre del contacto.
+              </p>
+
+              <div className="flex flex-col gap-1.5">
+                {action.buttons.map((btn, btnIndex) => (
+                  <div key={btnIndex} className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={btn.title}
+                      onChange={(e) => {
+                        // The id IS the title — WhatsApp's own quick-reply
+                        // buttons default their payload to the button text
+                        // too, so a "Cuando se toca un botón" automation can
+                        // match either kind of button by the same exact
+                        // text, without a separate id field to keep in sync.
+                        const title = e.target.value.slice(0, 20);
+                        const buttons = action.buttons.map((b, i) =>
+                          i === btnIndex ? { title, id: title } : b
+                        );
+                        updateAction(index, { buttons });
+                      }}
+                      maxLength={20}
+                      placeholder={`Botón ${btnIndex + 1} (ej: Sí, me interesa)`}
+                      className="flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:border-primary"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateAction(index, { buttons: action.buttons.filter((_, i) => i !== btnIndex) })
+                      }
+                      className="shrink-0 text-muted hover:text-red-400"
+                      title="Quitar botón"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+                {action.buttons.length < 3 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateAction(index, { buttons: [...action.buttons, { id: "", title: "" }] })
+                    }
+                    className="flex w-fit items-center gap-1 text-xs text-primary hover:underline"
+                  >
+                    <Plus size={12} />
+                    Agregar botón{action.buttons.length > 0 ? "" : " (opcional, hasta 3)"}
+                  </button>
+                )}
+                {action.buttons.length > 0 && (
+                  <p className="text-[11px] text-muted">
+                    Cuando el contacto toque un botón, puedes crear una automatización con el disparador
+                    &quot;Cuando se toca un botón&quot; usando ese mismo texto para reaccionar al clic.
+                  </p>
+                )}
+              </div>
+            </div>
           )}
 
           {action.action_type === "add_tag" && (

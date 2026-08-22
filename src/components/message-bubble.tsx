@@ -35,6 +35,7 @@ function summarize(m: Pick<Message, "message_type" | "body">): string {
   if (m.message_type === "audio") return "🎤 Nota de voz";
   if (m.message_type === "document") return m.body || "📄 Documento";
   if (m.message_type === "reaction") return m.body ? `Reaccionó ${m.body}` : "Reacción";
+  if (m.message_type === "button") return m.body ? `🔘 ${m.body}` : "Tocó un botón";
   return m.body || "Mensaje";
 }
 
@@ -59,6 +60,16 @@ export function MessageBubble({
         <p className="max-w-[85%] rounded-full border border-border bg-surface px-3 py-1 text-xs italic text-muted sm:max-w-[70%]">
           {out ? "Reaccionaste" : "Reaccionó"} {m.body ? m.body : "(quitó su reacción)"}
           {quotedMessage && <> a &quot;{summarize(quotedMessage).slice(0, 40)}&quot;</>}
+        </p>
+      </div>
+    );
+  }
+
+  if (m.message_type === "button") {
+    return (
+      <div className={`flex ${out ? "justify-end" : "justify-start"}`}>
+        <p className="flex max-w-[85%] items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs text-primary sm:max-w-[70%]">
+          🔘 Tocó: {m.body || "botón"}
         </p>
       </div>
     );

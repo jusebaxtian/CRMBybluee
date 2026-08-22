@@ -99,6 +99,42 @@ export async function sendTextMessage(
   });
 }
 
+// Interactive reply buttons on a plain session message — no Meta approval
+// needed (unlike template buttons), but only deliverable inside the 24h
+// window like any other free-form message. Max 3 buttons, id max 256
+// chars — the id is what comes back in the webhook when tapped, so it
+// doubles as the automation-trigger payload.
+export async function sendInteractiveButtonsMessage(
+  phoneNumberId: string,
+  accessToken: string,
+  to: string,
+  bodyText: string,
+  buttons: { id: string; title: string }[]
+): Promise<{ messages: { id: string }[] }> {
+  return graphFetch(`/${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to,
+      type: "interactive",
+      interactive: {
+        type: "button",
+        body: { text: bodyText },
+        action: {
+          buttons: buttons.slice(0, 3).map((b) => ({
+            type: "reply",
+            reply: { id: b.id, title: b.title.slice(0, 20) },
+          })),
+        },
+      },
+    }),
+  });
+}
+
 export type MetaTemplate = {
   name: string;
   language: string;
@@ -118,6 +154,10 @@ export async function listTemplates(
   return data.data as MetaTemplate[];
 }
 
+export type TemplateButtonInput =
+  | { type: "URL"; text: string; url: string } // url may contain one {{1}}
+  | { type: "QUICK_REPLY"; text: string };
+
 export async function createMetaTemplate(
   wabaId: string,
   accessToken: string,
@@ -129,6 +169,7 @@ export async function createMetaTemplate(
     headerMedia?: { format: "IMAGE" | "VIDEO" | "DOCUMENT"; handle: string };
     bodyText: string;
     footerText?: string;
+    buttons?: TemplateButtonInput[];
   }
 ): Promise<{ id: string; status: string; category: string }> {
   const components: Record<string, unknown>[] = [];
@@ -142,9 +183,39 @@ export async function createMetaTemplate(
   } else if (input.headerText) {
     components.push({ type: "HEADER", format: "TEXT", text: input.headerText });
   }
-  components.push({ type: "BODY", text: input.bodyText });
+
+  const bodyComponent: Record<string, unknown> = { type: "BODY", text: input.bodyText };
+  // Meta rejects a body with {{n}} placeholders unless an example value is
+  // supplied for each one — "Juan" stands in for the contact name, which is
+  // what every current caller maps {{1}} to at send time.
+  const bodyVariableCount = (input.bodyText.match(/\{\{\d+\}\}/g) ?? []).length;
+  if (bodyVariableCount > 0) {
+    bodyComponent.example = {
+      body_text: [Array.from({ length: bodyVariableCount }, (_, i) => (i === 0 ? "Juan" : `valor${i + 1}`))],
+    };
+  }
+  components.push(bodyComponent);
+
   if (input.footerText) {
     components.push({ type: "FOOTER", text: input.footerText });
+  }
+
+  if (input.buttons && input.buttons.length > 0) {
+    components.push({
+      type: "BUTTONS",
+      buttons: input.buttons.map((b) => {
+        if (b.type === "URL") {
+          const hasVariable = /\{\{1\}\}/.test(b.url);
+          return {
+            type: "URL",
+            text: b.text,
+            url: b.url,
+            ...(hasVariable ? { example: [`${b.url.replace(/\{\{1\}\}/, "ejemplo")}`] } : {}),
+          };
+        }
+        return { type: "QUICK_REPLY", text: b.text };
+      }),
+    });
   }
 
   return graphFetch(`/${wabaId}/message_templates`, {
@@ -288,7 +359,11 @@ export async function sendTemplateMessage(
   templateName: string,
   language: string,
   bodyParams?: string[],
-  headerMedia?: { type: "image" | "video" | "document"; link: string }
+  headerMedia?: { type: "image" | "video" | "document"; link: string },
+  // Fills the one {{1}} a URL button's link is allowed to carry — e.g. the
+  // contact's name appended to a tracking link. Index must match the
+  // button's position among the template's URL/QUICK_REPLY buttons.
+  buttonUrlParam?: { index: number; value: string }
 ): Promise<{ messages: { id: string }[] }> {
   const template: Record<string, unknown> = { name: templateName, language: { code: language } };
   const components: Record<string, unknown>[] = [];
@@ -303,6 +378,14 @@ export async function sendTemplateMessage(
     components.push({
       type: "body",
       parameters: bodyParams.map((text) => ({ type: "text", text })),
+    });
+  }
+  if (buttonUrlParam) {
+    components.push({
+      type: "button",
+      sub_type: "url",
+      index: String(buttonUrlParam.index),
+      parameters: [{ type: "text", text: buttonUrlParam.value }],
     });
   }
   if (components.length > 0) template.components = components;

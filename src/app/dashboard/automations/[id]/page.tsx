@@ -27,7 +27,7 @@ export default async function EditAutomationPage({
   const { data: actions } = await supabase
     .from("automation_actions")
     .select(
-      "action_type, message_body, tag_id, media_url, media_filename, template_id, quick_reply_id, target_agent_id, agent_distribution, delay_seconds"
+      "action_type, message_body, tag_id, media_url, media_filename, template_id, quick_reply_id, target_agent_id, agent_distribution, delay_seconds, buttons"
     )
     .eq("automation_id", id)
     .order("position", { ascending: true });
@@ -66,7 +66,7 @@ export default async function EditAutomationPage({
           automation={{
             id: automation.id,
             name: automation.name,
-            trigger_type: automation.trigger_type as "tag_added" | "keyword",
+            trigger_type: automation.trigger_type as "tag_added" | "keyword" | "button_tap",
             trigger_tag_id: automation.trigger_tag_id,
             trigger_keyword: automation.trigger_keyword,
             actions: actions ?? [],

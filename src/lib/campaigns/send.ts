@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendTemplateMessage, sendTextMessage, sendMediaMessage, uploadMedia } from "@/lib/whatsapp/graph";
 import { mediaKindFromMime } from "@/lib/whatsapp/media-limits";
+import { substituteContactVariables, buildTemplateSendParams } from "@/lib/whatsapp/variables";
 
 const WINDOW_MS = 24 * 60 * 60 * 1000;
 
@@ -51,7 +52,7 @@ export async function executeCampaignSend(
   const { data: campaign } = await supabase
     .from("campaigns")
     .select(
-      "id, send_type, message_body, media_url, media_filename, templates(meta_template_name, language, body_text, header_format, header_media_url, header_media_mime_type)"
+      "id, send_type, message_body, media_url, media_filename, templates(meta_template_name, language, body_text, header_format, header_media_url, header_media_mime_type, variable_count, buttons)"
     )
     .eq("id", campaignId)
     .single();
@@ -64,6 +65,8 @@ export async function executeCampaignSend(
     header_format: "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | null;
     header_media_url: string | null;
     header_media_mime_type: string | null;
+    variable_count: number;
+    buttons: { type: "URL" | "QUICK_REPLY"; text: string; url?: string }[] | null;
   } | null;
 
   const templateHeaderMedia =
@@ -87,7 +90,7 @@ export async function executeCampaignSend(
 
   const { data: recipients } = await supabase
     .from("campaign_recipients")
-    .select("id, contact_id, contacts(wa_id, likely_blocked)")
+    .select("id, contact_id, contacts(wa_id, name, likely_blocked)")
     .eq("campaign_id", campaignId)
     .eq("status", "pending");
 
@@ -140,10 +143,12 @@ export async function executeCampaignSend(
   }
 
   for (const recipient of recipients ?? []) {
-    const { wa_id: waId, likely_blocked: likelyBlocked } = recipient.contacts as unknown as {
+    const contact = recipient.contacts as unknown as {
       wa_id: string;
+      name: string | null;
       likely_blocked: boolean;
     };
+    const { wa_id: waId, likely_blocked: likelyBlocked } = contact;
 
     if (noFollowupContactIds.has(recipient.contact_id)) {
       await supabase
@@ -171,14 +176,16 @@ export async function executeCampaignSend(
     }
     try {
       if (campaign.send_type === "template" && template) {
+        const { bodyParams, buttonUrlParam } = buildTemplateSendParams(template, contact);
         const result = await sendTemplateMessage(
           account.phone_number_id,
           account.access_token,
           waId,
           template.meta_template_name,
           template.language,
-          undefined,
-          templateHeaderMedia
+          bodyParams,
+          templateHeaderMedia,
+          buttonUrlParam
         );
 
         const conversationId = await getOrCreateConversation(supabase, workspaceId, recipient.contact_id);
@@ -226,6 +233,10 @@ export async function executeCampaignSend(
           throw new Error("La ventana de 24h se cerró para este contacto antes del envío.");
         }
 
+        const personalizedBody = campaign.message_body
+          ? substituteContactVariables(campaign.message_body, contact)
+          : campaign.message_body;
+
         let result;
         if (campaign.media_url && mediaKind) {
           result = await sendMediaMessage(
@@ -235,14 +246,14 @@ export async function executeCampaignSend(
             mediaKind,
             mediaId ? { id: mediaId } : { link: campaign.media_url },
             campaign.media_filename ?? undefined,
-            mediaKind !== "audio" ? campaign.message_body ?? undefined : undefined
+            mediaKind !== "audio" ? personalizedBody ?? undefined : undefined
           );
         } else {
           result = await sendTextMessage(
             account.phone_number_id,
             account.access_token,
             waId,
-            campaign.message_body ?? ""
+            personalizedBody ?? ""
           );
         }
 
@@ -251,7 +262,7 @@ export async function executeCampaignSend(
             conversation_id: conversationId,
             direction: "out",
             message_type: mediaKind ?? "text",
-            body: campaign.message_body,
+            body: personalizedBody,
             media_url: campaign.media_url,
             wa_message_id: result.messages[0]?.id,
             status: "sent",

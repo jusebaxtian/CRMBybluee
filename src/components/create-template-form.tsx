@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { Plus, X } from "lucide-react";
 import { createTemplate } from "@/app/actions/templates";
 import { Button } from "@/components/ui/button";
 
@@ -10,12 +11,16 @@ const headerAccept: Record<string, string> = {
   document: "application/pdf",
 };
 
+type TemplateButton = { type: "URL" | "QUICK_REPLY"; text: string; url: string };
+
 export function CreateTemplateForm() {
   const [state, action, pending] = useActionState(createTemplate, undefined);
   const [bodyText, setBodyText] = useState("");
   const [headerKind, setHeaderKind] = useState<"none" | "text" | "image" | "video" | "document">(
     "none"
   );
+  const [buttons, setButtons] = useState<TemplateButton[]>([]);
+  const urlButtonCount = buttons.filter((b) => b.type === "URL").length;
 
   return (
     <form action={action} className="flex flex-col gap-4">
@@ -144,6 +149,73 @@ export function CreateTemplateForm() {
           maxLength={60}
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
         />
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-muted">Botones (opcional)</label>
+        <input type="hidden" name="buttonsJson" value={JSON.stringify(buttons)} />
+        <div className="flex flex-col gap-2">
+          {buttons.map((btn, i) => (
+            <div key={i} className="flex flex-col gap-1.5 rounded-md border border-border p-2.5">
+              <div className="flex items-center gap-1.5">
+                <select
+                  value={btn.type}
+                  onChange={(e) => {
+                    const type = e.target.value as TemplateButton["type"];
+                    setButtons((prev) => prev.map((b, idx) => (idx === i ? { ...b, type } : b)));
+                  }}
+                  className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:border-primary"
+                >
+                  <option value="QUICK_REPLY">Respuesta rápida</option>
+                  <option value="URL" disabled={urlButtonCount >= 2 && btn.type !== "URL"}>
+                    Ir a un sitio web
+                  </option>
+                </select>
+                <input
+                  type="text"
+                  value={btn.text}
+                  onChange={(e) => {
+                    const text = e.target.value.slice(0, 20);
+                    setButtons((prev) => prev.map((b, idx) => (idx === i ? { ...b, text } : b)));
+                  }}
+                  maxLength={20}
+                  placeholder="Texto del botón"
+                  className="flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:border-primary"
+                />
+                <button
+                  type="button"
+                  onClick={() => setButtons((prev) => prev.filter((_, idx) => idx !== i))}
+                  className="shrink-0 text-muted hover:text-red-400"
+                  title="Quitar botón"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              {btn.type === "URL" && (
+                <input
+                  type="text"
+                  value={btn.url}
+                  onChange={(e) => {
+                    const url = e.target.value;
+                    setButtons((prev) => prev.map((b, idx) => (idx === i ? { ...b, url } : b)));
+                  }}
+                  placeholder="https://tusitio.com/{{1}} (el {{1}} es opcional, se rellena con el nombre)"
+                  className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:border-primary"
+                />
+              )}
+            </div>
+          ))}
+          {buttons.length < 3 && (
+            <button
+              type="button"
+              onClick={() => setButtons((prev) => [...prev, { type: "QUICK_REPLY", text: "", url: "" }])}
+              className="flex w-fit items-center gap-1 text-xs text-primary hover:underline"
+            >
+              <Plus size={12} />
+              Agregar botón (hasta 3, máx. 2 de tipo URL)
+            </button>
+          )}
+        </div>
       </div>
 
       {state && "error" in state && <p className="text-sm text-red-400">{state.error}</p>}

@@ -84,7 +84,9 @@ export default async function AutomationsPage() {
                   <p className="text-xs text-muted">
                     {a.trigger_type === "tag_added"
                       ? `Se activa al asignar la etiqueta "${tag?.name ?? "—"}"`
-                      : `Se activa con la palabra clave "${a.trigger_keyword}"`}
+                      : a.trigger_type === "button_tap"
+                        ? `Se activa al tocar el botón "${a.trigger_keyword}"`
+                        : `Se activa con la palabra clave "${a.trigger_keyword}"`}
                   </p>
                 </div>
                 <AutomationRowActions

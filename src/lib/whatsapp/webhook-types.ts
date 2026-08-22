@@ -24,6 +24,14 @@ export type WhatsAppWebhookPayload = {
           // A tap-and-hold reaction (👍/❤️/etc.) on one of our messages.
           // emoji is "" when the customer removed a previously-set reaction.
           reaction?: { message_id: string; emoji: string };
+          // Tapping a template's Quick Reply button arrives as type "button".
+          button?: { payload: string; text: string };
+          // Tapping a session (non-template) interactive button arrives as
+          // type "interactive" with button_reply.
+          interactive?: {
+            type: string;
+            button_reply?: { id: string; title: string };
+          };
           // Present when the customer replied by swiping/quoting a specific
           // earlier message instead of sending a plain message.
           context?: { from: string; id: string };

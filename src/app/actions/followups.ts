@@ -30,6 +30,7 @@ type ActionInput = {
   target_agent_id?: string;
   agent_distribution?: { agent_id: string; percent: number }[];
   delay_seconds?: number;
+  buttons?: { id: string; title: string }[];
 };
 
 const mediaTypes = new Set(["send_image", "send_video", "send_audio", "send_document"]);
@@ -51,7 +52,8 @@ function actionRow(a: ActionInput, automationId: string, index: number) {
       a.action_type === "assign_agent_random"
         ? (a.agent_distribution ?? []).filter((d) => d.agent_id && d.percent > 0)
         : null,
-    delay_seconds: Math.max(0, Math.min(86400, Math.floor(a.delay_seconds ?? 0))),
+    delay_seconds: Math.max(0, Math.min(30 * 86400, Math.floor(a.delay_seconds ?? 0))),
+    buttons: a.action_type === "send_message" && a.buttons?.length ? a.buttons : null,
   };
 }
 

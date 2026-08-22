@@ -1,6 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { sendTextMessage, sendMediaMessage, sendTemplateMessage, uploadMedia } from "@/lib/whatsapp/graph";
+import {
+  sendTextMessage,
+  sendMediaMessage,
+  sendTemplateMessage,
+  sendInteractiveButtonsMessage,
+  uploadMedia,
+} from "@/lib/whatsapp/graph";
 import { maybeTrackPurchaseFromTag } from "@/lib/meta/conversions";
+import { substituteContactVariables, buildTemplateSendParams } from "@/lib/whatsapp/variables";
 
 export type Automation = {
   id: string;
@@ -19,12 +26,15 @@ export type AutomationAction = {
   delay_seconds: number;
   target_agent_id: string | null;
   agent_distribution: { agent_id: string; percent: number }[] | null;
+  buttons: { id: string; title: string }[] | null;
   templates: {
     meta_template_name: string;
     language: string;
     body_text: string | null;
     header_format: "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | null;
     header_media_url: string | null;
+    variable_count?: number;
+    buttons?: { type: "URL" | "QUICK_REPLY"; text: string; url?: string }[] | null;
   } | null;
 };
 
@@ -82,7 +92,7 @@ export async function executeAction(
     const { data: qrActions } = await supabase
       .from("quick_reply_actions")
       .select(
-        "position, action_type, message_body, tag_id, media_url, media_filename, template_id, templates(meta_template_name, language, body_text, header_format, header_media_url)"
+        "position, action_type, message_body, tag_id, media_url, media_filename, template_id, buttons, templates(meta_template_name, language, body_text, header_format, header_media_url, variable_count, buttons)"
       )
       .eq("quick_reply_id", action.quick_reply_id)
       .order("position");
@@ -143,7 +153,7 @@ export async function executeAction(
 
   const { data: contact } = await supabase
     .from("contacts")
-    .select("wa_id")
+    .select("wa_id, name")
     .eq("id", contactId)
     .single();
 
@@ -158,19 +168,25 @@ export async function executeAction(
   const conversationId = await getOrCreateConversation(supabase, automation.workspace_id, contactId);
 
   if (action.action_type === "send_message" && action.message_body) {
-    const result = await sendTextMessage(
-      account.phone_number_id,
-      account.access_token,
-      contact.wa_id,
-      action.message_body
-    );
+    const body = substituteContactVariables(action.message_body, contact);
+    const hasButtons = action.buttons && action.buttons.length > 0;
+
+    const result = hasButtons
+      ? await sendInteractiveButtonsMessage(
+          account.phone_number_id,
+          account.access_token,
+          contact.wa_id,
+          body,
+          action.buttons!
+        )
+      : await sendTextMessage(account.phone_number_id, account.access_token, contact.wa_id, body);
 
     if (conversationId) {
       await supabase.from("messages").insert({
         conversation_id: conversationId,
         direction: "out",
         message_type: "text",
-        body: action.message_body,
+        body,
         wa_message_id: result.messages[0]?.id,
         status: "sent",
         via_automation_id: automation.id,
@@ -238,14 +254,16 @@ export async function executeAction(
           }
         : undefined;
 
+    const { bodyParams, buttonUrlParam } = buildTemplateSendParams(action.templates, contact);
     const result = await sendTemplateMessage(
       account.phone_number_id,
       account.access_token,
       contact.wa_id,
       action.templates.meta_template_name,
       action.templates.language,
-      undefined,
-      headerMedia
+      bodyParams,
+      headerMedia,
+      buttonUrlParam
     );
 
     if (conversationId) {
@@ -277,7 +295,7 @@ async function fetchActions(
   const { data } = await supabase
     .from("automation_actions")
     .select(
-      "position, action_type, message_body, tag_id, media_url, media_filename, template_id, quick_reply_id, delay_seconds, target_agent_id, agent_distribution, templates(meta_template_name, language, body_text, header_format, header_media_url)"
+      "position, action_type, message_body, tag_id, media_url, media_filename, template_id, quick_reply_id, delay_seconds, target_agent_id, agent_distribution, buttons, templates(meta_template_name, language, body_text, header_format, header_media_url, variable_count, buttons)"
     )
     .eq("automation_id", automationId)
     .order("position");
@@ -459,6 +477,48 @@ export async function runKeywordAutomations(
   // customer who greets you daily retriggers the whole welcome sequence
   // every single time. Claim each candidate via automation_starts before
   // running it; on conflict (already started) it's skipped.
+  const { data: claimed } = await supabase
+    .from("automation_starts")
+    .upsert(
+      candidates.map((a) => ({ automation_id: a.id, contact_id: contactId })),
+      { onConflict: "automation_id,contact_id", ignoreDuplicates: true }
+    )
+    .select("automation_id");
+  const claimedIds = new Set((claimed ?? []).map((c) => c.automation_id));
+
+  let matched = false;
+  for (const automation of candidates) {
+    if (!claimedIds.has(automation.id)) continue;
+    matched = true;
+    await runActionsForAutomation(supabase, automation, contactId);
+  }
+
+  return matched;
+}
+
+// Fires when a contact taps a button (template Quick Reply or a session
+// interactive button) whose id/payload exactly matches an automation's
+// configured trigger_keyword — exact match, unlike runKeywordAutomations'
+// substring match, since a button payload is an identifier, not free text a
+// customer typed. Same once-per-contact claim via automation_starts.
+export async function runButtonTapAutomations(
+  supabase: SupabaseClient,
+  workspaceId: string,
+  contactId: string,
+  buttonPayload: string
+): Promise<boolean> {
+  if (await isContactExcludedFromAutomations(supabase, contactId)) return false;
+
+  const { data: automations } = await supabase
+    .from("automations")
+    .select("id, workspace_id, trigger_keyword")
+    .eq("workspace_id", workspaceId)
+    .eq("trigger_type", "button_tap")
+    .eq("is_active", true);
+
+  const candidates = (automations ?? []).filter((a) => a.trigger_keyword === buttonPayload);
+  if (candidates.length === 0) return false;
+
   const { data: claimed } = await supabase
     .from("automation_starts")
     .upsert(
