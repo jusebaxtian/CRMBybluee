@@ -202,6 +202,7 @@ export async function executeAction(
         direction: "out",
         message_type: "text",
         body,
+        buttons: urlButton ? [urlButton] : quickReplyButtons && quickReplyButtons.length > 0 ? quickReplyButtons : null,
         wa_message_id: result.messages[0]?.id,
         status: "sent",
         via_automation_id: automation.id,

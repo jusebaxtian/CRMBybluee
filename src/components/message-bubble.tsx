@@ -1,4 +1,8 @@
-import { FileText, Download, Check, CheckCheck, AlertCircle, Clock, Reply } from "lucide-react";
+import { FileText, Download, Check, CheckCheck, AlertCircle, Clock, Reply, ExternalLink } from "lucide-react";
+
+type MessageButton =
+  | { type: "QUICK_REPLY"; id: string; title: string }
+  | { type: "URL"; title: string; url: string };
 
 type Message = {
   id: string;
@@ -11,6 +15,7 @@ type Message = {
   error_detail?: string | null;
   wa_message_id?: string | null;
   context_wa_message_id?: string | null;
+  buttons?: MessageButton[] | null;
   created_at: string;
 };
 
@@ -138,6 +143,36 @@ export function MessageBubble({
 
         {m.body && m.message_type !== "document" && (
           <p className="whitespace-pre-wrap break-words">{m.body}</p>
+        )}
+
+        {m.buttons && m.buttons.length > 0 && (
+          <div className={`mt-2 flex flex-col gap-1 border-t pt-2 ${out ? "border-white/25" : "border-border"}`}>
+            {m.buttons.map((b, i) =>
+              b.type === "URL" ? (
+                <a
+                  key={i}
+                  href={b.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium ${
+                    out ? "bg-white/15 hover:bg-white/25" : "bg-background hover:bg-surface"
+                  }`}
+                >
+                  <ExternalLink size={12} />
+                  {b.title}
+                </a>
+              ) : (
+                <span
+                  key={i}
+                  className={`flex items-center justify-center rounded-md px-2 py-1.5 text-xs font-medium ${
+                    out ? "bg-white/15" : "bg-background"
+                  }`}
+                >
+                  {b.title}
+                </span>
+              )
+            )}
+          </div>
         )}
 
         <p className="mt-1 flex items-center justify-end gap-1 text-[10px] opacity-70">
