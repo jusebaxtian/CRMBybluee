@@ -4,6 +4,7 @@ import {
   sendMediaMessage,
   sendTemplateMessage,
   sendInteractiveButtonsMessage,
+  sendInteractiveCtaUrlMessage,
   uploadMedia,
 } from "@/lib/whatsapp/graph";
 import { maybeTrackPurchaseFromTag } from "@/lib/meta/conversions";
@@ -26,7 +27,9 @@ export type AutomationAction = {
   delay_seconds: number;
   target_agent_id: string | null;
   agent_distribution: { agent_id: string; percent: number }[] | null;
-  buttons: { id: string; title: string }[] | null;
+  buttons:
+    | ({ type: "QUICK_REPLY"; id: string; title: string } | { type: "URL"; title: string; url: string })[]
+    | null;
   templates: {
     meta_template_name: string;
     language: string;
@@ -169,17 +172,29 @@ export async function executeAction(
 
   if (action.action_type === "send_message" && action.message_body) {
     const body = substituteContactVariables(action.message_body, contact);
-    const hasButtons = action.buttons && action.buttons.length > 0;
+    const urlButton = action.buttons?.find((b) => b.type === "URL");
+    const quickReplyButtons = action.buttons?.filter(
+      (b): b is { type: "QUICK_REPLY"; id: string; title: string } => b.type === "QUICK_REPLY"
+    );
 
-    const result = hasButtons
-      ? await sendInteractiveButtonsMessage(
+    const result = urlButton
+      ? await sendInteractiveCtaUrlMessage(
           account.phone_number_id,
           account.access_token,
           contact.wa_id,
           body,
-          action.buttons!
+          urlButton.title,
+          urlButton.url
         )
-      : await sendTextMessage(account.phone_number_id, account.access_token, contact.wa_id, body);
+      : quickReplyButtons && quickReplyButtons.length > 0
+        ? await sendInteractiveButtonsMessage(
+            account.phone_number_id,
+            account.access_token,
+            contact.wa_id,
+            body,
+            quickReplyButtons
+          )
+        : await sendTextMessage(account.phone_number_id, account.access_token, contact.wa_id, body);
 
     if (conversationId) {
       await supabase.from("messages").insert({

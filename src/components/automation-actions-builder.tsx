@@ -79,7 +79,10 @@ type ActionRow = {
   buttons: ButtonRow[];
 };
 
-type ButtonRow = { id: string; title: string };
+// WhatsApp doesn't allow mixing reply buttons with a URL button in the same
+// message — a "send_message" action carries either up to 3 QUICK_REPLY
+// buttons or exactly one URL button, never both.
+type ButtonRow = { type: "QUICK_REPLY"; id: string; title: string } | { type: "URL"; title: string; url: string };
 
 export type InitialAction = {
   action_type: ActionType;
@@ -152,6 +155,114 @@ const delaySecondsPerUnit: Record<"seconds" | "minutes" | "hours" | "days", numb
   hours: 3600,
   days: 86400,
 };
+
+// WhatsApp allows either up to 3 quick-reply buttons OR exactly one URL
+// button on a session message — never both — so this is a mode switch, not
+// a free-form list. "Cuando se toca un botón" automations match a quick-
+// reply button's exact text; a URL button just opens the link, no webhook.
+function BottomButtonsEditor({
+  buttons,
+  onChange,
+}: {
+  buttons: ButtonRow[];
+  onChange: (buttons: ButtonRow[]) => void;
+}) {
+  const mode: "none" | "QUICK_REPLY" | "URL" = buttons[0]?.type ?? "none";
+
+  function setMode(next: "none" | "QUICK_REPLY" | "URL") {
+    if (next === "none") onChange([]);
+    else if (next === "QUICK_REPLY") onChange([{ type: "QUICK_REPLY", id: "", title: "" }]);
+    else onChange([{ type: "URL", title: "", url: "" }]);
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <select
+        value={mode}
+        onChange={(e) => setMode(e.target.value as "none" | "QUICK_REPLY" | "URL")}
+        className="w-fit rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:border-primary"
+      >
+        <option value="none">Sin botones</option>
+        <option value="QUICK_REPLY">Botones de respuesta rápida (hasta 3)</option>
+        <option value="URL">Botón de enlace (URL, uno solo)</option>
+      </select>
+
+      {mode === "QUICK_REPLY" && (
+        <>
+          {buttons.map((btn, i) => (
+            <div key={i} className="flex items-center gap-1.5">
+              <input
+                type="text"
+                value={btn.title}
+                onChange={(e) => {
+                  // The id IS the title — WhatsApp's own quick-reply
+                  // buttons default their payload to the button text too,
+                  // so a "Cuando se toca un botón" automation can match by
+                  // that same exact text, no separate id field to keep in sync.
+                  const title = e.target.value.slice(0, 20);
+                  onChange(buttons.map((b, idx) => (idx === i ? { type: "QUICK_REPLY", id: title, title } : b)));
+                }}
+                maxLength={20}
+                placeholder={`Botón ${i + 1} (ej: Sí, me interesa)`}
+                className="flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:border-primary"
+              />
+              <button
+                type="button"
+                onClick={() => onChange(buttons.filter((_, idx) => idx !== i))}
+                className="shrink-0 text-muted hover:text-red-400"
+                title="Quitar botón"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+          {buttons.length < 3 && (
+            <button
+              type="button"
+              onClick={() => onChange([...buttons, { type: "QUICK_REPLY", id: "", title: "" }])}
+              className="flex w-fit items-center gap-1 text-xs text-primary hover:underline"
+            >
+              <Plus size={12} />
+              Agregar otro botón
+            </button>
+          )}
+          <p className="text-[11px] text-muted">
+            Cuando el contacto toque un botón, crea una automatización con el disparador &quot;Cuando se toca
+            un botón&quot; usando ese mismo texto para reaccionar al clic.
+          </p>
+        </>
+      )}
+
+      {mode === "URL" && buttons[0]?.type === "URL" && (() => {
+        const urlButton = buttons[0];
+        return (
+          <>
+            <input
+              type="text"
+              value={urlButton.title}
+              onChange={(e) =>
+                onChange([{ type: "URL", title: e.target.value.slice(0, 20), url: urlButton.url }])
+              }
+              maxLength={20}
+              placeholder="Texto del botón (ej: Ver catálogo)"
+              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:border-primary"
+            />
+            <input
+              type="text"
+              value={urlButton.url}
+              onChange={(e) => onChange([{ type: "URL", title: urlButton.title, url: e.target.value }])}
+              placeholder="https://tusitio.com/pagina"
+              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:border-primary"
+            />
+            <p className="text-[11px] text-muted">
+              Al tocarlo, el contacto va directo a esa página — no dispara ninguna automatización.
+            </p>
+          </>
+        );
+      })()}
+    </div>
+  );
+}
 
 export function AutomationActionsBuilder({
   tags,
@@ -395,59 +506,10 @@ export function AutomationActionsBuilder({
                 aparezca el nombre del contacto.
               </p>
 
-              <div className="flex flex-col gap-1.5">
-                {action.buttons.map((btn, btnIndex) => (
-                  <div key={btnIndex} className="flex items-center gap-1.5">
-                    <input
-                      type="text"
-                      value={btn.title}
-                      onChange={(e) => {
-                        // The id IS the title — WhatsApp's own quick-reply
-                        // buttons default their payload to the button text
-                        // too, so a "Cuando se toca un botón" automation can
-                        // match either kind of button by the same exact
-                        // text, without a separate id field to keep in sync.
-                        const title = e.target.value.slice(0, 20);
-                        const buttons = action.buttons.map((b, i) =>
-                          i === btnIndex ? { title, id: title } : b
-                        );
-                        updateAction(index, { buttons });
-                      }}
-                      maxLength={20}
-                      placeholder={`Botón ${btnIndex + 1} (ej: Sí, me interesa)`}
-                      className="flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:border-primary"
-                    />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateAction(index, { buttons: action.buttons.filter((_, i) => i !== btnIndex) })
-                      }
-                      className="shrink-0 text-muted hover:text-red-400"
-                      title="Quitar botón"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
-                {action.buttons.length < 3 && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      updateAction(index, { buttons: [...action.buttons, { id: "", title: "" }] })
-                    }
-                    className="flex w-fit items-center gap-1 text-xs text-primary hover:underline"
-                  >
-                    <Plus size={12} />
-                    Agregar botón{action.buttons.length > 0 ? "" : " (opcional, hasta 3)"}
-                  </button>
-                )}
-                {action.buttons.length > 0 && (
-                  <p className="text-[11px] text-muted">
-                    Cuando el contacto toque un botón, puedes crear una automatización con el disparador
-                    &quot;Cuando se toca un botón&quot; usando ese mismo texto para reaccionar al clic.
-                  </p>
-                )}
-              </div>
+              <BottomButtonsEditor
+                buttons={action.buttons}
+                onChange={(buttons) => updateAction(index, { buttons })}
+              />
             </div>
           )}
 

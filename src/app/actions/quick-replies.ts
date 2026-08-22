@@ -20,7 +20,7 @@ type ActionInput = {
   media_url?: string;
   media_filename?: string;
   template_id?: string;
-  buttons?: { id: string; title: string }[];
+  buttons?: ({ type: "QUICK_REPLY"; id: string; title: string } | { type: "URL"; title: string; url: string })[];
 };
 
 const mediaTypes = new Set(["send_image", "send_video", "send_audio", "send_document"]);

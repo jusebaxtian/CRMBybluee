@@ -30,7 +30,7 @@ type ActionInput = {
   target_agent_id?: string;
   agent_distribution?: { agent_id: string; percent: number }[];
   delay_seconds?: number;
-  buttons?: { id: string; title: string }[];
+  buttons?: ({ type: "QUICK_REPLY"; id: string; title: string } | { type: "URL"; title: string; url: string })[];
 };
 
 const mediaTypes = new Set(["send_image", "send_video", "send_audio", "send_document"]);

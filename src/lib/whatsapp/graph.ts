@@ -135,6 +135,40 @@ export async function sendInteractiveButtonsMessage(
   });
 }
 
+// A single "visit website" button on a plain session message — Meta's
+// "cta_url" interactive type. Can't be mixed with reply buttons in the same
+// message (WhatsApp only allows one or the other), so this is a distinct
+// call from sendInteractiveButtonsMessage rather than a variant of it.
+export async function sendInteractiveCtaUrlMessage(
+  phoneNumberId: string,
+  accessToken: string,
+  to: string,
+  bodyText: string,
+  buttonText: string,
+  url: string
+): Promise<{ messages: { id: string }[] }> {
+  return graphFetch(`/${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to,
+      type: "interactive",
+      interactive: {
+        type: "cta_url",
+        body: { text: bodyText },
+        action: {
+          name: "cta_url",
+          parameters: { display_text: buttonText.slice(0, 20), url },
+        },
+      },
+    }),
+  });
+}
+
 export type MetaTemplate = {
   name: string;
   language: string;
