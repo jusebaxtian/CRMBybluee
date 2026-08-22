@@ -125,6 +125,14 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
     if (b.type === "URL" && !b.url) {
       return { error: `Escribe la URL del botón "${b.text}".` };
     }
+    if (b.type === "URL" && !/^https?:\/\//i.test(b.url)) {
+      return { error: `La URL del botón "${b.text}" debe empezar con https:// o http://.` };
+    }
+  }
+  const hasQuickReplyButton = buttons.some((b) => b.type === "QUICK_REPLY");
+  const hasUrlButton = buttons.some((b) => b.type === "URL");
+  if (hasQuickReplyButton && hasUrlButton) {
+    return { error: "No puedes mezclar botones de respuesta rápida con botones de sitio web en la misma plantilla." };
   }
 
   const supabase = await createClient();

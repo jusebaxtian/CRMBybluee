@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { createTemplate } from "@/app/actions/templates";
 import { Button } from "@/components/ui/button";
@@ -15,12 +15,36 @@ type TemplateButton = { type: "URL" | "QUICK_REPLY"; text: string; url: string }
 
 export function CreateTemplateForm() {
   const [state, action, pending] = useActionState(createTemplate, undefined);
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState("UTILITY");
+  const [language, setLanguage] = useState("es");
   const [bodyText, setBodyText] = useState("");
   const [headerKind, setHeaderKind] = useState<"none" | "text" | "image" | "video" | "document">(
     "none"
   );
+  const [headerText, setHeaderText] = useState("");
+  const [footerText, setFooterText] = useState("");
   const [buttons, setButtons] = useState<TemplateButton[]>([]);
   const urlButtonCount = buttons.filter((b) => b.type === "URL").length;
+  const quickReplyButtonCount = buttons.filter((b) => b.type === "QUICK_REPLY").length;
+  // Meta rejects a template that mixes Quick Reply buttons with Call-to-Action
+  // (URL) buttons in the same BUTTONS component — a template can have one
+  // family or the other, never both.
+  const hasQuickReply = quickReplyButtonCount > 0;
+  const hasUrl = urlButtonCount > 0;
+
+  useEffect(() => {
+    if (state && "success" in state) {
+      setName("");
+      setCategory("UTILITY");
+      setLanguage("es");
+      setBodyText("");
+      setHeaderKind("none");
+      setHeaderText("");
+      setFooterText("");
+      setButtons([]);
+    }
+  }, [state]);
 
   return (
     <form action={action} className="flex flex-col gap-4">
@@ -34,6 +58,8 @@ export function CreateTemplateForm() {
             name="name"
             type="text"
             required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
             placeholder="promo_verano"
             pattern="[a-z0-9_]+"
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
@@ -47,7 +73,8 @@ export function CreateTemplateForm() {
           <select
             id="category"
             name="category"
-            defaultValue="UTILITY"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
           >
             <option value="UTILITY">Utilidad</option>
@@ -62,7 +89,8 @@ export function CreateTemplateForm() {
           <select
             id="language"
             name="language"
-            defaultValue="es"
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
           >
             <option value="es">Español</option>
@@ -98,6 +126,8 @@ export function CreateTemplateForm() {
             name="headerText"
             type="text"
             maxLength={60}
+            value={headerText}
+            onChange={(e) => setHeaderText(e.target.value)}
             placeholder="Texto del encabezado"
             className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
           />
@@ -147,12 +177,18 @@ export function CreateTemplateForm() {
           name="footerText"
           type="text"
           maxLength={60}
+          value={footerText}
+          onChange={(e) => setFooterText(e.target.value)}
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
         />
       </div>
 
       <div>
         <label className="mb-1 block text-sm font-medium text-muted">Botones (opcional)</label>
+        <p className="mb-2 text-xs text-muted">
+          Meta no permite mezclar botones de respuesta rápida con botones de sitio web en la misma
+          plantilla — usa solo uno de los dos tipos.
+        </p>
         <input type="hidden" name="buttonsJson" value={JSON.stringify(buttons)} />
         <div className="flex flex-col gap-2">
           {buttons.map((btn, i) => (
@@ -166,8 +202,16 @@ export function CreateTemplateForm() {
                   }}
                   className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:border-primary"
                 >
-                  <option value="QUICK_REPLY">Respuesta rápida</option>
-                  <option value="URL" disabled={urlButtonCount >= 2 && btn.type !== "URL"}>
+                  <option
+                    value="QUICK_REPLY"
+                    disabled={hasUrl && btn.type !== "QUICK_REPLY"}
+                  >
+                    Respuesta rápida
+                  </option>
+                  <option
+                    value="URL"
+                    disabled={(urlButtonCount >= 2 && btn.type !== "URL") || (hasQuickReply && btn.type !== "URL")}
+                  >
                     Ir a un sitio web
                   </option>
                 </select>
@@ -202,6 +246,9 @@ export function CreateTemplateForm() {
                   placeholder="https://tusitio.com/{{1}} (el {{1}} es opcional, se rellena con el nombre)"
                   className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:border-primary"
                 />
+              )}
+              {btn.type === "URL" && btn.url.trim() && !/^https?:\/\//i.test(btn.url.trim()) && (
+                <p className="text-xs text-red-400">La URL debe empezar con https:// o http://</p>
               )}
             </div>
           ))}
