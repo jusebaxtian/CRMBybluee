@@ -66,13 +66,44 @@ const controlPoints = [
   },
 ];
 
-// Slots for real product screenshots — swap the placeholder card below for
-// an <img src="/landing/xxx.png"> once the file exists in /public/landing.
+// Real product screenshots — see /public/landing.
 const screenshots = [
-  { key: "inbox", title: "Bandeja unificada", text: "Todas tus conversaciones de WhatsApp en un solo lugar." },
-  { key: "campaigns", title: "Campañas masivas", text: "Envía plantillas aprobadas a tu base de contactos." },
-  { key: "automations", title: "Automatizaciones", text: "Flujos y seguimientos que trabajan solos." },
-  { key: "templates", title: "Plantillas con botones", text: "Botones de enlace o respuesta rápida en tus plantillas." },
+  {
+    key: "inbox",
+    title: "Bandeja unificada",
+    text: "Todas tus conversaciones de WhatsApp en un solo lugar.",
+    src: "/landing/inbox.png",
+  },
+  {
+    key: "campaigns",
+    title: "Campañas masivas",
+    text: "Envía plantillas aprobadas a tu base de contactos.",
+    src: "/landing/campaigns.png",
+  },
+  {
+    key: "automations",
+    title: "Automatizaciones",
+    text: "Flujos que responden solos por etiqueta o palabra clave.",
+    src: "/landing/automations.png",
+  },
+  {
+    key: "followups",
+    title: "Seguimientos",
+    text: "Secuencias de mensajes automáticos si el cliente no responde.",
+    src: "/landing/followups.png",
+  },
+  {
+    key: "ai-agent",
+    title: "Agente de IA",
+    text: "Configura el tono y el enfoque con el que la IA responde por ti.",
+    src: "/landing/ai-agent.png",
+  },
+  {
+    key: "dashboard",
+    title: "Dashboard",
+    text: "Estado de tu cuenta, tu plan y tu WhatsApp conectado, de un vistazo.",
+    src: "/landing/dashboard.png",
+  },
 ];
 
 const faqs = [
@@ -421,7 +452,7 @@ export default async function Home() {
               Dónde vendemos
             </p>
             <h2 className="mt-2 text-3xl font-semibold text-foreground sm:text-4xl">
-              Hecho para negocios de Latinoamérica.
+              Tenemos clientes en toda Latinoamérica.
             </h2>
             <p className="mt-4 max-w-md text-muted">
               ByBluee está pensado en español, para la forma en que se vende por

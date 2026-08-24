@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Image as ImageIcon } from "lucide-react";
 
 type Screenshot = {
   key: string;
   title: string;
   text: string;
+  src: string;
 };
 
-const ROTATE_MS = 3800;
+const ROTATE_MS = 4200;
 
 export function ScreenshotsShowcase({ items }: { items: Screenshot[] }) {
   const [active, setActive] = useState(0);
@@ -49,14 +49,9 @@ export function ScreenshotsShowcase({ items }: { items: Screenshot[] }) {
       </div>
 
       <div className="relative mt-6 overflow-hidden rounded-2xl border border-border bg-surface">
-        <div
-          key={current.key}
-          className="bubble-in flex aspect-video items-center justify-center bg-background/60 text-muted"
-        >
-          <div className="flex flex-col items-center gap-2">
-            <ImageIcon size={28} />
-            <span className="text-xs">Captura próximamente</span>
-          </div>
+        <div key={current.key} className="bubble-in bg-background/60">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={current.src} alt={current.title} className="w-full object-cover object-top" />
         </div>
         <div key={`${current.key}-caption`} className="bubble-in p-4">
           <h3 className="text-sm font-medium text-foreground">{current.title}</h3>
