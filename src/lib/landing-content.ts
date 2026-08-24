@@ -8,6 +8,8 @@ import {
   PlugZap,
   LayoutDashboard,
   Rocket,
+  Bot,
+  MousePointerClick,
 } from "lucide-react";
 
 export const features = [
@@ -30,6 +32,16 @@ export const features = [
     icon: Zap,
     title: "Automatizaciones",
     text: "Flujos que responden solos por etiqueta o palabra clave, con esperas configurables y reparto entre agentes.",
+  },
+  {
+    icon: Bot,
+    title: "Agente de IA",
+    text: "Si un cliente no responde, la IA redacta y envía el seguimiento por su cuenta, con el tono y enfoque que tú le definas. Lo pausas cuando quieras.",
+  },
+  {
+    icon: MousePointerClick,
+    title: "Plantillas con botones",
+    text: "Crea plantillas aprobadas por Meta con botones de enlace o respuesta rápida, y automatiza lo que pasa cuando el cliente los toca.",
   },
   {
     icon: UserCog,

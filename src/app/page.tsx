@@ -1,5 +1,21 @@
 import Link from "next/link";
-import { ArrowRight, Clock, MessageSquareOff, Megaphone } from "lucide-react";
+import {
+  ArrowRight,
+  Clock,
+  MessageSquareOff,
+  Megaphone,
+  ShieldCheck,
+  Zap as ZapIcon,
+  LifeBuoy,
+  RefreshCw,
+  Eye,
+  PauseCircle,
+  Link2,
+  UserCheck,
+  Check,
+  X,
+  Image as ImageIcon,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Reveal } from "@/components/reveal";
 import { HeroInboxMockup } from "@/components/hero-inbox-mockup";
@@ -16,6 +32,68 @@ const sectors = [
   "Coaches y consultores",
   "Educación",
   "Estudios jurídicos",
+];
+
+const trustBadges = [
+  { icon: ShieldCheck, title: "100% seguro", text: "Tus datos siempre protegidos" },
+  { icon: ZapIcon, title: "Activación rápida", text: "Empieza a vender hoy mismo" },
+  { icon: LifeBuoy, title: "Soporte directo", text: "Te acompañamos siempre" },
+  { icon: RefreshCw, title: "Mejoras constantes", text: "Siempre lo último del CRM" },
+];
+
+const controlPoints = [
+  {
+    icon: Eye,
+    title: "Ves cada conversación en vivo",
+    text: "Bandeja en tiempo real: lo que la IA o tu equipo escriben, tal cual lo lee tu cliente.",
+  },
+  {
+    icon: PauseCircle,
+    title: "Pausa la IA cuando quieras",
+    text: "Por conversación o de forma general. Tú retomas el chat en el momento en que lo necesites.",
+  },
+  {
+    icon: Link2,
+    title: "Plantillas fijas y aprobadas por Meta",
+    text: "Las plantillas de campañas y seguimientos pasan por la aprobación oficial de WhatsApp — nada se envía sin revisión.",
+  },
+  {
+    icon: UserCheck,
+    title: "Reparto claro entre tu equipo",
+    text: "Cada agente ve solo las conversaciones que le asignas, con notas y etiquetas compartidas.",
+  },
+];
+
+// Slots for real product screenshots — swap the placeholder card below for
+// an <img src="/landing/xxx.png"> once the file exists in /public/landing.
+const screenshots = [
+  { key: "inbox", title: "Bandeja unificada", text: "Todas tus conversaciones de WhatsApp en un solo lugar." },
+  { key: "campaigns", title: "Campañas masivas", text: "Envía plantillas aprobadas a tu base de contactos." },
+  { key: "automations", title: "Automatizaciones", text: "Flujos y seguimientos que trabajan solos." },
+  { key: "templates", title: "Plantillas con botones", text: "Botones de enlace o respuesta rápida en tus plantillas." },
+];
+
+const faqs = [
+  {
+    q: "¿ByBluee usa la API oficial de WhatsApp?",
+    a: "Sí. ByBluee funciona sobre la WhatsApp Business Cloud API de Meta — no es un número clonado ni una automatización no oficial.",
+  },
+  {
+    q: "¿Puedo pausar la IA o las automatizaciones?",
+    a: "Sí. Puedes pausar el agente de IA o los seguimientos automáticos por conversación en cualquier momento, y retomar el chat tú mismo cuando quieras.",
+  },
+  {
+    q: "¿Las plantillas de WhatsApp las aprueba Meta?",
+    a: "Sí. Toda plantilla que uses en campañas, seguimientos o automatizaciones pasa primero por el proceso oficial de aprobación de Meta.",
+  },
+  {
+    q: "¿Cómo activo mi plan?",
+    a: "Escríbenos por WhatsApp, te ayudamos a elegir el plan según lo que necesitas y activamos tu cuenta.",
+  },
+  {
+    q: "¿Puedo tener varios agentes respondiendo?",
+    a: "Sí, puedes crear usuarios agentes que solo ven y responden las conversaciones que les asignes.",
+  },
 ];
 
 export default async function Home() {
@@ -62,6 +140,9 @@ export default async function Home() {
             <a href="#precios" className="hover:text-foreground">
               Precios
             </a>
+            <a href="#faq" className="hover:text-foreground">
+              Preguntas
+            </a>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -99,20 +180,34 @@ export default async function Home() {
 
             <Reveal delay={80}>
               <h1 className="mt-5 text-4xl font-semibold leading-tight text-foreground sm:text-5xl">
-                Tu WhatsApp está lleno de clientes que{" "}
-                <span className="text-primary">todavía no cierras</span>
+                Tu WhatsApp, convertido en un{" "}
+                <span className="text-primary">equipo que vende por ti</span>
               </h1>
             </Reveal>
 
             <Reveal delay={160}>
               <p className="mt-5 max-w-lg text-base text-muted sm:text-lg">
-                ByBluee convierte tu WhatsApp Business en un CRM completo: bandeja
-                organizada, campañas, automatizaciones y agentes de respuesta — todo
-                sobre la API oficial de Meta.
+                Bandeja organizada, campañas, automatizaciones y un agente de IA que
+                da seguimiento cuando tú no puedes — todo sobre la API oficial de
+                WhatsApp Business.
               </p>
             </Reveal>
 
-            <Reveal delay={240}>
+            <Reveal delay={220}>
+              <div className="mt-6 flex flex-wrap gap-3 text-xs text-muted">
+                <span className="rounded-full border border-border px-3 py-1">
+                  Ahorra tiempo
+                </span>
+                <span className="rounded-full border border-border px-3 py-1">
+                  Responde más rápido
+                </span>
+                <span className="rounded-full border border-border px-3 py-1">
+                  Más ventas cada día
+                </span>
+              </div>
+            </Reveal>
+
+            <Reveal delay={280}>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <a
                   href={genericWaHref}
@@ -145,7 +240,7 @@ export default async function Home() {
       {/* Sectors marquee */}
       <div className="border-y border-border/60 bg-surface/50 py-4">
         <p className="mb-3 text-center text-xs uppercase tracking-wide text-muted">
-          Usado por negocios de estos sectores
+          Usado por negocios de estos sectores en Latinoamérica
         </p>
         <div className="overflow-hidden">
           <div className="marquee-track flex w-max gap-8 whitespace-nowrap">
@@ -158,7 +253,7 @@ export default async function Home() {
         </div>
       </div>
 
-      {/* Problem */}
+      {/* Problem — antes / después */}
       <section id="beneficios" className="mx-auto max-w-6xl px-5 py-20 sm:px-8">
         <Reveal>
           <p className="text-center text-xs font-semibold uppercase tracking-wide text-primary">
@@ -174,34 +269,46 @@ export default async function Home() {
           </p>
         </Reveal>
 
-        <div className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {[
-            {
-              icon: MessageSquareOff,
-              title: "Conversaciones sin dueño",
-              text: "Varios vendedores contestan el mismo número sin saber qué se habló antes.",
-            },
-            {
-              icon: Clock,
-              title: "Seguimientos que se olvidan",
-              text: "Un cliente dice 'escríbeme mañana' y ese mensaje se pierde entre cien más.",
-            },
-            {
-              icon: Megaphone,
-              title: "Sin forma de escalar",
-              text: "Enviar plantillas o novedades a toda tu base a mano no es sostenible.",
-            },
-          ].map((p, i) => (
-            <Reveal key={p.title} delay={i * 100}>
-              <div className="h-full rounded-xl border border-border bg-surface p-6">
-                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-red-400/15 text-red-400">
-                  <p.icon size={18} />
-                </div>
-                <h3 className="font-medium text-foreground">{p.title}</h3>
-                <p className="mt-2 text-sm text-muted">{p.text}</p>
-              </div>
-            </Reveal>
-          ))}
+        <div className="mt-12 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Reveal>
+            <div className="h-full rounded-2xl border border-border bg-surface p-6">
+              <h3 className="text-sm font-semibold text-muted">Respondiendo a mano</h3>
+              <p className="mt-1 text-xs text-muted">Todo mezclado en un solo chat</p>
+              <ul className="mt-5 flex flex-col gap-3">
+                {[
+                  "Decenas de chats abiertos y mensajes sin contestar",
+                  "El que no responde hoy, mañana ya se enfrió",
+                  "Nadie sabe quién ya habló con cada cliente",
+                  "Enviar novedades a toda tu base es trabajo manual",
+                ].map((p) => (
+                  <li key={p} className="flex items-start gap-3">
+                    <X size={16} className="mt-0.5 shrink-0 text-red-400" />
+                    <span className="text-sm text-foreground">{p}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </Reveal>
+
+          <Reveal delay={120}>
+            <div className="h-full rounded-2xl border border-primary/30 bg-primary/5 p-6">
+              <h3 className="text-sm font-semibold text-primary">Con ByBluee</h3>
+              <p className="mt-1 text-xs text-muted">Organizado, con tu equipo apoyando</p>
+              <ul className="mt-5 flex flex-col gap-3">
+                {[
+                  "Cada conversación con su etiqueta, agente y estado",
+                  "El agente de IA da seguimiento si tú no llegas a tiempo",
+                  "Tu equipo responde solo lo que le asignas",
+                  "Campañas y novedades salen a toda tu base en minutos",
+                ].map((p) => (
+                  <li key={p} className="flex items-start gap-3">
+                    <Check size={16} className="mt-0.5 shrink-0 text-primary" />
+                    <span className="text-sm text-foreground">{p}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </Reveal>
         </div>
       </section>
 
@@ -217,9 +324,9 @@ export default async function Home() {
             </h2>
           </Reveal>
 
-          <div className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {features.map((f, i) => (
-              <Reveal key={f.title} delay={(i % 3) * 100}>
+              <Reveal key={f.title} delay={(i % 4) * 90}>
                 <div className="group h-full rounded-xl border border-border bg-surface p-6 transition-transform duration-300 hover:-translate-y-1 hover:border-primary/40">
                   <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/15 text-primary transition-transform duration-300 group-hover:scale-110">
                     <f.icon size={18} />
@@ -233,7 +340,7 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* How it works */}
+      {/* How it works — stations */}
       <section id="como-funciona" className="mx-auto max-w-6xl px-5 py-20 sm:px-8">
         <Reveal>
           <p className="text-center text-xs font-semibold uppercase tracking-wide text-primary">
@@ -247,15 +354,97 @@ export default async function Home() {
         <div className="mt-12 grid grid-cols-1 gap-8 sm:grid-cols-3">
           {steps.map((s, i) => (
             <Reveal key={s.title} delay={i * 120}>
-              <div className="relative text-center">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/15 text-primary">
-                  <s.icon size={24} />
-                </div>
-                <span className="mt-4 block text-xs font-semibold text-primary">
+              <div className="relative h-full rounded-2xl border border-border bg-surface p-6 text-center">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-primary">
                   Paso {i + 1}
                 </span>
-                <h3 className="mt-1 font-medium text-foreground">{s.title}</h3>
+                <div className="mx-auto mt-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/15 text-primary">
+                  <s.icon size={24} />
+                </div>
+                <h3 className="mt-4 font-medium text-foreground">{s.title}</h3>
                 <p className="mt-2 text-sm text-muted">{s.text}</p>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      {/* Real product screenshots */}
+      <section className="bg-surface/40 py-20">
+        <div className="mx-auto max-w-6xl px-5 sm:px-8">
+          <Reveal>
+            <p className="text-center text-xs font-semibold uppercase tracking-wide text-primary">
+              Así se ve por dentro
+            </p>
+            <h2 className="mx-auto mt-2 max-w-2xl text-center text-3xl font-semibold text-foreground sm:text-4xl">
+              El CRM real, no una maqueta
+            </h2>
+          </Reveal>
+
+          <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2">
+            {screenshots.map((s, i) => (
+              <Reveal key={s.key} delay={i * 100}>
+                <div className="overflow-hidden rounded-2xl border border-border bg-surface">
+                  <div className="flex aspect-video items-center justify-center bg-background/60 text-muted">
+                    <div className="flex flex-col items-center gap-2">
+                      <ImageIcon size={28} />
+                      <span className="text-xs">Captura próximamente</span>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <h3 className="text-sm font-medium text-foreground">{s.title}</h3>
+                    <p className="mt-1 text-xs text-muted">{s.text}</p>
+                  </div>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Control total */}
+      <section className="mx-auto max-w-6xl px-5 py-20 sm:px-8">
+        <Reveal>
+          <p className="text-center text-xs font-semibold uppercase tracking-wide text-primary">
+            Control total
+          </p>
+          <h2 className="mx-auto mt-2 max-w-2xl text-center text-3xl font-semibold text-foreground sm:text-4xl">
+            Automatizado no significa a ciegas
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-center text-muted">
+            Cada mensaje que sale de tu WhatsApp queda registrado. Tú decides cuándo
+            la IA actúa y cuándo tomas tú la conversación.
+          </p>
+        </Reveal>
+
+        <div className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {controlPoints.map((c, i) => (
+            <Reveal key={c.title} delay={i * 90}>
+              <div className="flex h-full items-start gap-4 rounded-xl border border-border bg-surface p-6">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                  <c.icon size={18} />
+                </div>
+                <div>
+                  <h3 className="font-medium text-foreground">{c.title}</h3>
+                  <p className="mt-1 text-sm text-muted">{c.text}</p>
+                </div>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      {/* Trust badges */}
+      <section className="border-y border-border/60 bg-surface/40 py-10">
+        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-6 px-5 sm:grid-cols-4 sm:px-8">
+          {trustBadges.map((b, i) => (
+            <Reveal key={b.title} delay={i * 80}>
+              <div className="text-center">
+                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                  <b.icon size={18} />
+                </div>
+                <p className="mt-2 text-sm font-medium text-foreground">{b.title}</p>
+                <p className="text-xs text-muted">{b.text}</p>
               </div>
             </Reveal>
           ))}
@@ -264,7 +453,7 @@ export default async function Home() {
 
       {/* Pricing */}
       {plans && plans.length > 0 && (
-        <section id="precios" className="bg-surface/40 py-20">
+        <section id="precios" className="py-20">
           <div className="mx-auto max-w-6xl px-5 sm:px-8">
             <Reveal>
               <p className="text-center text-xs font-semibold uppercase tracking-wide text-primary">
@@ -310,6 +499,46 @@ export default async function Home() {
           </div>
         </section>
       )}
+
+      {/* FAQ */}
+      <section id="faq" className="bg-surface/40 py-20">
+        <div className="mx-auto max-w-3xl px-5 sm:px-8">
+          <Reveal>
+            <p className="text-center text-xs font-semibold uppercase tracking-wide text-primary">
+              Preguntas frecuentes
+            </p>
+            <h2 className="mx-auto mt-2 max-w-xl text-center text-3xl font-semibold text-foreground sm:text-4xl">
+              Lo que más nos preguntan
+            </h2>
+          </Reveal>
+
+          <div className="mt-10 flex flex-col gap-3">
+            {faqs.map((f, i) => (
+              <Reveal key={f.q} delay={i * 70}>
+                <div className="rounded-xl border border-border bg-surface p-5">
+                  <h3 className="text-sm font-medium text-foreground">{f.q}</h3>
+                  <p className="mt-2 text-sm text-muted">{f.a}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+
+          <Reveal delay={faqs.length * 70}>
+            <p className="mt-8 text-center text-sm text-muted">
+              ¿Tienes otra pregunta?{" "}
+              <a
+                href={genericWaHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-primary hover:underline"
+              >
+                Escríbenos por WhatsApp
+              </a>
+              .
+            </p>
+          </Reveal>
+        </div>
+      </section>
 
       {/* Final CTA */}
       <section className="mx-auto max-w-4xl px-5 py-24 text-center sm:px-8">
