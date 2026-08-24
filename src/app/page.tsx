@@ -14,13 +14,15 @@ import {
   UserCheck,
   Check,
   X,
-  Image as ImageIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Reveal } from "@/components/reveal";
 import { HeroInboxMockup } from "@/components/hero-inbox-mockup";
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
 import { SocialLinks } from "@/components/social-links";
+import { WhatsAppLiveDemo } from "@/components/whatsapp-live-demo";
+import { ScreenshotsShowcase } from "@/components/screenshots-showcase";
+import { LatamPulseMap } from "@/components/latam-pulse-map";
 import { features, steps } from "@/lib/landing-content";
 
 const sectors = [
@@ -381,24 +383,51 @@ export default async function Home() {
             </h2>
           </Reveal>
 
-          <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2">
-            {screenshots.map((s, i) => (
-              <Reveal key={s.key} delay={i * 100}>
-                <div className="overflow-hidden rounded-2xl border border-border bg-surface">
-                  <div className="flex aspect-video items-center justify-center bg-background/60 text-muted">
-                    <div className="flex flex-col items-center gap-2">
-                      <ImageIcon size={28} />
-                      <span className="text-xs">Captura próximamente</span>
-                    </div>
-                  </div>
-                  <div className="p-4">
-                    <h3 className="text-sm font-medium text-foreground">{s.title}</h3>
-                    <p className="mt-1 text-xs text-muted">{s.text}</p>
-                  </div>
-                </div>
-              </Reveal>
-            ))}
-          </div>
+          <Reveal delay={120}>
+            <ScreenshotsShowcase items={screenshots} />
+          </Reveal>
+        </div>
+      </section>
+
+      {/* Live agent demo */}
+      <section className="mx-auto max-w-6xl px-5 py-20 sm:px-8">
+        <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
+          <Reveal>
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+              El agente de IA en acción
+            </p>
+            <h2 className="mt-2 text-3xl font-semibold text-foreground sm:text-4xl">
+              Mientras tú duermes, tu agente responde.
+            </h2>
+            <p className="mt-4 max-w-md text-muted">
+              Llega un mensaje, la IA lo lee, escribe y responde con el tono que tú
+              definiste — igual que lo verías en tu propio WhatsApp.
+            </p>
+          </Reveal>
+          <Reveal delay={150}>
+            <WhatsAppLiveDemo />
+          </Reveal>
+        </div>
+      </section>
+
+      {/* LatAm */}
+      <section className="bg-surface/40 py-20">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-12 px-5 sm:px-8 lg:grid-cols-2">
+          <Reveal>
+            <LatamPulseMap />
+          </Reveal>
+          <Reveal delay={120}>
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+              Dónde vendemos
+            </p>
+            <h2 className="mt-2 text-3xl font-semibold text-foreground sm:text-4xl">
+              Hecho para negocios de Latinoamérica.
+            </h2>
+            <p className="mt-4 max-w-md text-muted">
+              ByBluee está pensado en español, para la forma en que se vende por
+              WhatsApp en la región — sin traducciones raras ni fricción.
+            </p>
+          </Reveal>
         </div>
       </section>
 

@@ -133,6 +133,85 @@ body {
   animation: marquee-scroll 28s linear infinite;
 }
 
+@keyframes ping-ring {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.7;
+  }
+  75%,
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+
+.ping-ring {
+  animation: ping-ring 1.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.bubble-in {
+  animation: bubble-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes typing-dot {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+.typing-dot {
+  animation: typing-dot 1s ease-in-out infinite;
+}
+
+@keyframes orbit-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.orbit-spin {
+  animation: orbit-spin 40s linear infinite;
+}
+
+.orbit-spin-reverse {
+  animation: orbit-spin 30s linear infinite reverse;
+}
+
+@keyframes dot-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(27, 168, 74, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(27, 168, 74, 0);
+  }
+}
+
+.dot-pulse {
+  animation: dot-pulse 2.2s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .reveal,
   .reveal.is-visible,
@@ -140,9 +219,16 @@ body {
   .float-slower,
   .pop-in,
   .glow-pulse,
-  .marquee-track {
+  .marquee-track,
+  .ping-ring,
+  .bubble-in,
+  .typing-dot,
+  .orbit-spin,
+  .orbit-spin-reverse,
+  .dot-pulse {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
+    box-shadow: none !important;
   }
 }
