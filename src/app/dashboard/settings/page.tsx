@@ -26,6 +26,15 @@ export default async function SettingsPage() {
 
   const agents = await listWorkspaceAgents(supabase, workspaceId);
 
+  const { data: workspacePlan } = workspaceId
+    ? await supabase.from("workspaces").select("plan_id").eq("id", workspaceId).maybeSingle()
+    : { data: null };
+  const { data: plan } = workspacePlan?.plan_id
+    ? await supabase.from("plans").select("max_agents").eq("id", workspacePlan.plan_id).maybeSingle()
+    : { data: null };
+  // null = unlimited (Semestral), 0 = not included in this plan (Inicial), 3 = Pro.
+  const maxAgents = plan?.max_agents ?? null;
+
   const { data: whatsappAccount } = workspaceId
     ? await supabase
         .from("whatsapp_accounts")
@@ -51,16 +60,25 @@ export default async function SettingsPage() {
       <div className="mb-4 flex items-center gap-2">
         <Users size={18} className="text-primary" />
         <h2 className="text-base font-semibold text-foreground">
-          Agentes de respuesta ({agents.length}/3)
+          Agentes de respuesta {maxAgents !== null ? `(${agents.length}/${maxAgents})` : `(${agents.length})`}
         </h2>
       </div>
 
-      <AgentsList agents={agents} />
+      {maxAgents === 0 ? (
+        <p className="text-sm text-muted">
+          Tu plan actual no incluye agentes de respuesta. Mejora tu plan para agregar hasta 3, o
+          agentes ilimitados con el plan Semestral.
+        </p>
+      ) : (
+        <>
+          <AgentsList agents={agents} />
 
-      {agents.length < 3 && (
-        <div className="mt-5 border-t border-border pt-5">
-          <AgentProfileForm />
-        </div>
+          {(maxAgents === null || agents.length < maxAgents) && (
+            <div className="mt-5 border-t border-border pt-5">
+              <AgentProfileForm />
+            </div>
+          )}
+        </>
       )}
     </div>
   );

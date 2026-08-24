@@ -23,7 +23,7 @@ import { SocialLinks } from "@/components/social-links";
 import { WhatsAppLiveDemo } from "@/components/whatsapp-live-demo";
 import { ScreenshotsShowcase } from "@/components/screenshots-showcase";
 import { LatamPulseMap } from "@/components/latam-pulse-map";
-import { features, steps } from "@/lib/landing-content";
+import { features, steps, getPlanFeatures } from "@/lib/landing-content";
 
 const sectors = [
   "Inmobiliarias",
@@ -529,32 +529,59 @@ export default async function Home() {
             </Reveal>
 
             <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {plans.map((plan, i) => (
-                <Reveal key={plan.id} delay={i * 100}>
-                  <div className="flex h-full flex-col rounded-2xl border border-border bg-surface p-6">
-                    <h3 className="text-lg font-semibold text-foreground">{plan.name}</h3>
-                    <div className="mt-3 flex items-baseline gap-1">
-                      <span className="text-3xl font-semibold text-foreground">
-                        ${(plan.price_cents / 100).toLocaleString("es-CO")}
-                      </span>
-                      <span className="text-sm text-muted">
-                        {plan.currency} /{" "}
-                        {plan.billing_cycle === "yearly" ? "año" : "mes"}
-                      </span>
-                    </div>
-                    <a
-                      href={waHref(
-                        `Hola, quiero el plan ${plan.name} de CRM ByBluee por $${(plan.price_cents / 100).toLocaleString("es-CO")} ${plan.currency}.`
-                      )}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-6 rounded-lg bg-primary px-4 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
+              {plans.map((plan, i) => {
+                const featured = plan.name.toLowerCase().includes("pro");
+                const cycleLabel =
+                  plan.billing_cycle === "yearly"
+                    ? "año"
+                    : plan.billing_cycle === "semiannual"
+                      ? "6 meses"
+                      : "mes";
+                return (
+                  <Reveal key={plan.id} delay={i * 100}>
+                    <div
+                      className={`flex h-full flex-col rounded-2xl border p-6 ${
+                        featured ? "border-primary bg-primary/5" : "border-border bg-surface"
+                      }`}
                     >
-                      Empezar ahora
-                    </a>
-                  </div>
-                </Reveal>
-              ))}
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-lg font-semibold text-foreground">{plan.name}</h3>
+                        {featured && (
+                          <span className="rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-semibold text-white">
+                            Más popular
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-3 flex items-baseline gap-1">
+                        <span className="text-3xl font-semibold text-foreground">
+                          ${(plan.price_cents / 100).toLocaleString("es-CO")}
+                        </span>
+                        <span className="text-sm text-muted">
+                          {plan.currency} / {cycleLabel}
+                        </span>
+                      </div>
+                      <ul className="mt-5 flex flex-1 flex-col gap-2 text-sm text-muted">
+                        {getPlanFeatures(plan.name).map((item) => (
+                          <li key={item} className="flex items-start gap-2">
+                            <Check size={14} className="mt-0.5 shrink-0 text-success" />
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                      <a
+                        href={waHref(
+                          `Hola, quiero el plan ${plan.name} de CRM ByBluee por $${(plan.price_cents / 100).toLocaleString("es-CO")} ${plan.currency}.`
+                        )}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-6 rounded-lg bg-primary px-4 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-primary-hover"
+                      >
+                        Empezar ahora
+                      </a>
+                    </div>
+                  </Reveal>
+                );
+              })}
             </div>
           </div>
         </section>

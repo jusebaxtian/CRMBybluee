@@ -13,7 +13,7 @@ import { Reveal } from "@/components/reveal";
 import { HeroInboxMockup } from "@/components/hero-inbox-mockup";
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
 import { SocialLinks } from "@/components/social-links";
-import { features, includedItems, painPoints } from "@/lib/landing-content";
+import { features, includedItems, painPoints, getPlanFeatures } from "@/lib/landing-content";
 
 const trustBadges = [
   { icon: ShieldCheck, title: "100% seguro", text: "Tus datos siempre protegidos" },
@@ -22,41 +22,14 @@ const trustBadges = [
   { icon: RefreshCw, title: "Mejoras constantes", text: "Siempre lo último del CRM" },
 ];
 
-const pricingPlans = [
-  {
-    name: "Plan Inicial",
-    cycleLabel: "6 meses",
-    priceLabel: "$160.000",
-    featured: false,
-    message: "Hola, quiero el Plan Inicial (6 meses) de CRM ByBluee por $160.000 COP.",
-  },
-  {
-    name: "Plan Anual",
-    cycleLabel: "12 meses",
-    priceLabel: "$220.000",
-    featured: true,
-    message: "Hola, quiero el Plan Anual (12 meses) de CRM ByBluee por $220.000 COP.",
-  },
-  {
-    name: "Plan Emprendedor",
-    cycleLabel: "12 meses",
-    priceLabel: "$700.000",
-    featured: false,
-    message: "Hola, quiero el Plan Emprendedor de CRM ByBluee por $700.000 COP.",
-  },
-];
-
-const pricingFeatures = [
-  "Chatbot para WhatsApp",
-  "CRM de contactos",
-  "Automatizaciones ilimitadas",
-  "Campañas masivas",
-  "Reportes avanzados",
-  "Soporte premium",
-];
-
 export default async function ByBlueeLanding() {
   const supabase = await createClient();
+  const { data: plans } = await supabase
+    .from("plans")
+    .select("*")
+    .eq("is_active", true)
+    .order("price_cents");
+
   const { data: supportSetting } = await supabase
     .from("platform_settings")
     .select("value")
@@ -278,20 +251,26 @@ export default async function ByBlueeLanding() {
           </Reveal>
 
           <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {pricingPlans.map((plan, i) => {
-              const waHref = `https://wa.me/${salesWhatsappNumber}?text=${encodeURIComponent(plan.message)}`;
+            {(plans ?? []).map((plan, i) => {
+              const featured = plan.name.toLowerCase().includes("pro");
+              const cycleLabel =
+                plan.billing_cycle === "yearly"
+                  ? "año"
+                  : plan.billing_cycle === "semiannual"
+                    ? "6 meses"
+                    : "mes";
+              const message = `Hola, quiero el plan ${plan.name} de CRM ByBluee por $${(plan.price_cents / 100).toLocaleString("es-CO")} ${plan.currency}.`;
+              const waHref = `https://wa.me/${salesWhatsappNumber}?text=${encodeURIComponent(message)}`;
               return (
-                <Reveal key={plan.name} delay={i * 100}>
+                <Reveal key={plan.id} delay={i * 100}>
                   <div
                     className={`relative flex h-full flex-col rounded-2xl border p-6 ${
-                      plan.featured
-                        ? "border-primary bg-primary/5"
-                        : "border-border bg-surface"
+                      featured ? "border-primary bg-primary/5" : "border-border bg-surface"
                     }`}
                   >
                     <div className="flex items-center gap-2">
                       <h3 className="text-lg font-semibold text-foreground">{plan.name}</h3>
-                      {plan.featured && (
+                      {featured && (
                         <span className="flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-semibold text-white">
                           <ZapIcon size={10} />
                           Más popular
@@ -300,13 +279,13 @@ export default async function ByBlueeLanding() {
                     </div>
                     <div className="mt-3 flex items-baseline gap-1">
                       <span className="text-3xl font-semibold text-foreground">
-                        {plan.priceLabel}
+                        ${(plan.price_cents / 100).toLocaleString("es-CO")}
                       </span>
-                      <span className="text-sm text-muted">COP</span>
+                      <span className="text-sm text-muted">{plan.currency}</span>
                     </div>
-                    <p className="text-xs text-muted">Renovación cada {plan.cycleLabel}</p>
+                    <p className="text-xs text-muted">Renovación cada {cycleLabel}</p>
                     <ul className="mt-5 flex flex-1 flex-col gap-2 text-sm text-muted">
-                      {pricingFeatures.map((item) => (
+                      {getPlanFeatures(plan.name).map((item) => (
                         <li key={item} className="flex items-center gap-2">
                           <Check size={13} className="shrink-0 text-success" />
                           {item}

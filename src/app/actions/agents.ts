@@ -5,8 +5,6 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
 
-const MAX_AGENTS_PER_WORKSPACE = 3;
-
 async function requireOwnerOrAdmin() {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
@@ -33,14 +31,32 @@ export async function createAgentProfile(_prevState: unknown, formData: FormData
   if (!email) return { error: "El correo es obligatorio." };
   if (password.length < 8) return { error: "La contraseña debe tener al menos 8 caracteres." };
 
-  const { count } = await supabase
-    .from("workspace_members")
-    .select("user_id", { count: "exact", head: true })
-    .eq("workspace_id", workspaceId)
-    .eq("role", "agent");
+  const { data: workspace } = await supabase
+    .from("workspaces")
+    .select("plan_id")
+    .eq("id", workspaceId)
+    .maybeSingle();
 
-  if ((count ?? 0) >= MAX_AGENTS_PER_WORKSPACE) {
-    return { error: `Ya tienes el máximo de ${MAX_AGENTS_PER_WORKSPACE} agentes.` };
+  const { data: plan } = workspace?.plan_id
+    ? await supabase.from("plans").select("max_agents").eq("id", workspace.plan_id).maybeSingle()
+    : { data: null };
+
+  // max_agents null means unlimited; 0 means the plan doesn't include agents at all.
+  const maxAgents = plan?.max_agents ?? null;
+  if (maxAgents === 0) {
+    return { error: "Tu plan actual no incluye agentes de respuesta. Mejora tu plan para agregarlos." };
+  }
+
+  if (maxAgents !== null) {
+    const { count } = await supabase
+      .from("workspace_members")
+      .select("user_id", { count: "exact", head: true })
+      .eq("workspace_id", workspaceId)
+      .eq("role", "agent");
+
+    if ((count ?? 0) >= maxAgents) {
+      return { error: `Ya tienes el máximo de ${maxAgents} agentes para tu plan.` };
+    }
   }
 
   const admin = createAdminClient();

@@ -90,3 +90,40 @@ export const painPoints = [
   "Tu equipo no sabe quién ya habló con cada contacto",
   "Enviar novedades a toda tu base es un trabajo manual",
 ];
+
+const baseFeatures = [
+  "Bandeja unificada de WhatsApp",
+  "Contactos y etiquetas",
+  "Campañas masivas con plantillas",
+  "Automatizaciones y seguimientos",
+  "Respuestas rápidas",
+  "Plantillas aprobadas por Meta, con botones",
+];
+
+// Real per-plan differences — keep in sync with plans.max_agents and
+// plan_modules (ai_agent / reports) in the database.
+export function getPlanFeatures(planName: string): string[] {
+  const name = planName.toLowerCase();
+
+  if (name.includes("inicial")) {
+    return baseFeatures;
+  }
+
+  if (name.includes("semestral")) {
+    return [
+      ...baseFeatures,
+      "Agente de IA con seguimiento automático",
+      "Reportes",
+      "Agentes de respuesta ilimitados",
+      "Acompañamiento personalizado",
+    ];
+  }
+
+  // Pro (or any other plan) — includes AI + reports + up to 3 agents.
+  return [
+    ...baseFeatures,
+    "Agente de IA con seguimiento automático",
+    "Reportes",
+    "Hasta 3 agentes de respuesta",
+  ];
+}
