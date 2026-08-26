@@ -24,11 +24,21 @@ declare global {
 type SignupData = { waba_id: string; phone_number_id: string };
 type Status = "idle" | "connecting" | "error" | "success";
 
-export function ConnectWhatsAppButton() {
+export function ConnectWhatsAppButton({
+  label = "Conectar WhatsApp",
+  askLabel = false,
+  disabled = false,
+}: {
+  label?: string;
+  /** Show a "nombre de este canal" field (Ventas, Soporte…) before connecting — used once a workspace already has one number and is adding another. */
+  askLabel?: boolean;
+  disabled?: boolean;
+}) {
   const router = useRouter();
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [sdkReady, setSdkReady] = useState(false);
+  const [channelLabel, setChannelLabel] = useState("");
   const signupDataRef = useRef<SignupData | null>(null);
 
   useEffect(() => {
@@ -72,6 +82,7 @@ export function ConnectWhatsAppButton() {
         code,
         wabaId: signupData.waba_id,
         phoneNumberId: signupData.phone_number_id,
+        label: channelLabel,
       });
 
       if ("error" in result) {
@@ -123,13 +134,23 @@ export function ConnectWhatsAppButton() {
         onReady={() => setSdkReady(true)}
       />
 
+      {askLabel && (
+        <input
+          type="text"
+          value={channelLabel}
+          onChange={(e) => setChannelLabel(e.target.value)}
+          placeholder="Nombre de este canal (ej: Ventas, Soporte)"
+          className="mt-4 w-full max-w-xs rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+        />
+      )}
+
       <button
         type="button"
         onClick={launchSignup}
-        disabled={!sdkReady || status === "connecting"}
-        className="mt-5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
+        disabled={disabled || !sdkReady || status === "connecting"}
+        className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
       >
-        {status === "connecting" ? "Conectando..." : "Conectar WhatsApp"}
+        {status === "connecting" ? "Conectando..." : label}
       </button>
 
       {message && (

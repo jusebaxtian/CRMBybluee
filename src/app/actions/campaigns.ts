@@ -86,6 +86,7 @@ export async function createCampaign(_prevState: unknown, formData: FormData) {
   const messageBody = String(formData.get("messageBody") ?? "").trim() || null;
   const mediaUrl = String(formData.get("mediaUrl") ?? "") || null;
   const mediaFilename = String(formData.get("mediaFilename") ?? "") || null;
+  const whatsappAccountId = String(formData.get("whatsappAccountId") ?? "") || null;
   const audienceParams = readAudienceParams(formData, sendType);
 
   if (!name) return { error: "El nombre es obligatorio." };
@@ -113,6 +114,7 @@ export async function createCampaign(_prevState: unknown, formData: FormData) {
       message_body: sendType === "free_text" ? messageBody : null,
       media_url: sendType === "free_text" ? mediaUrl : null,
       media_filename: sendType === "free_text" ? mediaFilename : null,
+      whatsapp_account_id: whatsappAccountId,
       audience_tag_ids: audienceParams.includeTagIds.length > 0 ? audienceParams.includeTagIds : null,
       audience_exclude_tag_ids: audienceParams.excludeTagIds.length > 0 ? audienceParams.excludeTagIds : null,
       audience_created_from: audienceParams.createdFromRaw
@@ -183,6 +185,7 @@ export async function updateCampaign(campaignId: string, _prevState: unknown, fo
   const messageBody = String(formData.get("messageBody") ?? "").trim() || null;
   const mediaUrl = String(formData.get("mediaUrl") ?? "") || null;
   const mediaFilename = String(formData.get("mediaFilename") ?? "") || null;
+  const whatsappAccountId = String(formData.get("whatsappAccountId") ?? "") || null;
   const audienceParams = readAudienceParams(formData, sendType);
 
   if (!name) return { error: "El nombre es obligatorio." };
@@ -220,6 +223,7 @@ export async function updateCampaign(campaignId: string, _prevState: unknown, fo
       template_id: sendType === "template" ? templateId : null,
       message_body: sendType === "free_text" ? messageBody : null,
       media_url: sendType === "free_text" ? mediaUrl : null,
+      whatsapp_account_id: whatsappAccountId,
       media_filename: sendType === "free_text" ? mediaFilename : null,
       audience_tag_ids: audienceParams.includeTagIds.length > 0 ? audienceParams.includeTagIds : null,
       audience_exclude_tag_ids: audienceParams.excludeTagIds.length > 0 ? audienceParams.excludeTagIds : null,

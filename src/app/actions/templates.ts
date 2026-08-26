@@ -23,6 +23,10 @@ export async function syncTemplates() {
     .from("whatsapp_accounts")
     .select("waba_id, access_token")
     .eq("workspace_id", workspaceId)
+    .neq("status", "frozen")
+    // Templates belong to the shared WABA, not to any one phone number, so
+    // any connected account's token can manage them.
+    .limit(1)
     .maybeSingle();
   if (!account) return { error: "Este workspace no tiene WhatsApp conectado." };
 
@@ -142,6 +146,10 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
     .from("whatsapp_accounts")
     .select("waba_id, access_token")
     .eq("workspace_id", workspaceId)
+    .neq("status", "frozen")
+    // Templates belong to the shared WABA, not to any one phone number, so
+    // any connected account's token can manage them.
+    .limit(1)
     .maybeSingle();
   if (!account) return { error: "Este workspace no tiene WhatsApp conectado." };
 
@@ -246,6 +254,10 @@ export async function deleteTemplate(templateId: string) {
     .from("whatsapp_accounts")
     .select("waba_id, access_token")
     .eq("workspace_id", workspaceId)
+    .neq("status", "frozen")
+    // Templates belong to the shared WABA, not to any one phone number, so
+    // any connected account's token can manage them.
+    .limit(1)
     .maybeSingle();
   if (!account) return { error: "Este workspace no tiene WhatsApp conectado." };
 

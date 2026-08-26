@@ -1,7 +1,8 @@
-import { BadgeCheck, Gauge, MessageSquareOff } from "lucide-react";
+import { BadgeCheck, Gauge, MessageSquareOff, Snowflake } from "lucide-react";
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
 import { ConnectWhatsAppButton } from "@/components/connect-whatsapp-button";
 import { DisconnectWhatsAppButton } from "@/components/disconnect-whatsapp-button";
+import { RenameWhatsAppAccount } from "@/components/rename-whatsapp-account";
 import type { PhoneNumberStatus } from "@/lib/whatsapp/graph";
 
 const qualityLabel: Record<string, string> = {
@@ -25,21 +26,113 @@ const messagingLimitLabel: Record<string, string> = {
   UNLIMITED: "Sin límite",
 };
 
-type WhatsAppAccount = {
+export type WhatsAppAccount = {
+  id: string;
   waba_id: string;
   phone_number_id: string;
   display_phone_number: string;
   status: string;
+  label: string | null;
 };
 
-export function WhatsAppApiPanel({
+function AccountCard({
   account,
   phoneStatus,
 }: {
-  account: WhatsAppAccount | null;
+  account: WhatsAppAccount;
   phoneStatus: PhoneNumberStatus | null;
 }) {
-  if (!account) {
+  const frozen = account.status === "frozen";
+
+  return (
+    <div className={`rounded-xl border p-6 ${frozen ? "border-warning/40 bg-warning/5" : "border-border bg-surface"}`}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div
+            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
+              frozen ? "bg-warning/15 text-warning" : "bg-success/15 text-success"
+            }`}
+          >
+            {frozen ? <Snowflake size={20} /> : <WhatsAppIcon size={22} />}
+          </div>
+          <div>
+            <RenameWhatsAppAccount
+              accountId={account.id}
+              label={account.label}
+              fallback={account.display_phone_number}
+            />
+            <p className="text-sm text-muted">{account.display_phone_number}</p>
+          </div>
+        </div>
+        {frozen ? (
+          <span className="rounded-full border border-warning px-2.5 py-1 text-xs font-medium text-warning">
+            Congelado — mejora tu plan para reactivar
+          </span>
+        ) : (
+          <DisconnectWhatsAppButton accountId={account.id} />
+        )}
+      </div>
+
+      {!frozen && (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs text-foreground">
+            {phoneStatus?.verified_name ?? "—"}
+          </span>
+          <span
+            className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${
+              phoneStatus?.code_verification_status === "VERIFIED"
+                ? "border-success text-success"
+                : "border-border text-muted"
+            }`}
+          >
+            <BadgeCheck size={13} />
+            {phoneStatus?.code_verification_status === "VERIFIED" ? "Negocio verificado" : "No verificado"}
+          </span>
+          {phoneStatus?.quality_rating && (
+            <span
+              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${
+                qualityColor[phoneStatus.quality_rating] ?? qualityColor.UNKNOWN
+              }`}
+            >
+              <Gauge size={13} />
+              Calidad: {qualityLabel[phoneStatus.quality_rating] ?? phoneStatus.quality_rating}
+            </span>
+          )}
+          {phoneStatus?.messaging_limit_tier && (
+            <span className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs text-foreground">
+              Límite: {messagingLimitLabel[phoneStatus.messaging_limit_tier] ?? phoneStatus.messaging_limit_tier}
+            </span>
+          )}
+        </div>
+      )}
+
+      <div className="mt-5 grid grid-cols-1 gap-3 border-t border-border pt-4 sm:grid-cols-2">
+        <div>
+          <p className="text-xs text-muted">ID de cuenta de WhatsApp Business (WABA)</p>
+          <p className="truncate text-sm text-foreground">{account.waba_id}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted">ID del número de teléfono</p>
+          <p className="truncate text-sm text-foreground">{account.phone_number_id}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function WhatsAppApiPanel({
+  accounts,
+  phoneStatuses,
+  maxNumbers,
+}: {
+  accounts: WhatsAppAccount[];
+  phoneStatuses: Record<string, PhoneNumberStatus | null>;
+  maxNumbers: number;
+}) {
+  const activeCount = accounts.filter((a) => a.status !== "frozen").length;
+  const atLimit = activeCount >= maxNumbers;
+
+  if (accounts.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-surface p-6">
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-hover text-muted">
@@ -88,77 +181,30 @@ export function WhatsAppApiPanel({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-success/15 text-success">
-            <WhatsAppIcon size={22} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-foreground">WhatsApp conectado</h2>
-              <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted">
-                WhatsApp API Cloud
-              </span>
-            </div>
-            <p className="text-sm text-muted">{account.display_phone_number}</p>
-          </div>
-        </div>
-        <DisconnectWhatsAppButton />
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-foreground">Números de WhatsApp</h2>
+        <span className="text-xs text-muted">
+          <span className="font-medium text-foreground">{activeCount}</span> / {maxNumbers} conectados
+        </span>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <span className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs text-foreground">
-          {phoneStatus?.verified_name ?? "—"}
-        </span>
-        <span
-          className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${
-            phoneStatus?.code_verification_status === "VERIFIED"
-              ? "border-success text-success"
-              : "border-border text-muted"
-          }`}
-        >
-          <BadgeCheck size={13} />
-          {phoneStatus?.code_verification_status === "VERIFIED"
-            ? "Negocio verificado"
-            : "No verificado"}
-        </span>
-        {phoneStatus?.quality_rating && (
-          <span
-            className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${
-              qualityColor[phoneStatus.quality_rating] ?? qualityColor.UNKNOWN
-            }`}
-          >
-            <Gauge size={13} />
-            Calidad: {qualityLabel[phoneStatus.quality_rating] ?? phoneStatus.quality_rating}
-          </span>
-        )}
-        {phoneStatus?.messaging_limit_tier && (
-          <span className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs text-foreground">
-            Límite: {messagingLimitLabel[phoneStatus.messaging_limit_tier] ?? phoneStatus.messaging_limit_tier}
-          </span>
-        )}
-      </div>
+      {accounts.map((account) => (
+        <AccountCard key={account.id} account={account} phoneStatus={phoneStatuses[account.id] ?? null} />
+      ))}
 
-      <div className="mt-5 grid grid-cols-1 gap-3 border-t border-border pt-4 sm:grid-cols-2">
-        <div>
-          <p className="text-xs text-muted">Número de teléfono</p>
-          <p className="text-sm text-foreground">{account.display_phone_number}</p>
-        </div>
-        <div>
-          <p className="text-xs text-muted">ID de cuenta de WhatsApp Business (WABA)</p>
-          <p className="truncate text-sm text-foreground">{account.waba_id}</p>
-        </div>
-        <div>
-          <p className="text-xs text-muted">ID del número de teléfono</p>
-          <p className="truncate text-sm text-foreground">{account.phone_number_id}</p>
-        </div>
-        <div>
-          <p className="text-xs text-muted">Estado</p>
-          <p className="text-sm text-foreground">
-            {account.status === "connected" ? "Conectado" : account.status}
+      <div className="rounded-xl border border-dashed border-border p-5">
+        {atLimit ? (
+          <p className="text-sm text-muted">
+            Alcanzaste el límite de números de tu plan.{" "}
+            <a href="/dashboard/billing" className="font-medium text-primary hover:underline">
+              Mejora tu plan
+            </a>{" "}
+            para conectar más.
           </p>
-        </div>
+        ) : (
+          <ConnectWhatsAppButton label="Conectar otro número" askLabel />
+        )}
       </div>
     </div>
   );

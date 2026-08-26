@@ -23,6 +23,7 @@ import { validateMediaMime, validateMediaSize } from "@/lib/whatsapp/media-limit
 import { transcodeVideoToH264 } from "@/lib/whatsapp/video-transcode";
 import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
 import { buildTemplateSendParams } from "@/lib/whatsapp/variables";
+import { resolveSendAccount } from "@/lib/whatsapp/account";
 
 const execFileAsync = promisify(execFile);
 
@@ -92,6 +93,7 @@ export async function connectWhatsApp(input: {
   code: string;
   wabaId: string;
   phoneNumberId: string;
+  label?: string;
 }) {
   const supabase = await createClient();
 
@@ -108,6 +110,39 @@ export async function connectWhatsApp(input: {
     .maybeSingle();
 
   if (!membership) return { error: "No se encontró tu workspace." };
+
+  const { data: workspace } = await supabase
+    .from("workspaces")
+    .select("plan_id")
+    .eq("id", membership.workspace_id)
+    .maybeSingle();
+  const { data: plan } = workspace?.plan_id
+    ? await supabase.from("plans").select("max_whatsapp_numbers").eq("id", workspace.plan_id).maybeSingle()
+    : { data: null };
+  const maxNumbers = plan?.max_whatsapp_numbers ?? 1;
+
+  const { count: currentCount } = await supabase
+    .from("whatsapp_accounts")
+    .select("id", { count: "exact", head: true })
+    .eq("workspace_id", membership.workspace_id)
+    .neq("status", "frozen");
+
+  // Reconnecting an already-connected number (same phone_number_id) isn't
+  // blocked by this — the upsert below finds and updates that row instead
+  // of adding a new one, so only a genuinely new number counts against
+  // the cap.
+  const { data: existingForThisNumber } = await supabase
+    .from("whatsapp_accounts")
+    .select("id, label")
+    .eq("workspace_id", membership.workspace_id)
+    .eq("phone_number_id", input.phoneNumberId)
+    .maybeSingle();
+
+  if (!existingForThisNumber && (currentCount ?? 0) >= maxNumbers) {
+    return {
+      error: `Tu plan permite hasta ${maxNumbers} número${maxNumbers === 1 ? "" : "s"} de WhatsApp. Mejora tu plan para conectar más.`,
+    };
+  }
 
   try {
     const accessToken = await exchangeCodeForToken(input.code);
@@ -135,6 +170,9 @@ export async function connectWhatsApp(input: {
         display_phone_number: phoneDetails.display_phone_number,
         access_token: accessToken,
         status: "connected",
+        // Reconnecting (e.g. a token refresh) doesn't necessarily pass a
+        // label again — keep whatever was already set instead of wiping it.
+        label: input.label?.trim() || existingForThisNumber?.label || null,
       },
       // "workspace_id" alone used to be the unique key (one number per
       // workspace) — now it's (workspace_id, phone_number_id), since a
@@ -154,7 +192,7 @@ export async function connectWhatsApp(input: {
   }
 }
 
-export async function disconnectWhatsApp(password: string) {
+export async function disconnectWhatsApp(password: string, accountId: string) {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
   if (!workspaceId) return { error: "No se encontró tu workspace." };
@@ -180,11 +218,28 @@ export async function disconnectWhatsApp(password: string) {
   const { error } = await supabase
     .from("whatsapp_accounts")
     .delete()
+    .eq("id", accountId)
     .eq("workspace_id", workspaceId);
 
   if (error) return { error: error.message };
 
   revalidatePath("/dashboard");
+  revalidatePath("/dashboard/settings");
+  return { success: true as const };
+}
+
+export async function renameWhatsAppAccount(accountId: string, label: string) {
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+
+  const { error } = await supabase
+    .from("whatsapp_accounts")
+    .update({ label: label.trim() || null })
+    .eq("id", accountId)
+    .eq("workspace_id", workspaceId);
+
+  if (error) return { error: error.message };
   revalidatePath("/dashboard/settings");
   return { success: true as const };
 }
@@ -195,13 +250,10 @@ async function sendToConversation(
   workspaceId: string,
   contactWaId: string,
   body: string,
-  replyToWaMessageId?: string
+  replyToWaMessageId?: string,
+  whatsappAccountId?: string | null
 ) {
-  const { data: account } = await supabase
-    .from("whatsapp_accounts")
-    .select("phone_number_id, access_token")
-    .eq("workspace_id", workspaceId)
-    .single();
+  const account = await resolveSendAccount(supabase, workspaceId, whatsappAccountId);
 
   if (!account) return { error: "Este workspace no tiene WhatsApp conectado." };
 
@@ -257,7 +309,7 @@ export async function sendChatMedia(formData: FormData) {
     supabase.auth.getUser(),
     supabase
       .from("conversations")
-      .select("id, workspace_id, contacts(wa_id)")
+      .select("id, workspace_id, whatsapp_account_id, contacts(wa_id)")
       .eq("id", conversationId)
       .single(),
   ]);
@@ -265,11 +317,11 @@ export async function sendChatMedia(formData: FormData) {
 
   if (!conversation) return { error: "Conversación no encontrada." };
 
-  const { data: account } = await supabase
-    .from("whatsapp_accounts")
-    .select("phone_number_id, access_token")
-    .eq("workspace_id", conversation.workspace_id)
-    .single();
+  const account = await resolveSendAccount(
+    supabase,
+    conversation.workspace_id,
+    conversation.whatsapp_account_id
+  );
 
   if (!account) return { error: "Este workspace no tiene WhatsApp conectado." };
 
@@ -419,7 +471,7 @@ export async function sendMessage(input: {
     supabase.auth.getUser(),
     supabase
       .from("conversations")
-      .select("id, workspace_id, contacts(wa_id)")
+      .select("id, workspace_id, whatsapp_account_id, contacts(wa_id)")
       .eq("id", input.conversationId)
       .single(),
   ]);
@@ -435,7 +487,8 @@ export async function sendMessage(input: {
     conversation.workspace_id,
     contactWaId,
     input.body,
-    input.replyToWaMessageId
+    input.replyToWaMessageId,
+    conversation.whatsapp_account_id
   );
 }
 
@@ -479,7 +532,7 @@ export async function sendTemplateToConversation(input: {
   const [{ data: conversation }, { data: template }] = await Promise.all([
     supabase
       .from("conversations")
-      .select("id, workspace_id, contacts(wa_id, name)")
+      .select("id, workspace_id, whatsapp_account_id, contacts(wa_id, name)")
       .eq("id", input.conversationId)
       .single(),
     supabase
@@ -492,11 +545,11 @@ export async function sendTemplateToConversation(input: {
   if (!conversation) return { error: "Conversación no encontrada." };
   if (!template) return { error: "Plantilla no encontrada." };
 
-  const { data: account } = await supabase
-    .from("whatsapp_accounts")
-    .select("phone_number_id, access_token")
-    .eq("workspace_id", conversation.workspace_id)
-    .single();
+  const account = await resolveSendAccount(
+    supabase,
+    conversation.workspace_id,
+    conversation.whatsapp_account_id
+  );
   if (!account) return { error: "Este workspace no tiene WhatsApp conectado." };
 
   const contact = conversation.contacts as unknown as { wa_id: string; name: string | null };
@@ -549,7 +602,7 @@ export async function sendTemplateToConversation(input: {
 
 // The Dataset ID from Events Manager that Click-to-WhatsApp Conversions API
 // events get sent to — see src/lib/meta/conversions.ts for where it's used.
-export async function saveCtwaDatasetId(datasetId: string) {
+export async function saveCtwaDatasetId(datasetId: string, accountId: string) {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
   if (!workspaceId) return { error: "No se encontró tu workspace." };
@@ -557,6 +610,7 @@ export async function saveCtwaDatasetId(datasetId: string) {
   const { error } = await supabase
     .from("whatsapp_accounts")
     .update({ ctwa_dataset_id: datasetId.trim() || null })
+    .eq("id", accountId)
     .eq("workspace_id", workspaceId);
   if (error) return { error: error.message };
 

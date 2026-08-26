@@ -102,11 +102,15 @@ export default async function DashboardPage({
     canceled: "bg-surface-hover text-muted",
   };
 
+  // A workspace can have more than one number now — the home dashboard
+  // summarizes the first connected one; /dashboard/settings has the full list.
   const { data: whatsappAccount } = workspaceId
     ? await supabase
         .from("whatsapp_accounts")
         .select("phone_number_id, access_token, display_phone_number, status")
         .eq("workspace_id", workspaceId)
+        .order("connected_at")
+        .limit(1)
         .maybeSingle()
     : { data: null };
 

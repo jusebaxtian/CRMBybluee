@@ -6,6 +6,7 @@ import { createCampaign, updateCampaign, uploadCampaignMedia, previewAudienceCou
 
 type Template = { id: string; meta_template_name: string; status: string };
 type Tag = { id: string; name: string; excludes_followups: boolean };
+type WhatsAppAccountOption = { id: string; label: string | null; display_phone_number: string };
 type SendType = "template" | "free_text";
 type MediaKind = "" | "image" | "video" | "audio" | "document";
 
@@ -29,6 +30,7 @@ export type CampaignInitialValues = {
   createdTo: string | null;
   audienceWindow: "all" | "open";
   scheduledAt: string | null; // ISO
+  whatsappAccountId: string | null;
 };
 
 // Local (browser) datetime for a <input type="datetime-local"> from an ISO string.
@@ -42,12 +44,14 @@ function toLocalInputValue(iso: string | null): string {
 export function NewCampaignForm({
   templates,
   tags,
+  whatsappAccounts = [],
   mode = "create",
   campaignId,
   initialValues,
 }: {
   templates: Template[];
   tags: Tag[];
+  whatsappAccounts?: WhatsAppAccountOption[];
   mode?: "create" | "edit";
   campaignId?: string;
   initialValues?: CampaignInitialValues;
@@ -55,6 +59,9 @@ export function NewCampaignForm({
   const boundAction = mode === "edit" && campaignId ? updateCampaign.bind(null, campaignId) : createCampaign;
   const [state, action, pending] = useActionState(boundAction, undefined);
 
+  const [whatsappAccountId, setWhatsappAccountId] = useState(
+    initialValues?.whatsappAccountId ?? whatsappAccounts[0]?.id ?? ""
+  );
   const [sendType, setSendType] = useState<SendType>(initialValues?.sendType ?? "template");
   const [mediaKind, setMediaKind] = useState<MediaKind>("");
   const [mediaUrl, setMediaUrl] = useState(initialValues?.mediaUrl ?? "");
@@ -115,6 +122,7 @@ export function NewCampaignForm({
   return (
     <form action={action} className="flex flex-col gap-4">
       <input type="hidden" name="sendType" value={sendType} />
+      <input type="hidden" name="whatsappAccountId" value={whatsappAccountId} />
       <input type="hidden" name="mediaUrl" value={mediaUrl} />
       <input type="hidden" name="mediaFilename" value={mediaFilename} />
       <input type="hidden" name="sendMode" value={sendMode} />
@@ -132,6 +140,23 @@ export function NewCampaignForm({
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
         />
       </div>
+
+      {whatsappAccounts.length > 1 && (
+        <div>
+          <label className="mb-1 block text-sm font-medium text-muted">Enviar desde</label>
+          <select
+            value={whatsappAccountId}
+            onChange={(e) => setWhatsappAccountId(e.target.value)}
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+          >
+            {whatsappAccounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.label || "Sin nombre"} · {a.display_phone_number}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div>
         <label className="mb-1 block text-sm font-medium text-muted">Tipo de envío</label>

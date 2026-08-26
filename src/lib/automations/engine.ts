@@ -9,6 +9,7 @@ import {
 } from "@/lib/whatsapp/graph";
 import { maybeTrackPurchaseFromTag } from "@/lib/meta/conversions";
 import { substituteContactVariables, buildTemplateSendParams } from "@/lib/whatsapp/variables";
+import { resolveSendAccount } from "@/lib/whatsapp/account";
 
 export type Automation = {
   id: string;
@@ -160,15 +161,19 @@ export async function executeAction(
     .eq("id", contactId)
     .single();
 
-  const { data: account } = await supabase
-    .from("whatsapp_accounts")
-    .select("phone_number_id, access_token")
-    .eq("workspace_id", automation.workspace_id)
-    .maybeSingle();
+  const conversationId = await getOrCreateConversation(supabase, automation.workspace_id, contactId);
+
+  const { data: conversationRow } = conversationId
+    ? await supabase.from("conversations").select("whatsapp_account_id").eq("id", conversationId).maybeSingle()
+    : { data: null };
+
+  const account = await resolveSendAccount(
+    supabase,
+    automation.workspace_id,
+    conversationRow?.whatsapp_account_id
+  );
 
   if (!contact || !account) return;
-
-  const conversationId = await getOrCreateConversation(supabase, automation.workspace_id, contactId);
 
   if (action.action_type === "send_message" && action.message_body) {
     const body = substituteContactVariables(action.message_body, contact);

@@ -2,6 +2,7 @@ import type { createAdminClient } from "@/lib/supabase/admin";
 import { callAiProvider, type ChatTurn } from "@/lib/ai/providers";
 import { sendTextMessage, sendMediaMessage } from "@/lib/whatsapp/graph";
 import { isContactExcludedFromAutomations } from "@/lib/automations/engine";
+import { resolveSendAccount } from "@/lib/whatsapp/account";
 
 // The AI ends its reply with this marker on its own line when it decides the
 // conversation needs a human — stripped before the text reaches the
@@ -103,7 +104,7 @@ export async function maybeRespondWithAiAgent(
 
   const { data: conversation } = await supabase
     .from("conversations")
-    .select("ai_handoff_requested, ai_manually_paused")
+    .select("ai_handoff_requested, ai_manually_paused, whatsapp_account_id")
     .eq("id", conversationId)
     .maybeSingle();
   if (!conversation || conversation.ai_handoff_requested || conversation.ai_manually_paused) return;
@@ -118,11 +119,7 @@ export async function maybeRespondWithAiAgent(
     .eq("id", contactId)
     .single();
 
-  const { data: account } = await supabase
-    .from("whatsapp_accounts")
-    .select("phone_number_id, access_token")
-    .eq("workspace_id", workspaceId)
-    .maybeSingle();
+  const account = await resolveSendAccount(supabase, workspaceId, conversation.whatsapp_account_id);
   if (!contact || !account) return;
 
   const { data: mediaLibrary } = await supabase

@@ -4,6 +4,7 @@ import { sendTextMessage, sendTemplateMessage } from "@/lib/whatsapp/graph";
 import { buildFollowupSystemPrompt } from "@/lib/ai/agent";
 import { isContactExcludedFromAutomations } from "@/lib/automations/engine";
 import { buildTemplateSendParams } from "@/lib/whatsapp/variables";
+import { resolveSendAccount } from "@/lib/whatsapp/account";
 
 const HISTORY_LIMIT = 20;
 // WhatsApp's customer-service window: free text is only allowed within 24h
@@ -59,7 +60,7 @@ async function processWorkspaceFollowups(
 
   const { data: conversations } = await supabase
     .from("conversations")
-    .select("id, contact_id, ai_followup_count, ai_followup_started_at")
+    .select("id, contact_id, whatsapp_account_id, ai_followup_count, ai_followup_started_at")
     .eq("workspace_id", agent.workspace_id)
     .eq("ai_handoff_requested", false)
     .eq("ai_manually_paused", false)
@@ -78,13 +79,6 @@ async function processWorkspaceFollowups(
     return Date.now() >= dueAt;
   });
   if (due.length === 0) return;
-
-  const { data: account } = await supabase
-    .from("whatsapp_accounts")
-    .select("phone_number_id, access_token")
-    .eq("workspace_id", agent.workspace_id)
-    .maybeSingle();
-  if (!account) return;
 
   let template: {
     meta_template_name: string;
@@ -119,6 +113,9 @@ async function processWorkspaceFollowups(
       .select("id")
       .maybeSingle();
     if (!claimed) continue;
+
+    const account = await resolveSendAccount(supabase, agent.workspace_id, conversation.whatsapp_account_id);
+    if (!account) continue;
 
     try {
       await sendFollowup(supabase, agent, conversation.id, conversation.contact_id, account, template, step);

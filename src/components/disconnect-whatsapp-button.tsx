@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { disconnectWhatsApp } from "@/app/actions/whatsapp";
 
-export function DisconnectWhatsAppButton() {
+export function DisconnectWhatsAppButton({ accountId }: { accountId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState("");
@@ -25,7 +25,7 @@ export function DisconnectWhatsAppButton() {
     }
     setError(null);
     startTransition(async () => {
-      const result = await disconnectWhatsApp(password);
+      const result = await disconnectWhatsApp(password, accountId);
       if (result?.error) {
         setError(result.error);
         return;

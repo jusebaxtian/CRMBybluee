@@ -6,7 +6,13 @@ import { Target } from "lucide-react";
 import { saveCtwaDatasetId } from "@/app/actions/whatsapp";
 import { Button } from "@/components/ui/button";
 
-export function CtwaDatasetForm({ datasetId }: { datasetId: string }) {
+export function CtwaDatasetForm({
+  datasetId,
+  accountId,
+}: {
+  datasetId: string;
+  accountId: string;
+}) {
   const router = useRouter();
   const [value, setValue] = useState(datasetId);
   const [pending, setPending] = useState(false);
@@ -17,7 +23,7 @@ export function CtwaDatasetForm({ datasetId }: { datasetId: string }) {
     setPending(true);
     setError(null);
     setMessage(null);
-    const result = await saveCtwaDatasetId(value);
+    const result = await saveCtwaDatasetId(value, accountId);
     setPending(false);
     if (result?.error) {
       setError(result.error);

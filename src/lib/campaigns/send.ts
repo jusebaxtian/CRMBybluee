@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendTemplateMessage, sendTextMessage, sendMediaMessage, uploadMedia } from "@/lib/whatsapp/graph";
 import { mediaKindFromMime } from "@/lib/whatsapp/media-limits";
 import { substituteContactVariables, buildTemplateSendParams } from "@/lib/whatsapp/variables";
+import { resolveSendAccount } from "@/lib/whatsapp/account";
 
 const WINDOW_MS = 24 * 60 * 60 * 1000;
 
@@ -52,7 +53,7 @@ export async function executeCampaignSend(
   const { data: campaign } = await supabase
     .from("campaigns")
     .select(
-      "id, send_type, message_body, media_url, media_filename, templates(meta_template_name, language, body_text, header_format, header_media_url, header_media_mime_type, variable_count, buttons)"
+      "id, send_type, message_body, media_url, media_filename, whatsapp_account_id, templates(meta_template_name, language, body_text, header_format, header_media_url, header_media_mime_type, variable_count, buttons)"
     )
     .eq("id", campaignId)
     .single();
@@ -79,11 +80,7 @@ export async function executeCampaignSend(
         }
       : undefined;
 
-  const { data: account } = await supabase
-    .from("whatsapp_accounts")
-    .select("phone_number_id, access_token")
-    .eq("workspace_id", workspaceId)
-    .single();
+  const account = await resolveSendAccount(supabase, workspaceId, campaign.whatsapp_account_id);
   if (!account) return { error: "Este workspace no tiene WhatsApp conectado." };
 
   await supabase.from("campaigns").update({ status: "sending" }).eq("id", campaignId);

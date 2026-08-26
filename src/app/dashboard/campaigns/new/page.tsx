@@ -21,11 +21,22 @@ export default async function NewCampaignPage() {
     .eq("workspace_id", workspaceId ?? "")
     .order("name");
 
+  const { data: whatsappAccounts } = await supabase
+    .from("whatsapp_accounts")
+    .select("id, label, display_phone_number")
+    .eq("workspace_id", workspaceId ?? "")
+    .neq("status", "frozen")
+    .order("connected_at");
+
   return (
     <div className="mx-auto max-w-lg">
       <div className="rounded-xl border border-border bg-surface p-6">
         <h1 className="mb-4 text-lg font-semibold text-foreground">Nueva campaña</h1>
-        <NewCampaignForm templates={templates ?? []} tags={tags ?? []} />
+        <NewCampaignForm
+          templates={templates ?? []}
+          tags={tags ?? []}
+          whatsappAccounts={whatsappAccounts ?? []}
+        />
       </div>
     </div>
   );

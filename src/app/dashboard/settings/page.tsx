@@ -30,30 +30,38 @@ export default async function SettingsPage() {
     ? await supabase.from("workspaces").select("plan_id").eq("id", workspaceId).maybeSingle()
     : { data: null };
   const { data: plan } = workspacePlan?.plan_id
-    ? await supabase.from("plans").select("max_agents").eq("id", workspacePlan.plan_id).maybeSingle()
+    ? await supabase
+        .from("plans")
+        .select("max_agents, max_whatsapp_numbers")
+        .eq("id", workspacePlan.plan_id)
+        .maybeSingle()
     : { data: null };
   // null = unlimited (Semestral), 0 = not included in this plan (Inicial), 3 = Pro.
   const maxAgents = plan?.max_agents ?? null;
+  const maxWhatsappNumbers = plan?.max_whatsapp_numbers ?? 1;
 
-  const { data: whatsappAccount } = workspaceId
+  const { data: whatsappAccounts } = workspaceId
     ? await supabase
         .from("whatsapp_accounts")
-        .select("waba_id, phone_number_id, access_token, display_phone_number, status, ctwa_dataset_id")
+        .select("id, waba_id, phone_number_id, access_token, display_phone_number, status, label, ctwa_dataset_id")
         .eq("workspace_id", workspaceId)
-        .maybeSingle()
-    : { data: null };
+        .order("connected_at")
+    : { data: [] };
 
-  let phoneStatus: Awaited<ReturnType<typeof getPhoneNumberStatus>> | null = null;
-  if (whatsappAccount) {
-    try {
-      phoneStatus = await getPhoneNumberStatus(
-        whatsappAccount.phone_number_id,
-        whatsappAccount.access_token
-      );
-    } catch {
-      phoneStatus = null;
-    }
-  }
+  const accounts = whatsappAccounts ?? [];
+
+  const phoneStatuses: Record<string, Awaited<ReturnType<typeof getPhoneNumberStatus>> | null> = {};
+  await Promise.all(
+    accounts
+      .filter((a) => a.status !== "frozen")
+      .map(async (a) => {
+        try {
+          phoneStatuses[a.id] = await getPhoneNumberStatus(a.phone_number_id, a.access_token);
+        } catch {
+          phoneStatuses[a.id] = null;
+        }
+      })
+  );
 
   const agentsSection = (
     <div className="rounded-xl border border-border bg-surface p-5">
@@ -85,13 +93,12 @@ export default async function SettingsPage() {
 
   const whatsappSection = (
     <div className="flex flex-col gap-5">
-      <WhatsAppApiPanel
-        account={whatsappAccount ? { ...whatsappAccount } : null}
-        phoneStatus={phoneStatus}
-      />
-      {whatsappAccount && (
-        <CtwaDatasetForm datasetId={whatsappAccount.ctwa_dataset_id ?? ""} />
-      )}
+      <WhatsAppApiPanel accounts={accounts} phoneStatuses={phoneStatuses} maxNumbers={maxWhatsappNumbers} />
+      {accounts
+        .filter((a) => a.status !== "frozen")
+        .map((a) => (
+          <CtwaDatasetForm key={a.id} accountId={a.id} datasetId={a.ctwa_dataset_id ?? ""} />
+        ))}
     </div>
   );
 

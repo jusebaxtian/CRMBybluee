@@ -227,12 +227,13 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
 
       const { data: account } = await supabase
         .from("whatsapp_accounts")
-        .select("workspace_id, access_token")
+        .select("id, workspace_id, access_token")
         .eq("phone_number_id", phoneNumberId)
         .maybeSingle();
 
       if (!account) continue;
       const workspaceId = account.workspace_id as string;
+      const whatsappAccountId = account.id as string;
 
       for (const message of value.messages ?? []) {
         // Meta's webhook delivery is at-least-once — it resends the same
@@ -267,10 +268,14 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
             {
               workspace_id: workspaceId,
               contact_id: contact.id,
+              whatsapp_account_id: whatsappAccountId,
               last_message_at: new Date(Number(message.timestamp) * 1000).toISOString(),
               status: "open",
             },
-            { onConflict: "workspace_id,contact_id" }
+            // Keyed by channel too, so the same contact texting two of the
+            // workspace's numbers gets a separate thread per number instead
+            // of one merged conversation.
+            { onConflict: "workspace_id,contact_id,whatsapp_account_id" }
           )
           .select("id, assigned_agent_id, ad_source_id")
           .single();

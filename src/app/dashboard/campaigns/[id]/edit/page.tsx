@@ -17,7 +17,7 @@ export default async function EditCampaignPage({
   const { data: campaign } = await supabase
     .from("campaigns")
     .select(
-      "id, name, status, send_type, template_id, message_body, media_url, media_filename, audience_tag_ids, audience_exclude_tag_ids, audience_created_from, audience_created_to, audience_window, scheduled_at"
+      "id, name, status, send_type, template_id, message_body, media_url, media_filename, audience_tag_ids, audience_exclude_tag_ids, audience_created_from, audience_created_to, audience_window, scheduled_at, whatsapp_account_id"
     )
     .eq("id", id)
     .eq("workspace_id", workspaceId ?? "")
@@ -39,6 +39,13 @@ export default async function EditCampaignPage({
     .eq("workspace_id", workspaceId ?? "")
     .order("name");
 
+  const { data: whatsappAccounts } = await supabase
+    .from("whatsapp_accounts")
+    .select("id, label, display_phone_number")
+    .eq("workspace_id", workspaceId ?? "")
+    .neq("status", "frozen")
+    .order("connected_at");
+
   const initialValues: CampaignInitialValues = {
     name: campaign.name,
     sendType: campaign.send_type as "template" | "free_text",
@@ -52,6 +59,7 @@ export default async function EditCampaignPage({
     createdTo: campaign.audience_created_to ? campaign.audience_created_to.slice(0, 10) : null,
     audienceWindow: campaign.audience_window as "all" | "open",
     scheduledAt: campaign.scheduled_at,
+    whatsappAccountId: campaign.whatsapp_account_id,
   };
 
   return (
@@ -61,6 +69,7 @@ export default async function EditCampaignPage({
         <NewCampaignForm
           templates={templates ?? []}
           tags={tags ?? []}
+          whatsappAccounts={whatsappAccounts ?? []}
           mode="edit"
           campaignId={campaign.id}
           initialValues={initialValues}

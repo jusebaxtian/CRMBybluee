@@ -52,11 +52,15 @@ export default async function AdminWorkspaceDetailPage({
         .eq("workspace_id", id),
     ]);
 
-  const { data: whatsappAccount } = await supabase
+  // A workspace can have more than one number now — this admin summary
+  // shows the first connected one; see /dashboard/settings for the full list.
+  const { data: whatsappAccounts } = await supabase
     .from("whatsapp_accounts")
     .select("display_phone_number, status")
     .eq("workspace_id", id)
-    .maybeSingle();
+    .order("connected_at");
+  const whatsappAccount = whatsappAccounts?.[0] ?? null;
+  const whatsappAccountCount = whatsappAccounts?.length ?? 0;
 
   const { data: recentAccess } = await supabase
     .from("admin_access_logs")
@@ -138,7 +142,12 @@ export default async function AdminWorkspaceDetailPage({
         <StatCard label="Usuarios" value={membersCount ?? 0} />
         <StatCard
           label="WhatsApp"
-          value={whatsappAccount ? whatsappAccount.display_phone_number ?? "Conectado" : "No conectado"}
+          value={
+            whatsappAccount
+              ? (whatsappAccount.display_phone_number ?? "Conectado") +
+                (whatsappAccountCount > 1 ? ` (+${whatsappAccountCount - 1} más)` : "")
+              : "No conectado"
+          }
         />
         <StatCard
           label="Última conexión"

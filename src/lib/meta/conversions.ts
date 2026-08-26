@@ -14,16 +14,9 @@ export async function sendPurchaseConversionEvent(
   workspaceId: string,
   contactId: string
 ) {
-  const { data: account } = await supabase
-    .from("whatsapp_accounts")
-    .select("access_token, ctwa_dataset_id")
-    .eq("workspace_id", workspaceId)
-    .maybeSingle();
-  if (!account?.ctwa_dataset_id) return;
-
   const { data: conversation } = await supabase
     .from("conversations")
-    .select("ctwa_clid")
+    .select("ctwa_clid, whatsapp_account_id")
     .eq("workspace_id", workspaceId)
     .eq("contact_id", contactId)
     .not("ctwa_clid", "is", null)
@@ -31,6 +24,24 @@ export async function sendPurchaseConversionEvent(
     .limit(1)
     .maybeSingle();
   if (!conversation?.ctwa_clid) return;
+
+  // The dataset is configured per number — use the account this
+  // conversation's ad click actually came in through, falling back to the
+  // workspace's first connected number for pre-multi-number conversations.
+  const { data: account } = conversation.whatsapp_account_id
+    ? await supabase
+        .from("whatsapp_accounts")
+        .select("access_token, ctwa_dataset_id")
+        .eq("id", conversation.whatsapp_account_id)
+        .maybeSingle()
+    : await supabase
+        .from("whatsapp_accounts")
+        .select("access_token, ctwa_dataset_id")
+        .eq("workspace_id", workspaceId)
+        .order("connected_at")
+        .limit(1)
+        .maybeSingle();
+  if (!account?.ctwa_dataset_id) return;
 
   try {
     const res = await fetch(
