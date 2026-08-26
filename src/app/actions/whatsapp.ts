@@ -136,7 +136,13 @@ export async function connectWhatsApp(input: {
         access_token: accessToken,
         status: "connected",
       },
-      { onConflict: "workspace_id" }
+      // "workspace_id" alone used to be the unique key (one number per
+      // workspace) — now it's (workspace_id, phone_number_id), since a
+      // workspace can hold multiple numbers (see 0066 migration).
+      // Reconnecting the SAME number still updates its existing row; a
+      // genuinely new number inserts a new one instead of overwriting the
+      // workspace's only row like before.
+      { onConflict: "workspace_id,phone_number_id" }
     );
 
     if (error) return { error: error.message };
