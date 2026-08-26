@@ -2,11 +2,15 @@
 // replies, campaigns) — a literal {{nombre}} token in the text gets
 // replaced with the contact's name (falls back to their number if they
 // don't have one saved). Case-insensitive so "{{Nombre}}" also works.
+// {{1}} is also accepted as an alias — people used to filling in approved
+// templates' numbered {{1}} reach for it out of habit in free-text sends too.
 export function substituteContactVariables(
   text: string,
   contact: { name: string | null; wa_id: string }
 ): string {
-  return text.replace(/\{\{\s*nombre\s*\}\}/gi, contact.name || contact.wa_id);
+  return text
+    .replace(/\{\{\s*nombre\s*\}\}/gi, contact.name || contact.wa_id)
+    .replace(/\{\{\s*1\s*\}\}/g, contact.name || contact.wa_id);
 }
 
 // Approved Meta templates only take NUMBERED {{1}}, {{2}}... placeholders,
