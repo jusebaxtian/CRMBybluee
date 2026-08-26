@@ -29,7 +29,7 @@ export default async function ConversationPage({
   const { data: conversation } = await supabase
     .from("conversations")
     .select(
-      "id, contact_id, last_read_at, assigned_agent_id, ad_source_id, ad_headline, ad_body, followups_enabled, ai_handoff_requested, ai_manually_paused, contacts(name, wa_id, notes, likely_blocked, contact_tags(tag_id, tags(excludes_followups)))"
+      "id, contact_id, last_read_at, assigned_agent_id, ad_source_id, ad_headline, ad_body, followups_enabled, ai_handoff_requested, ai_manually_paused, whatsapp_account_id, contacts(name, wa_id, notes, likely_blocked, contact_tags(tag_id, tags(excludes_followups)))"
     )
     .eq("id", id)
     .eq("workspace_id", workspaceId ?? "")
@@ -74,6 +74,16 @@ export default async function ConversationPage({
     .select("id, name, color")
     .eq("workspace_id", workspaceId ?? "")
     .order("name");
+
+  // Only worth showing "respondiendo desde X" once there's more than one
+  // number to disambiguate between.
+  const { data: workspaceChannels } = workspaceId
+    ? await supabase.from("whatsapp_accounts").select("id, label, display_phone_number").eq("workspace_id", workspaceId)
+    : { data: [] };
+  const channel =
+    (workspaceChannels?.length ?? 0) > 1
+      ? workspaceChannels?.find((c) => c.id === conversation.whatsapp_account_id) ?? null
+      : null;
 
   const { data: automations } = assignedTagIds.length > 0
     ? await supabase
@@ -151,6 +161,12 @@ export default async function ConversationPage({
               {contact.name && <span className="text-muted"> · {contact.name}</span>}
             </p>
             <ConversationWindowStatus lastInboundAt={lastInboundAt} />
+            {channel && (
+              <p className="truncate text-xs text-muted">
+                Respondiendo desde {channel.label || channel.display_phone_number}
+                {channel.label ? ` · ${channel.display_phone_number}` : ""}
+              </p>
+            )}
           </div>
           <ConversationDetailsSheet
             contactName={contact.name}

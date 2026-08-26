@@ -18,9 +18,11 @@ function msRemaining(lastInboundAt: string, now: number) {
 
 type Tag = { id: string; name: string; color: string };
 type Agent = { id: string; name: string | null; email: string };
+type Channel = { id: string; label: string | null; display_phone_number: string };
 type Conversation = {
   id: string;
   last_message_at: string;
+  whatsappAccountId: string | null;
   lastMessagePreview: string | null;
   answered: boolean;
   unreadCount: number;
@@ -33,6 +35,10 @@ type Conversation = {
   contact: { name: string | null; wa_id: string };
   tags: Tag[];
 };
+
+// Cycled by channel index — same order every render since `channels` comes
+// from a stable, ordered query (connected_at).
+const CHANNEL_COLORS = ["#1ba84a", "#4a9eff", "#f59e0b", "#a855f7"];
 
 // Small red "24h" flag next to the timestamp when the WhatsApp free-form
 // window has expired for that contact — same rule as the chat's own gate.
@@ -79,20 +85,26 @@ export function ConversationListPanel({
   contacts,
   allTags,
   agents,
+  channels,
 }: {
   conversations: Conversation[];
   contacts: Contact[];
   allTags: Tag[];
   agents: Agent[];
+  channels: Channel[];
 }) {
   const pathname = usePathname();
   const [query, setQuery] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [assignedFilter, setAssignedFilter] = useState<string>(""); // "" = all, "unassigned", or agent id
+  const [channelFilter, setChannelFilter] = useState<string>(""); // "" = all channels
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [expiringSoon, setExpiringSoon] = useState(false);
   const [needsHumanOnly, setNeedsHumanOnly] = useState(false);
+
+  const channelColor = new Map(channels.map((c, i) => [c.id, CHANNEL_COLORS[i % CHANNEL_COLORS.length]]));
+  const channelName = (c: Channel) => c.label || c.display_phone_number;
 
   // Only needed to keep the "por vencer" filter and its badges live —
   // ticks once a second so a conversation drops out of the list the moment
@@ -106,6 +118,7 @@ export function ConversationListPanel({
   const filtered = useMemo(() => {
     return conversations.filter((c) => {
       if (query && !c.contact.wa_id.includes(query)) return false;
+      if (channelFilter && c.whatsappAccountId !== channelFilter) return false;
       if (unreadOnly && c.unreadCount === 0) return false;
       if (needsHumanOnly && !c.needsHuman) return false;
       if (expiringSoon) {
@@ -130,6 +143,7 @@ export function ConversationListPanel({
   }, [
     conversations,
     query,
+    channelFilter,
     unreadOnly,
     expiringSoon,
     needsHumanOnly,
@@ -211,6 +225,40 @@ export function ConversationListPanel({
           )}
         </button>
       </div>
+
+      {channels.length > 1 && (
+        <div className="flex flex-wrap gap-1.5 border-b border-border px-3 py-2.5">
+          <button
+            type="button"
+            onClick={() => setChannelFilter("")}
+            className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+              channelFilter === ""
+                ? "border-primary bg-primary/15 text-primary"
+                : "border-border text-muted hover:text-foreground"
+            }`}
+          >
+            Todos
+          </button>
+          {channels.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => setChannelFilter(c.id)}
+              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                channelFilter === c.id
+                  ? "border-primary bg-primary/15 text-primary"
+                  : "border-border text-muted hover:text-foreground"
+              }`}
+            >
+              <span
+                className="h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{ backgroundColor: channelColor.get(c.id) }}
+              />
+              {channelName(c)}
+            </button>
+          ))}
+        </div>
+      )}
 
       {filtersOpen && (
         <div className="flex flex-col gap-3 border-b border-border bg-background/50 p-3">
@@ -342,6 +390,13 @@ export function ConversationListPanel({
                   <span
                     title="Sin responder"
                     className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface bg-warning"
+                  />
+                )}
+                {channels.length > 1 && conv.whatsappAccountId && channelColor.has(conv.whatsappAccountId) && (
+                  <span
+                    title={channelName(channels.find((c) => c.id === conv.whatsappAccountId)!)}
+                    className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface"
+                    style={{ backgroundColor: channelColor.get(conv.whatsappAccountId) }}
                   />
                 )}
               </div>

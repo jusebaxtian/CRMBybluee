@@ -18,10 +18,18 @@ export default async function InboxLayout({
   const { data: conversationsRaw } = await supabase
     .from("conversations")
     .select(
-      "id, last_message_at, last_read_at, assigned_agent_id, ad_source_id, ad_headline, ai_handoff_requested, ai_manually_paused, contacts(name, wa_id, likely_blocked, contact_tags(tags(id, name, color)))"
+      "id, last_message_at, last_read_at, assigned_agent_id, ad_source_id, ad_headline, ai_handoff_requested, ai_manually_paused, whatsapp_account_id, contacts(name, wa_id, likely_blocked, contact_tags(tags(id, name, color)))"
     )
     .eq("workspace_id", workspaceId ?? "")
     .order("last_message_at", { ascending: false });
+
+  const { data: channels } = workspaceId
+    ? await supabase
+        .from("whatsapp_accounts")
+        .select("id, label, display_phone_number")
+        .eq("workspace_id", workspaceId)
+        .order("connected_at")
+    : { data: [] };
 
   // Per-conversation summary (last message, last inbound time, unread
   // count) computed in the DB via lateral joins — scales with conversation
@@ -79,6 +87,7 @@ export default async function InboxLayout({
     return {
       id: c.id,
       last_message_at: c.last_message_at,
+      whatsappAccountId: c.whatsapp_account_id as string | null,
       lastMessagePreview,
       answered: summary ? summary.direction === "out" : true,
       unreadCount: summary?.unreadCount ?? 0,
@@ -127,6 +136,7 @@ export default async function InboxLayout({
             contacts={contacts ?? []}
             allTags={workspaceTags ?? []}
             agents={agents}
+            channels={channels ?? []}
           />
         }
       >
