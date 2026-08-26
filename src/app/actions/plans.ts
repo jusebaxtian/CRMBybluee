@@ -20,6 +20,11 @@ export async function createPlan(_prevState: unknown, formData: FormData) {
     price_cents: Math.round(priceCop * 100),
     currency: "COP",
     billing_cycle: billingCycle,
+    // Safe defaults — edit right after creating via "Límites del plan".
+    // Left null (unlimited) would let a workspace on a brand-new plan
+    // connect unlimited agents/numbers until someone notices.
+    max_agents: 0,
+    max_whatsapp_numbers: 1,
   });
 
   if (error) return { error: error.message };
@@ -35,6 +40,24 @@ export async function updatePlanPrice(planId: string, priceCop: number) {
   const { error } = await supabase
     .from("plans")
     .update({ price_cents: Math.round(priceCop * 100) })
+    .eq("id", planId);
+
+  if (error) return { error: error.message };
+  revalidatePath("/admin/plans");
+  return { success: true };
+}
+
+// null = unlimited, for both limits.
+export async function updatePlanLimits(
+  planId: string,
+  limits: { maxAgents: number | null; maxWhatsappNumbers: number | null }
+) {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
+
+  const { error } = await supabase
+    .from("plans")
+    .update({ max_agents: limits.maxAgents, max_whatsapp_numbers: limits.maxWhatsappNumbers })
     .eq("id", planId);
 
   if (error) return { error: error.message };

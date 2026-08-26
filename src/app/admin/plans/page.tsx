@@ -4,13 +4,14 @@ import { PlanPriceEditor } from "@/components/plan-price-editor";
 import { PlanModuleToggle } from "@/components/plan-module-toggle";
 import { PlanActiveToggle } from "@/components/plan-active-toggle";
 import { PlanDescriptionEditor } from "@/components/plan-description-editor";
+import { PlanLimitsEditor } from "@/components/plan-limits-editor";
 
 export default async function AdminPlansPage() {
   const supabase = await createClient();
 
   const { data: plans } = await supabase
     .from("plans")
-    .select("id, name, price_cents, is_active, description")
+    .select("id, name, price_cents, is_active, description, max_agents, max_whatsapp_numbers")
     .order("price_cents");
 
   const { data: modules } = await supabase
@@ -55,6 +56,17 @@ export default async function AdminPlansPage() {
 
               <div className="mb-4">
                 <PlanDescriptionEditor planId={plan.id} initialDescription={plan.description ?? []} />
+              </div>
+
+              <div className="mb-4 rounded-lg border border-border bg-background p-3">
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
+                  Límites del plan
+                </p>
+                <PlanLimitsEditor
+                  planId={plan.id}
+                  initialMaxAgents={plan.max_agents}
+                  initialMaxWhatsappNumbers={plan.max_whatsapp_numbers}
+                />
               </div>
 
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
