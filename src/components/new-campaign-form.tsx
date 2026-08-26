@@ -315,32 +315,79 @@ export function NewCampaignForm({
           ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label htmlFor="createdFrom" className="mb-1 block text-xs font-medium text-muted">
-              Creados desde
-            </label>
-            <input
-              id="createdFrom"
-              name="createdFrom"
-              type="date"
-              value={createdFrom}
-              onChange={(e) => setCreatedFrom(e.target.value)}
-              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
-            />
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted">
+            Fecha de registro del contacto
+          </label>
+          <p className="mb-2 text-[11px] text-muted">
+            Filtra por cuándo llegó el contacto al CRM. Sin fecha, la campaña llega a todos.
+          </p>
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {([
+              ["Hoy", 0, 0],
+              ["Ayer", 1, 1],
+              ["Últimos 7 días", 6, 0],
+              ["Este mes", "month", 0],
+            ] as const).map(([label, from, to]) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => {
+                  const toDate = new Date();
+                  toDate.setDate(toDate.getDate() - to);
+                  const fromDate =
+                    from === "month"
+                      ? new Date(toDate.getFullYear(), toDate.getMonth(), 1)
+                      : new Date(new Date().setDate(new Date().getDate() - from));
+                  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+                  setCreatedFrom(fmt(fromDate));
+                  setCreatedTo(fmt(toDate));
+                }}
+                className="rounded-full border border-border px-2.5 py-1 text-xs text-muted hover:border-primary hover:text-primary"
+              >
+                {label}
+              </button>
+            ))}
+            {(createdFrom || createdTo) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCreatedFrom("");
+                  setCreatedTo("");
+                }}
+                className="rounded-full border border-border px-2.5 py-1 text-xs text-muted hover:text-foreground"
+              >
+                Limpiar
+              </button>
+            )}
           </div>
-          <div>
-            <label htmlFor="createdTo" className="mb-1 block text-xs font-medium text-muted">
-              Creados hasta
-            </label>
-            <input
-              id="createdTo"
-              name="createdTo"
-              type="date"
-              value={createdTo}
-              onChange={(e) => setCreatedTo(e.target.value)}
-              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
-            />
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label htmlFor="createdFrom" className="mb-1 block text-xs font-medium text-muted">
+                Desde
+              </label>
+              <input
+                id="createdFrom"
+                name="createdFrom"
+                type="date"
+                value={createdFrom}
+                onChange={(e) => setCreatedFrom(e.target.value)}
+                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
+              />
+            </div>
+            <div>
+              <label htmlFor="createdTo" className="mb-1 block text-xs font-medium text-muted">
+                Hasta
+              </label>
+              <input
+                id="createdTo"
+                name="createdTo"
+                type="date"
+                value={createdTo}
+                onChange={(e) => setCreatedTo(e.target.value)}
+                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
+              />
+            </div>
           </div>
         </div>
 
