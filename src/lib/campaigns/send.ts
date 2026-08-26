@@ -100,12 +100,21 @@ export async function executeCampaignSend(
   // large recipient list can build a query string long enough to trip
   // nginx's URL-length limit (silently returns no rows, not an error).
   const noFollowupContactIds = new Set<string>();
+  // A contact an agent replied to (manually, from the chat) in the last 15
+  // minutes is being talked to right now — skip them so the campaign
+  // doesn't interrupt that conversation. Same reasoning/pattern as the
+  // no-followup exclusion above.
+  const activeChatContactIds = new Set<string>();
   if (recipients && recipients.length > 0) {
-    const { data: excluded } = await supabase.rpc("campaign_no_followup_recipient_ids", {
-      p_campaign_id: campaignId,
-    });
+    const [{ data: excluded }, { data: activeChats }] = await Promise.all([
+      supabase.rpc("campaign_no_followup_recipient_ids", { p_campaign_id: campaignId }),
+      supabase.rpc("campaign_active_chat_recipient_ids", { p_campaign_id: campaignId }),
+    ]);
     for (const row of (excluded ?? []) as { contact_id: string }[]) {
       noFollowupContactIds.add(row.contact_id);
+    }
+    for (const row of (activeChats ?? []) as { contact_id: string }[]) {
+      activeChatContactIds.add(row.contact_id);
     }
   }
 
@@ -153,6 +162,17 @@ export async function executeCampaignSend(
         .update({
           status: "failed",
           error_message: "Contacto tiene una etiqueta de \"no seguimientos\" — excluido de envíos masivos.",
+        })
+        .eq("id", recipient.id);
+      continue;
+    }
+
+    if (activeChatContactIds.has(recipient.contact_id)) {
+      await supabase
+        .from("campaign_recipients")
+        .update({
+          status: "failed",
+          error_message: "Un agente le está respondiendo en este momento — excluido para no interrumpir la conversación.",
         })
         .eq("id", recipient.id);
       continue;

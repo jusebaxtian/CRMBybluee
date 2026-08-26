@@ -276,6 +276,10 @@ async function sendToConversation(
         wa_message_id: result.messages[0]?.id,
         context_wa_message_id: replyToWaMessageId ?? null,
         status: "sent",
+        // Flags this as a human agent actively answering — campaigns skip a
+        // contact with a recent sent_by_support message so a mass send
+        // doesn't interrupt a conversation someone's live in right now.
+        sent_by_support: true,
       }),
       supabase
         .from("conversations")
@@ -439,6 +443,7 @@ export async function sendChatMedia(formData: FormData) {
         media_mime_type: uploadContentType,
         wa_message_id: result.messages[0]?.id,
         status: "sent",
+        sent_by_support: true,
       }),
       supabase
         .from("conversations")
@@ -585,6 +590,7 @@ export async function sendTemplateToConversation(input: {
         media_url: headerMedia?.link ?? null,
         wa_message_id: result.messages[0]?.id,
         status: "sent",
+        sent_by_support: true,
       }),
       supabase
         .from("conversations")
