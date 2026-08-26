@@ -167,6 +167,21 @@ export default async function ConversationPage({
                 {channel.label ? ` · ${channel.display_phone_number}` : ""}
               </p>
             )}
+            {assignedTagIds.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1 lg:hidden">
+                {(allTags ?? [])
+                  .filter((tag) => assignedTagIds.includes(tag.id))
+                  .map((tag) => (
+                    <span
+                      key={tag.id}
+                      className="rounded-full px-1.5 py-0.5 text-[9px] font-medium leading-none text-white"
+                      style={{ backgroundColor: tag.color }}
+                    >
+                      {tag.name}
+                    </span>
+                  ))}
+              </div>
+            )}
           </div>
           <ConversationDetailsSheet
             contactName={contact.name}
