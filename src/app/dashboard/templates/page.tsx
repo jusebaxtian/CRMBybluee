@@ -1,4 +1,4 @@
-import { FileText } from "lucide-react";
+import { FileText, MousePointerClick } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { SyncTemplatesButton } from "@/components/sync-templates-button";
 import { CreateTemplateForm } from "@/components/create-template-form";
@@ -6,12 +6,25 @@ import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule, getEnabledModuleKeys } from "@/lib/entitlements";
 import { CampaignsTabs } from "@/components/campaigns-tabs";
 import { DeleteTemplateButton } from "@/components/delete-template-button";
+import { TemplatePreview } from "@/components/template-preview";
 
+const statusLabel: Record<string, string> = {
+  APPROVED: "Aprobada",
+  PENDING: "Pendiente",
+  REJECTED: "Rechazada",
+  DELETED: "Eliminada",
+};
 const statusColor: Record<string, string> = {
-  APPROVED: "text-success border-success",
-  PENDING: "text-warning border-warning",
-  REJECTED: "text-red-400 border-red-400",
+  APPROVED: "text-success border-success bg-success/10",
+  PENDING: "text-warning border-warning bg-warning/10",
+  REJECTED: "text-red-400 border-red-400 bg-red-400/10",
   DELETED: "text-muted border-border line-through",
+};
+const headerFormatLabel: Record<string, string> = {
+  TEXT: "Encabezado de texto",
+  IMAGE: "Encabezado con imagen",
+  VIDEO: "Encabezado con video",
+  DOCUMENT: "Encabezado con documento",
 };
 
 export default async function TemplatesPage() {
@@ -22,7 +35,9 @@ export default async function TemplatesPage() {
 
   const { data: templates } = await supabase
     .from("templates")
-    .select("id, meta_template_name, language, category, status, body_text")
+    .select(
+      "id, meta_template_name, language, category, status, body_text, variable_count, header_format, header_text, header_media_url, buttons"
+    )
     .eq("workspace_id", workspaceId ?? "")
     .order("meta_template_name");
 
@@ -56,32 +71,63 @@ export default async function TemplatesPage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {templates.map((t) => (
-            <div key={t.id} className="rounded-xl border border-border bg-surface p-5">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="font-medium text-foreground">{t.meta_template_name}</p>
-                <span
-                  className={`rounded-full border px-2 py-0.5 text-xs ${
-                    statusColor[t.status] ?? "text-muted border-border"
-                  }`}
-                >
-                  {t.status}
-                </span>
-              </div>
-              <p className="text-xs text-muted">
-                {t.language} · {t.category ?? "—"}
-              </p>
-              {t.body_text && (
-                <p className="mt-3 text-sm text-foreground">{t.body_text}</p>
-              )}
-              {t.status !== "DELETED" && (
-                <div className="mt-3">
-                  <DeleteTemplateButton templateId={t.id} templateName={t.meta_template_name} />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          {templates.map((t) => {
+            const headerFormat = t.header_format as "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | null;
+            const buttons = t.buttons as { type: "URL" | "QUICK_REPLY"; text: string; url?: string }[] | null;
+            return (
+              <div key={t.id} className="flex flex-col rounded-xl border border-border bg-surface p-5">
+                <div className="mb-3 flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-foreground">{t.meta_template_name}</p>
+                    <p className="text-xs text-muted">
+                      {t.language} · {t.category ?? "—"}
+                    </p>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                      statusColor[t.status] ?? "text-muted border-border"
+                    }`}
+                  >
+                    {statusLabel[t.status] ?? t.status}
+                  </span>
                 </div>
-              )}
-            </div>
-          ))}
+
+                <TemplatePreview
+                  headerFormat={headerFormat}
+                  headerText={t.header_text}
+                  headerMediaUrl={t.header_media_url}
+                  bodyText={t.body_text}
+                  buttons={buttons}
+                />
+
+                <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                  {headerFormat && (
+                    <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted">
+                      {headerFormatLabel[headerFormat] ?? headerFormat}
+                    </span>
+                  )}
+                  {t.variable_count > 0 && (
+                    <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted">
+                      {t.variable_count} variable{t.variable_count > 1 ? "s" : ""}
+                    </span>
+                  )}
+                  {buttons && buttons.length > 0 && (
+                    <span className="flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] text-muted">
+                      <MousePointerClick size={11} />
+                      {buttons.length} botón{buttons.length > 1 ? "es" : ""}
+                    </span>
+                  )}
+                </div>
+
+                {t.status !== "DELETED" && (
+                  <div className="mt-3 border-t border-border pt-3">
+                    <DeleteTemplateButton templateId={t.id} templateName={t.meta_template_name} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
