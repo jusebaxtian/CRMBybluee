@@ -1,4 +1,5 @@
 import { FileText, Download, Check, CheckCheck, AlertCircle, Clock, Reply, ExternalLink } from "lucide-react";
+import { VoiceMessagePlayer } from "@/components/voice-message-player";
 
 type MessageButton =
   | { type: "QUICK_REPLY"; id: string; title: string }
@@ -123,7 +124,7 @@ export function MessageBubble({
         )}
 
         {m.message_type === "audio" && m.media_url && (
-          <audio src={m.media_url} controls className="mb-1 h-10 w-56 max-w-full" />
+          <VoiceMessagePlayer src={m.media_url} tint={out ? "outbound" : "default"} />
         )}
 
         {m.message_type === "document" && m.media_url && (
