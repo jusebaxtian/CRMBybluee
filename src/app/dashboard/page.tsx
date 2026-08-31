@@ -11,6 +11,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { ConnectWhatsAppButton } from "@/components/connect-whatsapp-button";
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
+import { TagStatsTable } from "@/components/tag-stats-table";
 import { getWorkspaceId } from "@/lib/workspace";
 import { getPhoneNumberStatus } from "@/lib/whatsapp/graph";
 
@@ -151,6 +152,31 @@ export default async function DashboardPage({
     dailyLimit && conversationsOpenedCount !== null
       ? Math.min(100, (conversationsOpenedCount / dailyLimit) * 100)
       : null;
+
+  const [{ data: tagsRaw }, { data: tagCounts }, { count: totalContacts }] = await Promise.all([
+    workspaceId
+      ? supabase.from("tags").select("id, name, color").eq("workspace_id", workspaceId).order("position")
+      : Promise.resolve({ data: [] as { id: string; name: string; color: string }[] }),
+    workspaceId
+      ? supabase.rpc("tag_contact_counts", { p_workspace_id: workspaceId })
+      : Promise.resolve({ data: [] as { tag_id: string; contact_count: number }[] }),
+    workspaceId
+      ? supabase.from("contacts").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId)
+      : Promise.resolve({ count: 0 }),
+  ]);
+
+  const countByTagId = new Map(
+    ((tagCounts ?? []) as { tag_id: string; contact_count: number }[]).map((r) => [
+      r.tag_id,
+      Number(r.contact_count),
+    ])
+  );
+  const tagStats = (tagsRaw ?? []).map((t) => ({
+    id: t.id,
+    name: t.name,
+    color: t.color,
+    count: countByTagId.get(t.id) ?? 0,
+  }));
 
   const { data: bannerSetting } = await supabase
     .from("platform_settings")
@@ -408,6 +434,8 @@ export default async function DashboardPage({
           )}
         </div>
       </div>
+
+      <TagStatsTable tags={tagStats} totalContacts={totalContacts ?? 0} />
     </div>
   );
 }

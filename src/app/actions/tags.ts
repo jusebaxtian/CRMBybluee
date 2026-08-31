@@ -121,3 +121,20 @@ export async function toggleContactTag(input: {
 
   revalidatePath("/dashboard/contacts");
 }
+
+// Persists the drag-and-drop order from the dashboard's tag stats table —
+// `orderedTagIds` is the full list in its new order, position = index.
+export async function reorderTags(orderedTagIds: string[]) {
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+
+  await Promise.all(
+    orderedTagIds.map((tagId, index) =>
+      supabase.from("tags").update({ position: index }).eq("id", tagId).eq("workspace_id", workspaceId)
+    )
+  );
+
+  revalidatePath("/dashboard");
+  return { success: true as const };
+}
