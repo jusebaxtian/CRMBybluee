@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { GripVertical, Tag as TagIcon } from "lucide-react";
 import { reorderTags } from "@/app/actions/tags";
@@ -27,6 +27,7 @@ export function TagStatsTable({
   const [saving, setSaving] = useState(false);
   const [from, setFrom] = useState(dateFrom ?? "");
   const [to, setTo] = useState(dateTo ?? "");
+  const [isPending, startTransition] = useTransition();
 
   // The date filter re-fetches server-side (new counts) and re-renders this
   // component with a new `tags` prop — keep local drag state in sync with
@@ -41,7 +42,11 @@ export function TagStatsTable({
     else qs.delete("tagsFrom");
     if (nextTo) qs.set("tagsTo", nextTo);
     else qs.delete("tagsTo");
-    router.push(`${pathname}${qs.toString() ? `?${qs.toString()}` : ""}`);
+    // scroll: false + a transition — this only refetches this table's data,
+    // no reason to jump the page back to the top or block the UI while it does.
+    startTransition(() => {
+      router.push(`${pathname}${qs.toString() ? `?${qs.toString()}` : ""}`, { scroll: false });
+    });
   }
 
   function applyPreset(daysBack: number | "month") {
@@ -86,7 +91,9 @@ export function TagStatsTable({
           <TagIcon size={16} className="text-primary" />
           <h2 className="text-sm font-semibold text-foreground">Etiquetas</h2>
         </div>
-        <span className="text-xs text-muted">{saving ? "Guardando orden..." : "Arrastra para reordenar"}</span>
+        <span className="text-xs text-muted">
+          {saving ? "Guardando orden..." : isPending ? "Actualizando..." : "Arrastra para reordenar"}
+        </span>
       </div>
       <p className="mb-3 text-xs text-muted">
         Cuántos contactos tiene cada etiqueta, sobre el total de {totalContacts.toLocaleString("es-CO")}{" "}
@@ -145,6 +152,7 @@ export function TagStatsTable({
         </div>
       </div>
 
+      <div className={isPending ? "opacity-60 transition-opacity" : "transition-opacity"}>
       {rows.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted">
           {hasDateFilter ? "Ninguna etiqueta tiene contactos en ese rango." : "Todavía no tienes etiquetas creadas."}
@@ -193,6 +201,7 @@ export function TagStatsTable({
           })}
         </div>
       )}
+      </div>
     </div>
   );
 }
