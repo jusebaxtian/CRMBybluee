@@ -251,11 +251,14 @@ export async function bulkDeleteContacts(contactIds: string[]) {
   if (!workspaceId) return { error: "No se encontró tu workspace." };
   if (contactIds.length === 0) return { error: "No hay contactos seleccionados." };
 
-  const { error } = await supabase
-    .from("contacts")
-    .delete()
-    .eq("workspace_id", workspaceId)
-    .in("id", contactIds);
+  // `.in("id", contactIds)` builds a `?id=in.(uuid,uuid,...)` query string —
+  // with hundreds of contacts selected (e.g. "eliminar todos") that trips
+  // nginx's URL-length limit and comes back as a literal 414, not a
+  // catchable error. RPC sends the id list in the POST body instead.
+  const { error } = await supabase.rpc("bulk_delete_contacts", {
+    p_workspace_id: workspaceId,
+    p_contact_ids: contactIds,
+  });
 
   if (error) return { error: error.message };
   revalidatePath("/dashboard/contacts");
