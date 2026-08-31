@@ -22,6 +22,10 @@ export default async function DashboardPage({
 }) {
   const params = await searchParams;
   const locked = typeof params.locked === "string" ? params.locked : null;
+  const tagsFrom = typeof params.tagsFrom === "string" ? params.tagsFrom : null;
+  const tagsTo = typeof params.tagsTo === "string" ? params.tagsTo : null;
+  const tagsFromIso = tagsFrom ? new Date(`${tagsFrom}T00:00:00`).toISOString() : null;
+  const tagsToIso = tagsTo ? new Date(`${tagsTo}T23:59:59.999`).toISOString() : null;
 
   const supabase = await createClient();
 
@@ -153,16 +157,24 @@ export default async function DashboardPage({
       ? Math.min(100, (conversationsOpenedCount / dailyLimit) * 100)
       : null;
 
+  let contactsCountQuery = workspaceId
+    ? supabase.from("contacts").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId)
+    : null;
+  if (contactsCountQuery && tagsFromIso) contactsCountQuery = contactsCountQuery.gte("created_at", tagsFromIso);
+  if (contactsCountQuery && tagsToIso) contactsCountQuery = contactsCountQuery.lte("created_at", tagsToIso);
+
   const [{ data: tagsRaw }, { data: tagCounts }, { count: totalContacts }] = await Promise.all([
     workspaceId
       ? supabase.from("tags").select("id, name, color").eq("workspace_id", workspaceId).order("position")
       : Promise.resolve({ data: [] as { id: string; name: string; color: string }[] }),
     workspaceId
-      ? supabase.rpc("tag_contact_counts", { p_workspace_id: workspaceId })
+      ? supabase.rpc("tag_contact_counts", {
+          p_workspace_id: workspaceId,
+          p_created_from: tagsFromIso,
+          p_created_to: tagsToIso,
+        })
       : Promise.resolve({ data: [] as { tag_id: string; contact_count: number }[] }),
-    workspaceId
-      ? supabase.from("contacts").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId)
-      : Promise.resolve({ count: 0 }),
+    contactsCountQuery ?? Promise.resolve({ count: 0 }),
   ]);
 
   const countByTagId = new Map(
@@ -435,7 +447,12 @@ export default async function DashboardPage({
         </div>
       </div>
 
-      <TagStatsTable tags={tagStats} totalContacts={totalContacts ?? 0} />
+      <TagStatsTable
+        tags={tagStats}
+        totalContacts={totalContacts ?? 0}
+        dateFrom={tagsFrom}
+        dateTo={tagsTo}
+      />
     </div>
   );
 }
