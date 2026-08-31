@@ -81,11 +81,23 @@ export function ContactsTable({
     setDateTo("");
   }
 
-  const allSelected = filteredContacts.length > 0 && selected.size === filteredContacts.length;
+  const MAX_BULK_DELETE = 1000;
+  const DELETE_BATCH_SIZE = 100;
+  const [deleteProgress, setDeleteProgress] = useState<{ done: number; total: number } | null>(null);
+
+  const allSelected =
+    filteredContacts.length > 0 &&
+    selected.size === Math.min(filteredContacts.length, MAX_BULK_DELETE);
   const someSelected = selected.size > 0 && !allSelected;
 
   function toggleAll() {
-    setSelected(allSelected ? new Set() : new Set(filteredContacts.map((c) => c.id)));
+    if (allSelected) {
+      setSelected(new Set());
+      return;
+    }
+    // Cap at MAX_BULK_DELETE even when "seleccionar todos" would match more —
+    // keeps every selection a size the bulk-delete action will actually accept.
+    setSelected(new Set(filteredContacts.slice(0, MAX_BULK_DELETE).map((c) => c.id)));
   }
 
   function toggleOne(id: string) {
@@ -120,12 +132,27 @@ export function ContactsTable({
   async function confirmBulkDelete() {
     setPending(true);
     setError(null);
-    const result = await bulkDeleteContacts(Array.from(selected));
-    setPending(false);
-    if (result?.error) {
-      setError(result.error);
-      return;
+    const ids = Array.from(selected);
+    const total = ids.length;
+    setDeleteProgress({ done: 0, total });
+
+    // One request per 100 instead of all at once — gives a real % instead of
+    // a spinner, and keeps each delete (with its cascade to
+    // conversations/messages) short instead of one long transaction.
+    for (let i = 0; i < ids.length; i += DELETE_BATCH_SIZE) {
+      const batch = ids.slice(i, i + DELETE_BATCH_SIZE);
+      const result = await bulkDeleteContacts(batch);
+      if (result?.error) {
+        setError(result.error);
+        setPending(false);
+        setDeleteProgress(null);
+        return;
+      }
+      setDeleteProgress({ done: Math.min(i + DELETE_BATCH_SIZE, total), total });
     }
+
+    setPending(false);
+    setDeleteProgress(null);
     setSelected(new Set());
     setDeleteModalOpen(false);
     setDeleteConfirmText("");
@@ -236,6 +263,7 @@ export function ContactsTable({
           <span className="text-sm font-medium text-foreground">
             {selected.size} seleccionado{selected.size === 1 ? "" : "s"}
           </span>
+          <span className="text-xs text-muted">(máximo {MAX_BULK_DELETE} a la vez)</span>
 
           <div className="relative">
             <button
@@ -449,18 +477,44 @@ export function ContactsTable({
               {selected.size === 1 ? "" : "s"} de forma permanente, junto con su conversación e
               historial de mensajes. Esta acción no se puede deshacer.
             </p>
-            <p className="mt-3 text-xs text-muted">
-              Escribe <span className="font-mono font-semibold text-foreground">ELIMINAR</span> para
-              confirmar.
+            <p className="mt-2 text-xs text-muted">
+              Puedes eliminar máximo <span className="font-semibold text-foreground">1000 contactos</span>{" "}
+              a la vez.
             </p>
-            <input
-              type="text"
-              value={deleteConfirmText}
-              onChange={(e) => setDeleteConfirmText(e.target.value)}
-              placeholder="ELIMINAR"
-              autoFocus
-              className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-red-400"
-            />
+
+            {deleteProgress ? (
+              <div className="mt-4">
+                <div className="mb-1.5 flex items-center justify-between text-xs">
+                  <span className="text-muted">Eliminando...</span>
+                  <span className="font-semibold text-foreground">
+                    {Math.round((deleteProgress.done / deleteProgress.total) * 100)}% ({deleteProgress.done}/
+                    {deleteProgress.total})
+                  </span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-surface-hover">
+                  <div
+                    className="h-full rounded-full bg-red-500 transition-all"
+                    style={{ width: `${(deleteProgress.done / deleteProgress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="mt-3 text-xs text-muted">
+                  Escribe <span className="font-mono font-semibold text-foreground">ELIMINAR</span> para
+                  confirmar.
+                </p>
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="ELIMINAR"
+                  autoFocus
+                  className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-red-400"
+                />
+              </>
+            )}
+
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"
@@ -479,7 +533,11 @@ export function ContactsTable({
                 disabled={pending || deleteConfirmText.trim().toUpperCase() !== "ELIMINAR"}
                 className="rounded-md bg-red-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {pending ? "Eliminando..." : `Eliminar ${selected.size} contacto(s)`}
+                {pending
+                  ? deleteProgress
+                    ? `Eliminando... ${Math.round((deleteProgress.done / deleteProgress.total) * 100)}%`
+                    : "Eliminando..."
+                  : `Eliminar ${selected.size} contacto(s)`}
               </button>
             </div>
           </div>

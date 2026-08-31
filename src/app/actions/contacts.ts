@@ -245,11 +245,20 @@ export async function updateContact(contactId: string, name: string, phone: stri
   return { success: true };
 }
 
+const MAX_BULK_DELETE = 1000;
+
 export async function bulkDeleteContacts(contactIds: string[]) {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
   if (!workspaceId) return { error: "No se encontró tu workspace." };
   if (contactIds.length === 0) return { error: "No hay contactos seleccionados." };
+  // Enforced here too, not just in the UI — the RPC itself (see 0073) can
+  // handle far more than this in one call, but capping the batch size keeps
+  // any single delete (and its cascade to conversations/messages) short and
+  // predictable instead of one huge transaction holding locks for a while.
+  if (contactIds.length > MAX_BULK_DELETE) {
+    return { error: `Puedes eliminar máximo ${MAX_BULK_DELETE} contactos a la vez.` };
+  }
 
   // `.in("id", contactIds)` builds a `?id=in.(uuid,uuid,...)` query string —
   // with hundreds of contacts selected (e.g. "eliminar todos") that trips
