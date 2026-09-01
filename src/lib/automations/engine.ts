@@ -489,9 +489,17 @@ export async function runKeywordAutomations(
     .eq("is_active", true);
 
   const lowerBody = messageBody.toLowerCase();
-  const candidates = (automations ?? []).filter(
-    (a) => a.trigger_keyword && lowerBody.includes(a.trigger_keyword.toLowerCase())
-  );
+  // trigger_keyword can hold several keywords separated by commas (e.g.
+  // "hola, saludos, buenos días") — matches if the message contains ANY one
+  // of them, not just the whole string verbatim.
+  const candidates = (automations ?? []).filter((a) => {
+    if (!a.trigger_keyword) return false;
+    const keywords: string[] = a.trigger_keyword
+      .split(",")
+      .map((k: string) => k.trim().toLowerCase())
+      .filter((k: string) => k.length > 0);
+    return keywords.some((k: string) => lowerBody.includes(k));
+  });
   if (candidates.length === 0) return false;
 
   // A keyword flow (e.g. "hola") runs once per contact, ever — otherwise a
@@ -514,6 +522,79 @@ export async function runKeywordAutomations(
     await runActionsForAutomation(supabase, automation, contactId);
   }
 
+  return matched;
+}
+
+// Fires on ANY inbound message from the contact, no keyword needed — a
+// catch-all "whatever they write" welcome/handoff trigger. Once per
+// contact, ever (same automation_starts claim as tag/keyword/button_tap).
+export async function runAnyMessageAutomations(
+  supabase: SupabaseClient,
+  workspaceId: string,
+  contactId: string
+): Promise<boolean> {
+  if (await isContactExcludedFromAutomations(supabase, contactId)) return false;
+
+  const { data: automations } = await supabase
+    .from("automations")
+    .select("id, workspace_id")
+    .eq("workspace_id", workspaceId)
+    .eq("trigger_type", "any_message")
+    .eq("is_active", true);
+  if (!automations || automations.length === 0) return false;
+
+  const { data: claimed } = await supabase
+    .from("automation_starts")
+    .upsert(
+      automations.map((a) => ({ automation_id: a.id, contact_id: contactId })),
+      { onConflict: "automation_id,contact_id", ignoreDuplicates: true }
+    )
+    .select("automation_id");
+  const claimedIds = new Set((claimed ?? []).map((c) => c.automation_id));
+
+  let matched = false;
+  for (const automation of automations) {
+    if (!claimedIds.has(automation.id)) continue;
+    matched = true;
+    await runActionsForAutomation(supabase, automation, contactId);
+  }
+  return matched;
+}
+
+// Fires on the contact's FIRST message of the current calendar day — unlike
+// every other trigger this repeats daily instead of once-per-contact-ever,
+// so it claims via a separate, date-scoped table (automation_daily_starts).
+export async function runFirstMessageOfDayAutomations(
+  supabase: SupabaseClient,
+  workspaceId: string,
+  contactId: string
+): Promise<boolean> {
+  if (await isContactExcludedFromAutomations(supabase, contactId)) return false;
+
+  const { data: automations } = await supabase
+    .from("automations")
+    .select("id, workspace_id")
+    .eq("workspace_id", workspaceId)
+    .eq("trigger_type", "first_message_of_day")
+    .eq("is_active", true);
+  if (!automations || automations.length === 0) return false;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: claimed } = await supabase
+    .from("automation_daily_starts")
+    .upsert(
+      automations.map((a) => ({ automation_id: a.id, contact_id: contactId, started_on: today })),
+      { onConflict: "automation_id,contact_id,started_on", ignoreDuplicates: true }
+    )
+    .select("automation_id");
+  const claimedIds = new Set((claimed ?? []).map((c) => c.automation_id));
+
+  let matched = false;
+  for (const automation of automations) {
+    if (!claimedIds.has(automation.id)) continue;
+    matched = true;
+    await runActionsForAutomation(supabase, automation, contactId);
+  }
   return matched;
 }
 

@@ -83,7 +83,12 @@ export async function uploadAutomationActionMedia(formData: FormData) {
 
 export async function createAutomation(_prevState: unknown, formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
-  const triggerType = String(formData.get("triggerType") ?? "") as "tag_added" | "keyword" | "button_tap";
+  const triggerType = String(formData.get("triggerType") ?? "") as
+    | "tag_added"
+    | "keyword"
+    | "button_tap"
+    | "any_message"
+    | "first_message_of_day";
   const triggerTagId = String(formData.get("triggerTagId") ?? "") || null;
   const triggerKeyword = String(formData.get("triggerKeyword") ?? "").trim() || null;
   const actionsJson = String(formData.get("actionsJson") ?? "[]");
@@ -173,7 +178,12 @@ export async function createAutomation(_prevState: unknown, formData: FormData) 
 export async function updateAutomation(_prevState: unknown, formData: FormData) {
   const automationId = String(formData.get("automationId") ?? "");
   const name = String(formData.get("name") ?? "").trim();
-  const triggerType = String(formData.get("triggerType") ?? "") as "tag_added" | "keyword" | "button_tap";
+  const triggerType = String(formData.get("triggerType") ?? "") as
+    | "tag_added"
+    | "keyword"
+    | "button_tap"
+    | "any_message"
+    | "first_message_of_day";
   const triggerTagId = String(formData.get("triggerTagId") ?? "") || null;
   const triggerKeyword = String(formData.get("triggerKeyword") ?? "").trim() || null;
   const actionsJson = String(formData.get("actionsJson") ?? "[]");

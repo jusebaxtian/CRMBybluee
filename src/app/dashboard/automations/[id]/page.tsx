@@ -66,7 +66,12 @@ export default async function EditAutomationPage({
           automation={{
             id: automation.id,
             name: automation.name,
-            trigger_type: automation.trigger_type as "tag_added" | "keyword" | "button_tap",
+            trigger_type: automation.trigger_type as
+              | "tag_added"
+              | "keyword"
+              | "button_tap"
+              | "any_message"
+              | "first_message_of_day",
             trigger_tag_id: automation.trigger_tag_id,
             trigger_keyword: automation.trigger_keyword,
             actions: actions ?? [],

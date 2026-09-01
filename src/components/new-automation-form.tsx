@@ -10,10 +10,12 @@ type Template = { id: string; meta_template_name: string; language: string; stat
 type Agent = { id: string; name: string | null; email: string };
 type QuickReply = { id: string; name: string };
 
+type TriggerType = "tag_added" | "keyword" | "button_tap" | "any_message" | "first_message_of_day";
+
 type ExistingAutomation = {
   id: string;
   name: string;
-  trigger_type: "tag_added" | "keyword" | "button_tap";
+  trigger_type: TriggerType;
   trigger_tag_id: string | null;
   trigger_keyword: string | null;
   actions: InitialAction[];
@@ -36,9 +38,7 @@ export function NewAutomationForm({
     automation ? updateAutomation : createAutomation,
     undefined
   );
-  const [triggerType, setTriggerType] = useState<"tag_added" | "keyword" | "button_tap">(
-    automation?.trigger_type ?? "tag_added"
-  );
+  const [triggerType, setTriggerType] = useState<TriggerType>(automation?.trigger_type ?? "tag_added");
   const [uploading, setUploading] = useState(false);
 
   return (
@@ -65,12 +65,14 @@ export function NewAutomationForm({
         <select
           name="triggerType"
           value={triggerType}
-          onChange={(e) => setTriggerType(e.target.value as "tag_added" | "keyword" | "button_tap")}
+          onChange={(e) => setTriggerType(e.target.value as TriggerType)}
           className="mb-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
         >
           <option value="tag_added">Cuando se asigna una etiqueta</option>
           <option value="keyword">Cuando llega un mensaje con una palabra clave</option>
           <option value="button_tap">Cuando se toca un botón</option>
+          <option value="any_message">Cuando el contacto escribe lo que sea (primera vez)</option>
+          <option value="first_message_of_day">Cuando escribe por primera vez en el día</option>
         </select>
 
         {triggerType === "tag_added" ? (
@@ -102,15 +104,31 @@ export function NewAutomationForm({
               o respuesta rápida.
             </p>
           </div>
+        ) : triggerType === "keyword" ? (
+          <div>
+            <input
+              name="triggerKeyword"
+              type="text"
+              required
+              defaultValue={automation?.trigger_keyword ?? ""}
+              placeholder="ej: hola, saludos, buenos días, buenas tardes"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            />
+            <p className="mt-1 text-xs text-muted">
+              Puedes poner varias palabras separadas por coma — se activa si el mensaje contiene
+              cualquiera de ellas.
+            </p>
+          </div>
+        ) : triggerType === "any_message" ? (
+          <p className="text-xs text-muted">
+            Se activa la primera vez que un contacto te escribe cualquier cosa (texto, foto, audio,
+            lo que sea) — no necesitas escribir nada más aquí.
+          </p>
         ) : (
-          <input
-            name="triggerKeyword"
-            type="text"
-            required
-            defaultValue={automation?.trigger_keyword ?? ""}
-            placeholder="ej: precio, horario, información"
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-          />
+          <p className="text-xs text-muted">
+            Se activa cada día, la primera vez que ese contacto te escribe — se repite día tras día,
+            a diferencia de los demás activadores que solo corren una vez por contacto.
+          </p>
         )}
       </div>
 

@@ -86,7 +86,11 @@ export default async function AutomationsPage() {
                       ? `Se activa al asignar la etiqueta "${tag?.name ?? "—"}"`
                       : a.trigger_type === "button_tap"
                         ? `Se activa al tocar el botón "${a.trigger_keyword}"`
-                        : `Se activa con la palabra clave "${a.trigger_keyword}"`}
+                        : a.trigger_type === "any_message"
+                          ? "Se activa la primera vez que el contacto escribe algo"
+                          : a.trigger_type === "first_message_of_day"
+                            ? "Se activa cada día, al primer mensaje del contacto"
+                            : `Se activa con la palabra clave "${a.trigger_keyword}"`}
                   </p>
                 </div>
                 <AutomationRowActions

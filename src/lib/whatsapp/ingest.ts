@@ -1,6 +1,11 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { WhatsAppWebhookPayload } from "@/lib/whatsapp/webhook-types";
-import { runKeywordAutomations, runButtonTapAutomations } from "@/lib/automations/engine";
+import {
+  runKeywordAutomations,
+  runButtonTapAutomations,
+  runAnyMessageAutomations,
+  runFirstMessageOfDayAutomations,
+} from "@/lib/automations/engine";
 import { getMediaUrl, downloadMedia } from "@/lib/whatsapp/graph";
 import { notifyNewMessage } from "@/lib/push/send";
 import { maybeRespondWithAiAgent } from "@/lib/ai/agent";
@@ -397,6 +402,16 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
         // A reaction isn't something to auto-reply to — running keyword
         // automations or the AI agent off an emoji would be nonsensical.
         // Same for a button tap: it already ran its own trigger above.
+        let matchedAutomation = false;
+        if (!isReaction && !isButtonTap) {
+          // Content-agnostic triggers — fire regardless of message type
+          // (text, image, audio...), unlike keyword matching which needs
+          // actual text to search.
+          const matchedAny = await runAnyMessageAutomations(supabase, workspaceId, contact.id);
+          const matchedFirstOfDay = await runFirstMessageOfDayAutomations(supabase, workspaceId, contact.id);
+          matchedAutomation = matchedAny || matchedFirstOfDay;
+        }
+
         const textForAutomations =
           isReaction || isButtonTap ? null : message.text?.body ?? audioTranscript;
         if (textForAutomations) {
@@ -406,9 +421,11 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
             contact.id,
             textForAutomations
           );
-          if (!matchedKeyword) {
-            await maybeRespondWithAiAgent(supabase, workspaceId, conversation.id, contact.id);
-          }
+          matchedAutomation = matchedAutomation || matchedKeyword;
+        }
+
+        if (!matchedAutomation && textForAutomations) {
+          await maybeRespondWithAiAgent(supabase, workspaceId, conversation.id, contact.id);
         }
       }
 
