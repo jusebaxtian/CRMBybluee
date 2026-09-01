@@ -24,6 +24,26 @@ export default async function CampaignsPage() {
     .eq("workspace_id", workspaceId ?? "")
     .order("created_at", { ascending: false });
 
+  // Aggregated in SQL (see campaign_recipient_counts) rather than fetching
+  // campaign_recipients directly — a campaign can have thousands of rows,
+  // which would hit PostgREST's 1000-row response cap.
+  const { data: counts } = await supabase.rpc("campaign_recipient_counts", {
+    p_workspace_id: workspaceId ?? "",
+  });
+  const countsByCampaign = new Map(
+    (
+      (counts ?? []) as {
+        campaign_id: string;
+        sent_count: number;
+        failed_count: number;
+        pending_count: number;
+      }[]
+    ).map((c) => [
+      c.campaign_id,
+      { sent: c.sent_count, failed: c.failed_count, pending: c.pending_count },
+    ])
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <CampaignsTabs enabledModules={enabledModules} />
@@ -54,13 +74,15 @@ export default async function CampaignsPage() {
         <div className="overflow-hidden rounded-xl border border-border bg-surface">
           {campaigns.map((c) => {
             const template = c.templates as unknown as { meta_template_name: string } | null;
+            const count = countsByCampaign.get(c.id);
+            const hasRecipients = count && count.sent + count.failed + count.pending > 0;
             return (
               <Link
                 key={c.id}
                 href={`/dashboard/campaigns/${c.id}`}
-                className="flex items-center justify-between border-b border-border px-5 py-4 last:border-b-0 hover:bg-surface-hover"
+                className="flex items-center justify-between gap-4 border-b border-border px-5 py-4 last:border-b-0 hover:bg-surface-hover"
               >
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-medium text-foreground">{c.name}</p>
                   <p className="text-xs text-muted">
                     {c.send_type === "free_text"
@@ -68,9 +90,18 @@ export default async function CampaignsPage() {
                       : `Plantilla: ${template?.meta_template_name ?? "—"}`}
                   </p>
                 </div>
-                <span className="text-xs text-muted">
-                  {c.status === "draft" && c.scheduled_at ? "Programada" : statusLabel[c.status] ?? c.status}
-                </span>
+                <div className="flex shrink-0 items-center gap-3">
+                  {hasRecipients && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-success">{count.sent} enviados</span>
+                      {count.failed > 0 && <span className="text-red-400">{count.failed} fallidos</span>}
+                      {count.pending > 0 && <span className="text-muted">{count.pending} pendientes</span>}
+                    </div>
+                  )}
+                  <span className="text-xs text-muted">
+                    {c.status === "draft" && c.scheduled_at ? "Programada" : statusLabel[c.status] ?? c.status}
+                  </span>
+                </div>
               </Link>
             );
           })}
