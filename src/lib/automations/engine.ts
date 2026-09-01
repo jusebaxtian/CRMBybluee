@@ -121,7 +121,15 @@ export async function executeAction(
   }
 
   if (action.action_type === "add_tag" && action.tag_id) {
-    await supabase.from("contact_tags").upsert({ contact_id: contactId, tag_id: action.tag_id });
+    // Errors here used to be swallowed silently — the caller (runFrom /
+    // runActionsForAutomation) would still log "completed" in
+    // automation_runs even if this insert failed, with no way to tell an
+    // actually-broken tag apart from one that just genuinely didn't apply.
+    // Throwing surfaces it as a "failed" run with a real error_message.
+    const { error } = await supabase
+      .from("contact_tags")
+      .upsert({ contact_id: contactId, tag_id: action.tag_id });
+    if (error) throw new Error(`No se pudo aplicar la etiqueta: ${error.message}`);
     await maybeTrackPurchaseFromTag(supabase, automation.workspace_id, contactId, action.tag_id);
     return;
   }
