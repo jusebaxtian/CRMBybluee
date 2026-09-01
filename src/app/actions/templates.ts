@@ -287,7 +287,10 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
 
     const variableCount = (bodyText.match(/\{\{\d+\}\}/g) ?? []).length;
 
-    await supabase.from("templates").upsert(
+    // Meta already accepted the template at this point — if this insert
+    // fails silently, the client sees a false "success" while the template
+    // never appears locally and is unusable.
+    const { error: upsertError } = await supabase.from("templates").upsert(
       {
         workspace_id: workspaceId,
         meta_template_name: name,
@@ -306,6 +309,11 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
       },
       { onConflict: "workspace_id,meta_template_name,language" }
     );
+    if (upsertError) {
+      return {
+        error: `La plantilla se creó en Meta, pero no se pudo guardar aquí: ${upsertError.message}. Usa "Sincronizar" para traerla.`,
+      };
+    }
 
     revalidatePath("/dashboard/templates");
     return { success: true };

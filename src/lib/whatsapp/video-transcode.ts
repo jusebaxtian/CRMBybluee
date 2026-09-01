@@ -52,6 +52,16 @@ function evenize(n: number): number {
 // level like a constant CRF) is what guarantees the *size* stays under
 // 16MB regardless of how long or high-resolution the source is — a fixed
 // CRF produces wildly different file sizes depending on length/resolution.
+//
+// The bitrate math is only a prediction, not a guarantee: ffprobe's
+// duration can be off for some containers (.mov / variable frame rate is
+// the common case), and libx264's single-pass ABR can still overshoot its
+// -b:v target on high-motion content even with maxrate/bufsize set. A
+// client hit exactly this — the "computed" bitrate produced a 39MB file
+// for a 16MB target. So after encoding, the actual output size is
+// checked and re-encoded at a proportionally lower bitrate (up to 2 extra
+// tries) until it's actually under the limit, instead of trusting the
+// pre-encode estimate.
 export async function transcodeVideoToH264(buffer: Buffer, sourceExt: string): Promise<Buffer> {
   const id = crypto.randomUUID();
   const inPath = path.join(tmpdir(), `${id}-in.${sourceExt || "mp4"}`);
@@ -61,7 +71,7 @@ export async function transcodeVideoToH264(buffer: Buffer, sourceExt: string): P
     const { duration, width, height } = await probeVideo(inPath);
 
     const targetBits = TARGET_MAX_BYTES * SAFETY_MARGIN * 8;
-    const videoBitrateKbps = Math.min(
+    let videoBitrateKbps = Math.min(
       MAX_VIDEO_BITRATE_KBPS,
       Math.max(MIN_VIDEO_BITRATE_KBPS, Math.floor(targetBits / duration / 1000) - AUDIO_BITRATE_KBPS)
     );
@@ -74,41 +84,58 @@ export async function transcodeVideoToH264(buffer: Buffer, sourceExt: string): P
     const outWidth = evenize(width * scale);
     const outHeight = evenize(height * scale);
 
-    await execFileAsync(
-      "ffmpeg",
-      [
-        "-y",
-        "-i",
-        inPath,
-        "-c:v",
-        "libx264",
-        "-profile:v",
-        "main",
-        "-pix_fmt",
-        "yuv420p",
-        "-preset",
-        "veryfast",
-        "-b:v",
-        `${videoBitrateKbps}k`,
-        "-maxrate",
-        `${Math.round(videoBitrateKbps * 1.5)}k`,
-        "-bufsize",
-        `${videoBitrateKbps * 2}k`,
-        "-vf",
-        `scale=${outWidth}:${outHeight}`,
-        "-c:a",
-        "aac",
-        "-b:a",
-        `${AUDIO_BITRATE_KBPS}k`,
-        // Moves the moov atom to the front so WhatsApp/players can start
-        // reading the file before it's fully downloaded.
-        "-movflags",
-        "+faststart",
-        outPath,
-      ],
-      { maxBuffer: 1024 * 1024 * 50 }
-    );
-    return await readFile(outPath);
+    const MAX_ATTEMPTS = 3;
+    let result: Buffer | null = null;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      await execFileAsync(
+        "ffmpeg",
+        [
+          "-y",
+          "-i",
+          inPath,
+          "-c:v",
+          "libx264",
+          "-profile:v",
+          "main",
+          "-pix_fmt",
+          "yuv420p",
+          "-preset",
+          "veryfast",
+          "-b:v",
+          `${videoBitrateKbps}k`,
+          "-maxrate",
+          `${Math.round(videoBitrateKbps * 1.5)}k`,
+          "-bufsize",
+          `${videoBitrateKbps * 2}k`,
+          "-vf",
+          `scale=${outWidth}:${outHeight}`,
+          "-c:a",
+          "aac",
+          "-b:a",
+          `${AUDIO_BITRATE_KBPS}k`,
+          // Moves the moov atom to the front so WhatsApp/players can start
+          // reading the file before it's fully downloaded.
+          "-movflags",
+          "+faststart",
+          outPath,
+        ],
+        { maxBuffer: 1024 * 1024 * 50 }
+      );
+
+      const out = await readFile(outPath);
+      if (out.length <= TARGET_MAX_BYTES || attempt === MAX_ATTEMPTS) {
+        result = out;
+        break;
+      }
+
+      // Overshot — scale the bitrate down proportionally to how far over we
+      // landed (with headroom) and re-encode instead of returning something
+      // Meta will reject.
+      const overshootRatio = out.length / (TARGET_MAX_BYTES * SAFETY_MARGIN);
+      videoBitrateKbps = Math.max(MIN_VIDEO_BITRATE_KBPS, Math.floor(videoBitrateKbps / overshootRatio));
+    }
+
+    return result as Buffer;
   } finally {
     await unlink(inPath).catch(() => {});
     await unlink(outPath).catch(() => {});

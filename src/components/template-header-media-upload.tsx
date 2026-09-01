@@ -116,7 +116,11 @@ export function TemplateHeaderMediaUpload({
               style={{ width: `${progress}%` }}
             />
           </div>
-          <p className="text-xs text-muted">Subiendo archivo... {progress}%</p>
+          <p className="text-xs text-muted">
+            {progress < 100
+              ? `Subiendo archivo... ${progress}%`
+              : "Procesando video (puede tardar 1-2 minutos)..."}
+          </p>
         </div>
       ) : (
         <button

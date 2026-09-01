@@ -195,7 +195,11 @@ export async function POST(request: NextRequest) {
 
     const variableCount = (bodyText.match(/\{\{\d+\}\}/g) ?? []).length;
 
-    await supabase.from("templates").upsert(
+    // Meta already accepted the template at this point — if this insert
+    // fails silently (as it used to, since the error was never checked),
+    // the client sees a false "success" while the template never appears
+    // locally and is unusable, with no record of what went wrong.
+    const { error: upsertError } = await supabase.from("templates").upsert(
       {
         workspace_id: workspaceId,
         meta_template_name: name,
@@ -214,6 +218,14 @@ export async function POST(request: NextRequest) {
       },
       { onConflict: "workspace_id,meta_template_name,language" }
     );
+    if (upsertError) {
+      return NextResponse.json(
+        {
+          error: `La plantilla se creó en Meta, pero no se pudo guardar aquí: ${upsertError.message}. Usa "Sincronizar" para traerla.`,
+        },
+        { status: 500 }
+      );
+    }
 
     revalidatePath("/dashboard/templates");
     return NextResponse.json({ success: true });
