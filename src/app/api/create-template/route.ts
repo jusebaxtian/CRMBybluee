@@ -8,13 +8,20 @@ import {
   type TemplateButtonInput,
 } from "@/lib/whatsapp/graph";
 import { getWorkspaceId } from "@/lib/workspace";
-import { validateMediaFile } from "@/lib/whatsapp/media-limits";
+import { validateMediaFile, validateMediaMime, validateMediaSize } from "@/lib/whatsapp/media-limits";
+import { transcodeVideoToH264 } from "@/lib/whatsapp/video-transcode";
 
 // Plain REST endpoint (not a Server Action) so the client can submit via
 // XMLHttpRequest and get real upload progress for the header file — fetch/
 // Server Actions don't expose progress events, XHR's upload.onprogress does.
 // Mirrors createTemplate() in src/app/actions/templates.ts exactly.
+//
+// Always returns JSON, even on an unexpected failure — see the comment in
+// /api/template-header-media/route.ts for why a raw un-transcoded video
+// used to blow past nginx's/Next's body-size cap and surface as a cryptic
+// "respuesta inválida del servidor" partway through the upload.
 export async function POST(request: NextRequest) {
+  try {
   const formData = await request.formData();
   const name = String(formData.get("name") ?? "").trim().toLowerCase();
   const language = String(formData.get("language") ?? "es");
@@ -101,10 +108,37 @@ export async function POST(request: NextRequest) {
   let headerMediaMimeType: string | null = null;
 
   if (["image", "video", "document"].includes(headerKind) && headerFile) {
-    const validationError = validateMediaFile(headerKind as "image" | "video" | "document", headerFile);
-    if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
+    let uploadBody: Buffer | File = headerFile;
+    let contentType = headerFile.type;
+    let storedFilename = headerFile.name;
 
-    const buffer = Buffer.from(await headerFile.arrayBuffer());
+    if (headerKind === "video") {
+      const mimeError = validateMediaMime("video", headerFile.type);
+      if (mimeError) return NextResponse.json({ error: mimeError }, { status: 400 });
+
+      let transcoded: Buffer;
+      try {
+        const ext = headerFile.name.split(".").pop() || "mp4";
+        transcoded = await transcodeVideoToH264(Buffer.from(await headerFile.arrayBuffer()), ext);
+      } catch {
+        return NextResponse.json(
+          { error: "No se pudo procesar el video. Intenta con otro archivo." },
+          { status: 500 }
+        );
+      }
+
+      const sizeError = validateMediaSize("video", transcoded.length);
+      if (sizeError) return NextResponse.json({ error: sizeError }, { status: 400 });
+
+      uploadBody = transcoded;
+      contentType = "video/mp4";
+      storedFilename = headerFile.name.replace(/\.[^.]+$/, "") + ".mp4";
+    } else {
+      const validationError = validateMediaFile(headerKind as "image" | "document", headerFile);
+      if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
+    }
+
+    const buffer = Buffer.isBuffer(uploadBody) ? uploadBody : Buffer.from(await uploadBody.arrayBuffer());
     const appId = process.env.NEXT_PUBLIC_META_APP_ID;
     if (!appId) {
       return NextResponse.json(
@@ -118,8 +152,8 @@ export async function POST(request: NextRequest) {
         appId,
         account.access_token,
         buffer,
-        headerFile.type,
-        headerFile.name
+        contentType,
+        storedFilename
       );
       headerMedia = { format: headerKind.toUpperCase() as "IMAGE" | "VIDEO" | "DOCUMENT", handle };
     } catch (err) {
@@ -132,10 +166,10 @@ export async function POST(request: NextRequest) {
     }
 
     const admin = createAdminClient();
-    const path = `${workspaceId}/templates/${Date.now()}-${headerFile.name}`;
+    const path = `${workspaceId}/templates/${Date.now()}-${storedFilename}`;
     const { error: uploadError } = await admin.storage
       .from("chat-media")
-      .upload(path, headerFile, { contentType: headerFile.type });
+      .upload(path, buffer, { contentType });
     if (uploadError) {
       return NextResponse.json({ error: uploadError.message }, { status: 500 });
     }
@@ -144,7 +178,7 @@ export async function POST(request: NextRequest) {
       data: { publicUrl },
     } = admin.storage.from("chat-media").getPublicUrl(path);
     headerMediaUrl = publicUrl;
-    headerMediaMimeType = headerFile.type;
+    headerMediaMimeType = contentType;
   }
 
   try {
@@ -186,6 +220,12 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Error desconocido." },
+      { status: 500 }
+    );
+  }
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Error desconocido al enviar la plantilla." },
       { status: 500 }
     );
   }

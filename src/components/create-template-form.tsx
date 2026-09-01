@@ -27,7 +27,13 @@ function submitWithProgress(
       try {
         resolve(JSON.parse(xhr.responseText));
       } catch {
-        reject(new Error("Respuesta inválida del servidor."));
+        reject(
+          new Error(
+            xhr.status === 413
+              ? "El archivo es demasiado grande para subir."
+              : "El servidor no pudo procesar la plantilla. Intenta de nuevo o con otro archivo."
+          )
+        );
       }
     };
     xhr.onerror = () => reject(new Error("Error de red al enviar la plantilla."));
