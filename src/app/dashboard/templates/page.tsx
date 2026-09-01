@@ -7,6 +7,7 @@ import { requireModule, getEnabledModuleKeys } from "@/lib/entitlements";
 import { CampaignsTabs } from "@/components/campaigns-tabs";
 import { DeleteTemplateButton } from "@/components/delete-template-button";
 import { TemplatePreview } from "@/components/template-preview";
+import { TemplateHeaderMediaUpload } from "@/components/template-header-media-upload";
 
 const statusLabel: Record<string, string> = {
   APPROVED: "Aprobada",
@@ -100,6 +101,12 @@ export default async function TemplatesPage() {
                   bodyText={t.body_text}
                   buttons={buttons}
                 />
+
+                {headerFormat && headerFormat !== "TEXT" && !t.header_media_url && (
+                  <div className="mt-3">
+                    <TemplateHeaderMediaUpload templateId={t.id} headerFormat={headerFormat} />
+                  </div>
+                )}
 
                 <div className="mt-3 flex flex-wrap items-center gap-1.5">
                   {headerFormat && (

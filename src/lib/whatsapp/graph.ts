@@ -180,7 +180,12 @@ export type MetaTemplate = {
   language: string;
   status: string;
   category: string;
-  components: { type: string; text?: string }[];
+  components: {
+    type: string;
+    format?: string;
+    text?: string;
+    buttons?: { type: string; text: string; url?: string }[];
+  }[];
 };
 
 export async function listTemplates(
