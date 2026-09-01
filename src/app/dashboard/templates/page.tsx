@@ -40,6 +40,10 @@ export default async function TemplatesPage() {
       "id, meta_template_name, language, category, status, body_text, variable_count, header_format, header_text, header_media_url, buttons"
     )
     .eq("workspace_id", workspaceId ?? "")
+    // Solo se muestran/usan plantillas creadas desde el formulario del CRM —
+    // una creada directo en Meta Business Manager y traída por sincronizar
+    // queda oculta hasta que se recree aquí. Ver migración 0075.
+    .eq("created_via", "crm")
     .order("meta_template_name");
 
   return (
@@ -51,11 +55,17 @@ export default async function TemplatesPage() {
         <CreateTemplateForm />
       </div>
 
+      <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
+        Para poder usar una plantilla en campañas o automatizaciones, debe crearse desde este
+        formulario. Las plantillas creadas directamente en Meta Business Manager no se muestran
+        ni se pueden usar aquí — créala arriba para que quede disponible.
+      </div>
+
       <div className="rounded-xl border border-border bg-surface p-5">
         <SyncTemplatesButton />
         <p className="mt-2 text-xs text-muted">
-          Sincroniza para traer el estado más reciente de aprobación de Meta (o plantillas
-          creadas antes desde Meta Business Manager).
+          Sincroniza para traer el estado más reciente de aprobación de las plantillas creadas
+          desde aquí (no trae plantillas creadas directo en Meta Business Manager).
         </p>
       </div>
 

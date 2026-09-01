@@ -31,6 +31,7 @@ export default async function EditCampaignPage({
     .select("id, meta_template_name, status")
     .eq("workspace_id", workspaceId ?? "")
     .eq("status", "APPROVED")
+    .eq("created_via", "crm")
     .order("meta_template_name");
 
   const { data: tags } = await supabase

@@ -19,6 +19,7 @@ export default async function NewFollowupSequencePage() {
     .from("templates")
     .select("id, meta_template_name, language, status")
     .eq("workspace_id", workspaceId ?? "")
+    .eq("created_via", "crm")
     .neq("status", "DELETED")
     .order("meta_template_name");
 

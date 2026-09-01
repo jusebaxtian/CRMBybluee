@@ -302,6 +302,7 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
         header_media_url: headerMediaUrl,
         header_media_mime_type: headerMediaMimeType,
         synced_at: new Date().toISOString(),
+        created_via: "crm",
       },
       { onConflict: "workspace_id,meta_template_name,language" }
     );

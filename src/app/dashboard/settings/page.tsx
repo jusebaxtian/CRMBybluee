@@ -128,6 +128,7 @@ export default async function SettingsPage() {
           .select("id, meta_template_name, language")
           .eq("workspace_id", workspaceId)
           .eq("status", "APPROVED")
+          .eq("created_via", "crm")
           .order("meta_template_name")
       : { data: [] };
 
