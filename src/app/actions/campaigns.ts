@@ -7,7 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { validateMediaMime, validateMediaSize } from "@/lib/whatsapp/media-limits";
 import { getWorkspaceId } from "@/lib/workspace";
 import { resolveCampaignAudience, type AudienceParams } from "@/lib/campaigns/audience";
-import { executeCampaignSend } from "@/lib/campaigns/send";
+import { startCampaignSend } from "@/lib/campaigns/send";
 
 function readAudienceParams(formData: FormData, sendType: "template" | "free_text"): AudienceParams {
   return {
@@ -277,7 +277,13 @@ export async function sendCampaign(campaignId: string) {
   const workspaceId = await getWorkspaceId(supabase);
   if (!workspaceId) return { error: "No autenticado." };
 
-  const result = await executeCampaignSend(supabase, workspaceId, campaignId);
+  // startCampaignSend awaits only the fast setup checks, then keeps sending
+  // in the background — a campaign with thousands of recipients used to
+  // hold this request open until every single one finished, which for
+  // anything past a few hundred recipients ran well past nginx's 180s
+  // timeout and errored out in the browser even though the send kept
+  // going server-side regardless.
+  const result = await startCampaignSend(supabase, workspaceId, campaignId);
   revalidatePath(`/dashboard/campaigns/${campaignId}`);
   return result;
 }

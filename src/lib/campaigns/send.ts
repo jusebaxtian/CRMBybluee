@@ -41,25 +41,16 @@ async function getOrCreateConversation(
   return data?.id ?? null;
 }
 
-// Shared by the manual "Enviar" button and the scheduler tick — both need
-// the exact same send/record-keeping logic, just triggered differently.
-// Callers pass either the session-scoped client (manual send, RLS-checked)
-// or the admin client (scheduler, no session to check against).
-export async function executeCampaignSend(
-  supabase: SupabaseClient,
-  workspaceId: string,
-  campaignId: string
-): Promise<{ error: string } | { success: true }> {
-  const { data: campaign } = await supabase
-    .from("campaigns")
-    .select(
-      "id, send_type, message_body, media_url, media_filename, whatsapp_account_id, templates(meta_template_name, language, body_text, header_format, header_media_url, header_media_mime_type, variable_count, buttons)"
-    )
-    .eq("id", campaignId)
-    .single();
-  if (!campaign) return { error: "Campaña no encontrada." };
-
-  const template = campaign.templates as unknown as {
+type PreparedCampaignSend = {
+  campaign: {
+    id: string;
+    send_type: string;
+    message_body: string | null;
+    media_url: string | null;
+    media_filename: string | null;
+    whatsapp_account_id: string | null;
+  };
+  template: {
     meta_template_name: string;
     language: string;
     body_text: string | null;
@@ -69,6 +60,31 @@ export async function executeCampaignSend(
     variable_count: number;
     buttons: { type: "URL" | "QUICK_REPLY"; text: string; url?: string }[] | null;
   } | null;
+  templateHeaderMedia: { type: "image" | "video" | "document"; link: string } | undefined;
+  account: NonNullable<Awaited<ReturnType<typeof resolveSendAccount>>>;
+};
+
+// The fast part: fetch the campaign, resolve which number sends it, and flip
+// its status to "sending". Split out from the (potentially long-running,
+// thousands of recipients) send loop below so a caller can await just this
+// part quickly and return, then run the actual sending in the background
+// instead of holding an HTTP request open the whole time — see
+// startCampaignSend, used by the manual "Enviar" button.
+async function prepareCampaignSend(
+  supabase: SupabaseClient,
+  workspaceId: string,
+  campaignId: string
+): Promise<{ error: string } | { data: PreparedCampaignSend }> {
+  const { data: campaign } = await supabase
+    .from("campaigns")
+    .select(
+      "id, send_type, message_body, media_url, media_filename, whatsapp_account_id, templates(meta_template_name, language, body_text, header_format, header_media_url, header_media_mime_type, variable_count, buttons)"
+    )
+    .eq("id", campaignId)
+    .single();
+  if (!campaign) return { error: "Campaña no encontrada." };
+
+  const template = campaign.templates as unknown as PreparedCampaignSend["template"];
 
   const templateHeaderMedia =
     template?.header_format &&
@@ -84,6 +100,22 @@ export async function executeCampaignSend(
   if (!account) return { error: "Este workspace no tiene WhatsApp conectado." };
 
   await supabase.from("campaigns").update({ status: "sending" }).eq("id", campaignId);
+
+  return { data: { campaign, template, templateHeaderMedia, account } };
+}
+
+// The slow part: actually sends to every recipient, one at a time. Shared
+// by the manual "Enviar" button (called in the background, not awaited by
+// the request that triggered it) and the scheduler tick (already
+// server-side, no HTTP request to hold open) — both need the exact same
+// send/record-keeping logic, just triggered and awaited differently.
+async function runCampaignSendLoop(
+  supabase: SupabaseClient,
+  workspaceId: string,
+  campaignId: string,
+  prepared: PreparedCampaignSend
+): Promise<{ error: string } | { success: true }> {
+  const { campaign, template, templateHeaderMedia, account } = prepared;
 
   // PostgREST hard-caps any single response (table select OR an RPC
   // returning a table) at 1000 rows — a campaign with more than 1000
@@ -344,4 +376,40 @@ export async function executeCampaignSend(
     .eq("id", campaignId);
 
   return { success: true };
+}
+
+// Used by the scheduler tick — already running server-side with no HTTP
+// request to hold open, so it just awaits the whole thing start to finish
+// like before.
+export async function executeCampaignSend(
+  supabase: SupabaseClient,
+  workspaceId: string,
+  campaignId: string
+): Promise<{ error: string } | { success: true }> {
+  const prepared = await prepareCampaignSend(supabase, workspaceId, campaignId);
+  if ("error" in prepared) return prepared;
+  return runCampaignSendLoop(supabase, workspaceId, campaignId, prepared.data);
+}
+
+// Used by the manual "Enviar" button. Awaits only the fast part (campaign
+// lookup, resolving which number sends it, flipping status to "sending") so
+// real setup errors ("no WhatsApp conectado") still come back to the
+// button immediately — then fires the actual send loop WITHOUT awaiting it,
+// so a campaign with thousands of recipients doesn't hold the browser's
+// request open long enough to hit nginx's 180s proxy timeout. The loop
+// keeps running server-side after this function returns; progress is
+// visible via each recipient's status in the campaign detail page.
+export async function startCampaignSend(
+  supabase: SupabaseClient,
+  workspaceId: string,
+  campaignId: string
+): Promise<{ error: string } | { success: true; background: true }> {
+  const prepared = await prepareCampaignSend(supabase, workspaceId, campaignId);
+  if ("error" in prepared) return prepared;
+
+  runCampaignSendLoop(supabase, workspaceId, campaignId, prepared.data).catch((err) => {
+    console.error(`campaign ${campaignId}: background send loop failed:`, err);
+  });
+
+  return { success: true, background: true };
 }

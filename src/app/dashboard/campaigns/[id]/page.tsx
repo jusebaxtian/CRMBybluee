@@ -4,6 +4,8 @@ import { ArrowLeft, Users, Clock, Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { SendCampaignButton } from "@/components/send-campaign-button";
 import { DeleteCampaignButton } from "@/components/delete-campaign-button";
+import { RealtimeRefresh } from "@/components/realtime-refresh";
+import { CampaignRecipientsTable } from "@/components/campaign-recipients-table";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
 
@@ -11,22 +13,6 @@ const statusLabel: Record<string, string> = {
   draft: "Borrador",
   sending: "Enviando...",
   completed: "Completada",
-  failed: "Falló",
-};
-
-const recipientStatusColor: Record<string, string> = {
-  pending: "text-muted border-border",
-  sent: "text-primary border-primary",
-  delivered: "text-success border-success",
-  read: "text-success border-success",
-  failed: "text-red-400 border-red-400",
-};
-
-const recipientStatusLabel: Record<string, string> = {
-  pending: "Pendiente",
-  sent: "Enviado",
-  delivered: "Entregado",
-  read: "Leído",
   failed: "Falló",
 };
 
@@ -51,15 +37,39 @@ export default async function CampaignDetailPage({
 
   const template = campaign.templates as unknown as { meta_template_name: string } | null;
 
-  const { data: recipients } = await supabase
-    .from("campaign_recipients")
-    .select("id, status, error_message, contacts(name, wa_id)")
-    .eq("campaign_id", id);
+  // PostgREST hard-caps any single response at 1000 rows — a plain
+  // .select() undercounted "X contactos en total" (and the table below)
+  // for any campaign past that. Page through with .range() until a batch
+  // comes back short, same fix as the send loop itself.
+  type RecipientListRow = {
+    id: string;
+    status: string;
+    error_message: string | null;
+    contacts: { name: string | null; wa_id: string };
+  };
+  const recipients: RecipientListRow[] = [];
+  for (let offset = 0; ; offset += 1000) {
+    const { data: batch } = await supabase
+      .from("campaign_recipients")
+      .select("id, status, error_message, contacts(name, wa_id)")
+      .eq("campaign_id", id)
+      .range(offset, offset + 999);
+    if (!batch || batch.length === 0) break;
+    recipients.push(...(batch as unknown as RecipientListRow[]));
+    if (batch.length < 1000) break;
+  }
 
   const isScheduled = campaign.status === "draft" && !!campaign.scheduled_at;
 
   return (
     <div className="flex flex-col gap-6">
+      {campaign.status === "sending" && (
+        <RealtimeRefresh
+          table="campaign_recipients"
+          filter={`campaign_id=eq.${campaign.id}`}
+          channelName={`campaign-recipients-${campaign.id}`}
+        />
+      )}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Link href="/dashboard/campaigns" className="text-muted hover:text-foreground">
@@ -112,45 +122,7 @@ export default async function CampaignDetailPage({
 
       {campaign.status === "draft" && <SendCampaignButton campaignId={campaign.id} />}
 
-      <div className="overflow-hidden rounded-xl border border-border bg-surface">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-border text-muted">
-              <th className="px-5 py-3 font-medium">Contacto</th>
-              <th className="px-5 py-3 font-medium">Número</th>
-              <th className="px-5 py-3 font-medium">Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(recipients ?? []).map((r) => {
-              const contact = r.contacts as unknown as { name: string | null; wa_id: string };
-              return (
-                <tr key={r.id} className="border-b border-border last:border-b-0">
-                  <td className="px-5 py-3 text-foreground">{contact.name ?? "—"}</td>
-                  <td className="px-5 py-3 text-foreground">{contact.wa_id}</td>
-                  <td className="px-5 py-3">
-                    <span
-                      className={`rounded-full border px-2 py-0.5 text-xs ${
-                        recipientStatusColor[r.status]
-                      }`}
-                      title={r.error_message ?? undefined}
-                    >
-                      {recipientStatusLabel[r.status] ?? r.status}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-            {(!recipients || recipients.length === 0) && (
-              <tr>
-                <td colSpan={3} className="px-5 py-6 text-center text-muted">
-                  Esta campaña no tiene destinatarios.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <CampaignRecipientsTable recipients={recipients} />
     </div>
   );
 }
