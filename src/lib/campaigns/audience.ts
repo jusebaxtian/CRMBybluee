@@ -29,20 +29,32 @@ export async function resolveCampaignAudience(
 ): Promise<{ contactIds: string[]; matchedBeforeWindow: number }> {
   const { includeTagIds, excludeTagIds, createdFromRaw, createdToRaw, audienceWindow } = params;
 
-  const { data, error } = await supabase.rpc("resolve_campaign_recipients", {
-    p_workspace_id: workspaceId,
-    p_include_tag_ids: includeTagIds.length > 0 ? includeTagIds : null,
-    p_exclude_tag_ids: excludeTagIds.length > 0 ? excludeTagIds : null,
-    p_created_from: createdFromRaw ? new Date(createdFromRaw).toISOString() : null,
-    p_created_to: createdToRaw ? new Date(`${createdToRaw}T23:59:59.999`).toISOString() : null,
-  });
+  // PostgREST hard-caps ANY single response (including an RPC that returns
+  // a table, like this one) at 1000 rows — a tag matching more than that
+  // used to make the count/send silently stop at 1000 regardless of the
+  // real audience size, with no error. Page through with .range() until
+  // a batch comes back short.
+  const PAGE_SIZE = 1000;
+  const rows: ResolvedRecipientRow[] = [];
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .rpc("resolve_campaign_recipients", {
+        p_workspace_id: workspaceId,
+        p_include_tag_ids: includeTagIds.length > 0 ? includeTagIds : null,
+        p_exclude_tag_ids: excludeTagIds.length > 0 ? excludeTagIds : null,
+        p_created_from: createdFromRaw ? new Date(createdFromRaw).toISOString() : null,
+        p_created_to: createdToRaw ? new Date(`${createdToRaw}T23:59:59.999`).toISOString() : null,
+      })
+      .range(offset, offset + PAGE_SIZE - 1);
 
-  if (error) {
-    console.error("resolve_campaign_recipients failed:", error.message);
-    return { contactIds: [], matchedBeforeWindow: 0 };
+    if (error) {
+      console.error("resolve_campaign_recipients failed:", error.message);
+      break;
+    }
+    const batch = (data ?? []) as ResolvedRecipientRow[];
+    rows.push(...batch);
+    if (batch.length < PAGE_SIZE) break;
   }
-
-  const rows = (data ?? []) as ResolvedRecipientRow[];
   const matchedBeforeWindow = rows.length;
   const contactIds =
     audienceWindow === "open"

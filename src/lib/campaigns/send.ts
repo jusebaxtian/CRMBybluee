@@ -85,11 +85,29 @@ export async function executeCampaignSend(
 
   await supabase.from("campaigns").update({ status: "sending" }).eq("id", campaignId);
 
-  const { data: recipients } = await supabase
-    .from("campaign_recipients")
-    .select("id, contact_id, contacts(wa_id, name, likely_blocked)")
-    .eq("campaign_id", campaignId)
-    .eq("status", "pending");
+  // PostgREST hard-caps any single response (table select OR an RPC
+  // returning a table) at 1000 rows — a campaign with more than 1000
+  // pending recipients used to have only the first 1000 actually sent,
+  // silently, no error. Page through with .range() until a batch comes
+  // back short, same fix as resolveCampaignAudience.
+  type RecipientRow = {
+    id: string;
+    contact_id: string;
+    contacts: { wa_id: string; name: string | null; likely_blocked: boolean };
+  };
+  const PAGE_SIZE = 1000;
+  const recipients: RecipientRow[] = [];
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const { data: batch } = await supabase
+      .from("campaign_recipients")
+      .select("id, contact_id, contacts(wa_id, name, likely_blocked)")
+      .eq("campaign_id", campaignId)
+      .eq("status", "pending")
+      .range(offset, offset + PAGE_SIZE - 1);
+    if (!batch || batch.length === 0) break;
+    recipients.push(...(batch as unknown as RecipientRow[]));
+    if (batch.length < PAGE_SIZE) break;
+  }
 
   // Last-line guard, independent of whatever the audience filters computed
   // at creation time: a contact carrying any "excludes_followups" tag must
@@ -105,16 +123,22 @@ export async function executeCampaignSend(
   // doesn't interrupt that conversation. Same reasoning/pattern as the
   // no-followup exclusion above.
   const activeChatContactIds = new Set<string>();
-  if (recipients && recipients.length > 0) {
-    const [{ data: excluded }, { data: activeChats }] = await Promise.all([
-      supabase.rpc("campaign_no_followup_recipient_ids", { p_campaign_id: campaignId }),
-      supabase.rpc("campaign_active_chat_recipient_ids", { p_campaign_id: campaignId }),
-    ]);
-    for (const row of (excluded ?? []) as { contact_id: string }[]) {
-      noFollowupContactIds.add(row.contact_id);
+  if (recipients.length > 0) {
+    for (let offset = 0; ; offset += PAGE_SIZE) {
+      const { data: excluded } = await supabase
+        .rpc("campaign_no_followup_recipient_ids", { p_campaign_id: campaignId })
+        .range(offset, offset + PAGE_SIZE - 1);
+      const batch = (excluded ?? []) as { contact_id: string }[];
+      for (const row of batch) noFollowupContactIds.add(row.contact_id);
+      if (batch.length < PAGE_SIZE) break;
     }
-    for (const row of (activeChats ?? []) as { contact_id: string }[]) {
-      activeChatContactIds.add(row.contact_id);
+    for (let offset = 0; ; offset += PAGE_SIZE) {
+      const { data: activeChats } = await supabase
+        .rpc("campaign_active_chat_recipient_ids", { p_campaign_id: campaignId })
+        .range(offset, offset + PAGE_SIZE - 1);
+      const batch = (activeChats ?? []) as { contact_id: string }[];
+      for (const row of batch) activeChatContactIds.add(row.contact_id);
+      if (batch.length < PAGE_SIZE) break;
     }
   }
 
