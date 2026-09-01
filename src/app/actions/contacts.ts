@@ -161,12 +161,27 @@ export async function importContactsFile(formData: FormData) {
       tagIdByName = new Map((allTags ?? []).map((t) => [t.name, t.id]));
     }
 
-    const { data: contactRows } = await supabase
-      .from("contacts")
-      .select("id, wa_id")
-      .eq("workspace_id", workspaceId)
-      .in("wa_id", phones);
-    const contactIdByPhone = new Map((contactRows ?? []).map((c) => [c.wa_id, c.id]));
+    // `.in("wa_id", phones)` builds a `?wa_id=in.(573...,573...,...)` query
+    // string — with a large import (thousands of phones) that trips
+    // nginx's URL-length limit the same way the old bulk-delete/campaign
+    // bugs did. No filter needed instead: page through every contact in
+    // the workspace (workspace_id alone keeps the URL short regardless of
+    // row count) and just look up by phone in memory.
+    const phoneSet = new Set(phones);
+    const contactIdByPhone = new Map<string, string>();
+    const CONTACT_PAGE_SIZE = 1000;
+    for (let offset = 0; ; offset += CONTACT_PAGE_SIZE) {
+      const { data: batch } = await supabase
+        .from("contacts")
+        .select("id, wa_id")
+        .eq("workspace_id", workspaceId)
+        .range(offset, offset + CONTACT_PAGE_SIZE - 1);
+      if (!batch || batch.length === 0) break;
+      for (const c of batch) {
+        if (phoneSet.has(c.wa_id)) contactIdByPhone.set(c.wa_id, c.id);
+      }
+      if (batch.length < CONTACT_PAGE_SIZE) break;
+    }
 
     const contactTagRows: { contact_id: string; tag_id: string }[] = [];
     for (const row of rows) {

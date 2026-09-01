@@ -11,11 +11,32 @@ export default async function ContactsPage() {
   const workspaceId = await getWorkspaceId(supabase);
   await requireModule(supabase, workspaceId, "contacts");
 
-  const { data: contacts } = await supabase
-    .from("contacts")
-    .select("id, name, wa_id, created_at, contact_tags(tag_id), conversations(ad_source_id, ad_headline)")
-    .eq("workspace_id", workspaceId ?? "")
-    .order("created_at", { ascending: false });
+  // PostgREST caps any single request at 1000 rows (PGRST_DB_MAX_ROWS) —
+  // a plain .select() on a workspace with more contacts than that silently
+  // truncates instead of erroring, so "Total de contactos" undercounted for
+  // any workspace past 1000. Page through in batches of 1000 until exhausted.
+  const contacts: {
+    id: string;
+    name: string | null;
+    wa_id: string;
+    created_at: string;
+    contact_tags: { tag_id: string }[];
+    conversations: { ad_source_id: string | null; ad_headline: string | null }[];
+  }[] = [];
+  if (workspaceId) {
+    const PAGE_SIZE = 1000;
+    for (let offset = 0; ; offset += PAGE_SIZE) {
+      const { data: batch } = await supabase
+        .from("contacts")
+        .select("id, name, wa_id, created_at, contact_tags(tag_id), conversations(ad_source_id, ad_headline)")
+        .eq("workspace_id", workspaceId)
+        .order("created_at", { ascending: false })
+        .range(offset, offset + PAGE_SIZE - 1);
+      if (!batch || batch.length === 0) break;
+      contacts.push(...batch);
+      if (batch.length < PAGE_SIZE) break;
+    }
+  }
 
   const { data: allTags } = await supabase
     .from("tags")

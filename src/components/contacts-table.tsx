@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Pencil,
@@ -80,6 +80,27 @@ export function ContactsTable({
     setDateFrom("");
     setDateTo("");
   }
+
+  // The full contact list can now legitimately be thousands of rows (fixed
+  // the fetch that was silently capping it at 1000) — paginate the render
+  // so the browser isn't drawing all of them into the DOM at once. Filtering
+  // above still runs over the complete in-memory list, so search/filters
+  // still reach every contact, not just the current page.
+  const PAGE_SIZE = 100;
+  const [page, setPage] = useState(1);
+  const pageCount = Math.max(1, Math.ceil(filteredContacts.length / PAGE_SIZE));
+  const pagedContacts = useMemo(
+    () => filteredContacts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filteredContacts, page]
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, tagFilter, dateFrom, dateTo]);
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount);
+  }, [page, pageCount]);
 
   const MAX_BULK_DELETE = 1000;
   const DELETE_BATCH_SIZE = 100;
@@ -364,7 +385,7 @@ export function ContactsTable({
                 </td>
               </tr>
             )}
-            {filteredContacts.map((c) => (
+            {pagedContacts.map((c) => (
               <tr key={c.id} className="border-b border-border last:border-b-0">
                 <td className="px-5 py-3">
                   <input
@@ -463,6 +484,36 @@ export function ContactsTable({
           </tbody>
         </table>
       </div>
+
+      {filteredContacts.length > 0 && (
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-muted">
+            Mostrando {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredContacts.length)} de{" "}
+            {filteredContacts.length}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Anterior
+            </button>
+            <span className="text-xs text-muted">
+              Página {page} de {pageCount}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+              disabled={page >= pageCount}
+              className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Siguiente
+            </button>
+          </div>
+        </div>
+      )}
 
       {deleteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
