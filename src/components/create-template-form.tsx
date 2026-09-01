@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
-import { Plus, X } from "lucide-react";
-import { createTemplate } from "@/app/actions/templates";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { CheckCircle2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const headerAccept: Record<string, string> = {
@@ -13,8 +13,30 @@ const headerAccept: Record<string, string> = {
 
 type TemplateButton = { type: "URL" | "QUICK_REPLY"; text: string; url: string };
 
+function submitWithProgress(
+  formData: FormData,
+  onProgress: (pct: number) => void
+): Promise<{ success?: boolean; error?: string }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/create-template");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      try {
+        resolve(JSON.parse(xhr.responseText));
+      } catch {
+        reject(new Error("Respuesta inválida del servidor."));
+      }
+    };
+    xhr.onerror = () => reject(new Error("Error de red al enviar la plantilla."));
+    xhr.send(formData);
+  });
+}
+
 export function CreateTemplateForm() {
-  const [state, action, pending] = useActionState(createTemplate, undefined);
+  const router = useRouter();
   const [name, setName] = useState("");
   const [category, setCategory] = useState("UTILITY");
   const [language, setLanguage] = useState("es");
@@ -27,21 +49,47 @@ export function CreateTemplateForm() {
   const [buttons, setButtons] = useState<TemplateButton[]>([]);
   const urlButtonCount = buttons.filter((b) => b.type === "URL").length;
 
-  useEffect(() => {
-    if (state && "success" in state) {
-      setName("");
-      setCategory("UTILITY");
-      setLanguage("es");
-      setBodyText("");
-      setHeaderKind("none");
-      setHeaderText("");
-      setFooterText("");
-      setButtons([]);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    setSuccess(false);
+    setUploading(true);
+    setProgress(0);
+
+    const formData = new FormData(e.currentTarget);
+    formData.set("buttonsJson", JSON.stringify(buttons));
+
+    try {
+      const result = await submitWithProgress(formData, setProgress);
+      if (result?.error) {
+        setError(result.error);
+      } else {
+        setSuccess(true);
+        setName("");
+        setCategory("UTILITY");
+        setLanguage("es");
+        setBodyText("");
+        setHeaderKind("none");
+        setHeaderText("");
+        setFooterText("");
+        setButtons([]);
+        (e.target as HTMLFormElement).reset();
+        router.refresh();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al enviar la plantilla.");
+    } finally {
+      setUploading(false);
     }
-  }, [state]);
+  }
 
   return (
-    <form action={action} className="flex flex-col gap-4">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div>
           <label htmlFor="name" className="mb-1 block text-sm font-medium text-muted">
@@ -247,15 +295,29 @@ export function CreateTemplateForm() {
         </div>
       </div>
 
-      {state && "error" in state && <p className="text-sm text-red-400">{state.error}</p>}
-      {state && "success" in state && (
-        <p className="text-sm text-success">
+      {uploading && (
+        <div className="flex flex-col gap-1">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-hover">
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-150"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <p className="text-xs text-muted">
+            {progress < 100 ? `Subiendo archivo... ${progress}%` : "Procesando en Meta..."}
+          </p>
+        </div>
+      )}
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      {success && (
+        <p className="flex items-center gap-1.5 text-sm text-success">
+          <CheckCircle2 size={14} />
           Plantilla enviada a Meta para aprobación. Puede tardar minutos u horas en revisarse.
         </p>
       )}
 
-      <Button type="submit" disabled={pending} className="self-start">
-        {pending ? "Enviando a Meta..." : "Enviar plantilla a aprobación"}
+      <Button type="submit" disabled={uploading} className="self-start">
+        {uploading ? "Enviando a Meta..." : "Enviar plantilla a aprobación"}
       </Button>
     </form>
   );

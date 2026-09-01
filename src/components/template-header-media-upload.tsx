@@ -2,14 +2,39 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Upload } from "lucide-react";
-import { setTemplateHeaderMedia } from "@/app/actions/templates";
+import { AlertTriangle, CheckCircle2, Upload } from "lucide-react";
 
 const accept: Record<string, string> = {
   IMAGE: "image/jpeg,image/png",
   VIDEO: "video/mp4,video/quicktime",
   DOCUMENT: "application/pdf",
 };
+
+function uploadWithProgress(
+  templateId: string,
+  file: File,
+  onProgress: (pct: number) => void
+): Promise<{ success?: boolean; error?: string }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/template-header-media");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      try {
+        resolve(JSON.parse(xhr.responseText));
+      } catch {
+        reject(new Error("Respuesta inválida del servidor."));
+      }
+    };
+    xhr.onerror = () => reject(new Error("Error de red al subir el archivo."));
+    const formData = new FormData();
+    formData.set("templateId", templateId);
+    formData.set("file", file);
+    xhr.send(formData);
+  });
+}
 
 // Shown on a template synced from Meta that has an IMAGE/VIDEO/DOCUMENT
 // header but no local file for it yet — every send fails until this is
@@ -23,21 +48,38 @@ export function TemplateHeaderMediaUpload({
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [pending, setPending] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
 
   async function handleFile(file: File) {
-    setPending(true);
+    setUploading(true);
+    setProgress(0);
     setError(null);
-    const formData = new FormData();
-    formData.set("file", file);
-    const result = await setTemplateHeaderMedia(templateId, formData);
-    setPending(false);
-    if (result?.error) {
-      setError(result.error);
-      return;
+    setDone(false);
+    try {
+      const result = await uploadWithProgress(templateId, file, setProgress);
+      if (result?.error) {
+        setError(result.error);
+      } else {
+        setDone(true);
+        router.refresh();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al subir el archivo.");
+    } finally {
+      setUploading(false);
     }
-    router.refresh();
+  }
+
+  if (done) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-success/40 bg-success/10 p-3 text-xs text-success">
+        <CheckCircle2 size={14} className="shrink-0" />
+        Archivo subido correctamente.
+      </div>
+    );
   }
 
   return (
@@ -60,15 +102,26 @@ export function TemplateHeaderMediaUpload({
           if (file) void handleFile(file);
         }}
       />
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        disabled={pending}
-        className="flex items-center gap-1.5 rounded-md border border-warning/50 bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-surface-hover disabled:opacity-50"
-      >
-        <Upload size={12} />
-        {pending ? "Subiendo..." : "Subir archivo del encabezado"}
-      </button>
+      {uploading ? (
+        <div className="flex flex-col gap-1">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-hover">
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-150"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <p className="text-xs text-muted">Subiendo archivo... {progress}%</p>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          className="flex items-center gap-1.5 rounded-md border border-warning/50 bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-surface-hover"
+        >
+          <Upload size={12} />
+          Subir archivo del encabezado
+        </button>
+      )}
       {error && <p className="mt-1.5 text-xs text-red-400">{error}</p>}
     </div>
   );
