@@ -4,9 +4,8 @@ const colorClasses: Record<"success" | "danger" | "muted", string> = {
   muted: "border-border text-muted",
 };
 
-// Round, outline-only badge — no fill — with the number on top and a short
-// label underneath, used for at-a-glance campaign send results (sent/
-// failed/pending) wherever a compact stat needs to stand on its own.
+// Pill-shaped, outline-only badge — no fill — value and label inline,
+// matching the client's reference style for tag/status chips.
 export function StatBadge({
   value,
   label,
@@ -17,11 +16,10 @@ export function StatBadge({
   color: "success" | "danger" | "muted";
 }) {
   return (
-    <div
-      className={`flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-full border ${colorClasses[color]}`}
+    <span
+      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium ${colorClasses[color]}`}
     >
-      <span className="text-sm font-semibold leading-none">{value}</span>
-      <span className="mt-1 text-[9px] leading-none">{label}</span>
-    </div>
+      {value} {label}
+    </span>
   );
 }
