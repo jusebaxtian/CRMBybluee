@@ -8,9 +8,13 @@ import { resumeAutomationRun, isContactExcludedFromFollowups } from "@/lib/autom
 export async function processDueAutomationRuns() {
   const supabase = createAdminClient();
 
+  // A paused row (contact replied — see handle_message_for_followups()) has
+  // an old run_at that's already in the past, but must NOT fire until the
+  // next outbound message re-arms it 30 minutes out and clears the pause.
   const { data: dueRuns } = await supabase
     .from("automation_pending_runs")
     .select("id, workspace_id, automation_id, contact_id, next_position, automations(trigger_type)")
+    .eq("paused", false)
     .lte("run_at", new Date().toISOString())
     .limit(50);
 
