@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule, getEnabledModuleKeys } from "@/lib/entitlements";
 import { CampaignsTabs } from "@/components/campaigns-tabs";
+import { StatBadge } from "@/components/stat-badge";
 
 const statusLabel: Record<string, string> = {
   draft: "Borrador",
@@ -92,10 +93,14 @@ export default async function CampaignsPage() {
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
                   {hasRecipients && (
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-success">{count.sent} enviados</span>
-                      {count.failed > 0 && <span className="text-red-400">{count.failed} fallidos</span>}
-                      {count.pending > 0 && <span className="text-muted">{count.pending} pendientes</span>}
+                    <div className="flex items-center gap-2">
+                      <StatBadge value={count.sent} label="enviados" color="success" />
+                      {count.failed > 0 && (
+                        <StatBadge value={count.failed} label="fallidos" color="danger" />
+                      )}
+                      {count.pending > 0 && (
+                        <StatBadge value={count.pending} label="pendientes" color="muted" />
+                      )}
                     </div>
                   )}
                   <span className="text-xs text-muted">
