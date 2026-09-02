@@ -41,30 +41,53 @@ export default async function TagsPage() {
           </p>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-2">
+        <div className="rounded-xl border border-border bg-surface">
+          <div className="grid grid-cols-[20px_1fr_70px_auto_70px] items-center gap-3 border-b border-border px-4 py-2 text-[10px] font-medium uppercase tracking-wide text-muted">
+            <span />
+            <span>Etiqueta</span>
+            <span className="text-right">Contactos</span>
+            <span>Configuración</span>
+            <span />
+          </div>
           {tags.map((tag) => {
             const contactCount = (tag.contact_tags as unknown as { count: number }[])[0]?.count ?? 0;
             return (
               <div
                 key={tag.id}
-                className="flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm"
-                style={{ color: tag.color, borderColor: tag.color }}
+                className="group grid grid-cols-[20px_1fr_70px_auto_70px] items-center gap-3 border-b border-border px-4 py-2 text-sm last:border-b-0 hover:bg-surface-hover"
               >
-                <span>
-                  {tag.name}{" "}
-                  <span className="text-muted" title={`${contactCount} contacto${contactCount === 1 ? "" : "s"} con esta etiqueta`}>
-                    {contactCount}
-                  </span>
-                </span>
-                <TagFollowupsToggle tagId={tag.id} excludesFollowups={tag.excludes_followups} />
-                <EditTagButton
-                  tagId={tag.id}
-                  tagName={tag.name}
-                  tagColor={tag.color}
-                  excludesFollowups={tag.excludes_followups}
-                  marksPurchase={tag.marks_purchase}
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: tag.color }}
                 />
-                <DeleteTagButton tagId={tag.id} tagName={tag.name} contactCount={contactCount} />
+                <span className="truncate text-foreground">{tag.name}</span>
+                <span
+                  className="text-right tabular-nums text-muted"
+                  title={`${contactCount} contacto${contactCount === 1 ? "" : "s"} con esta etiqueta`}
+                >
+                  {contactCount}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <TagFollowupsToggle tagId={tag.id} excludesFollowups={tag.excludes_followups} />
+                  {tag.marks_purchase && (
+                    <span
+                      className="rounded-full bg-success/15 px-1.5 py-0.5 text-[10px] text-success"
+                      title="Reporta compra a Meta Ads (Conversions API) al usar esta etiqueta"
+                    >
+                      Reporta compra
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center justify-end gap-2.5 opacity-0 transition-opacity group-hover:opacity-100">
+                  <EditTagButton
+                    tagId={tag.id}
+                    tagName={tag.name}
+                    tagColor={tag.color}
+                    excludesFollowups={tag.excludes_followups}
+                    marksPurchase={tag.marks_purchase}
+                  />
+                  <DeleteTagButton tagId={tag.id} tagName={tag.name} contactCount={contactCount} />
+                </div>
               </div>
             );
           })}
