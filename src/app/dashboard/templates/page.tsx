@@ -44,6 +44,10 @@ export default async function TemplatesPage() {
     // una creada directo en Meta Business Manager y traída por sincronizar
     // queda oculta hasta que se recree aquí. Ver migración 0075.
     .eq("created_via", "crm")
+    // Eliminadas quedan como fila DELETED (no se pueden borrar del todo si
+    // una campaña pasada las referencia — ver deleteTemplate()), pero no
+    // deben mostrarse en ningún listado, ni siquiera tachadas aquí.
+    .neq("status", "DELETED")
     .order("meta_template_name");
 
   return (
