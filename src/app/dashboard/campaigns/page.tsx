@@ -4,13 +4,20 @@ import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule, getEnabledModuleKeys } from "@/lib/entitlements";
 import { CampaignsTabs } from "@/components/campaigns-tabs";
-import { StatBadge } from "@/components/stat-badge";
+import { StatBadge, StatusBadge } from "@/components/stat-badge";
 
 const statusLabel: Record<string, string> = {
   draft: "Borrador",
   sending: "Enviando...",
   completed: "Completada",
   failed: "Falló",
+};
+
+const statusColor: Record<string, "muted" | "accent" | "success" | "danger"> = {
+  draft: "muted",
+  sending: "accent",
+  completed: "success",
+  failed: "danger",
 };
 
 export default async function CampaignsPage() {
@@ -103,9 +110,14 @@ export default async function CampaignsPage() {
                       )}
                     </div>
                   )}
-                  <span className="text-xs text-muted">
-                    {c.status === "draft" && c.scheduled_at ? "Programada" : statusLabel[c.status] ?? c.status}
-                  </span>
+                  <StatusBadge
+                    label={
+                      c.status === "draft" && c.scheduled_at ? "Programada" : statusLabel[c.status] ?? c.status
+                    }
+                    color={
+                      c.status === "draft" && c.scheduled_at ? "warning" : statusColor[c.status] ?? "muted"
+                    }
+                  />
                 </div>
               </Link>
             );
