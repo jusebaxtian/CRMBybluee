@@ -268,7 +268,7 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
         // whatever failure streak/likely_blocked flag it had.
         await resetContactReachability(supabase, contact.id);
 
-        const { data: conversation } = await supabase
+        const { data: conversation, error: conversationError } = await supabase
           .from("conversations")
           .upsert(
             {
@@ -286,7 +286,24 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           .select("id, assigned_agent_id, ad_source_id")
           .single();
 
-        if (!conversation) continue;
+        // This used to fail silently for any conversation whose
+        // whatsapp_account_id was still null (pre-multi-number data) — a
+        // non-null value being upserted doesn't match that row under the
+        // 3-column constraint above, so Postgres collides with the OTHER
+        // unique constraint on (workspace_id, contact_id) instead, a real
+        // error that was never checked. 3,099 conversations were stuck this
+        // way system-wide (see migration 0079) — logging now so a future
+        // recurrence (e.g. a whatsapp_account_id pointing at a deleted
+        // account) is visible instead of indistinguishable from "no
+        // message ever arrived".
+        if (conversationError || !conversation) {
+          console.error("whatsapp webhook: conversation upsert failed", conversationError, {
+            workspaceId,
+            contactId: contact.id,
+            whatsappAccountId,
+          });
+          continue;
+        }
 
         // Only Meta ("ad") referrals identify a paid campaign — organic
         // "post" shares also set referral but aren't Meta Ads. Written once:
@@ -365,7 +382,7 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
               (message.document?.filename ?? null) ??
               (audioTranscript ? `🎙️ ${audioTranscript}` : null);
 
-        await supabase.from("messages").insert({
+        const { error: insertError } = await supabase.from("messages").insert({
           conversation_id: conversation.id,
           direction: "in",
           message_type: isButtonTap ? "button" : message.type,
@@ -377,6 +394,16 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           status: "delivered",
           created_at: new Date(Number(message.timestamp) * 1000).toISOString(),
         });
+        // This insert's error used to go unchecked — a failure here looked
+        // identical to the webhook never having arrived at all.
+        if (insertError) {
+          console.error("whatsapp webhook: messages insert failed", insertError, {
+            isButtonTap,
+            messageType: message.type,
+            waMessageId: message.id,
+          });
+          continue;
+        }
 
         const notificationPreview = isReaction
           ? reactionEmoji

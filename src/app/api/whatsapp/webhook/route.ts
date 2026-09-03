@@ -36,6 +36,12 @@ export async function POST(request: NextRequest) {
   const rawBody = await request.text();
 
   if (!isValidSignature(rawBody, request.headers.get("x-hub-signature-256"))) {
+    // Was completely silent before — a signature mismatch on a genuine
+    // Meta payload would look identical to "nothing arrived at all" from
+    // every other angle, which cost real time diagnosing an unrelated bug.
+    console.error("whatsapp webhook: invalid signature", {
+      hasHeader: !!request.headers.get("x-hub-signature-256"),
+    });
     return new NextResponse("Invalid signature", { status: 401 });
   }
 
