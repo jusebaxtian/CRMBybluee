@@ -258,7 +258,14 @@ export async function createMetaTemplate(
             ...(hasVariable ? { example: [`${b.url.replace(/\{\{1\}\}/, "ejemplo")}`] } : {}),
           };
         }
-        return { type: "QUICK_REPLY", text: b.text };
+        // Meta's docs say an unset payload defaults to the button's text,
+        // but that default has proven unreliable in practice — a tapped
+        // Quick Reply button on an approved template silently produced no
+        // webhook event at all for one account. Setting the payload
+        // explicitly (matching what a button_tap automation's
+        // trigger_keyword is already compared against) removes that
+        // ambiguity instead of depending on undocumented default behavior.
+        return { type: "QUICK_REPLY", text: b.text, payload: b.text };
       }),
     });
   }
