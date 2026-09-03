@@ -509,10 +509,23 @@ export async function sendMessageToContact(input: { contactId: string; body: str
     .single();
   if (!contact) return { error: "Contacto no encontrado." };
 
+  // Leaving whatsapp_account_id unset on a freshly-created conversation used
+  // to leave it null forever — silently breaking every future inbound reply
+  // from this contact (ingest.ts's upsert targets a 3-column unique
+  // constraint including whatsapp_account_id; a null value on the existing
+  // row doesn't match a non-null value being upserted there, so it collides
+  // with the OTHER unique constraint instead). Resolving it here and using
+  // the plain 2-column conflict target (never the 3-column one) avoids that.
+  const account = await resolveSendAccount(supabase, workspaceId, null);
+
   const { data: conversation, error: convError } = await supabase
     .from("conversations")
     .upsert(
-      { workspace_id: workspaceId, contact_id: contact.id },
+      {
+        workspace_id: workspaceId,
+        contact_id: contact.id,
+        ...(account ? { whatsapp_account_id: account.id } : {}),
+      },
       { onConflict: "workspace_id,contact_id", ignoreDuplicates: false }
     )
     .select("id")

@@ -67,15 +67,39 @@ const mediaActionType: Record<string, "image" | "video" | "audio" | "document"> 
   send_document: "document",
 };
 
+// Leaving whatsapp_account_id unset here used to leave it null forever on a
+// freshly-created conversation — which then silently broke every future
+// inbound reply from that contact (ingest.ts's own upsert targets the
+// 3-column unique constraint including whatsapp_account_id; a null value on
+// the existing row doesn't match a non-null value being upserted there, so
+// Postgres collides with the OTHER unique constraint on just
+// (workspace_id, contact_id) instead — a real error, previously unchecked).
+// Resolving and writing it here, on the plain 2-column conflict target
+// (never touching the 3-column one these other call sites don't need),
+// keeps every conversation this file creates or reuses self-healing instead
+// of a landmine for the next inbound message.
 async function getOrCreateConversation(
   supabase: SupabaseClient,
   workspaceId: string,
   contactId: string
 ): Promise<string | null> {
+  const { data: existing } = await supabase
+    .from("conversations")
+    .select("id, whatsapp_account_id")
+    .eq("workspace_id", workspaceId)
+    .eq("contact_id", contactId)
+    .maybeSingle();
+
+  const account = await resolveSendAccount(supabase, workspaceId, existing?.whatsapp_account_id);
+
   const { data } = await supabase
     .from("conversations")
     .upsert(
-      { workspace_id: workspaceId, contact_id: contactId },
+      {
+        workspace_id: workspaceId,
+        contact_id: contactId,
+        ...(account ? { whatsapp_account_id: account.id } : {}),
+      },
       { onConflict: "workspace_id,contact_id" }
     )
     .select("id")

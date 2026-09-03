@@ -28,14 +28,28 @@ function guessMimeFromFilename(filename: string | null): string {
   return map[ext] ?? "application/pdf";
 }
 
+// Not setting whatsapp_account_id here used to leave it null forever on a
+// freshly-created conversation, which silently broke every future inbound
+// reply from that contact — ingest.ts's own upsert targets a 3-column
+// unique constraint including whatsapp_account_id, and a null value on the
+// existing row doesn't match the non-null value being upserted there, so
+// Postgres collides with the OTHER unique constraint on just
+// (workspace_id, contact_id) instead. The campaign's own send account is
+// already known here (unlike ingest.ts, no extra resolveSendAccount lookup
+// needed per recipient), and this uses the plain 2-column conflict target,
+// never the 3-column one, so no such collision is possible either way.
 async function getOrCreateConversation(
   supabase: SupabaseClient,
   workspaceId: string,
-  contactId: string
+  contactId: string,
+  whatsappAccountId: string
 ): Promise<string | null> {
   const { data } = await supabase
     .from("conversations")
-    .upsert({ workspace_id: workspaceId, contact_id: contactId }, { onConflict: "workspace_id,contact_id" })
+    .upsert(
+      { workspace_id: workspaceId, contact_id: contactId, whatsapp_account_id: whatsappAccountId },
+      { onConflict: "workspace_id,contact_id" }
+    )
     .select("id")
     .single();
   return data?.id ?? null;
@@ -261,7 +275,7 @@ async function runCampaignSendLoop(
           buttonUrlParam
         );
 
-        const conversationId = await getOrCreateConversation(supabase, workspaceId, recipient.contact_id);
+        const conversationId = await getOrCreateConversation(supabase, workspaceId, recipient.contact_id, account.id);
         if (conversationId) {
           await supabase.from("messages").insert({
             conversation_id: conversationId,
@@ -290,7 +304,7 @@ async function runCampaignSendLoop(
       } else {
         // Free-form send — re-check the window right before sending, since
         // it may have closed since the campaign was created.
-        const conversationId = await getOrCreateConversation(supabase, workspaceId, recipient.contact_id);
+        const conversationId = await getOrCreateConversation(supabase, workspaceId, recipient.contact_id, account.id);
         const { data: lastInbound } = await supabase
           .from("messages")
           .select("created_at")
