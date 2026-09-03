@@ -27,10 +27,31 @@ function playAlert(ctx: AudioContext) {
   }
 }
 
-export function InboundMessageSound() {
+type Props = {
+  workspaceId?: string | null;
+  isPlatformAdmin?: boolean;
+  isImpersonating?: boolean;
+};
+
+// A platform admin's RLS lets them see every workspace's messages, so with
+// no scoping here they'd hear a chime for every client's inbound message,
+// all the time — not just the one they're actively viewing in "modo
+// soporte". A regular client only ever has one workspace, so this stays a
+// no-op for them.
+export function InboundMessageSound({
+  workspaceId = null,
+  isPlatformAdmin = false,
+  isImpersonating = false,
+}: Props) {
   const audioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
+    // An admin browsing their own dashboard (not "modo soporte" on a
+    // specific client) gets no sound at all — there's no single workspace
+    // to scope it to, and playing for every client at once is the exact
+    // complaint being fixed here.
+    if (isPlatformAdmin && !isImpersonating) return;
+
     function ensureContext() {
       if (!audioCtxRef.current) {
         const AudioCtx =
@@ -54,20 +75,42 @@ export function InboundMessageSound() {
     let channel: ReturnType<typeof supabase.channel> | null = null;
     let cancelled = false;
 
+    // messages doesn't carry workspace_id itself (only conversation_id), so
+    // scoping to "the workspace currently open in modo soporte" needs one
+    // extra lookup per inbound row — cheap at chat-message frequency, and
+    // the only way to keep an admin's sound to the client they're actually
+    // viewing instead of every workspace RLS lets them see.
+    async function belongsToCurrentWorkspace(conversationId: string): Promise<boolean> {
+      if (!workspaceId) return false;
+      const { data } = await supabase
+        .from("conversations")
+        .select("workspace_id")
+        .eq("id", conversationId)
+        .maybeSingle();
+      return data?.workspace_id === workspaceId;
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (cancelled) return;
       if (session?.access_token) supabase.realtime.setAuth(session.access_token);
 
-      // No filter: RLS already scopes which message rows this connection can
-      // see to the caller's own workspace(s).
+      // No table-level filter: RLS scopes which message rows a regular
+      // client's connection can see to their own workspace, but a platform
+      // admin can see every workspace's rows — belongsToCurrentWorkspace()
+      // below is what actually narrows it down for them.
       channel = supabase
         .channel("inbound-message-sound")
         .on(
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "messages" },
-          (payload) => {
-            const row = payload.new as { direction?: string };
+          async (payload) => {
+            const row = payload.new as { direction?: string; conversation_id?: string };
             if (row.direction !== "in") return;
+            if (isPlatformAdmin) {
+              if (!row.conversation_id || !(await belongsToCurrentWorkspace(row.conversation_id))) {
+                return;
+              }
+            }
             try {
               const ctx = ensureContext();
               if (ctx.state === "suspended") ctx.resume();
@@ -82,10 +125,13 @@ export function InboundMessageSound() {
           { event: "UPDATE", schema: "public", table: "conversations" },
           (payload) => {
             const before = payload.old as { ai_handoff_requested?: boolean };
-            const after = payload.new as { ai_handoff_requested?: boolean };
+            const after = payload.new as { ai_handoff_requested?: boolean; workspace_id?: string };
             // Only the false → true transition — an update caused by clearing
             // the handoff (or any unrelated column change) must stay silent.
             if (before.ai_handoff_requested === true || after.ai_handoff_requested !== true) return;
+            // conversations carries workspace_id on the row itself, no extra
+            // lookup needed here unlike the messages case above.
+            if (isPlatformAdmin && after.workspace_id !== workspaceId) return;
             try {
               const ctx = ensureContext();
               if (ctx.state === "suspended") ctx.resume();
@@ -104,7 +150,7 @@ export function InboundMessageSound() {
       window.removeEventListener("keydown", unlock);
       if (channel) supabase.removeChannel(channel);
     };
-  }, []);
+  }, [workspaceId, isPlatformAdmin, isImpersonating]);
 
   return null;
 }

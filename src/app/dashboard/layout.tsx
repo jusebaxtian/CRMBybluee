@@ -22,6 +22,12 @@ export default async function DashboardLayout({
 
   const isAdmin = await isPlatformAdmin(supabase);
   const impersonatedWorkspaceId = isAdmin ? await getImpersonatedWorkspaceId() : null;
+  // Distinct from workspaceId below: that one falls back to the admin's own
+  // workspace when not impersonating, so it's never null for an admin — this
+  // is the one signal for "actually in modo soporte right now" (used to gate
+  // the inbound-message sound so an admin isn't hearing every client's
+  // messages while just browsing their own workspace).
+  const isImpersonating = !!impersonatedWorkspaceId;
   const workspaceId = await getWorkspaceId(supabase);
   const workspaceRole = await getWorkspaceRole(supabase, workspaceId);
 
@@ -148,6 +154,7 @@ export default async function DashboardLayout({
       planId={workspace?.plan_id ?? null}
       workspaceStatus={workspace?.status ?? null}
       impersonatedOwnerId={impersonatedOwnerId}
+      isImpersonating={isImpersonating}
       banner={
         impersonatedWorkspaceId ? <ImpersonationBanner workspaceName={workspaceName} /> : null
       }

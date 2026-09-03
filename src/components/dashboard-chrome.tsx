@@ -33,6 +33,7 @@ export function DashboardChrome({
   planId = null,
   workspaceStatus = null,
   impersonatedOwnerId = null,
+  isImpersonating = false,
   banner,
   children,
 }: {
@@ -50,6 +51,7 @@ export function DashboardChrome({
   planId?: string | null;
   workspaceStatus?: string | null;
   impersonatedOwnerId?: string | null;
+  isImpersonating?: boolean;
   banner: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -57,7 +59,11 @@ export function DashboardChrome({
 
   return (
     <div className="flex bg-background">
-      <InboundMessageSound />
+      <InboundMessageSound
+        workspaceId={workspaceId}
+        isPlatformAdmin={isPlatformAdmin}
+        isImpersonating={isImpersonating}
+      />
       <NotificationSound
         workspaceId={workspaceId}
         planId={planId}
