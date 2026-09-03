@@ -48,7 +48,8 @@ export default async function TemplatesPage() {
     // una campaña pasada las referencia — ver deleteTemplate()), pero no
     // deben mostrarse en ningún listado, ni siquiera tachadas aquí.
     .neq("status", "DELETED")
-    .order("meta_template_name");
+    // Más reciente creada primero.
+    .order("created_at", { ascending: false });
 
   return (
     <div className="flex flex-col gap-6">
