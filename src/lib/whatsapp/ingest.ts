@@ -5,6 +5,7 @@ import {
   runButtonTapAutomations,
   runAnyMessageAutomations,
   runFirstMessageOfDayAutomations,
+  resumePendingReplyWaits,
 } from "@/lib/automations/engine";
 import { getMediaUrl, downloadMedia } from "@/lib/whatsapp/graph";
 import { notifyNewMessage } from "@/lib/push/send";
@@ -403,7 +404,18 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
         // automations or the AI agent off an emoji would be nonsensical.
         // Same for a button tap: it already ran its own trigger above.
         let matchedAutomation = false;
-        if (!isReaction && !isButtonTap) {
+
+        // A "wait_for_reply" step (see engine.ts) has no content requirement
+        // — any inbound message counts as the reply it's waiting for, so
+        // this checks before the text/reaction gating below. Like the other
+        // triggers, matching here only skips the AI-agent fallback further
+        // down (matchedAutomation) — a keyword automation can still fire
+        // independently if the reply text happens to match one.
+        if (!isReaction) {
+          matchedAutomation = await resumePendingReplyWaits(supabase, workspaceId, contact.id);
+        }
+
+        if (!matchedAutomation && !isReaction && !isButtonTap) {
           // Content-agnostic triggers — fire regardless of message type
           // (text, image, audio...), unlike keyword matching which needs
           // actual text to search.

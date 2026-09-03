@@ -140,6 +140,7 @@ export function NewAutomationForm({
           agents={agents}
           quickReplies={quickReplies}
           initialActions={automation?.actions}
+          allowWaitForReply
           onUploadingChange={setUploading}
         />
       </div>

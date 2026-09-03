@@ -60,7 +60,8 @@ type ActionType =
   | "send_template"
   | "send_quick_reply"
   | "assign_agent"
-  | "assign_agent_random";
+  | "assign_agent_random"
+  | "wait_for_reply";
 
 type AgentShare = { agent_id: string; percent: number };
 
@@ -272,6 +273,7 @@ export function AutomationActionsBuilder({
   initialActions,
   hideAgentActions = false,
   showDelay = true,
+  allowWaitForReply = false,
   onUploadingChange,
 }: {
   tags: Tag[];
@@ -281,6 +283,7 @@ export function AutomationActionsBuilder({
   initialActions?: InitialAction[];
   hideAgentActions?: boolean;
   showDelay?: boolean;
+  allowWaitForReply?: boolean;
   onUploadingChange?: (uploading: boolean) => void;
 }) {
   const [actions, setActions] = useState<ActionRow[]>(
@@ -409,7 +412,10 @@ export function AutomationActionsBuilder({
     quick_reply_id: a.action_type === "send_quick_reply" ? a.quick_reply_id : undefined,
     target_agent_id: a.action_type === "assign_agent" ? a.target_agent_id : undefined,
     agent_distribution: a.action_type === "assign_agent_random" ? a.agent_distribution : undefined,
-    delay_seconds: a.delay_value > 0 ? a.delay_value * delaySecondsPerUnit[a.delay_unit] : 0,
+    delay_seconds:
+      a.action_type !== "wait_for_reply" && a.delay_value > 0
+        ? a.delay_value * delaySecondsPerUnit[a.delay_unit]
+        : 0,
     buttons: a.action_type === "send_message" ? a.buttons.filter((b) => b.title.trim()) : undefined,
   }));
 
@@ -453,6 +459,9 @@ export function AutomationActionsBuilder({
                 <option value="send_quick_reply">Enviar respuesta rápida</option>
               )}
               <option value="add_tag">Agregar etiqueta</option>
+              {allowWaitForReply && (
+                <option value="wait_for_reply">Esperar respuesta del cliente</option>
+              )}
               {!hideAgentActions && (
                 <>
                   <option value="assign_agent">Asignar a un agente</option>
@@ -748,7 +757,16 @@ export function AutomationActionsBuilder({
             </div>
           )}
 
-          {showDelay && (
+          {action.action_type === "wait_for_reply" && (
+            <p className="flex items-start gap-1.5 text-[11px] text-muted">
+              <Info size={13} className="mt-0.5 shrink-0" />
+              La automatización se detiene aquí hasta que el cliente escriba algo — no importa qué
+              responda, en cuanto conteste continúa con el siguiente paso. Si nunca responde, se
+              queda esperando indefinidamente en este punto.
+            </p>
+          )}
+
+          {showDelay && action.action_type !== "wait_for_reply" && (
             <div className="mt-2 flex items-center gap-2 border-t border-border pt-2">
               <Clock size={13} className="shrink-0 text-muted" />
               <span className="text-xs text-muted">Esperar</span>

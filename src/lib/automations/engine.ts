@@ -345,6 +345,23 @@ async function runFrom(
   for (let i = fromIndex; i < actions.length; i++) {
     const action = actions[i];
 
+    // Pure gate — sends nothing itself, just pauses the sequence here until
+    // the contact replies (see resumeAutomationAfterReply, called from
+    // ingest.ts on the next inbound message). Unlike a timed delay, there's
+    // no run_at — it waits indefinitely.
+    if (action.action_type === "wait_for_reply") {
+      const nextAction = actions[i + 1];
+      if (nextAction) {
+        await supabase.from("automation_reply_waits").upsert({
+          workspace_id: automation.workspace_id,
+          automation_id: automation.id,
+          contact_id: contactId,
+          next_position: nextAction.position,
+        });
+      }
+      return;
+    }
+
     if (action.delay_seconds > 0) {
       const runAt = new Date(Date.now() + action.delay_seconds * 1000).toISOString();
       await supabase.from("automation_pending_runs").insert({
@@ -358,6 +375,38 @@ async function runFrom(
     }
 
     await executeAction(supabase, automation, contactId, action);
+  }
+}
+
+// Called from ingest.ts when an inbound message arrives and this contact has
+// a sequence paused at a wait_for_reply step — jumps straight to the next
+// position (the wait step itself has nothing to execute) and continues the
+// chain from there via runFrom, same as any other resume path.
+export async function resumeAutomationAfterReply(
+  supabase: SupabaseClient,
+  automation: Automation,
+  contactId: string,
+  nextPosition: number
+) {
+  try {
+    const actions = await fetchActions(supabase, automation.id);
+    const startIndex = actions.findIndex((a) => a.position === nextPosition);
+    if (startIndex === -1) return;
+
+    await runFrom(supabase, automation, contactId, actions, startIndex);
+
+    await supabase.from("automation_runs").insert({
+      automation_id: automation.id,
+      contact_id: contactId,
+      status: "completed",
+    });
+  } catch (err) {
+    await supabase.from("automation_runs").insert({
+      automation_id: automation.id,
+      contact_id: contactId,
+      status: "failed",
+      error_message: err instanceof Error ? err.message : "Error desconocido.",
+    });
   }
 }
 
@@ -646,4 +695,41 @@ export async function runButtonTapAutomations(
   }
 
   return matched;
+}
+
+// Any automation currently paused at a "wait_for_reply" step for this
+// contact resumes on their next inbound message — the reply itself is
+// just the signal to continue, its content isn't inspected or stored.
+// Claimed (deleted) before resuming, same pattern as the other triggers,
+// so a duplicate webhook delivery can't resume the same wait twice.
+export async function resumePendingReplyWaits(
+  supabase: SupabaseClient,
+  workspaceId: string,
+  contactId: string
+): Promise<boolean> {
+  const { data: waits } = await supabase
+    .from("automation_reply_waits")
+    .select("automation_id, next_position")
+    .eq("workspace_id", workspaceId)
+    .eq("contact_id", contactId);
+  if (!waits || waits.length === 0) return false;
+
+  let resumed = false;
+  for (const wait of waits) {
+    const { error: claimError } = await supabase
+      .from("automation_reply_waits")
+      .delete()
+      .eq("automation_id", wait.automation_id)
+      .eq("contact_id", contactId);
+    if (claimError) continue;
+
+    resumed = true;
+    await resumeAutomationAfterReply(
+      supabase,
+      { id: wait.automation_id, workspace_id: workspaceId },
+      contactId,
+      wait.next_position
+    );
+  }
+  return resumed;
 }

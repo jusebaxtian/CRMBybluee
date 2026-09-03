@@ -18,7 +18,8 @@ type ActionInput = {
     | "send_template"
     | "send_quick_reply"
     | "assign_agent"
-    | "assign_agent_random";
+    | "assign_agent_random"
+    | "wait_for_reply";
   message_body?: string;
   tag_id?: string;
   media_url?: string;
