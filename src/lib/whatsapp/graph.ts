@@ -258,14 +258,14 @@ export async function createMetaTemplate(
             ...(hasVariable ? { example: [`${b.url.replace(/\{\{1\}\}/, "ejemplo")}`] } : {}),
           };
         }
-        // Meta's docs say an unset payload defaults to the button's text,
-        // but that default has proven unreliable in practice — a tapped
-        // Quick Reply button on an approved template silently produced no
-        // webhook event at all for one account. Setting the payload
-        // explicitly (matching what a button_tap automation's
-        // trigger_keyword is already compared against) removes that
-        // ambiguity instead of depending on undocumented default behavior.
-        return { type: "QUICK_REPLY", text: b.text, payload: b.text };
+        // Tried setting an explicit payload here to work around a template
+        // Quick Reply button never generating an inbound webhook event for
+        // one account — reverted: Meta rejected template creation outright
+        // ("esta cuenta no tiene acceso para crear plantillas... con cargas
+        // útiles de respuestas rápidas") — an explicit payload is a
+        // permission-gated feature this WABA doesn't have, not a free
+        // choice. Back to relying on Meta's default (text-as-payload).
+        return { type: "QUICK_REPLY", text: b.text };
       }),
     });
   }
