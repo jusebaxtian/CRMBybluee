@@ -761,8 +761,8 @@ export function AutomationActionsBuilder({
             <p className="flex items-start gap-1.5 text-[11px] text-muted">
               <Info size={13} className="mt-0.5 shrink-0" />
               La automatización se detiene aquí hasta que el cliente escriba algo — no importa qué
-              responda, en cuanto conteste continúa con el siguiente paso. Si nunca responde, se
-              queda esperando indefinidamente en este punto.
+              responda, en cuanto conteste continúa con el siguiente paso. Si no responde en 5
+              minutos, continúa de todas formas al siguiente paso.
             </p>
           )}
 

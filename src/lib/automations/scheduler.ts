@@ -25,6 +25,18 @@ export async function processDueAutomationRuns() {
       .eq("id", run.id);
     if (claimError) continue;
 
+    // If this due run is the WAIT_FOR_REPLY_TIMEOUT_SECONDS fallback for a
+    // "wait_for_reply" step (see engine.ts), the contact never answered in
+    // time — cancel the matching reply-wait so a late reply doesn't ALSO
+    // resume this same step again. A no-op for every other kind of run,
+    // since those never have a matching row here.
+    await supabase
+      .from("automation_reply_waits")
+      .delete()
+      .eq("automation_id", run.automation_id)
+      .eq("contact_id", run.contact_id)
+      .eq("next_position", run.next_position);
+
     // A "No interesados" tag (or the conversation's own toggle) may have
     // been applied any time during the wait — re-check right before firing,
     // not just when the sequence was first scheduled.

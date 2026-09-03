@@ -16,6 +16,10 @@ export type Automation = {
   workspace_id: string;
 };
 
+// A "wait_for_reply" step gives up and continues the sequence on its own if
+// the contact hasn't answered within this long.
+const WAIT_FOR_REPLY_TIMEOUT_SECONDS = 5 * 60;
+
 export type AutomationAction = {
   position: number;
   action_type: string;
@@ -347,8 +351,10 @@ async function runFrom(
 
     // Pure gate — sends nothing itself, just pauses the sequence here until
     // the contact replies (see resumeAutomationAfterReply, called from
-    // ingest.ts on the next inbound message). Unlike a timed delay, there's
-    // no run_at — it waits indefinitely.
+    // ingest.ts on the next inbound message) OR WAIT_FOR_REPLY_TIMEOUT_SECONDS
+    // passes with no reply, in which case the scheduler (scheduler.ts) fires
+    // it as a normal timed step instead — whichever happens first wins, and
+    // cancels the other (see resumePendingReplyWaits and scheduler.ts).
     if (action.action_type === "wait_for_reply") {
       const nextAction = actions[i + 1];
       if (nextAction) {
@@ -357,6 +363,13 @@ async function runFrom(
           automation_id: automation.id,
           contact_id: contactId,
           next_position: nextAction.position,
+        });
+        await supabase.from("automation_pending_runs").insert({
+          workspace_id: automation.workspace_id,
+          automation_id: automation.id,
+          contact_id: contactId,
+          next_position: nextAction.position,
+          run_at: new Date(Date.now() + WAIT_FOR_REPLY_TIMEOUT_SECONDS * 1000).toISOString(),
         });
       }
       return;
@@ -722,6 +735,15 @@ export async function resumePendingReplyWaits(
       .eq("automation_id", wait.automation_id)
       .eq("contact_id", contactId);
     if (claimError) continue;
+
+    // The reply beat the WAIT_FOR_REPLY_TIMEOUT_SECONDS fallback — cancel it
+    // so it doesn't ALSO fire this same step again once its run_at is due.
+    await supabase
+      .from("automation_pending_runs")
+      .delete()
+      .eq("automation_id", wait.automation_id)
+      .eq("contact_id", contactId)
+      .eq("next_position", wait.next_position);
 
     resumed = true;
     await resumeAutomationAfterReply(
