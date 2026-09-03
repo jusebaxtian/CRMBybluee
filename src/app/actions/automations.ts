@@ -326,3 +326,34 @@ export async function runAutomationManually(automationId: string, contactId: str
     return { error: err instanceof Error ? err.message : "No se pudo ejecutar la automatización." };
   }
 }
+
+// Every trigger (keyword, tag, button_tap, any_message, first_message_of_day)
+// only ever runs once per contact — automation_starts is the permanent claim
+// that enforces that. Useful for real contacts, but it means the same test
+// number can't retrigger an automation to verify a fix. This wipes that
+// contact's claim across every automation (plus the daily-start and
+// wait-for-reply state) so the next matching message/tap fires everything
+// again, as if they'd never triggered any automation before.
+export async function resetContactAutomationHistory(contactId: string) {
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+
+  const { data: contact } = await supabase
+    .from("contacts")
+    .select("id")
+    .eq("id", contactId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (!contact) return { error: "Contacto no encontrado." };
+
+  const admin = createAdminClient();
+  await Promise.all([
+    admin.from("automation_starts").delete().eq("contact_id", contactId),
+    admin.from("automation_daily_starts").delete().eq("contact_id", contactId),
+    admin.from("automation_reply_waits").delete().eq("contact_id", contactId),
+    admin.from("automation_pending_runs").delete().eq("contact_id", contactId),
+  ]);
+
+  return { success: true as const };
+}

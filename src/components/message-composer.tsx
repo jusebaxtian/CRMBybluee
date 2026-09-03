@@ -6,6 +6,7 @@ import { sendMessage, sendChatMedia } from "@/app/actions/whatsapp";
 import type { OptimisticMessage } from "@/components/chat-pane";
 import { QuickReplyPicker } from "@/components/quick-reply-picker";
 import { AutomationPicker } from "@/components/automation-picker";
+import { ResetAutomationsButton } from "@/components/reset-automations-button";
 import { mediaKindFromMime, validateMediaSize } from "@/lib/whatsapp/media-limits";
 
 type RecordingStatus = "idle" | "recording" | "reviewing";
@@ -392,6 +393,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
         </button>
         <QuickReplyPicker contactId={contactId} quickReplies={quickReplies} />
         <AutomationPicker contactId={contactId} automations={automations} />
+        <ResetAutomationsButton contactId={contactId} />
         <button
           type="button"
           onClick={startRecording}
