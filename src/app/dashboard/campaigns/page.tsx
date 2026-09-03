@@ -97,6 +97,15 @@ export default async function CampaignsPage() {
                       ? "Mensaje libre"
                       : `Plantilla: ${template?.meta_template_name ?? "—"}`}
                   </p>
+                  <p className="mt-0.5 text-[11px] text-muted">
+                    {new Date(c.created_at).toLocaleString("es-CO", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
                   {hasRecipients && (
