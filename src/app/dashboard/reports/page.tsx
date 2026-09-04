@@ -3,7 +3,7 @@ import { Users, UserPlus, Download } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
-import { bogotaDayRange } from "@/lib/reports/day";
+import { bogotaDayRange, bogotaYesterdayRange } from "@/lib/reports/day";
 
 export default async function ReportsPage() {
   const supabase = await createClient();
@@ -16,8 +16,13 @@ export default async function ReportsPage() {
   }
 
   const { ymd, startIso, endIso } = bogotaDayRange();
+  const {
+    ymd: yesterdayYmd,
+    startIso: yesterdayStartIso,
+    endIso: yesterdayEndIso,
+  } = bogotaYesterdayRange();
 
-  const [{ count: contactsCount }, { count: todayCount }] = workspaceId
+  const [{ count: contactsCount }, { count: todayCount }, { count: yesterdayCount }] = workspaceId
     ? await Promise.all([
         supabase
           .from("contacts")
@@ -29,10 +34,22 @@ export default async function ReportsPage() {
           .eq("workspace_id", workspaceId)
           .gte("created_at", startIso)
           .lte("created_at", endIso),
+        supabase
+          .from("contacts")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId)
+          .gte("created_at", yesterdayStartIso)
+          .lte("created_at", yesterdayEndIso),
       ])
-    : [{ count: 0 }, { count: 0 }];
+    : [{ count: 0 }, { count: 0 }, { count: 0 }];
 
   const todayLabel = new Date(`${ymd}T12:00:00-05:00`).toLocaleDateString("es-CO", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+
+  const yesterdayLabel = new Date(`${yesterdayYmd}T12:00:00-05:00`).toLocaleDateString("es-CO", {
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -60,6 +77,27 @@ export default async function ReportsPage() {
           </div>
           <a
             href="/api/reports/daily"
+            className="flex shrink-0 items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary/90"
+          >
+            <Download size={16} />
+            Exportar
+          </a>
+        </div>
+
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-surface p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+              <UserPlus size={18} />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">Personas que llegaron ayer</p>
+              <p className="text-xs text-muted">
+                {yesterdayCount ?? 0} persona{yesterdayCount === 1 ? "" : "s"} · {yesterdayLabel} · hora de llegada, teléfono/usuario, etiquetas y notas
+              </p>
+            </div>
+          </div>
+          <a
+            href="/api/reports/yesterday"
             className="flex shrink-0 items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary/90"
           >
             <Download size={16} />
