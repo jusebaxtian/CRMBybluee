@@ -112,9 +112,12 @@ export function MessageBubble({
 
         {m.message_type === "image" && m.media_url && (
           // eslint-disable-next-line @next/next/no-img-element
+          // El pie de foto ya se muestra como texto justo debajo, asi que
+          // repetirlo en el alt lo duplicaba en pantalla cuando la imagen no
+          // cargaba, y lo hacia leer dos veces a un lector de pantalla.
           <img
             src={m.media_url}
-            alt={m.body ?? "Imagen"}
+            alt="Imagen"
             className="mb-1 max-h-72 w-full rounded-md object-cover"
           />
         )}
