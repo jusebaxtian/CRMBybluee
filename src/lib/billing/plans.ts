@@ -6,6 +6,10 @@ export type PlanWithFeatures = {
   id: string;
   name: string;
   price_cents: number;
+  /** Precio "antes", tachado en la web. null = solo se muestra el precio normal. */
+  compare_price_cents: number | null;
+  /** compare_price_cents - price_cents, ya en centavos. null si no hay comparacion. */
+  savings_cents: number | null;
   currency: string;
   billing_cycle: string;
   /** Insignia editable desde /admin/plans (ej. "Mas popular"). null = sin insignia. */
@@ -28,6 +32,11 @@ export function planCycleLabel(billingCycle: string): string {
   return cycleLabel[billingCycle] ?? billingCycle;
 }
 
+/** Centavos -> "80.000", el formato de precio que usa toda la app. */
+export function formatCents(cents: number): string {
+  return (cents / 100).toLocaleString("es-CO");
+}
+
 // Fuente unica de verdad para las caracteristicas de cada plan: lo mismo que ve
 // el cliente en Facturacion se muestra en la landing publica. No hardcodear
 // listas de features en las paginas.
@@ -37,7 +46,9 @@ export async function getActivePlansWithFeatures(
   const [{ data: plans }, { data: modules }, { data: planModules }] = await Promise.all([
     supabase
       .from("plans")
-      .select("id, name, price_cents, currency, billing_cycle, description, badge_label")
+      .select(
+        "id, name, price_cents, compare_price_cents, currency, billing_cycle, description, badge_label"
+      )
       .eq("is_active", true)
       .order("price_cents"),
     supabase.from("modules").select("key, name"),
@@ -55,6 +66,12 @@ export async function getActivePlansWithFeatures(
 
   return (plans ?? []).map((p) => {
     const description = (p.description ?? []) as string[];
+    // Solo cuenta como comparacion si supera al precio real; si no, la web
+    // muestra unicamente el precio normal.
+    const comparePrice =
+      typeof p.compare_price_cents === "number" && p.compare_price_cents > p.price_cents
+        ? p.compare_price_cents
+        : null;
     // Orden alfabetico para que la lista sea estable entre paginas y recargas.
     const planModuleNames = (modulesByPlan.get(p.id) ?? []).sort((a, b) =>
       a.localeCompare(b, "es")
@@ -64,6 +81,8 @@ export async function getActivePlansWithFeatures(
       id: p.id,
       name: p.name,
       price_cents: p.price_cents,
+      compare_price_cents: comparePrice,
+      savings_cents: comparePrice === null ? null : comparePrice - p.price_cents,
       currency: p.currency,
       billing_cycle: p.billing_cycle,
       badge_label: p.badge_label?.trim() ? p.badge_label.trim() : null,

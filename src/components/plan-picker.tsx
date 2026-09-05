@@ -9,12 +9,17 @@ type Plan = {
   id: string;
   name: string;
   price_cents: number;
+  compare_price_cents: number | null;
+  savings_cents: number | null;
   currency: string;
   billing_cycle: string;
   badge_label: string | null;
   description: string[];
   modules: string[];
 };
+
+// Mismo formato de precio que usan las landings (formatCents en lib/billing/plans).
+const fmt = (cents: number) => (cents / 100).toLocaleString("es-CO");
 
 const cycleLabel: Record<string, string> = {
   monthly: "mes",
@@ -60,14 +65,24 @@ export function PlanPicker({ plans, currentPlanId }: { plans: Plan[]; currentPla
                   </span>
                 )}
               </div>
+              {plan.compare_price_cents !== null && (
+                <p className="mt-1 text-xs text-muted line-through">
+                  ${fmt(plan.compare_price_cents)} {plan.currency}
+                </p>
+              )}
               <div className="mt-1 flex items-baseline gap-1">
                 <span className="text-2xl font-semibold text-foreground">
-                  ${(plan.price_cents / 100).toLocaleString("es-CO")}
+                  ${fmt(plan.price_cents)}
                 </span>
                 <span className="text-xs text-muted">
                   {plan.currency} / {cycleLabel[plan.billing_cycle] ?? plan.billing_cycle}
                 </span>
               </div>
+              {plan.savings_cents !== null && (
+                <p className="mt-1.5 inline-flex w-fit items-center rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">
+                  Ahorras ${fmt(plan.savings_cents)} {plan.currency}
+                </p>
+              )}
 
               {(plan.description.length > 0 || plan.modules.length > 0) && (
                 <ul className="mt-4 flex flex-col gap-1.5 text-sm text-muted">

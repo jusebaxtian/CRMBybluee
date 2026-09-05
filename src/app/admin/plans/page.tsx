@@ -8,7 +8,7 @@ export default async function AdminPlansPage() {
   const { data: plans } = await supabase
     .from("plans")
     .select(
-      "id, name, price_cents, is_active, description, max_agents, max_whatsapp_numbers, badge_label"
+      "id, name, price_cents, compare_price_cents, is_active, description, max_agents, max_whatsapp_numbers, badge_label"
     )
     .order("price_cents");
 
@@ -44,8 +44,9 @@ export default async function AdminPlansPage() {
           <div key={plan.id} className="rounded-xl border border-border bg-surface p-5">
             <PlanEditor
               planId={plan.id}
-              planName={plan.name}
+              initialName={plan.name}
               initialPriceCents={plan.price_cents}
+              initialComparePriceCents={plan.compare_price_cents}
               initialBadgeLabel={plan.badge_label}
               initialIsActive={plan.is_active}
               initialDescription={plan.description ?? []}

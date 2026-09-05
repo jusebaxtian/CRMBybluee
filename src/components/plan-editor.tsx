@@ -19,8 +19,9 @@ function toLimit(v: string): number | null {
 
 export function PlanEditor({
   planId,
-  planName,
+  initialName,
   initialPriceCents,
+  initialComparePriceCents,
   initialBadgeLabel,
   initialIsActive,
   initialDescription,
@@ -30,8 +31,9 @@ export function PlanEditor({
   initialModuleKeys,
 }: {
   planId: string;
-  planName: string;
+  initialName: string;
   initialPriceCents: number;
+  initialComparePriceCents: number | null;
   initialBadgeLabel: string | null;
   initialIsActive: boolean;
   initialDescription: string[];
@@ -41,7 +43,11 @@ export function PlanEditor({
   initialModuleKeys: string[];
 }) {
   const router = useRouter();
+  const [name, setName] = useState(initialName);
   const [price, setPrice] = useState(String(initialPriceCents / 100));
+  const [comparePrice, setComparePrice] = useState(
+    initialComparePriceCents === null ? "" : String(initialComparePriceCents / 100)
+  );
   const [badge, setBadge] = useState(initialBadgeLabel ?? "");
   const [isActive, setIsActive] = useState(initialIsActive);
   const [description, setDescription] = useState(initialDescription.join("\n"));
@@ -66,7 +72,9 @@ export function PlanEditor({
     setMessage(null);
 
     const result = await updatePlan(planId, {
+      name,
       priceCop: Number(price),
+      comparePriceCop: comparePrice.trim() === "" ? null : Number(comparePrice),
       badgeLabel: badge,
       isActive,
       description: description.split("\n"),
@@ -88,32 +96,94 @@ export function PlanEditor({
 
   const trimmedBadge = badge.trim();
 
+  // Vista previa del bloque de precio tal como lo vera el cliente.
+  const priceNum = Number(price);
+  const compareNum = comparePrice.trim() === "" ? null : Number(comparePrice);
+
+  const comparePriceError =
+    compareNum !== null && Number.isFinite(compareNum) && Number.isFinite(priceNum) && compareNum <= priceNum
+      ? "El precio de comparación debe ser mayor al precio actual."
+      : null;
+
+  const showsSavings =
+    compareNum !== null &&
+    !comparePriceError &&
+    Number.isFinite(compareNum) &&
+    Number.isFinite(priceNum) &&
+    compareNum > priceNum;
+
+  const fmt = (n: number) => n.toLocaleString("es-CO");
+  const savings = showsSavings ? fmt(compareNum! - priceNum) : null;
+  const comparePreview = showsSavings ? fmt(compareNum!) : "";
+  const pricePreview = Number.isFinite(priceNum) ? fmt(priceNum) : price;
+
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-lg font-semibold text-foreground">{planName}</p>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setIsActive((v) => !v)}
-            className={`rounded-full border px-3 py-1 text-xs font-medium ${
-              isActive
-                ? "border-success text-success hover:bg-success/10"
-                : "border-border text-muted hover:bg-surface-hover"
-            }`}
-          >
-            {isActive ? "Activo" : "Inactivo"}
-          </button>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted">$</span>
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-[220px] flex-1">
+          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted">
+            Nombre del plan
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full max-w-sm rounded-md border border-border bg-background px-3 py-2 text-base font-semibold text-foreground outline-none focus:border-primary"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsActive((v) => !v)}
+          className={`rounded-full border px-3 py-1 text-xs font-medium ${
+            isActive
+              ? "border-success text-success hover:bg-success/10"
+              : "border-border text-muted hover:bg-surface-hover"
+          }`}
+        >
+          {isActive ? "Activo" : "Inactivo"}
+        </button>
+      </div>
+
+      <div className="mb-4 rounded-lg border border-border bg-background p-3">
+        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Precio</p>
+        <div className="flex flex-wrap items-end gap-4">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">Precio actual (COP)</label>
             <input
               type="number"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
-              className="w-28 rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-primary"
+              className="w-32 rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-primary"
             />
-            <span className="text-sm text-muted">COP/mes</span>
           </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">
+              Precio de comparación (COP)
+            </label>
+            <input
+              type="number"
+              value={comparePrice}
+              onChange={(e) => setComparePrice(e.target.value)}
+              placeholder="Opcional"
+              className="w-32 rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-primary"
+            />
+          </div>
+        </div>
+        <div className="mt-2 text-[11px] text-muted">
+          {comparePriceError ? (
+            <span className="text-red-400">{comparePriceError}</span>
+          ) : savings !== null ? (
+            <span className="flex flex-wrap items-center gap-2">
+              Se verá así en la web:
+              <span className="text-muted line-through">${comparePreview}</span>
+              <span className="font-semibold text-foreground">${pricePreview}</span>
+              <span className="rounded-full bg-success/15 px-2 py-0.5 font-semibold text-success">
+                Ahorras ${savings}
+              </span>
+            </span>
+          ) : (
+            "Deja la comparación vacía para mostrar únicamente el precio normal."
+          )}
         </div>
       </div>
 

@@ -39,7 +39,9 @@ export async function createPlan(_prevState: unknown, formData: FormData) {
 export async function updatePlan(
   planId: string,
   input: {
+    name: string;
     priceCop: number;
+    comparePriceCop: number | null;
     badgeLabel: string;
     isActive: boolean;
     description: string[];
@@ -51,8 +53,22 @@ export async function updatePlan(
   const supabase = await createClient();
   if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
 
+  const name = input.name.trim();
+  if (!name) return { error: "El nombre del plan es obligatorio." };
+
   if (!input.priceCop || input.priceCop <= 0) {
     return { error: "Ingresa un precio valido." };
+  }
+
+  // Vacio = sin precio de comparacion. Si se llena, tiene que ser mayor al
+  // precio real; si no, el "Ahorras" saldria en cero o negativo.
+  if (input.comparePriceCop !== null) {
+    if (input.comparePriceCop <= 0) {
+      return { error: "El precio de comparacion no es valido." };
+    }
+    if (input.comparePriceCop <= input.priceCop) {
+      return { error: "El precio de comparacion debe ser mayor al precio actual." };
+    }
   }
 
   // Campo vacio = sin insignia. Se guarda null para que las landings no
@@ -62,7 +78,10 @@ export async function updatePlan(
   const { error: planError } = await supabase
     .from("plans")
     .update({
+      name,
       price_cents: Math.round(input.priceCop * 100),
+      compare_price_cents:
+        input.comparePriceCop === null ? null : Math.round(input.comparePriceCop * 100),
       badge_label: badge === "" ? null : badge,
       is_active: input.isActive,
       description: input.description.map((line) => line.trim()).filter(Boolean),

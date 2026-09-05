@@ -14,7 +14,7 @@ import { HeroInboxMockup } from "@/components/hero-inbox-mockup";
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
 import { SocialLinks } from "@/components/social-links";
 import { features, includedItems, painPoints } from "@/lib/landing-content";
-import { getActivePlansWithFeatures, planCycleLabel } from "@/lib/billing/plans";
+import { getActivePlansWithFeatures, planCycleLabel, formatCents } from "@/lib/billing/plans";
 
 const trustBadges = [
   { icon: ShieldCheck, title: "100% seguro", text: "Tus datos siempre protegidos" },
@@ -254,7 +254,7 @@ export default async function ByBlueeLanding() {
               const badge = plan.badge_label;
               const featured = Boolean(badge);
               const cycleLabel = planCycleLabel(plan.billing_cycle);
-              const message = `Hola, quiero el plan ${plan.name} de CRM ByBluee por $${(plan.price_cents / 100).toLocaleString("es-CO")} ${plan.currency}.`;
+              const message = `Hola, quiero el plan ${plan.name} de CRM ByBluee por $${formatCents(plan.price_cents)} ${plan.currency}.`;
               const waHref = `https://wa.me/${salesWhatsappNumber}?text=${encodeURIComponent(message)}`;
               return (
                 <Reveal key={plan.id} delay={i * 100}>
@@ -272,13 +272,27 @@ export default async function ByBlueeLanding() {
                         </span>
                       )}
                     </div>
-                    <div className="mt-3 flex items-baseline gap-1">
+                    {plan.compare_price_cents !== null && (
+                      <p className="mt-3 text-sm text-muted line-through">
+                        ${formatCents(plan.compare_price_cents)} {plan.currency}
+                      </p>
+                    )}
+                    <div
+                      className={`flex items-baseline gap-1 ${
+                        plan.compare_price_cents === null ? "mt-3" : "mt-0.5"
+                      }`}
+                    >
                       <span className="text-3xl font-semibold text-foreground">
-                        ${(plan.price_cents / 100).toLocaleString("es-CO")}
+                        ${formatCents(plan.price_cents)}
                       </span>
                       <span className="text-sm text-muted">{plan.currency}</span>
                     </div>
                     <p className="text-xs text-muted">Renovación cada {cycleLabel}</p>
+                    {plan.savings_cents !== null && (
+                      <p className="mt-2 inline-flex w-fit items-center rounded-full bg-success/15 px-2.5 py-0.5 text-xs font-semibold text-success">
+                        Ahorras ${formatCents(plan.savings_cents)} {plan.currency}
+                      </p>
+                    )}
                     <ul className="mt-5 flex flex-1 flex-col gap-2 text-sm text-muted">
                       {plan.features.map((item, fi) => (
                         <li key={`${plan.id}-${fi}`} className="flex items-center gap-2">

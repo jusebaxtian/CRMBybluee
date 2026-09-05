@@ -24,7 +24,7 @@ import { WhatsAppLiveDemo } from "@/components/whatsapp-live-demo";
 import { ScreenshotsShowcase } from "@/components/screenshots-showcase";
 import { LatamPulseMap } from "@/components/latam-pulse-map";
 import { features, steps } from "@/lib/landing-content";
-import { getActivePlansWithFeatures, planCycleLabel } from "@/lib/billing/plans";
+import { getActivePlansWithFeatures, planCycleLabel, formatCents } from "@/lib/billing/plans";
 
 const sectors = [
   "Inmobiliarias",
@@ -547,14 +547,28 @@ export default async function Home() {
                           </span>
                         )}
                       </div>
-                      <div className="mt-3 flex items-baseline gap-1">
+                      {plan.compare_price_cents !== null && (
+                        <p className="mt-3 text-sm text-muted line-through">
+                          ${formatCents(plan.compare_price_cents)} {plan.currency}
+                        </p>
+                      )}
+                      <div
+                        className={`flex items-baseline gap-1 ${
+                          plan.compare_price_cents === null ? "mt-3" : "mt-0.5"
+                        }`}
+                      >
                         <span className="text-3xl font-semibold text-foreground">
-                          ${(plan.price_cents / 100).toLocaleString("es-CO")}
+                          ${formatCents(plan.price_cents)}
                         </span>
                         <span className="text-sm text-muted">
                           {plan.currency} / {cycleLabel}
                         </span>
                       </div>
+                      {plan.savings_cents !== null && (
+                        <p className="mt-2 inline-flex w-fit items-center rounded-full bg-success/15 px-2.5 py-0.5 text-xs font-semibold text-success">
+                          Ahorras ${formatCents(plan.savings_cents)} {plan.currency}
+                        </p>
+                      )}
                       <ul className="mt-5 flex flex-1 flex-col gap-2 text-sm text-muted">
                         {plan.features.map((item, fi) => (
                           <li key={`${plan.id}-${fi}`} className="flex items-start gap-2">
@@ -565,7 +579,7 @@ export default async function Home() {
                       </ul>
                       <a
                         href={waHref(
-                          `Hola, quiero el plan ${plan.name} de CRM ByBluee por $${(plan.price_cents / 100).toLocaleString("es-CO")} ${plan.currency}.`
+                          `Hola, quiero el plan ${plan.name} de CRM ByBluee por $${formatCents(plan.price_cents)} ${plan.currency}.`
                         )}
                         target="_blank"
                         rel="noopener noreferrer"
