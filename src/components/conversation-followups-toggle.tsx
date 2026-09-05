@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useOptimistic, useTransition } from "react";
 import { History } from "lucide-react";
 import { setConversationFollowupsEnabled } from "@/app/actions/followups";
 
@@ -14,14 +13,17 @@ export function ConversationFollowupsToggle({
   enabled: boolean;
   excludedByTag: boolean;
 }) {
-  const router = useRouter();
-  const [pending, setPending] = useState(false);
+  // Ver la nota en conversation-ai-toggle: el interruptor responde al instante
+  // y el valor real llega con la revalidacion de la accion.
+  const [optimisticEnabled, setOptimisticEnabled] = useOptimistic(enabled);
+  const [, startTransition] = useTransition();
 
-  async function handleToggle() {
-    setPending(true);
-    await setConversationFollowupsEnabled(conversationId, !enabled);
-    setPending(false);
-    router.refresh();
+  function handleToggle() {
+    const next = !optimisticEnabled;
+    startTransition(async () => {
+      setOptimisticEnabled(next);
+      await setConversationFollowupsEnabled(conversationId, next);
+    });
   }
 
   return (
@@ -41,16 +43,19 @@ export function ConversationFollowupsToggle({
         <button
           type="button"
           onClick={handleToggle}
-          disabled={pending}
-          aria-pressed={enabled}
-          className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors disabled:opacity-50 ${
-            enabled ? "border-primary bg-primary" : "border-border bg-surface-hover"
+          aria-pressed={optimisticEnabled}
+          className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${
+            optimisticEnabled ? "border-primary bg-primary" : "border-border bg-surface-hover"
           }`}
-          title={enabled ? "Desactivar seguimientos para este contacto" : "Activar seguimientos para este contacto"}
+          title={
+            optimisticEnabled
+              ? "Desactivar seguimientos para este contacto"
+              : "Activar seguimientos para este contacto"
+          }
         >
           <span
             className={`absolute left-1 top-1/2 h-4.5 w-4.5 -translate-y-1/2 rounded-full bg-white shadow-sm transition-transform ${
-              enabled ? "translate-x-[18px]" : "translate-x-0"
+              optimisticEnabled ? "translate-x-[18px]" : "translate-x-0"
             }`}
           />
         </button>

@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useOptimistic, useTransition } from "react";
 import { Bot } from "lucide-react";
 import { setAiManuallyPaused } from "@/app/actions/ai-agent";
 
@@ -12,17 +11,23 @@ export function ConversationAiToggle({
   conversationId: string;
   manuallyPaused: boolean;
 }) {
-  const router = useRouter();
-  const [pending, setPending] = useState(false);
+  // El interruptor se mueve apenas lo tocas, sin esperar al servidor. Cuando
+  // la accion termina, revalidatePath trae el valor real y el optimista se
+  // descarta solo; si la accion falla, vuelve a su posicion anterior.
+  const [optimisticPaused, setOptimisticPaused] = useOptimistic(manuallyPaused);
+  const [, startTransition] = useTransition();
 
-  async function handleToggle() {
-    setPending(true);
-    await setAiManuallyPaused(conversationId, !manuallyPaused);
-    setPending(false);
-    router.refresh();
+  function handleToggle() {
+    const next = !optimisticPaused;
+    startTransition(async () => {
+      setOptimisticPaused(next);
+      // La accion hace revalidatePath, asi que no hace falta router.refresh():
+      // eso disparaba una segunda peticion completa al servidor por cada clic.
+      await setAiManuallyPaused(conversationId, next);
+    });
   }
 
-  const enabled = !manuallyPaused;
+  const enabled = !optimisticPaused;
 
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2.5">
@@ -33,9 +38,8 @@ export function ConversationAiToggle({
       <button
         type="button"
         onClick={handleToggle}
-        disabled={pending}
         aria-pressed={enabled}
-        className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors disabled:opacity-50 ${
+        className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${
           enabled ? "border-primary bg-primary" : "border-border bg-surface-hover"
         }`}
         title={enabled ? "Pausar la IA en este chat para atenderlo tú" : "Reactivar la IA en este chat"}

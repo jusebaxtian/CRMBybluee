@@ -26,14 +26,75 @@ export default async function ConversationPage({
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
 
-  const { data: conversation } = await supabase
-    .from("conversations")
-    .select(
-      "id, contact_id, last_read_at, assigned_agent_id, ad_source_id, ad_headline, ad_body, followups_enabled, ai_handoff_requested, ai_manually_paused, whatsapp_account_id, contacts(name, wa_id, notes, likely_blocked, contact_tags(tag_id, tags(excludes_followups)))"
-    )
-    .eq("id", id)
-    .eq("workspace_id", workspaceId ?? "")
-    .maybeSingle();
+  // Estas consultas no dependen unas de otras: en serie eran una docena de
+  // viajes encadenados a Supabase y la pagina no empezaba a pintarse hasta que
+  // terminaba el ultimo. En paralelo cuestan lo que la mas lenta.
+  const [
+    { data: conversation },
+    { data: messages },
+    { data: allTags },
+    { data: workspaceChannels },
+    agents,
+    { data: aiAgent },
+    { data: allAutomations },
+    { data: quickReplies },
+    { data: approvedTemplates },
+  ] = await Promise.all([
+    supabase
+      .from("conversations")
+      .select(
+        "id, contact_id, last_read_at, assigned_agent_id, ad_source_id, ad_headline, ad_body, followups_enabled, ai_handoff_requested, ai_manually_paused, whatsapp_account_id, contacts(name, wa_id, notes, likely_blocked, contact_tags(tag_id, tags(excludes_followups)))"
+      )
+      .eq("id", id)
+      .eq("workspace_id", workspaceId ?? "")
+      .maybeSingle(),
+    supabase
+      .from("messages")
+      .select(
+        "id, direction, body, status, message_type, media_url, media_mime_type, error_detail, wa_message_id, context_wa_message_id, buttons, created_at"
+      )
+      .eq("conversation_id", id)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("tags")
+      .select("id, name, color")
+      .eq("workspace_id", workspaceId ?? "")
+      .order("name"),
+    // Only worth showing "respondiendo desde X" once there's more than one
+    // number to disambiguate between.
+    workspaceId
+      ? supabase
+          .from("whatsapp_accounts")
+          .select("id, label, display_phone_number")
+          .eq("workspace_id", workspaceId)
+      : Promise.resolve({ data: [] as { id: string; label: string | null; display_phone_number: string }[] }),
+    listWorkspaceAgents(supabase, workspaceId),
+    workspaceId
+      ? supabase.from("ai_agents").select("is_active").eq("workspace_id", workspaceId).maybeSingle()
+      : Promise.resolve({ data: null as { is_active: boolean } | null }),
+    // All active automations, not just the ones triggered by this contact's
+    // tags — the chat's floating menu lets an agent fire any flow manually,
+    // same idea as quick replies but reusing automation flows.
+    supabase
+      .from("automations")
+      .select("id, name")
+      .eq("workspace_id", workspaceId ?? "")
+      .eq("is_active", true)
+      .order("name"),
+    supabase
+      .from("quick_replies")
+      .select("id, name")
+      .eq("workspace_id", workspaceId ?? "")
+      .eq("is_active", true)
+      .order("name"),
+    supabase
+      .from("templates")
+      .select("id, meta_template_name, language, body_text")
+      .eq("workspace_id", workspaceId ?? "")
+      .eq("status", "APPROVED")
+      .eq("created_via", "crm")
+      .order("meta_template_name"),
+  ]);
 
   if (!conversation) notFound();
 
@@ -47,13 +108,12 @@ export default async function ConversationPage({
   const assignedTagIds = contact.contact_tags.map((ct) => ct.tag_id);
   const excludedFromFollowupsByTag = contact.contact_tags.some((ct) => ct.tags?.excludes_followups);
 
-  const { data: messages } = await supabase
-    .from("messages")
-    .select(
-      "id, direction, body, status, message_type, media_url, media_mime_type, error_detail, wa_message_id, context_wa_message_id, buttons, created_at"
-    )
-    .eq("conversation_id", id)
-    .order("created_at", { ascending: true });
+  const channel =
+    (workspaceChannels?.length ?? 0) > 1
+      ? workspaceChannels?.find((c) => c.id === conversation.whatsapp_account_id) ?? null
+      : null;
+
+  const hasActiveAiAgent = !!aiAgent?.is_active;
 
   // Only write when there's something new to mark read — an unconditional
   // update on every render would re-trigger the conversations-table realtime
@@ -62,73 +122,25 @@ export default async function ConversationPage({
   const hasUnread =
     !!lastMessage &&
     (!conversation.last_read_at || new Date(lastMessage.created_at) > new Date(conversation.last_read_at));
-  if (hasUnread) {
-    await supabase
-      .from("conversations")
-      .update({ last_read_at: new Date().toISOString() })
-      .eq("id", id);
-  }
 
-  const { data: allTags } = await supabase
-    .from("tags")
-    .select("id, name, color")
-    .eq("workspace_id", workspaceId ?? "")
-    .order("name");
-
-  // Only worth showing "respondiendo desde X" once there's more than one
-  // number to disambiguate between.
-  const { data: workspaceChannels } = workspaceId
-    ? await supabase.from("whatsapp_accounts").select("id, label, display_phone_number").eq("workspace_id", workspaceId)
-    : { data: [] };
-  const channel =
-    (workspaceChannels?.length ?? 0) > 1
-      ? workspaceChannels?.find((c) => c.id === conversation.whatsapp_account_id) ?? null
-      : null;
-
-  const { data: automations } = assignedTagIds.length > 0
-    ? await supabase
-        .from("automations")
-        .select("id, name, is_active")
-        .eq("workspace_id", workspaceId ?? "")
-        .eq("trigger_type", "tag_added")
-        .in("trigger_tag_id", assignedTagIds)
-    : { data: [] };
-
-  const agents = await listWorkspaceAgents(supabase, workspaceId);
-
-  const { data: aiAgent } = workspaceId
-    ? await supabase
-        .from("ai_agents")
-        .select("is_active")
-        .eq("workspace_id", workspaceId)
-        .maybeSingle()
-    : { data: null };
-  const hasActiveAiAgent = !!aiAgent?.is_active;
-
-  // All active automations, not just the ones triggered by this contact's
-  // tags — the chat's floating menu lets an agent fire any flow manually,
-  // same idea as quick replies but reusing automation flows.
-  const { data: allAutomations } = await supabase
-    .from("automations")
-    .select("id, name")
-    .eq("workspace_id", workspaceId ?? "")
-    .eq("is_active", true)
-    .order("name");
-
-  const { data: quickReplies } = await supabase
-    .from("quick_replies")
-    .select("id, name")
-    .eq("workspace_id", workspaceId ?? "")
-    .eq("is_active", true)
-    .order("name");
-
-  const { data: approvedTemplates } = await supabase
-    .from("templates")
-    .select("id, meta_template_name, language, body_text")
-    .eq("workspace_id", workspaceId ?? "")
-    .eq("status", "APPROVED")
-    .eq("created_via", "crm")
-    .order("meta_template_name");
+  // Segunda ronda: lo unico que necesitaba conocer la conversacion primero.
+  // Tambien va en paralelo entre si.
+  const [{ data: automations }] = await Promise.all([
+    assignedTagIds.length > 0
+      ? supabase
+          .from("automations")
+          .select("id, name, is_active")
+          .eq("workspace_id", workspaceId ?? "")
+          .eq("trigger_type", "tag_added")
+          .in("trigger_tag_id", assignedTagIds)
+      : Promise.resolve({ data: [] as { id: string; name: string; is_active: boolean }[] }),
+    hasUnread
+      ? supabase
+          .from("conversations")
+          .update({ last_read_at: new Date().toISOString() })
+          .eq("id", id)
+      : Promise.resolve(null),
+  ]);
 
   const lastInboundAt =
     (messages ?? [])
