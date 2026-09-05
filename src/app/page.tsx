@@ -23,7 +23,8 @@ import { SocialLinks } from "@/components/social-links";
 import { WhatsAppLiveDemo } from "@/components/whatsapp-live-demo";
 import { ScreenshotsShowcase } from "@/components/screenshots-showcase";
 import { LatamPulseMap } from "@/components/latam-pulse-map";
-import { features, steps, getPlanFeatures } from "@/lib/landing-content";
+import { features, steps } from "@/lib/landing-content";
+import { getActivePlansWithFeatures, planCycleLabel } from "@/lib/billing/plans";
 
 const sectors = [
   "Inmobiliarias",
@@ -131,11 +132,8 @@ const faqs = [
 
 export default async function Home() {
   const supabase = await createClient();
-  const { data: plans } = await supabase
-    .from("plans")
-    .select("*")
-    .eq("is_active", true)
-    .order("price_cents");
+  // Mismos planes y caracteristicas que ve el cliente en Facturacion.
+  const plans = await getActivePlansWithFeatures(supabase);
 
   const { data: supportSetting } = await supabase
     .from("platform_settings")
@@ -531,12 +529,7 @@ export default async function Home() {
             <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {plans.map((plan, i) => {
                 const featured = plan.name.toLowerCase().includes("pro");
-                const cycleLabel =
-                  plan.billing_cycle === "yearly"
-                    ? "año"
-                    : plan.billing_cycle === "semiannual"
-                      ? "6 meses"
-                      : "mes";
+                const cycleLabel = planCycleLabel(plan.billing_cycle);
                 return (
                   <Reveal key={plan.id} delay={i * 100}>
                     <div
@@ -561,8 +554,8 @@ export default async function Home() {
                         </span>
                       </div>
                       <ul className="mt-5 flex flex-1 flex-col gap-2 text-sm text-muted">
-                        {getPlanFeatures(plan.name).map((item) => (
-                          <li key={item} className="flex items-start gap-2">
+                        {plan.features.map((item, fi) => (
+                          <li key={`${plan.id}-${fi}`} className="flex items-start gap-2">
                             <Check size={14} className="mt-0.5 shrink-0 text-success" />
                             {item}
                           </li>

@@ -13,7 +13,8 @@ import { Reveal } from "@/components/reveal";
 import { HeroInboxMockup } from "@/components/hero-inbox-mockup";
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
 import { SocialLinks } from "@/components/social-links";
-import { features, includedItems, painPoints, getPlanFeatures } from "@/lib/landing-content";
+import { features, includedItems, painPoints } from "@/lib/landing-content";
+import { getActivePlansWithFeatures, planCycleLabel } from "@/lib/billing/plans";
 
 const trustBadges = [
   { icon: ShieldCheck, title: "100% seguro", text: "Tus datos siempre protegidos" },
@@ -24,11 +25,8 @@ const trustBadges = [
 
 export default async function ByBlueeLanding() {
   const supabase = await createClient();
-  const { data: plans } = await supabase
-    .from("plans")
-    .select("*")
-    .eq("is_active", true)
-    .order("price_cents");
+  // Mismos planes y caracteristicas que ve el cliente en Facturacion.
+  const plans = await getActivePlansWithFeatures(supabase);
 
   const { data: supportSetting } = await supabase
     .from("platform_settings")
@@ -251,14 +249,9 @@ export default async function ByBlueeLanding() {
           </Reveal>
 
           <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {(plans ?? []).map((plan, i) => {
+            {plans.map((plan, i) => {
               const featured = plan.name.toLowerCase().includes("pro");
-              const cycleLabel =
-                plan.billing_cycle === "yearly"
-                  ? "año"
-                  : plan.billing_cycle === "semiannual"
-                    ? "6 meses"
-                    : "mes";
+              const cycleLabel = planCycleLabel(plan.billing_cycle);
               const message = `Hola, quiero el plan ${plan.name} de CRM ByBluee por $${(plan.price_cents / 100).toLocaleString("es-CO")} ${plan.currency}.`;
               const waHref = `https://wa.me/${salesWhatsappNumber}?text=${encodeURIComponent(message)}`;
               return (
@@ -285,8 +278,8 @@ export default async function ByBlueeLanding() {
                     </div>
                     <p className="text-xs text-muted">Renovación cada {cycleLabel}</p>
                     <ul className="mt-5 flex flex-1 flex-col gap-2 text-sm text-muted">
-                      {getPlanFeatures(plan.name).map((item) => (
-                        <li key={item} className="flex items-center gap-2">
+                      {plan.features.map((item, fi) => (
+                        <li key={`${plan.id}-${fi}`} className="flex items-center gap-2">
                           <Check size={13} className="shrink-0 text-success" />
                           {item}
                         </li>

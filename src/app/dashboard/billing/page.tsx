@@ -5,36 +5,7 @@ import { createBoldOrder, confirmBoldPayment } from "@/app/actions/billing";
 import { BoldCheckoutButton } from "@/components/bold-checkout-button";
 import { ManualTransferForm } from "@/components/manual-transfer-form";
 import { PlanPicker } from "@/components/plan-picker";
-
-async function buildPlansForPicker(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const [{ data: plans }, { data: modules }, { data: planModules }] = await Promise.all([
-    supabase
-      .from("plans")
-      .select("id, name, price_cents, currency, billing_cycle, description")
-      .eq("is_active", true)
-      .order("price_cents"),
-    supabase.from("modules").select("key, name"),
-    supabase.from("plan_modules").select("plan_id, module_key"),
-  ]);
-
-  const moduleNameByKey = new Map((modules ?? []).map((m) => [m.key, m.name]));
-  const modulesByPlan = new Map<string, string[]>();
-  for (const pm of planModules ?? []) {
-    if (!modulesByPlan.has(pm.plan_id)) modulesByPlan.set(pm.plan_id, []);
-    const name = moduleNameByKey.get(pm.module_key);
-    if (name) modulesByPlan.get(pm.plan_id)!.push(name);
-  }
-
-  return (plans ?? []).map((p) => ({
-    id: p.id,
-    name: p.name,
-    price_cents: p.price_cents,
-    currency: p.currency,
-    billing_cycle: p.billing_cycle,
-    description: p.description ?? [],
-    modules: modulesByPlan.get(p.id) ?? [],
-  }));
-}
+import { getActivePlansWithFeatures } from "@/lib/billing/plans";
 
 const statusLabel: Record<string, string> = {
   trialing: "En periodo de prueba",
@@ -106,9 +77,9 @@ export default async function BillingPage({
   const amountCents = workspace?.plans?.price_cents ?? 0;
   const boldOrder = canPay && amountCents > 0 ? await createBoldOrder(amountCents) : null;
 
-  let plansForPicker: Awaited<ReturnType<typeof buildPlansForPicker>> = [];
+  let plansForPicker: Awaited<ReturnType<typeof getActivePlansWithFeatures>> = [];
   if (canPay) {
-    plansForPicker = await buildPlansForPicker(supabase);
+    plansForPicker = await getActivePlansWithFeatures(supabase);
   }
 
   return (
