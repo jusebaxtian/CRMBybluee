@@ -12,6 +12,7 @@ import {
 } from "@/lib/whatsapp/graph";
 import { getWorkspaceId } from "@/lib/workspace";
 import { validateMediaFile } from "@/lib/whatsapp/media-limits";
+import { toPublicUrl } from "@/lib/supabase/config";
 
 export async function syncTemplates() {
   const supabase = await createClient();
@@ -144,8 +145,9 @@ export async function setTemplateHeaderMedia(templateId: string, formData: FormD
   if (uploadError) return { error: uploadError.message };
 
   const {
-    data: { publicUrl },
+    data: { publicUrl: rawPublicUrl },
   } = admin.storage.from("chat-media").getPublicUrl(path);
+  const publicUrl = toPublicUrl(rawPublicUrl);
 
   const { error } = await supabase
     .from("templates")
@@ -267,8 +269,9 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
     if (uploadError) return { error: uploadError.message };
 
     const {
-      data: { publicUrl },
+      data: { publicUrl: rawPublicUrl2 },
     } = admin.storage.from("chat-media").getPublicUrl(path);
+    const publicUrl = toPublicUrl(rawPublicUrl2);
     headerMediaUrl = publicUrl;
     headerMediaMimeType = headerFile.type;
   }

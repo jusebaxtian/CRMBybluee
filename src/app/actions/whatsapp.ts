@@ -24,6 +24,7 @@ import { transcodeVideoToH264 } from "@/lib/whatsapp/video-transcode";
 import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
 import { buildTemplateSendParams } from "@/lib/whatsapp/variables";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
+import { toPublicUrl } from "@/lib/supabase/config";
 
 const execFileAsync = promisify(execFile);
 
@@ -418,8 +419,9 @@ export async function sendChatMedia(formData: FormData) {
   if (uploadError) return { error: uploadError.message };
 
   const {
-    data: { publicUrl },
+    data: { publicUrl: rawPublicUrl },
   } = admin.storage.from("chat-media").getPublicUrl(storagePath);
+  const publicUrl = toPublicUrl(rawPublicUrl);
 
   try {
     const source = metaMediaId ? { id: metaMediaId } : { link: publicUrl };

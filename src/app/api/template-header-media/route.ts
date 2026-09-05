@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getWorkspaceId } from "@/lib/workspace";
 import { validateMediaMime, validateMediaSize } from "@/lib/whatsapp/media-limits";
 import { transcodeVideoToH264 } from "@/lib/whatsapp/video-transcode";
+import { toPublicUrl } from "@/lib/supabase/config";
 
 // Plain REST endpoint (not a Server Action) so the client can upload via
 // XMLHttpRequest and get real upload progress — fetch/Server Actions don't
@@ -96,8 +97,9 @@ export async function POST(request: NextRequest) {
     }
 
     const {
-      data: { publicUrl },
+      data: { publicUrl: rawPublicUrl },
     } = admin.storage.from("chat-media").getPublicUrl(path);
+    const publicUrl = toPublicUrl(rawPublicUrl);
 
     const { error } = await supabase
       .from("templates")

@@ -11,6 +11,7 @@ import { getMediaUrl, downloadMedia } from "@/lib/whatsapp/graph";
 import { notifyNewMessage } from "@/lib/push/send";
 import { maybeRespondWithAiAgent } from "@/lib/ai/agent";
 import { transcribeAudio } from "@/lib/ai/providers";
+import { toPublicUrl } from "@/lib/supabase/config";
 
 // Translates the most common Cloud API delivery-failure codes into a short,
 // actionable message an agent can actually understand — the raw error is
@@ -185,8 +186,9 @@ async function persistIncomingMedia(
     if (error) return null;
 
     const {
-      data: { publicUrl },
+      data: { publicUrl: rawPublicUrl },
     } = supabase.storage.from("chat-media").getPublicUrl(path);
+    const publicUrl = toPublicUrl(rawPublicUrl);
 
     return { url: publicUrl, mimeType: mime_type };
   } catch {

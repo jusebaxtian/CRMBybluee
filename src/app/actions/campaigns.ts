@@ -8,6 +8,7 @@ import { validateMediaMime, validateMediaSize } from "@/lib/whatsapp/media-limit
 import { getWorkspaceId } from "@/lib/workspace";
 import { resolveCampaignAudience, type AudienceParams } from "@/lib/campaigns/audience";
 import { startCampaignSend } from "@/lib/campaigns/send";
+import { toPublicUrl } from "@/lib/supabase/config";
 
 function readAudienceParams(formData: FormData, sendType: "template" | "free_text"): AudienceParams {
   return {
@@ -60,8 +61,9 @@ export async function uploadCampaignMedia(formData: FormData) {
   if (error) return { error: error.message };
 
   const {
-    data: { publicUrl },
+    data: { publicUrl: rawPublicUrl },
   } = admin.storage.from("chat-media").getPublicUrl(path);
+  const publicUrl = toPublicUrl(rawPublicUrl);
 
   return { success: true as const, url: publicUrl, filename: file.name };
 }

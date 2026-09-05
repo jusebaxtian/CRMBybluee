@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getWorkspaceId } from "@/lib/workspace";
 import { runActionsForAutomation } from "@/lib/automations/engine";
+import { toPublicUrl } from "@/lib/supabase/config";
 
 type ActionInput = {
   action_type:
@@ -76,8 +77,9 @@ export async function uploadAutomationActionMedia(formData: FormData) {
   if (error) return { error: error.message };
 
   const {
-    data: { publicUrl },
+    data: { publicUrl: rawPublicUrl },
   } = admin.storage.from("chat-media").getPublicUrl(path);
+  const publicUrl = toPublicUrl(rawPublicUrl);
 
   return { success: true as const, url: publicUrl, filename: file.name };
 }

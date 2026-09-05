@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getWorkspaceId } from "@/lib/workspace";
 import { validateMediaMime, validateMediaSize, type MediaKind } from "@/lib/whatsapp/media-limits";
 import { transcodeVideoToH264 } from "@/lib/whatsapp/video-transcode";
+import { toPublicUrl } from "@/lib/supabase/config";
 
 const mediaKindByActionType: Record<string, MediaKind> = {
   send_image: "image",
@@ -59,8 +60,9 @@ export async function POST(request: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
     const {
-      data: { publicUrl },
+      data: { publicUrl: rawPublicUrl },
     } = admin.storage.from("chat-media").getPublicUrl(path);
+    const publicUrl = toPublicUrl(rawPublicUrl);
 
     return NextResponse.json({ success: true, url: publicUrl, filename });
   }
@@ -83,8 +85,9 @@ export async function POST(request: NextRequest) {
   }
 
   const {
-    data: { publicUrl },
+    data: { publicUrl: rawPublicUrl2 },
   } = admin.storage.from("chat-media").getPublicUrl(path);
+  const publicUrl = toPublicUrl(rawPublicUrl2);
 
   return NextResponse.json({ success: true, url: publicUrl, filename: file.name });
 }

@@ -7,6 +7,7 @@ import { getWorkspaceId } from "@/lib/workspace";
 import { callAiProvider, type ChatTurn } from "@/lib/ai/providers";
 import { buildSystemPrompt, interpretAiReply, customerRequestedHuman } from "@/lib/ai/agent";
 import { mediaKindFromMime, validateMediaFile } from "@/lib/whatsapp/media-limits";
+import { toPublicUrl } from "@/lib/supabase/config";
 
 const defaultModel: Record<"openai" | "anthropic", string> = {
   openai: "gpt-4o-mini",
@@ -250,8 +251,9 @@ export async function addAiAgentMedia(_prevState: unknown, formData: FormData) {
   if (uploadError) return { error: uploadError.message };
 
   const {
-    data: { publicUrl },
+    data: { publicUrl: rawPublicUrl },
   } = admin.storage.from("chat-media").getPublicUrl(path);
+  const publicUrl = toPublicUrl(rawPublicUrl);
 
   const { error } = await supabase.from("ai_agent_media").insert({
     workspace_id: workspaceId,
@@ -308,8 +310,9 @@ export async function editAiAgentMedia(_prevState: unknown, formData: FormData) 
     if (uploadError) return { error: uploadError.message };
 
     const {
-      data: { publicUrl },
+      data: { publicUrl: rawPublicUrl2 },
     } = admin.storage.from("chat-media").getPublicUrl(path);
+    const publicUrl = toPublicUrl(rawPublicUrl2);
 
     update.media_type = kind;
     update.media_url = publicUrl;

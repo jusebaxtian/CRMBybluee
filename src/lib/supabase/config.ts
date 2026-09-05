@@ -32,3 +32,18 @@ function deriveCookieName(url: string): string {
     return "sb-auth-token";
   }
 }
+
+// Las URLs de archivos (chat-media, banners, plantillas) se guardan en la base
+// de datos y despues las abre el NAVEGADOR, no el servidor. getPublicUrl() las
+// arma con la URL del cliente que la llama, y los clientes del servidor usan
+// SUPABASE_SERVER_URL: sin esto quedarian apuntando a http://localhost:8000,
+// que desde el navegador del usuario no existe y el archivo no carga.
+//
+// Si SUPABASE_INTERNAL_URL no esta definida ambas URLs coinciden y esto no
+// hace nada.
+export function toPublicUrl(url: string): string {
+  if (SUPABASE_SERVER_URL === SUPABASE_URL) return url;
+  return url.startsWith(SUPABASE_SERVER_URL)
+    ? SUPABASE_URL + url.slice(SUPABASE_SERVER_URL.length)
+    : url;
+}

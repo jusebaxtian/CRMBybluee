@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPlatformAdmin } from "@/lib/admin";
 import { IMPERSONATION_COOKIE } from "@/lib/workspace";
+import { toPublicUrl } from "@/lib/supabase/config";
 
 export async function logAdminAccess(workspaceId: string) {
   const supabase = await createClient();
@@ -236,8 +237,9 @@ export async function updateDashboardBanner(formData: FormData) {
   if (uploadError) return { error: uploadError.message };
 
   const {
-    data: { publicUrl },
+    data: { publicUrl: rawPublicUrl },
   } = admin.storage.from("banners").getPublicUrl(path);
+  const publicUrl = toPublicUrl(rawPublicUrl);
 
   // Cache-bust so clients see the new image immediately instead of the
   // previous file under the same path/URL.
