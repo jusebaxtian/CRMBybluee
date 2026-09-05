@@ -528,7 +528,9 @@ export default async function Home() {
 
             <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {plans.map((plan, i) => {
-                const featured = plan.name.toLowerCase().includes("pro");
+                // La insignia se edita en /admin/plans; vacia = plan sin destacar.
+                const badge = plan.badge_label;
+                const featured = Boolean(badge);
                 const cycleLabel = planCycleLabel(plan.billing_cycle);
                 return (
                   <Reveal key={plan.id} delay={i * 100}>
@@ -539,9 +541,9 @@ export default async function Home() {
                     >
                       <div className="flex items-center gap-2">
                         <h3 className="text-lg font-semibold text-foreground">{plan.name}</h3>
-                        {featured && (
+                        {badge && (
                           <span className="rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-semibold text-white">
-                            Más popular
+                            {badge}
                           </span>
                         )}
                       </div>

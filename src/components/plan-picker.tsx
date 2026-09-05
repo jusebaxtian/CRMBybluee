@@ -11,6 +11,7 @@ type Plan = {
   price_cents: number;
   currency: string;
   billing_cycle: string;
+  badge_label: string | null;
   description: string[];
   modules: string[];
 };
@@ -51,7 +52,14 @@ export function PlanPicker({ plans, currentPlanId }: { plans: Plan[]; currentPla
                 isCurrent ? "border-primary bg-primary/5" : "border-border bg-surface"
               }`}
             >
-              <p className="text-base font-semibold text-foreground">{plan.name}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-base font-semibold text-foreground">{plan.name}</p>
+                {plan.badge_label && (
+                  <span className="rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-semibold text-white">
+                    {plan.badge_label}
+                  </span>
+                )}
+              </div>
               <div className="mt-1 flex items-baseline gap-1">
                 <span className="text-2xl font-semibold text-foreground">
                   ${(plan.price_cents / 100).toLocaleString("es-CO")}

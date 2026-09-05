@@ -8,6 +8,8 @@ export type PlanWithFeatures = {
   price_cents: number;
   currency: string;
   billing_cycle: string;
+  /** Insignia editable desde /admin/plans (ej. "Mas popular"). null = sin insignia. */
+  badge_label: string | null;
   /** Lineas libres escritas en plans.description desde /admin/plans. */
   description: string[];
   /** Nombres de los modulos habilitados para el plan (plan_modules -> modules.name). */
@@ -35,7 +37,7 @@ export async function getActivePlansWithFeatures(
   const [{ data: plans }, { data: modules }, { data: planModules }] = await Promise.all([
     supabase
       .from("plans")
-      .select("id, name, price_cents, currency, billing_cycle, description")
+      .select("id, name, price_cents, currency, billing_cycle, description, badge_label")
       .eq("is_active", true)
       .order("price_cents"),
     supabase.from("modules").select("key, name"),
@@ -64,6 +66,7 @@ export async function getActivePlansWithFeatures(
       price_cents: p.price_cents,
       currency: p.currency,
       billing_cycle: p.billing_cycle,
+      badge_label: p.badge_label?.trim() ? p.badge_label.trim() : null,
       description,
       modules: planModuleNames,
       features: [...description, ...planModuleNames],
