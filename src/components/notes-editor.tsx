@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
 import { updateContactNotes } from "@/app/actions/contacts";
 
 export function NotesEditor({
@@ -11,17 +10,18 @@ export function NotesEditor({
   contactId: string;
   initialNotes: string | null;
 }) {
-  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [notes, setNotes] = useState(initialNotes ?? "");
-  const [pending, setPending] = useState(false);
+  const [pending, startTransition] = useTransition();
 
-  async function handleSave() {
-    setPending(true);
-    await updateContactNotes(contactId, notes);
-    setPending(false);
+  function handleSave() {
+    // Se cierra el editor de una vez mostrando el texto ya escrito, en vez de
+    // dejar el boton en "Guardando..." durante todo el viaje al servidor.
+    // La accion revalida, asi que no hace falta router.refresh().
     setEditing(false);
-    router.refresh();
+    startTransition(async () => {
+      await updateContactNotes(contactId, notes);
+    });
   }
 
   if (editing) {
