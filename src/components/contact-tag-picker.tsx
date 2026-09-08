@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Plus } from "lucide-react";
 import { toggleContactTag } from "@/app/actions/tags";
 
@@ -17,7 +17,34 @@ export function ContactTagPicker({
 }) {
   const [open, setOpen] = useState(false);
   const [, startTransition] = useTransition();
+  const containerRef = useRef<HTMLDivElement>(null);
   const assigned = new Set(assignedTagIds);
+
+  // El desplegable solo se cerraba volviendo a pulsar el "+", asi que quedaba
+  // abierto tapando el chat despues de etiquetar. Se cierra al hacer clic
+  // fuera (o con Escape), pero no al marcar etiquetas dentro, para poder
+  // asignar varias de una vez.
+  //
+  // Un listener en el documento y no un fondo invisible a pantalla completa:
+  // asi el clic de afuera llega tambien al elemento que se toco, en vez de
+  // gastarse solo en cerrar.
+  useEffect(() => {
+    if (!open) return;
+
+    function handlePointerDown(e: PointerEvent) {
+      if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
+    }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
 
   function handleToggle(tagId: string, isAssigned: boolean) {
     startTransition(() => {
@@ -26,7 +53,7 @@ export function ContactTagPicker({
   }
 
   return (
-    <div className="relative flex flex-wrap items-center gap-1.5">
+    <div ref={containerRef} className="relative flex flex-wrap items-center gap-1.5">
       {allTags
         .filter((t) => assigned.has(t.id))
         .map((t) => (
