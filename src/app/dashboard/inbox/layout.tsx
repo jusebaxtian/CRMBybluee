@@ -18,9 +18,13 @@ export default async function InboxLayout({
   const { data: conversationsRaw } = await supabase
     .from("conversations")
     .select(
-      "id, last_message_at, last_read_at, assigned_agent_id, ad_source_id, ad_headline, ai_handoff_requested, ai_manually_paused, whatsapp_account_id, contacts(name, wa_id, likely_blocked, contact_tags(tags(id, name, color)))"
+      "id, last_message_at, last_read_at, pinned_at, assigned_agent_id, ad_source_id, ad_headline, ai_handoff_requested, ai_manually_paused, whatsapp_account_id, contacts(name, wa_id, likely_blocked, contact_tags(tags(id, name, color)))"
     )
     .eq("workspace_id", workspaceId ?? "")
+    // Las fijadas van arriba, la ultima que se fijo de primera; el resto
+    // sigue por actividad reciente. nullsFirst: false deja las no fijadas
+    // (pinned_at nulo) despues, que es justo lo que se quiere.
+    .order("pinned_at", { ascending: false, nullsFirst: false })
     .order("last_message_at", { ascending: false });
 
   const { data: channels } = workspaceId
@@ -88,6 +92,7 @@ export default async function InboxLayout({
     return {
       id: c.id,
       last_message_at: c.last_message_at,
+      pinnedAt: (c.pinned_at as string | null) ?? null,
       whatsappAccountId: c.whatsapp_account_id as string | null,
       lastMessagePreview,
       answered: summary ? summary.direction === "out" : true,

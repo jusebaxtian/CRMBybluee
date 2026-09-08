@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, SlidersHorizontal, X, Clock, Megaphone, ShieldAlert, Bot, Check } from "lucide-react";
+import { Search, SlidersHorizontal, X, Clock, Megaphone, ShieldAlert, Bot, Check, Pin, PinOff } from "lucide-react";
+import { setConversationPinned } from "@/app/actions/conversations";
 import { NewMessageButton } from "@/components/new-message-button";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { useMessageWindow } from "@/lib/use-message-window";
@@ -22,6 +23,7 @@ type Channel = { id: string; label: string | null; display_phone_number: string 
 type Conversation = {
   id: string;
   last_message_at: string;
+  pinnedAt: string | null;
   whatsappAccountId: string | null;
   lastMessagePreview: string | null;
   answered: boolean;
@@ -102,6 +104,19 @@ export function ConversationListPanel({
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [expiringSoon, setExpiringSoon] = useState(false);
   const [needsHumanOnly, setNeedsHumanOnly] = useState(false);
+  const [, startTransition] = useTransition();
+  const [pinError, setPinError] = useState<string | null>(null);
+
+  // El fijado es del espacio, no de quien lo pulsa: si el dueno fija un chat,
+  // sus agentes tambien lo ven arriba. El orden ya viene del servidor
+  // (pinned_at primero), asi que aqui solo se dispara la accion.
+  function handleTogglePin(conversationId: string, pinned: boolean) {
+    setPinError(null);
+    startTransition(async () => {
+      const result = await setConversationPinned(conversationId, pinned);
+      if (result?.error) setPinError(result.error);
+    });
+  }
 
   const channelColor = new Map(channels.map((c, i) => [c.id, CHANNEL_COLORS[i % CHANNEL_COLORS.length]]));
   const channelName = (c: Channel) => c.label || c.display_phone_number;
@@ -369,6 +384,11 @@ export function ConversationListPanel({
       )}
 
       <PullToRefresh className="flex-1">
+        {pinError && (
+          <p className="border-b border-border bg-warning/10 px-4 py-2 text-xs text-warning">
+            {pinError}
+          </p>
+        )}
         {filtered.length === 0 && (
           <p className="p-6 text-center text-sm text-muted">Sin resultados.</p>
         )}
@@ -378,8 +398,12 @@ export function ConversationListPanel({
             <Link
               key={conv.id}
               href={`/dashboard/inbox/${conv.id}`}
-              className={`flex items-center gap-3 border-b border-border px-4 py-3 ${
-                active ? "bg-surface-hover" : "hover:bg-surface-hover"
+              className={`group flex items-center gap-3 border-b border-border px-4 py-3 ${
+                active
+                  ? "bg-surface-hover"
+                  : conv.pinnedAt
+                    ? "bg-primary/5 hover:bg-surface-hover"
+                    : "hover:bg-surface-hover"
               }`}
             >
               <div className="relative shrink-0">
@@ -433,6 +457,25 @@ export function ConversationListPanel({
                   <span className="flex shrink-0 items-center gap-1">
                     <WindowExpiredBadge lastInboundAt={conv.lastInboundAt} />
                     <WindowExpiringSoonBadge lastInboundAt={conv.lastInboundAt} now={now} />
+                    <button
+                      type="button"
+                      // La fila entera es un <Link>: sin esto, fijar navegaria
+                      // al chat en vez de quedarse en la lista.
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleTogglePin(conv.id, !conv.pinnedAt);
+                      }}
+                      title={conv.pinnedAt ? "Quitar de fijados" : "Fijar arriba"}
+                      aria-label={conv.pinnedAt ? "Quitar de fijados" : "Fijar arriba"}
+                      className={`rounded p-0.5 ${
+                        conv.pinnedAt
+                          ? "text-primary"
+                          : "text-muted/0 hover:text-muted focus:text-muted group-hover:text-muted/70"
+                      }`}
+                    >
+                      {conv.pinnedAt ? <Pin size={11} /> : <PinOff size={11} />}
+                    </button>
                     <span className="text-[10px] text-muted">
                       {new Date(conv.last_message_at).toLocaleTimeString("es-CO", {
                         hour: "2-digit",
