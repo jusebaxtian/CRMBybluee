@@ -21,6 +21,9 @@ export type WhatsAppWebhookPayload = {
           audio?: { id: string; mime_type: string };
           video?: { id: string; mime_type: string; caption?: string };
           document?: { id: string; mime_type: string; filename?: string; caption?: string };
+          // Un sticker llega como adjunto webp propio (animated: true cuando
+          // se mueve). No lleva caption.
+          sticker?: { id: string; mime_type: string; animated?: boolean };
           // A tap-and-hold reaction (👍/❤️/etc.) on one of our messages.
           // emoji is "" when the customer removed a previously-set reaction.
           reaction?: { message_id: string; emoji: string };

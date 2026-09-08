@@ -40,6 +40,7 @@ function summarize(m: Pick<Message, "message_type" | "body">): string {
   if (m.message_type === "video") return "🎥 Video";
   if (m.message_type === "audio") return "🎤 Nota de voz";
   if (m.message_type === "document") return m.body || "📄 Documento";
+  if (m.message_type === "sticker") return "🩹 Sticker";
   if (m.message_type === "reaction") return m.body ? `Reaccionó ${m.body}` : "Reacción";
   if (m.message_type === "button") return m.body ? `🔘 ${m.body}` : "Tocó un botón";
   return m.body || "Mensaje";
@@ -120,6 +121,14 @@ export function MessageBubble({
             alt="Imagen"
             className="mb-1 max-h-72 w-full rounded-md object-cover"
           />
+        )}
+
+        {m.message_type === "sticker" && m.media_url && (
+          // Los stickers son webp, a veces animados: <img> los reproduce solo.
+          // Van mas pequenos que una foto y sin recorte, porque suelen tener
+          // fondo transparente.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={m.media_url} alt="Sticker" className="h-32 w-32 object-contain" />
         )}
 
         {m.message_type === "video" && m.media_url && (

@@ -70,6 +70,7 @@ export default async function InboxLayout({
     video: "🎥 Video",
     audio: "🎤 Nota de voz",
     document: "📄 Documento",
+    sticker: "🩹 Sticker",
   };
 
   const conversations = (conversationsRaw ?? []).map((c) => {

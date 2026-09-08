@@ -327,8 +327,16 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
             .eq("id", conversation.id);
         }
 
+        // Los stickers son un adjunto mas (webp, a veces animado). Sin
+        // incluirlos aqui su archivo nunca se descargaba y el mensaje llegaba
+        // sin media_url ni texto, o sea una burbuja vacia en el chat.
         const mediaPayload =
-          message.image ?? message.audio ?? message.video ?? message.document ?? null;
+          message.image ??
+          message.audio ??
+          message.video ??
+          message.document ??
+          message.sticker ??
+          null;
 
         let mediaUrl: string | null = null;
         let mediaMimeType: string | null = null;
