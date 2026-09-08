@@ -20,6 +20,37 @@ const statusColor: Record<string, "muted" | "accent" | "success" | "danger"> = {
   failed: "danger",
 };
 
+const dateFormat: Intl.DateTimeFormatOptions = {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+};
+
+// Qué fecha tiene sentido mostrar depende del estado: created_at (cuándo se
+// creó el borrador) no le dice nada al usuario sobre una campaña ya enviada,
+// que es lo que se quiere ver en la lista.
+function campaignDateLine(c: {
+  status: string;
+  created_at: string;
+  scheduled_at: string | null;
+  started_at: string | null;
+}): string {
+  if (c.status === "draft" && c.scheduled_at) {
+    return `Se enviará el ${new Date(c.scheduled_at).toLocaleString("es-CO", dateFormat)}`;
+  }
+
+  if (c.started_at) {
+    const verbo = c.status === "sending" ? "Envío iniciado el" : "Enviada el";
+    return `${verbo} ${new Date(c.started_at).toLocaleString("es-CO", dateFormat)}`;
+  }
+
+  // Borrador sin programar, o una campaña vieja anterior a started_at cuyos
+  // destinatarios nunca llegaron a enviarse.
+  return `Creada el ${new Date(c.created_at).toLocaleString("es-CO", dateFormat)}`;
+}
+
 export default async function CampaignsPage() {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
@@ -28,7 +59,9 @@ export default async function CampaignsPage() {
 
   const { data: campaigns } = await supabase
     .from("campaigns")
-    .select("id, name, status, send_type, created_at, scheduled_at, templates(meta_template_name)")
+    .select(
+      "id, name, status, send_type, created_at, scheduled_at, started_at, templates(meta_template_name)"
+    )
     .eq("workspace_id", workspaceId ?? "")
     .order("created_at", { ascending: false });
 
@@ -97,15 +130,7 @@ export default async function CampaignsPage() {
                       ? "Mensaje libre"
                       : `Plantilla: ${template?.meta_template_name ?? "—"}`}
                   </p>
-                  <p className="mt-0.5 text-[11px] text-muted">
-                    {new Date(c.created_at).toLocaleString("es-CO", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}
-                  </p>
+                  <p className="mt-0.5 text-[11px] text-muted">{campaignDateLine(c)}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
                   {hasRecipients && (

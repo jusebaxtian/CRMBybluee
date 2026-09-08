@@ -113,7 +113,12 @@ async function prepareCampaignSend(
   const account = await resolveSendAccount(supabase, workspaceId, campaign.whatsapp_account_id);
   if (!account) return { error: "Este workspace no tiene WhatsApp conectado." };
 
-  await supabase.from("campaigns").update({ status: "sending" }).eq("id", campaignId);
+  // started_at es lo que la lista muestra como fecha del envio; created_at
+  // solo dice cuando se creo el borrador.
+  await supabase
+    .from("campaigns")
+    .update({ status: "sending", started_at: new Date().toISOString() })
+    .eq("id", campaignId);
 
   return { data: { campaign, template, templateHeaderMedia, account } };
 }

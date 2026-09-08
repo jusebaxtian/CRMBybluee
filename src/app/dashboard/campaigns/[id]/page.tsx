@@ -28,7 +28,9 @@ export default async function CampaignDetailPage({
 
   const { data: campaign } = await supabase
     .from("campaigns")
-    .select("id, name, status, send_type, message_body, media_url, scheduled_at, templates(meta_template_name)")
+    .select(
+      "id, name, status, send_type, message_body, media_url, scheduled_at, started_at, templates(meta_template_name)"
+    )
     .eq("id", id)
     .eq("workspace_id", workspaceId ?? "")
     .maybeSingle();
@@ -106,6 +108,18 @@ export default async function CampaignDetailPage({
             {recipients?.length ?? 0} contacto{(recipients?.length ?? 0) === 1 ? "" : "s"} en total
           </span>
         </div>
+        {!isScheduled && campaign.started_at && (
+          <div className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm text-muted">
+            <Clock size={15} className="shrink-0" />
+            {campaign.status === "sending" ? "Envío iniciado el" : "Enviada el"}{" "}
+            {new Date(campaign.started_at).toLocaleString("es-CO", {
+              day: "2-digit",
+              month: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </div>
+        )}
         {isScheduled && campaign.scheduled_at && (
           <div className="flex items-center gap-2 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
             <Clock size={15} className="shrink-0" />

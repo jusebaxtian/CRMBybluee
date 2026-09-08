@@ -20,7 +20,7 @@ export async function processDueCampaigns() {
     // automation scheduler.
     const { data: claimed } = await supabase
       .from("campaigns")
-      .update({ status: "sending" })
+      .update({ status: "sending", started_at: new Date().toISOString() })
       .eq("id", campaign.id)
       .eq("status", "draft")
       .select("id")
