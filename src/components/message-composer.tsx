@@ -37,6 +37,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
   onOptimisticSend,
 }, ref) {
   const formRef = useRef<HTMLFormElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [uploading, setUploading] = useState(false);
@@ -88,6 +89,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
     // Show the message immediately (WhatsApp-style) instead of waiting on
     // the round trip to Meta's Graph API before anything appears.
     formRef.current?.reset();
+    resetBodyHeight();
     setSendError(null);
     onClearReply?.();
     onOptimisticSend?.({
@@ -162,7 +164,49 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
   // Ctrl/Cmd+V with an image on the clipboard (a screenshot, a copied image
   // from another app) attaches it like a picked file — text pastes are left
   // completely alone so normal typing/pasting still works.
-  function handlePaste(e: React.ClipboardEvent<HTMLInputElement>) {
+  // El campo arranca de una linea y crece con el texto hasta el tope que fija
+  // max-h-40 en las clases; a partir de ahi hace scroll en vez de empujar el
+  // chat hacia arriba.
+  function autoGrow(e: React.FormEvent<HTMLTextAreaElement>) {
+    const el = e.currentTarget;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }
+
+  function resetBodyHeight() {
+    if (bodyRef.current) bodyRef.current.style.height = "auto";
+  }
+
+  // Mismo criterio que WhatsApp: con teclado fisico Enter envia y Shift+Enter
+  // hace el salto de linea; en pantallas tactiles Enter hace el salto y se
+  // envia con el boton, porque ahi Shift+Enter no existe. Se consulta en cada
+  // pulsacion en vez de guardarlo en estado, asi acierta tambien si conectan
+  // un teclado a la tablet.
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key !== "Enter") return;
+
+    // El teclado del movil usa Enter para confirmar texto predictivo; enviar
+    // en ese momento cortaria la palabra a medias.
+    if (e.nativeEvent.isComposing) return;
+
+    const isTouch =
+      typeof window !== "undefined" &&
+      window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+
+    // Ctrl/Cmd+Enter envia siempre, en cualquier dispositivo.
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      formRef.current?.requestSubmit();
+      return;
+    }
+
+    if (isTouch || e.shiftKey) return; // salto de linea
+
+    e.preventDefault();
+    formRef.current?.requestSubmit();
+  }
+
+  function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
     const items = e.clipboardData?.items;
     if (!items) return;
     for (const item of items) {
@@ -423,18 +467,21 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
       <form
         ref={formRef}
         onSubmit={handleSubmit}
-        className="flex w-full min-w-0 items-center gap-1.5 sm:gap-2"
+        className="flex w-full min-w-0 items-end gap-1.5 sm:gap-2"
       >
-        <input
+        <textarea
+          ref={bodyRef}
           name="body"
-          type="text"
+          rows={1}
           placeholder="Escribe un mensaje..."
           autoComplete="off"
           required
           onPaste={handlePaste}
+          onInput={autoGrow}
+          onKeyDown={handleKeyDown}
           // 16px min font size on mobile — anything smaller makes iOS/Android
           // auto-zoom the page on focus, which pushes the send button off-screen.
-          className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 text-base text-foreground outline-none focus:border-primary sm:h-10 sm:px-3 sm:text-sm"
+          className="min-h-9 max-h-40 min-w-0 flex-1 resize-none overflow-y-auto rounded-lg border border-border bg-background px-2.5 py-2 text-base leading-5 text-foreground outline-none focus:border-primary sm:min-h-10 sm:px-3 sm:text-sm"
         />
         <button
           type="submit"
