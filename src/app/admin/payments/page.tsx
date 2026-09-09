@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PaymentReviewActions } from "@/components/payment-review-actions";
+import { toPublicUrl } from "@/lib/supabase/config";
 
 const statusColor: Record<string, string> = {
   pending: "text-warning border-warning",
@@ -14,9 +15,29 @@ export default async function AdminPaymentsPage() {
 
   const { data: payments } = await supabase
     .from("payments")
-    .select("id, provider, amount_cents, status, proof_path, created_at, workspaces(name)")
+    .select("id, provider, amount_cents, status, proof_path, created_at, workspace_id, workspaces(name)")
     .order("created_at", { ascending: false })
     .limit(50);
+
+  // El correo del dueño se resuelve una vez por workspace y no por pago: la
+  // misma empresa suele aparecer en varias filas.
+  const workspaceIds = [...new Set((payments ?? []).map((p) => p.workspace_id as string))];
+  const emailByWorkspace = new Map<string, string>(
+    await Promise.all(
+      workspaceIds.map(async (id): Promise<[string, string]> => {
+        const { data: owner } = await supabase
+          .from("workspace_members")
+          .select("user_id")
+          .eq("workspace_id", id)
+          .eq("role", "owner")
+          .limit(1)
+          .maybeSingle();
+        if (!owner?.user_id) return [id, "—"];
+        const { data } = await admin.auth.admin.getUserById(owner.user_id);
+        return [id, data.user?.email ?? "—"];
+      })
+    )
+  );
 
   const paymentsWithUrls = await Promise.all(
     (payments ?? []).map(async (p) => {
@@ -25,9 +46,12 @@ export default async function AdminPaymentsPage() {
         const { data } = await admin.storage
           .from("payment-proofs")
           .createSignedUrl(p.proof_path, 60 * 10);
-        proofUrl = data?.signedUrl ?? null;
+        // La URL firmada se arma con la base del cliente que la pide, y en el
+        // servidor esa base es la interna (localhost): sin esto el enlace
+        // apunta a una dirección que el navegador del admin no alcanza.
+        proofUrl = data?.signedUrl ? toPublicUrl(data.signedUrl) : null;
       }
-      return { ...p, proofUrl };
+      return { ...p, proofUrl, ownerEmail: emailByWorkspace.get(p.workspace_id as string) ?? "—" };
     })
   );
 
@@ -55,7 +79,10 @@ export default async function AdminPaymentsPage() {
               const workspace = p.workspaces as unknown as { name: string } | null;
               return (
                 <tr key={p.id} className="border-b border-border last:border-b-0">
-                  <td className="px-5 py-3 text-foreground">{workspace?.name ?? "—"}</td>
+                  <td className="px-5 py-3">
+                    <p className="text-foreground">{workspace?.name ?? "—"}</p>
+                    <p className="text-xs text-muted">{p.ownerEmail}</p>
+                  </td>
                   <td className="px-5 py-3 text-foreground">
                     {p.provider === "bold" ? "Bold" : "Transferencia"}
                   </td>

@@ -1,5 +1,6 @@
 import { FileText, Download, Check, CheckCheck, AlertCircle, Clock, Reply, ExternalLink } from "lucide-react";
 import { VoiceMessagePlayer } from "@/components/voice-message-player";
+import { MediaLightbox } from "@/components/media-lightbox";
 
 type MessageButton =
   | { type: "QUICK_REPLY"; id: string; title: string }
@@ -112,15 +113,10 @@ export function MessageBubble({
         )}
 
         {m.message_type === "image" && m.media_url && (
-          // eslint-disable-next-line @next/next/no-img-element
           // El pie de foto ya se muestra como texto justo debajo, asi que
           // repetirlo en el alt lo duplicaba en pantalla cuando la imagen no
           // cargaba, y lo hacia leer dos veces a un lector de pantalla.
-          <img
-            src={m.media_url}
-            alt="Imagen"
-            className="mb-1 max-h-72 w-full rounded-md object-cover"
-          />
+          <MediaLightbox src={m.media_url} kind="image" alt="Imagen" />
         )}
 
         {m.message_type === "sticker" && m.media_url && (
@@ -132,7 +128,7 @@ export function MessageBubble({
         )}
 
         {m.message_type === "video" && m.media_url && (
-          <video src={m.media_url} controls className="mb-1 max-h-72 w-full rounded-md" />
+          <MediaLightbox src={m.media_url} kind="video" />
         )}
 
         {m.message_type === "audio" && m.media_url && (
