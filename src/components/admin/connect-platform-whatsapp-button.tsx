@@ -4,6 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { connectPlatformWhatsApp } from "@/app/actions/admin-whatsapp";
+import {
+  interpretarMensajeDeAlta,
+  esOrigenDeMeta,
+  mensajeDeAlta,
+  type ResultadoAlta,
+} from "@/lib/whatsapp/embedded-signup";
 
 declare global {
   interface Window {
@@ -27,20 +33,25 @@ export function ConnectPlatformWhatsAppButton() {
   const [message, setMessage] = useState<string | null>(null);
   const [sdkReady, setSdkReady] = useState(false);
   const signupDataRef = useRef<SignupData | null>(null);
+  const ultimoResultadoRef = useRef<ResultadoAlta | null>(null);
 
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
-      if (!event.origin.endsWith("facebook.com")) return;
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === "WA_EMBEDDED_SIGNUP" && data.event === "FINISH") {
-          signupDataRef.current = {
-            waba_id: data.data.waba_id,
-            phone_number_id: data.data.phone_number_id,
-          };
-        }
-      } catch {
-        // Ignore non-JSON messages from other sources.
+      if (!esOrigenDeMeta(event.origin)) return;
+
+      const resultado = interpretarMensajeDeAlta(event.data);
+      if (resultado.tipo === "ignorar") return;
+
+      // Se guarda el ultimo resultado, sea cual sea. Antes solo se guardaba el
+      // caso perfecto y los demas se perdian: el usuario terminaba el alta y
+      // veia "se cancelo la conexion" sin mas explicacion.
+      ultimoResultadoRef.current = resultado;
+
+      if (resultado.tipo === "listo") {
+        signupDataRef.current = {
+          waba_id: resultado.wabaId,
+          phone_number_id: resultado.phoneNumberId,
+        };
       }
     }
     window.addEventListener("message", handleMessage);
@@ -61,7 +72,10 @@ export function ConnectPlatformWhatsAppButton() {
 
       if (!code || !signupData) {
         setStatus("error");
-        setMessage("Se canceló la conexión o no se recibió la información esperada.");
+        // El mensaje sale de lo que Meta dijo de verdad, no de una suposicion.
+        setMessage(
+          mensajeDeAlta(ultimoResultadoRef.current ?? { tipo: "ignorar" })
+        );
         return;
       }
 
