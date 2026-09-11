@@ -3,6 +3,7 @@ import { callAiProvider, type ChatTurn } from "@/lib/ai/providers";
 import { sendTextMessage, sendMediaMessage } from "@/lib/whatsapp/graph";
 import { isContactExcludedFromAutomations } from "@/lib/automations/engine";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
+import { recordOutboundMessage } from "@/lib/messaging/record";
 
 // The AI ends its reply with this marker on its own line when it decides the
 // conversation needs a human — stripped before the text reaches the
@@ -155,13 +156,11 @@ export async function maybeRespondWithAiAgent(
       contact.wa_id,
       fallback
     );
-    await supabase.from("messages").insert({
-      conversation_id: conversationId,
-      direction: "out",
-      message_type: "text",
+    await recordOutboundMessage(supabase, {
+      conversationId,
+      messageType: "text",
       body: fallback,
-      wa_message_id: result.messages[0]?.id,
-      status: "sent",
+      waMessageId: result.messages[0]?.id,
     });
     return;
   }
@@ -206,14 +205,12 @@ export async function maybeRespondWithAiAgent(
         { link: item.media_url },
         item.filename ?? undefined
       );
-      await supabase.from("messages").insert({
-        conversation_id: conversationId,
-        direction: "out",
-        message_type: item.media_type,
-        media_url: item.media_url,
-        media_mime_type: item.media_mime_type,
-        wa_message_id: result.messages[0]?.id,
-        status: "sent",
+      await recordOutboundMessage(supabase, {
+        conversationId,
+        messageType: item.media_type,
+        mediaUrl: item.media_url,
+        mediaMimeType: item.media_mime_type,
+        waMessageId: result.messages[0]?.id,
       });
     } catch (err) {
       console.error(`AI agent media send failed (key=${key}) for workspace=${workspaceId}:`, err);
@@ -229,12 +226,10 @@ export async function maybeRespondWithAiAgent(
     customerReply
   );
 
-  await supabase.from("messages").insert({
-    conversation_id: conversationId,
-    direction: "out",
-    message_type: "text",
+  await recordOutboundMessage(supabase, {
+    conversationId,
+    messageType: "text",
     body: customerReply,
-    wa_message_id: result.messages[0]?.id,
-    status: "sent",
+    waMessageId: result.messages[0]?.id,
   });
 }
