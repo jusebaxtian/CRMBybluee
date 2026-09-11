@@ -117,7 +117,13 @@ async function prepareCampaignSend(
   // solo dice cuando se creo el borrador.
   await supabase
     .from("campaigns")
-    .update({ status: "sending", started_at: new Date().toISOString() })
+    // last_progress_at arranca junto con el envio: sin el, el planificador
+    // veria la campaña en "sending" sin latido y la daria por estancada.
+    .update({
+      status: "sending",
+      started_at: new Date().toISOString(),
+      last_progress_at: new Date().toISOString(),
+    })
     .eq("id", campaignId);
 
   return { data: { campaign, template, templateHeaderMedia, account } };
@@ -223,7 +229,27 @@ async function runCampaignSendLoop(
     }
   }
 
+  // Latido de avance. El planificador lo usa para distinguir una campaña
+  // muerta (el proceso se cayo a mitad del envio) de una lenta pero viva: sin
+  // esta señal, reanudar una que sigue trabajando dispararia un segundo bucle
+  // sobre los mismos pendientes y el cliente recibiria el mensaje dos veces.
+  //
+  // Se escribe cada HEARTBEAT_EVERY destinatarios y no en cada uno: una
+  // escritura por mensaje duplicaria el trafico a la base sin ganar precision.
+  const HEARTBEAT_EVERY = 25;
+  let procesados = 0;
+  const latir = async () => {
+    await supabase
+      .from("campaigns")
+      .update({ last_progress_at: new Date().toISOString() })
+      .eq("id", campaignId);
+  };
+  await latir();
+
   for (const recipient of recipients ?? []) {
+    procesados += 1;
+    if (procesados % HEARTBEAT_EVERY === 0) await latir();
+
     const contact = recipient.contacts as unknown as {
       wa_id: string;
       name: string | null;
@@ -389,9 +415,27 @@ async function runCampaignSendLoop(
     }
   }
 
+  // El estado final mira TODA la campaña, no solo el lote que acaba de correr.
+  // Importa desde que el planificador puede reanudar un envío interrumpido:
+  // si se juzgara por el lote, una campaña con miles de envíos exitosos cuyos
+  // ultimos pendientes fallan quedaria marcada como fallida entera.
+  const [{ count: totalDestinatarios }, { count: totalFallidos }] = await Promise.all([
+    supabase
+      .from("campaign_recipients")
+      .select("id", { count: "exact", head: true })
+      .eq("campaign_id", campaignId),
+    supabase
+      .from("campaign_recipients")
+      .select("id", { count: "exact", head: true })
+      .eq("campaign_id", campaignId)
+      .eq("status", "failed"),
+  ]);
+
+  const todoFallo = !!totalDestinatarios && totalFallidos === totalDestinatarios;
+
   await supabase
     .from("campaigns")
-    .update({ status: failures > 0 && recipients?.length === failures ? "failed" : "completed" })
+    .update({ status: todoFallo ? "failed" : "completed" })
     .eq("id", campaignId);
 
   return { success: true };
