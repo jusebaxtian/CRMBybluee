@@ -36,7 +36,18 @@ module.exports = {
       // solo enruta al proceso web. Es deliberado -- `next start` es lo que
       // dispara instrumentation.ts, y un segundo punto de entrada seria codigo
       // nuevo que mantener para ahorrar unos megas de RAM.
-      env: { PORT: "3001" },
+      env: {
+        PORT: "3001",
+        // Permite pedir un volcado de heap en caliente con
+        // `kill -USR2 <pid>`. Sin esto habria que reiniciar el proceso con
+        // otra bandera, y un reinicio borra justo el estado que se quiere
+        // mirar.
+        //
+        // OJO: el .heapsnapshot se escribe en cwd, o sea dentro de
+        // /opt/crm-bybluee, y durante una fuga puede pesar mas de 2 GB.
+        // Moverlo a /opt/backups/ y borrarlo en cuanto se haya analizado.
+        NODE_OPTIONS: "--heapsnapshot-signal=SIGUSR2",
+      },
       max_memory_restart: "1200M",
       autorestart: true,
     },
