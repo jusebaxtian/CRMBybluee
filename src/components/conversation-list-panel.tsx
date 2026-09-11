@@ -8,14 +8,8 @@ import { setConversationPinned } from "@/app/actions/conversations";
 import { NewMessageButton } from "@/components/new-message-button";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { useMessageWindow } from "@/lib/use-message-window";
+import { isWindowExpiringSoon, msRemainingInWindow } from "@/lib/whatsapp/message-window";
 
-const WINDOW_MS = 24 * 60 * 60 * 1000;
-const EXPIRING_SOON_MAX_MS = 2 * 60 * 60 * 1000; // 2h
-const EXPIRING_SOON_MIN_MS = 10 * 1000; // 10s
-
-function msRemaining(lastInboundAt: string, now: number) {
-  return new Date(lastInboundAt).getTime() + WINDOW_MS - now;
-}
 
 type Tag = { id: string; name: string; color: string };
 type Agent = { id: string; name: string | null; email: string };
@@ -65,10 +59,8 @@ function WindowExpiringSoonBadge({
   lastInboundAt: string | null;
   now: number;
 }) {
-  if (!lastInboundAt) return null;
-  const remaining = msRemaining(lastInboundAt, now);
-  if (remaining < EXPIRING_SOON_MIN_MS || remaining > EXPIRING_SOON_MAX_MS) return null;
-  const m = Math.floor(remaining / 60_000);
+  if (!isWindowExpiringSoon(lastInboundAt, now)) return null;
+  const m = Math.floor(msRemainingInWindow(lastInboundAt, now) / 60_000);
   return (
     <span
       title="La ventana de 24h está por vencer"
@@ -136,11 +128,7 @@ export function ConversationListPanel({
       if (channelFilter && c.whatsappAccountId !== channelFilter) return false;
       if (unreadOnly && c.unreadCount === 0) return false;
       if (needsHumanOnly && !c.needsHuman) return false;
-      if (expiringSoon) {
-        if (!c.lastInboundAt) return false;
-        const remaining = msRemaining(c.lastInboundAt, now);
-        if (remaining < EXPIRING_SOON_MIN_MS || remaining > EXPIRING_SOON_MAX_MS) return false;
-      }
+      if (expiringSoon && !isWindowExpiringSoon(c.lastInboundAt, now)) return false;
       if (
         selectedTagIds.length > 0 &&
         !c.tags.some((t) => selectedTagIds.includes(t.id))

@@ -3,8 +3,7 @@ import { sendTemplateMessage, sendTextMessage, sendMediaMessage, uploadMedia } f
 import { mediaKindFromMime } from "@/lib/whatsapp/media-limits";
 import { substituteContactVariables, buildTemplateSendParams } from "@/lib/whatsapp/variables";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
-
-const WINDOW_MS = 24 * 60 * 60 * 1000;
+import { isWindowOpen } from "@/lib/whatsapp/message-window";
 
 // media_filename doesn't carry a mime type — infer a close-enough one from
 // its extension just to pick the right WhatsApp media kind (image/video/
@@ -346,7 +345,7 @@ async function runCampaignSendLoop(
           .maybeSingle();
 
         const windowOpen =
-          !!lastInbound && Date.now() - new Date(lastInbound.created_at).getTime() < WINDOW_MS;
+          isWindowOpen(lastInbound?.created_at ?? null, Date.now());
         if (!windowOpen) {
           throw new Error("La ventana de 24h se cerró para este contacto antes del envío.");
         }

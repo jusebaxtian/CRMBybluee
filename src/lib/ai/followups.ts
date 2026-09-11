@@ -5,12 +5,12 @@ import { buildFollowupSystemPrompt } from "@/lib/ai/agent";
 import { isContactExcludedFromAutomations } from "@/lib/automations/engine";
 import { buildTemplateSendParams } from "@/lib/whatsapp/variables";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
+import { isWindowOpen } from "@/lib/whatsapp/message-window";
 
 const HISTORY_LIMIT = 20;
 // WhatsApp's customer-service window: free text is only allowed within 24h
 // of the customer's own last message — past that, only an approved template
 // can reopen the conversation.
-const CUSTOMER_WINDOW_MS = 24 * 60 * 60 * 1000;
 const BATCH_LIMIT = 25;
 
 export type FollowupStep = { delay_minutes: number; focus: string };
@@ -158,7 +158,7 @@ async function sendFollowup(
     .maybeSingle();
 
   const withinWindow =
-    !!lastInbound && Date.now() - new Date(lastInbound.created_at).getTime() < CUSTOMER_WINDOW_MS;
+    isWindowOpen(lastInbound?.created_at ?? null, Date.now());
 
   if (withinWindow) {
     const { data: pastMessages } = await supabase
