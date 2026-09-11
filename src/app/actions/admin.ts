@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isPlatformAdmin } from "@/lib/admin";
 import { IMPERSONATION_COOKIE } from "@/lib/workspace";
 import { toPublicUrl } from "@/lib/supabase/config";
+import { eliminarArchivosDelWorkspace } from "@/lib/retencion/archivos";
 
 export async function logAdminAccess(workspaceId: string) {
   const supabase = await createClient();
@@ -88,11 +89,28 @@ export async function deleteWorkspace(workspaceId: string) {
 
   const admin = createAdminClient();
 
+  // Los archivos van PRIMERO, mientras el espacio todavia existe.
+  //
+  // Postgres no sabe nada de storage: el ON DELETE CASCADE se lleva las filas
+  // y deja los archivos. Si se borrara la fila antes, las rutas seguirian
+  // siendo las mismas pero ya nadie sabria a quien pertenecian, y es
+  // exactamente asi como quedaron diez objetos huerfanos en un bucket publico.
+  //
+  // Si falla el borrado de archivos se aborta sin tocar la base: es preferible
+  // un espacio intacto y un aviso, a una base borrada con los archivos dentro.
+  const archivos = await eliminarArchivosDelWorkspace(admin, workspaceId);
+  if (archivos.errores.length > 0) {
+    console.error(`deleteWorkspace ${workspaceId}: fallo al borrar archivos`, archivos.errores);
+    return { error: `No se pudieron borrar los archivos: ${archivos.errores[0]}` };
+  }
+
   // Deletes the workspace row, which cascades to every table that references
   // it (contacts, conversations, messages, campaigns, automations, payments,
   // subscriptions, etc.) before the owner accounts themselves are removed.
   const { error } = await admin.from("workspaces").delete().eq("id", workspaceId);
   if (error) return { error: error.message };
+
+  console.log(`deleteWorkspace ${workspaceId}: ${archivos.borrados} archivo(s) eliminado(s)`);
 
   for (const member of members ?? []) {
     await admin.auth.admin.deleteUser(member.user_id);
