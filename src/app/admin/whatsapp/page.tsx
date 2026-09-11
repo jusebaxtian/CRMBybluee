@@ -1,7 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ConnectPlatformWhatsAppButton } from "@/components/connect-platform-whatsapp-button";
-import { DisconnectPlatformWhatsAppButton } from "@/components/disconnect-platform-whatsapp-button";
-import { ActivationTemplateConfigPanel } from "@/components/activation-template-config";
+import { ConnectPlatformWhatsAppButton } from "@/components/admin/connect-platform-whatsapp-button";
+import { DisconnectPlatformWhatsAppButton } from "@/components/admin/disconnect-platform-whatsapp-button";
+import { ActivationTemplateConfigPanel } from "@/components/admin/activation-template-config";
 import { getActivationTemplateConfig } from "@/app/actions/admin-whatsapp";
 
 export default async function AdminWhatsAppPage() {

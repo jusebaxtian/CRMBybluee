@@ -4,9 +4,9 @@ import { ArrowLeft, LogIn } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logAdminAccess, startImpersonation } from "@/app/actions/admin";
-import { WorkspaceAdminEditor } from "@/components/workspace-admin-editor";
-import { EditClientFields } from "@/components/edit-client-fields";
-import { NotifyActivationButton } from "@/components/notify-activation-button";
+import { WorkspaceAdminEditor } from "@/components/admin/workspace-admin-editor";
+import { EditClientFields } from "@/components/admin/edit-client-fields";
+import { NotifyActivationButton } from "@/components/admin/notify-activation-button";
 import { getActivationTemplateConfig } from "@/app/actions/admin-whatsapp";
 
 export default async function AdminWorkspaceDetailPage({

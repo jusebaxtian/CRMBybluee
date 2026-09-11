@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { NewFollowupSequenceForm } from "@/components/new-followup-sequence-form";
+import { NewFollowupSequenceForm } from "@/components/automations/new-followup-sequence-form";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
 import { listWorkspaceAgents } from "@/lib/agents";

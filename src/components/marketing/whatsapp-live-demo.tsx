@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { WhatsAppIcon } from "@/components/whatsapp-icon";
+import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
 import { CheckCheck, Bot } from "lucide-react";
 
 type Stage = "waiting" | "incoming" | "typing" | "replied";

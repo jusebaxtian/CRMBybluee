@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { createAutomation, updateAutomation } from "@/app/actions/automations";
-import { AutomationActionsBuilder, type InitialAction } from "@/components/automation-actions-builder";
+import { AutomationActionsBuilder, type InitialAction } from "@/components/automations/automation-actions-builder";
 import { Button } from "@/components/ui/button";
 
 type Tag = { id: string; name: string };

@@ -9,10 +9,10 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { Reveal } from "@/components/reveal";
-import { HeroInboxMockup } from "@/components/hero-inbox-mockup";
-import { WhatsAppIcon } from "@/components/whatsapp-icon";
-import { SocialLinks } from "@/components/social-links";
+import { Reveal } from "@/components/marketing/reveal";
+import { HeroInboxMockup } from "@/components/marketing/hero-inbox-mockup";
+import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
+import { SocialLinks } from "@/components/marketing/social-links";
 import { features, includedItems, painPoints } from "@/lib/landing-content";
 import { getActivePlansWithFeatures, planCycleLabel, formatCents } from "@/lib/billing/plans";
 

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { DashboardChrome } from "@/components/dashboard-chrome";
-import { ImpersonationBanner } from "@/components/impersonation-banner";
+import { DashboardChrome } from "@/components/layout/dashboard-chrome";
+import { ImpersonationBanner } from "@/components/layout/impersonation-banner";
 import { isPlatformAdmin } from "@/lib/admin";
 import { getWorkspaceId, getImpersonatedWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
 

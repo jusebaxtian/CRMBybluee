@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { NewQuickReplyForm } from "@/components/new-quick-reply-form";
+import { NewQuickReplyForm } from "@/components/quick-replies/new-quick-reply-form";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
 

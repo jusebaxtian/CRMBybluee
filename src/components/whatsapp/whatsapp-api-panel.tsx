@@ -1,8 +1,8 @@
 import { BadgeCheck, Gauge, MessageSquareOff, Snowflake } from "lucide-react";
-import { WhatsAppIcon } from "@/components/whatsapp-icon";
-import { ConnectWhatsAppButton } from "@/components/connect-whatsapp-button";
-import { DisconnectWhatsAppButton } from "@/components/disconnect-whatsapp-button";
-import { RenameWhatsAppAccount } from "@/components/rename-whatsapp-account";
+import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
+import { ConnectWhatsAppButton } from "@/components/whatsapp/connect-whatsapp-button";
+import { DisconnectWhatsAppButton } from "@/components/whatsapp/disconnect-whatsapp-button";
+import { RenameWhatsAppAccount } from "@/components/whatsapp/rename-whatsapp-account";
 import type { PhoneNumberStatus } from "@/lib/whatsapp/graph";
 
 const qualityLabel: Record<string, string> = {

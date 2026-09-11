@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Sidebar } from "@/components/sidebar";
-import { Topbar } from "@/components/topbar";
-import { InboundMessageSound } from "@/components/inbound-message-sound";
-import { NotificationSound } from "@/components/notification-sound";
-import { PushNotifications } from "@/components/push-notifications";
-import { MobileBottomNav } from "@/components/mobile-bottom-nav";
+import { Sidebar } from "@/components/layout/sidebar";
+import { Topbar } from "@/components/layout/topbar";
+import { InboundMessageSound } from "@/components/notifications/inbound-message-sound";
+import { NotificationSound } from "@/components/notifications/notification-sound";
+import { PushNotifications } from "@/components/notifications/push-notifications";
+import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 
 type Notification = {
   id: string;

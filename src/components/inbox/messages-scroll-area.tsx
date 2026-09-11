@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { MessageBubble } from "@/components/message-bubble";
-import { PullToRefresh } from "@/components/pull-to-refresh";
+import { MessageBubble } from "@/components/inbox/message-bubble";
+import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 
 type Message = {
   id: string;

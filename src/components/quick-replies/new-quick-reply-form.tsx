@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { createQuickReply, updateQuickReply } from "@/app/actions/quick-replies";
-import { AutomationActionsBuilder, type InitialAction } from "@/components/automation-actions-builder";
+import { AutomationActionsBuilder, type InitialAction } from "@/components/automations/automation-actions-builder";
 import { Button } from "@/components/ui/button";
 
 type Tag = { id: string; name: string };

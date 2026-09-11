@@ -1,8 +1,8 @@
 import { Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { ImportContactsButton } from "@/components/import-contacts-button";
-import { AddContactForm } from "@/components/add-contact-form";
-import { ContactsTable } from "@/components/contacts-table";
+import { ImportContactsButton } from "@/components/contacts/import-contacts-button";
+import { AddContactForm } from "@/components/contacts/add-contact-form";
+import { ContactsTable } from "@/components/contacts/contacts-table";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
 

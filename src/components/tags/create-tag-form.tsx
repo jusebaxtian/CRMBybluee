@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { createTag } from "@/app/actions/tags";
-import { ColorSwatchPicker, TAG_COLORS } from "@/components/color-swatch-picker";
+import { ColorSwatchPicker, TAG_COLORS } from "@/components/tags/color-swatch-picker";
 
 export function CreateTagForm() {
   const [state, action, pending] = useActionState(createTag, undefined);

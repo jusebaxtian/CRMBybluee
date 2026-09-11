@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { NewCampaignForm } from "@/components/new-campaign-form";
+import { NewCampaignForm } from "@/components/campaigns/new-campaign-form";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
 

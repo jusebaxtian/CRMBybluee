@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
-import { ConversationListPanel } from "@/components/conversation-list-panel";
-import { InboxShell } from "@/components/inbox-shell";
-import { RealtimeRefresh } from "@/components/realtime-refresh";
+import { ConversationListPanel } from "@/components/inbox/conversation-list-panel";
+import { InboxShell } from "@/components/inbox/inbox-shell";
+import { RealtimeRefresh } from "@/components/ui/realtime-refresh";
 import { listWorkspaceAgents } from "@/lib/agents";
 
 export default async function InboxLayout({

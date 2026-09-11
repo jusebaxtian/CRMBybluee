@@ -3,8 +3,8 @@ import { Megaphone, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule, getEnabledModuleKeys } from "@/lib/entitlements";
-import { CampaignsTabs } from "@/components/campaigns-tabs";
-import { StatBadge, StatusBadge } from "@/components/stat-badge";
+import { CampaignsTabs } from "@/components/layout/campaigns-tabs";
+import { StatBadge, StatusBadge } from "@/components/campaigns/stat-badge";
 
 const statusLabel: Record<string, string> = {
   draft: "Borrador",

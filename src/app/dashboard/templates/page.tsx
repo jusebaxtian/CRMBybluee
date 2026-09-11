@@ -1,13 +1,13 @@
 import { FileText, MousePointerClick } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { SyncTemplatesButton } from "@/components/sync-templates-button";
-import { CreateTemplateForm } from "@/components/create-template-form";
+import { SyncTemplatesButton } from "@/components/templates/sync-templates-button";
+import { CreateTemplateForm } from "@/components/templates/create-template-form";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule, getEnabledModuleKeys } from "@/lib/entitlements";
-import { CampaignsTabs } from "@/components/campaigns-tabs";
-import { DeleteTemplateButton } from "@/components/delete-template-button";
-import { TemplatePreview } from "@/components/template-preview";
-import { TemplateHeaderMediaUpload } from "@/components/template-header-media-upload";
+import { CampaignsTabs } from "@/components/layout/campaigns-tabs";
+import { DeleteTemplateButton } from "@/components/templates/delete-template-button";
+import { TemplatePreview } from "@/components/templates/template-preview";
+import { TemplateHeaderMediaUpload } from "@/components/templates/template-header-media-upload";
 
 const statusLabel: Record<string, string> = {
   APPROVED: "Aprobada",

@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { DashboardBannerUploader } from "@/components/dashboard-banner-uploader";
+import { DashboardBannerUploader } from "@/components/admin/dashboard-banner-uploader";
 
 export default async function AdminBannerPage() {
   const supabase = await createClient();

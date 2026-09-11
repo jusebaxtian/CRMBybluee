@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Paperclip } from "lucide-react";
-import { MessagesScrollArea } from "@/components/messages-scroll-area";
-import { MessageComposer, type MessageComposerHandle } from "@/components/message-composer";
-import { TemplateGatePicker } from "@/components/template-gate-picker";
+import { MessagesScrollArea } from "@/components/inbox/messages-scroll-area";
+import { MessageComposer, type MessageComposerHandle } from "@/components/inbox/message-composer";
+import { TemplateGatePicker } from "@/components/templates/template-gate-picker";
 import { useMessageWindow } from "@/lib/use-message-window";
 
 export type OptimisticMessage = {

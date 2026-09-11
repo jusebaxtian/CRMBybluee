@@ -3,8 +3,8 @@
 import { useActionState, useState } from "react";
 import { Bot, Sparkles } from "lucide-react";
 import { saveAiAgent, toggleAiAgentActive } from "@/app/actions/ai-agent";
-import { AiAgentMediaLibrary } from "@/components/ai-agent-media-library";
-import { AiAgentTestChat } from "@/components/ai-agent-test-chat";
+import { AiAgentMediaLibrary } from "@/components/ai-agent/ai-agent-media-library";
+import { AiAgentTestChat } from "@/components/ai-agent/ai-agent-test-chat";
 import { Button } from "@/components/ui/button";
 
 type FollowupStep = { delay_minutes: number; focus: string };

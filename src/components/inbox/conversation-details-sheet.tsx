@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { Info, X, Zap, Megaphone } from "lucide-react";
-import { ContactTagPicker } from "@/components/contact-tag-picker";
-import { NotesEditor } from "@/components/notes-editor";
-import { ConversationAssignmentControl } from "@/components/conversation-assignment-control";
-import { ConversationFollowupsToggle } from "@/components/conversation-followups-toggle";
-import { ContactBlockedNotice } from "@/components/contact-blocked-notice";
-import { AiHandoffNotice } from "@/components/ai-handoff-notice";
-import { ConversationAiToggle } from "@/components/conversation-ai-toggle";
+import { ContactTagPicker } from "@/components/tags/contact-tag-picker";
+import { NotesEditor } from "@/components/inbox/notes-editor";
+import { ConversationAssignmentControl } from "@/components/inbox/conversation-assignment-control";
+import { ConversationFollowupsToggle } from "@/components/inbox/conversation-followups-toggle";
+import { ContactBlockedNotice } from "@/components/inbox/contact-blocked-notice";
+import { AiHandoffNotice } from "@/components/inbox/ai-handoff-notice";
+import { ConversationAiToggle } from "@/components/inbox/conversation-ai-toggle";
 
 type Agent = { id: string; name: string | null; email: string };
 type Tag = { id: string; name: string; color: string };

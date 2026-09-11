@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { PaymentReviewActions } from "@/components/payment-review-actions";
+import { PaymentReviewActions } from "@/components/admin/payment-review-actions";
 import { toPublicUrl } from "@/lib/supabase/config";
 
 const statusColor: Record<string, string> = {

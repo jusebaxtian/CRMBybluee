@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Users, Bot } from "lucide-react";
-import { WhatsAppIcon } from "@/components/whatsapp-icon";
+import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
 
 export function SettingsTabs({
   agentsContent,

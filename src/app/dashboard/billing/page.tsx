@@ -2,9 +2,9 @@ import { CreditCard, Landmark, CheckCircle2, AlertTriangle } from "lucide-react"
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
 import { createBoldOrder, confirmBoldPayment } from "@/app/actions/billing";
-import { BoldCheckoutButton } from "@/components/bold-checkout-button";
-import { ManualTransferForm } from "@/components/manual-transfer-form";
-import { PlanPicker } from "@/components/plan-picker";
+import { BoldCheckoutButton } from "@/components/billing/bold-checkout-button";
+import { ManualTransferForm } from "@/components/billing/manual-transfer-form";
+import { PlanPicker } from "@/components/billing/plan-picker";
 import { getActivePlansWithFeatures } from "@/lib/billing/plans";
 
 const statusLabel: Record<string, string> = {

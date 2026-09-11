@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { CreateNotificationForm } from "@/components/create-notification-form";
-import { DeleteNotificationButton } from "@/components/delete-notification-button";
+import { CreateNotificationForm } from "@/components/admin/create-notification-form";
+import { DeleteNotificationButton } from "@/components/admin/delete-notification-button";
 
 const scopeLabel: Record<string, string> = {
   all: "Todos",

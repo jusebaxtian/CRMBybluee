@@ -13,8 +13,8 @@ import {
   SlidersHorizontal,
   AlertTriangle,
 } from "lucide-react";
-import { ContactTagPicker } from "@/components/contact-tag-picker";
-import { SendMessagePopover } from "@/components/send-message-popover";
+import { ContactTagPicker } from "@/components/tags/contact-tag-picker";
+import { SendMessagePopover } from "@/components/contacts/send-message-popover";
 import { updateContact, bulkDeleteContacts, bulkAddTagToContacts } from "@/app/actions/contacts";
 
 type Tag = { id: string; name: string; color: string };

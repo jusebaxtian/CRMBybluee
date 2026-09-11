@@ -9,9 +9,9 @@ import {
   Gauge,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { ConnectWhatsAppButton } from "@/components/connect-whatsapp-button";
-import { WhatsAppIcon } from "@/components/whatsapp-icon";
-import { TagStatsTable } from "@/components/tag-stats-table";
+import { ConnectWhatsAppButton } from "@/components/whatsapp/connect-whatsapp-button";
+import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
+import { TagStatsTable } from "@/components/tags/tag-stats-table";
 import { getWorkspaceId } from "@/lib/workspace";
 import { getPhoneNumberStatus } from "@/lib/whatsapp/graph";
 

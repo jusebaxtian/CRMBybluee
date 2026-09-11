@@ -1,6 +1,6 @@
 import { FileText, Download, Check, CheckCheck, AlertCircle, Clock, Reply, ExternalLink } from "lucide-react";
-import { VoiceMessagePlayer } from "@/components/voice-message-player";
-import { MediaLightbox } from "@/components/media-lightbox";
+import { VoiceMessagePlayer } from "@/components/inbox/voice-message-player";
+import { MediaLightbox } from "@/components/inbox/media-lightbox";
 
 type MessageButton =
   | { type: "QUICK_REPLY"; id: string; title: string }

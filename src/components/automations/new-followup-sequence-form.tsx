@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { Info } from "lucide-react";
 import { createFollowupSequence, updateFollowupSequence } from "@/app/actions/followups";
-import { AutomationActionsBuilder, type InitialAction } from "@/components/automation-actions-builder";
+import { AutomationActionsBuilder, type InitialAction } from "@/components/automations/automation-actions-builder";
 import { Button } from "@/components/ui/button";
 
 type Tag = { id: string; name: string };

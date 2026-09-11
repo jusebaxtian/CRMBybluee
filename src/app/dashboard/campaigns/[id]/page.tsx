@@ -2,10 +2,10 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Users, Clock, Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { SendCampaignButton } from "@/components/send-campaign-button";
-import { DeleteCampaignButton } from "@/components/delete-campaign-button";
-import { RealtimeRefresh } from "@/components/realtime-refresh";
-import { CampaignRecipientsTable } from "@/components/campaign-recipients-table";
+import { SendCampaignButton } from "@/components/campaigns/send-campaign-button";
+import { DeleteCampaignButton } from "@/components/campaigns/delete-campaign-button";
+import { RealtimeRefresh } from "@/components/ui/realtime-refresh";
+import { CampaignRecipientsTable } from "@/components/campaigns/campaign-recipients-table";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
 

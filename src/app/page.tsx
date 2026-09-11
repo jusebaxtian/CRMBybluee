@@ -16,13 +16,13 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { Reveal } from "@/components/reveal";
-import { HeroInboxMockup } from "@/components/hero-inbox-mockup";
-import { WhatsAppIcon } from "@/components/whatsapp-icon";
-import { SocialLinks } from "@/components/social-links";
-import { WhatsAppLiveDemo } from "@/components/whatsapp-live-demo";
-import { ScreenshotsShowcase } from "@/components/screenshots-showcase";
-import { LatamPulseMap } from "@/components/latam-pulse-map";
+import { Reveal } from "@/components/marketing/reveal";
+import { HeroInboxMockup } from "@/components/marketing/hero-inbox-mockup";
+import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
+import { SocialLinks } from "@/components/marketing/social-links";
+import { WhatsAppLiveDemo } from "@/components/marketing/whatsapp-live-demo";
+import { ScreenshotsShowcase } from "@/components/marketing/screenshots-showcase";
+import { LatamPulseMap } from "@/components/marketing/latam-pulse-map";
 import { features, steps } from "@/lib/landing-content";
 import { getActivePlansWithFeatures, planCycleLabel, formatCents } from "@/lib/billing/plans";
 

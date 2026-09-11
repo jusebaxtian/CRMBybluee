@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil } from "lucide-react";
 import { updateTag } from "@/app/actions/tags";
-import { ColorSwatchPicker } from "@/components/color-swatch-picker";
+import { ColorSwatchPicker } from "@/components/tags/color-swatch-picker";
 
 export function EditTagButton({
   tagId,

@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { History, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { AutomationRowActions } from "@/components/automation-row-actions";
+import { AutomationRowActions } from "@/components/automations/automation-row-actions";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule, getEnabledModuleKeys } from "@/lib/entitlements";
-import { CampaignsTabs } from "@/components/campaigns-tabs";
+import { CampaignsTabs } from "@/components/layout/campaigns-tabs";
 import { toggleFollowupSequenceActive, deleteFollowupSequence } from "@/app/actions/followups";
 
 export default async function FollowupsPage() {

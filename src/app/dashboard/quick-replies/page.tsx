@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Reply, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { QuickReplyRowActions } from "@/components/quick-reply-row-actions";
+import { QuickReplyRowActions } from "@/components/quick-replies/quick-reply-row-actions";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
 

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { NewCampaignForm, type CampaignInitialValues } from "@/components/new-campaign-form";
+import { NewCampaignForm, type CampaignInitialValues } from "@/components/campaigns/new-campaign-form";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
 

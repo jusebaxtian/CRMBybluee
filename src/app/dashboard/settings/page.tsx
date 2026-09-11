@@ -5,12 +5,12 @@ import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
 import { requireModule, getEnabledModuleKeys } from "@/lib/entitlements";
 import { listWorkspaceAgents } from "@/lib/agents";
 import { getPhoneNumberStatus } from "@/lib/whatsapp/graph";
-import { AgentProfileForm } from "@/components/agent-profile-form";
-import { AgentsList } from "@/components/agents-list";
-import { SettingsTabs } from "@/components/settings-tabs";
-import { WhatsAppApiPanel } from "@/components/whatsapp-api-panel";
-import { AiAgentPanel } from "@/components/ai-agent-panel";
-import { CtwaDatasetForm } from "@/components/ctwa-dataset-form";
+import { AgentProfileForm } from "@/components/account/agent-profile-form";
+import { AgentsList } from "@/components/account/agents-list";
+import { SettingsTabs } from "@/components/layout/settings-tabs";
+import { WhatsAppApiPanel } from "@/components/whatsapp/whatsapp-api-panel";
+import { AiAgentPanel } from "@/components/ai-agent/ai-agent-panel";
+import { CtwaDatasetForm } from "@/components/whatsapp/ctwa-dataset-form";
 
 export default async function SettingsPage() {
   const supabase = await createClient();

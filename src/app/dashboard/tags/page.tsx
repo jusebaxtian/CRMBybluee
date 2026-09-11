@@ -1,12 +1,12 @@
 import { Tag as TagIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { CreateTagForm } from "@/components/create-tag-form";
-import { DeleteTagButton } from "@/components/delete-tag-button";
-import { EditTagButton } from "@/components/edit-tag-button";
-import { TagFollowupsToggle } from "@/components/tag-followups-toggle";
+import { CreateTagForm } from "@/components/tags/create-tag-form";
+import { DeleteTagButton } from "@/components/tags/delete-tag-button";
+import { EditTagButton } from "@/components/tags/edit-tag-button";
+import { TagFollowupsToggle } from "@/components/tags/tag-followups-toggle";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule, getEnabledModuleKeys } from "@/lib/entitlements";
-import { CampaignsTabs } from "@/components/campaigns-tabs";
+import { CampaignsTabs } from "@/components/layout/campaigns-tabs";
 
 export default async function TagsPage() {
   const supabase = await createClient();

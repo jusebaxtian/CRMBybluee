@@ -1,4 +1,4 @@
-import { WhatsAppIcon } from "@/components/whatsapp-icon";
+import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
 import { Check, CheckCheck } from "lucide-react";
 
 const conversations = [

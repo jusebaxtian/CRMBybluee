@@ -2,8 +2,8 @@
 
 import { ChevronDown, Menu } from "lucide-react";
 import { logout } from "@/app/actions/auth";
-import { NotificationBell } from "@/components/notification-bell";
-import { ChangePasswordButton } from "@/components/change-password-button";
+import { NotificationBell } from "@/components/notifications/notification-bell";
+import { ChangePasswordButton } from "@/components/account/change-password-button";
 
 type Notification = {
   id: string;

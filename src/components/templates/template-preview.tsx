@@ -1,5 +1,5 @@
 import { FileText, ExternalLink } from "lucide-react";
-import { WhatsAppIcon } from "@/components/whatsapp-icon";
+import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
 
 type TemplateButton = { type: "URL" | "QUICK_REPLY"; text: string; url?: string };
 

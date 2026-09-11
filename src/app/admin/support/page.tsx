@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { SupportWhatsappForm } from "@/components/support-whatsapp-form";
+import { SupportWhatsappForm } from "@/components/admin/support-whatsapp-form";
 
 export default async function AdminSupportPage() {
   const supabase = await createClient();

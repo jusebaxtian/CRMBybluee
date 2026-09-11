@@ -5,8 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Search, SlidersHorizontal, X, Clock, Megaphone, ShieldAlert, Bot, Check, Pin, PinOff } from "lucide-react";
 import { setConversationPinned } from "@/app/actions/conversations";
-import { NewMessageButton } from "@/components/new-message-button";
-import { PullToRefresh } from "@/components/pull-to-refresh";
+import { NewMessageButton } from "@/components/inbox/new-message-button";
+import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { useMessageWindow } from "@/lib/use-message-window";
 import { isWindowExpiringSoon, msRemainingInWindow } from "@/lib/whatsapp/message-window";
 

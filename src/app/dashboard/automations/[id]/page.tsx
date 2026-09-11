@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { NewAutomationForm } from "@/components/new-automation-form";
+import { NewAutomationForm } from "@/components/automations/new-automation-form";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
 import { listWorkspaceAgents } from "@/lib/agents";

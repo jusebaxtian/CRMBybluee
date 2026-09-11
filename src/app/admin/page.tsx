@@ -1,9 +1,9 @@
 import { Users, CreditCard, Clock, AlertTriangle, Plug, Send } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { WorkspaceRowActions } from "@/components/workspace-row-actions";
-import { EditRenewalDateButton } from "@/components/edit-renewal-date-button";
-import { WhatsAppIcon } from "@/components/whatsapp-icon";
+import { WorkspaceRowActions } from "@/components/admin/workspace-row-actions";
+import { EditRenewalDateButton } from "@/components/admin/edit-renewal-date-button";
+import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
 
 function daysSince(dateStr: string): number {
   return Math.max(

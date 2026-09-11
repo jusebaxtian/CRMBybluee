@@ -3,10 +3,10 @@
 import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { Send, Paperclip, Mic, Square, X, Check, Play, Pause, RotateCcw, Reply } from "lucide-react";
 import { sendMessage, sendChatMedia } from "@/app/actions/whatsapp";
-import type { OptimisticMessage } from "@/components/chat-pane";
-import { QuickReplyPicker } from "@/components/quick-reply-picker";
-import { AutomationPicker } from "@/components/automation-picker";
-import { ResetAutomationsButton } from "@/components/reset-automations-button";
+import type { OptimisticMessage } from "@/components/inbox/chat-pane";
+import { QuickReplyPicker } from "@/components/quick-replies/quick-reply-picker";
+import { AutomationPicker } from "@/components/automations/automation-picker";
+import { ResetAutomationsButton } from "@/components/automations/reset-automations-button";
 import { mediaKindFromMime, validateMediaSize } from "@/lib/whatsapp/media-limits";
 
 type RecordingStatus = "idle" | "recording" | "reviewing";

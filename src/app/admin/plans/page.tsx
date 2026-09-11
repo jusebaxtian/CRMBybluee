@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { CreatePlanForm } from "@/components/create-plan-form";
-import { PlanEditor } from "@/components/plan-editor";
+import { CreatePlanForm } from "@/components/admin/create-plan-form";
+import { PlanEditor } from "@/components/admin/plan-editor";
 
 export default async function AdminPlansPage() {
   const supabase = await createClient();
