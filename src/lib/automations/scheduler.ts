@@ -4,7 +4,8 @@ import { resumeAutomationRun, isContactExcludedFromFollowups } from "@/lib/autom
 // Picks up automation actions that were deferred with a delay and are now
 // due, and resumes them from where they left off. Runs in-process (see
 // instrumentation.ts) since there's no external job queue — each due run is
-// claimed (deleted) before executing so a slow tick can't double-process it.
+// claimed (deleted, and the delete verified to have removed the row) before
+// executing, so neither a slow tick nor a second process can double-send it.
 export async function processDueAutomationRuns() {
   const supabase = createAdminClient();
 
@@ -19,11 +20,21 @@ export async function processDueAutomationRuns() {
     .limit(50);
 
   for (const run of dueRuns ?? []) {
-    const { error: claimError } = await supabase
+    // Se comprueba que el borrado se haya llevado la fila, no solo que no
+    // diera error. Un DELETE que no encuentra nada devuelve error nulo: con
+    // dos procesos, los dos leen la misma tarea vencida, los dos la borran, y
+    // el segundo seguiria adelante creyendo que la reclamo. El mensaje le
+    // llegaria dos veces al cliente.
+    //
+    // `.select("id")` hace que PostgREST devuelva las filas borradas, y solo
+    // una de las dos carreras recibe una.
+    const { data: reclamada, error: claimError } = await supabase
       .from("automation_pending_runs")
       .delete()
-      .eq("id", run.id);
-    if (claimError) continue;
+      .eq("id", run.id)
+      .select("id")
+      .maybeSingle();
+    if (claimError || !reclamada) continue;
 
     // If this due run is the WAIT_FOR_REPLY_TIMEOUT_SECONDS fallback for a
     // "wait_for_reply" step (see engine.ts), the contact never answered in
