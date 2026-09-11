@@ -5,6 +5,7 @@ import { ConversationListPanel } from "@/components/inbox/conversation-list-pane
 import { InboxShell } from "@/components/inbox/inbox-shell";
 import { RealtimeRefresh } from "@/components/ui/realtime-refresh";
 import { listWorkspaceAgents } from "@/lib/agents";
+import { loadInboxPage } from "@/lib/inbox/load";
 
 export default async function InboxLayout({
   children,
@@ -15,17 +16,10 @@ export default async function InboxLayout({
   const workspaceId = await getWorkspaceId(supabase);
   await requireModule(supabase, workspaceId, "inbox");
 
-  const { data: conversationsRaw } = await supabase
-    .from("conversations")
-    .select(
-      "id, last_message_at, last_read_at, pinned_at, assigned_agent_id, ad_source_id, ad_headline, ai_handoff_requested, ai_manually_paused, whatsapp_account_id, contacts(name, wa_id, likely_blocked, contact_tags(tags(id, name, color)))"
-    )
-    .eq("workspace_id", workspaceId ?? "")
-    // Las fijadas van arriba, la ultima que se fijo de primera; el resto
-    // sigue por actividad reciente. nullsFirst: false deja las no fijadas
-    // (pinned_at nulo) despues, que es justo lo que se quiere.
-    .order("pinned_at", { ascending: false, nullsFirst: false })
-    .order("last_message_at", { ascending: false });
+  // Una sola pagina. Antes se pedia sin limite y PostgREST cortaba en 1.000
+  // por su cuenta: el espacio de 9.991 conversaciones mostraba 1.000 y nada
+  // lo indicaba. El resto de paginas las trae cargarMasConversaciones.
+  const { conversations, hayMas } = await loadInboxPage(supabase, workspaceId ?? "");
 
   const { data: channels } = workspaceId
     ? await supabase
@@ -34,83 +28,6 @@ export default async function InboxLayout({
         .eq("workspace_id", workspaceId)
         .order("connected_at")
     : { data: [] };
-
-  // Per-conversation summary (last message, last inbound time, unread
-  // count) computed in the DB via lateral joins — scales with conversation
-  // count instead of total message count. The previous approach fetched
-  // recent messages globally ordered and grouped them in JS, which silently
-  // dropped conversations past PostgREST's 1000-row default cap once a
-  // workspace's total message volume grew past it (showed "Sin mensajes"
-  // for conversations that actually had messages, just not recent enough
-  // relative to the rest of the workspace).
-  type ConversationSummaryRow = {
-    conversation_id: string;
-    last_body: string | null;
-    last_message_type: string | null;
-    last_direction: string | null;
-    last_inbound_at: string | null;
-    unread_count: number;
-  };
-
-  const { data: summaries } = workspaceId
-    ? await supabase.rpc("inbox_conversation_summaries", { p_workspace_id: workspaceId })
-    : { data: [] as ConversationSummaryRow[] };
-
-  const summaryByConversation = new Map(
-    ((summaries ?? []) as ConversationSummaryRow[]).map((s) => [
-      s.conversation_id,
-      {
-        body: s.last_body as string | null,
-        message_type: s.last_message_type as string | null,
-        direction: s.last_direction as string | null,
-        lastInboundAt: s.last_inbound_at as string | null,
-        unreadCount: Number(s.unread_count),
-      },
-    ])
-  );
-
-  const mediaLabel: Record<string, string> = {
-    image: "📷 Foto",
-    video: "🎥 Video",
-    audio: "🎤 Nota de voz",
-    document: "📄 Documento",
-    sticker: "🩹 Sticker",
-  };
-
-  const conversations = (conversationsRaw ?? []).map((c) => {
-    const summary = summaryByConversation.get(c.id);
-    const lastMessagePreview = summary
-      ? summary.body ?? mediaLabel[summary.message_type ?? ""] ?? "Mensaje"
-      : null;
-    const contactRaw = c.contacts as unknown as {
-      name: string | null;
-      wa_id: string;
-      likely_blocked: boolean;
-      contact_tags: { tags: { id: string; name: string; color: string } | null }[];
-    };
-
-    return {
-      id: c.id,
-      last_message_at: c.last_message_at,
-      pinnedAt: (c.pinned_at as string | null) ?? null,
-      whatsappAccountId: c.whatsapp_account_id as string | null,
-      lastMessagePreview,
-      answered: summary ? summary.direction === "out" : true,
-      unreadCount: summary?.unreadCount ?? 0,
-      assignedAgentId: c.assigned_agent_id as string | null,
-      lastInboundAt: summary?.lastInboundAt ?? null,
-      fromAds: !!c.ad_source_id,
-      adHeadline: c.ad_headline as string | null,
-      likelyBlocked: contactRaw.likely_blocked,
-      needsHuman: (c.ai_handoff_requested || c.ai_manually_paused) as boolean,
-      contact: { name: contactRaw.name, wa_id: contactRaw.wa_id },
-      tags: contactRaw.contact_tags.map((ct) => ct.tags).filter((t) => t !== null) as {
-        id: string;
-        name: string;
-        color: string;
-      }[],
-    };
-  });
 
   const { data: contacts } = await supabase
     .from("contacts")
@@ -139,6 +56,7 @@ export default async function InboxLayout({
         list={
           <ConversationListPanel
             conversations={conversations}
+            hayMas={hayMas}
             contacts={contacts ?? []}
             allTags={workspaceTags ?? []}
             agents={agents}

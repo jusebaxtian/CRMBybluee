@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Search, SlidersHorizontal, X, Clock, Megaphone, ShieldAlert, Bot, Check, Pin, PinOff } from "lucide-react";
-import { setConversationPinned } from "@/app/actions/conversations";
+import { setConversationPinned, cargarMasConversaciones } from "@/app/actions/conversations";
 import { NewMessageButton } from "@/components/inbox/new-message-button";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { useMessageWindow } from "@/lib/use-message-window";
@@ -75,19 +75,56 @@ function WindowExpiringSoonBadge({
 type Contact = { id: string; name: string | null; wa_id: string };
 
 export function ConversationListPanel({
-  conversations,
+  conversations: primeraPagina,
   contacts,
   allTags,
   agents,
   channels,
+  hayMas,
 }: {
   conversations: Conversation[];
   contacts: Contact[];
   allTags: Tag[];
   agents: Agent[];
   channels: Channel[];
+  hayMas: boolean;
 }) {
   const pathname = usePathname();
+
+  // La primera pagina llega del servidor; las siguientes se acumulan aqui.
+  // Cuando el servidor manda una primera pagina nueva (llego un mensaje y
+  // router.refresh() volvio a renderizar), se descartan las acumuladas: la
+  // lista se reordeno y los cursores viejos ya no encajan.
+  const [extra, setExtra] = useState<Conversation[]>([]);
+  const [quedanMas, setQuedanMas] = useState(hayMas);
+  const [cargando, setCargando] = useState(false);
+  const [errorCarga, setErrorCarga] = useState<string | null>(null);
+
+  useEffect(() => {
+    setExtra([]);
+    setQuedanMas(hayMas);
+  }, [primeraPagina, hayMas]);
+
+  const conversations = useMemo(() => [...primeraPagina, ...extra], [primeraPagina, extra]);
+
+  async function cargarMas() {
+    const ultima = conversations[conversations.length - 1];
+    if (!ultima || cargando) return;
+    setCargando(true);
+    setErrorCarga(null);
+    const resultado = await cargarMasConversaciones({
+      pinnedAt: ultima.pinnedAt,
+      lastMessageAt: ultima.last_message_at,
+    });
+    setCargando(false);
+    if ("error" in resultado) {
+      setErrorCarga(resultado.error ?? "No se pudieron cargar más chats.");
+      return;
+    }
+    setExtra((previas) => [...previas, ...resultado.conversations]);
+    setQuedanMas(resultado.hayMas);
+  }
+
   const [query, setQuery] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
@@ -510,6 +547,36 @@ export function ConversationListPanel({
             </Link>
           );
         })}
+
+        {quedanMas && (
+          <div className="p-3">
+            <button
+              type="button"
+              onClick={cargarMas}
+              disabled={cargando}
+              className="w-full rounded-lg border border-border py-2.5 text-sm text-muted transition-colors hover:bg-surface hover:text-foreground disabled:opacity-50"
+            >
+              {cargando ? "Cargando…" : "Cargar más chats"}
+            </button>
+            {errorCarga && (
+              <p className="mt-2 text-center text-xs text-red-400">{errorCarga}</p>
+            )}
+          </div>
+        )}
+
+        {/* Los filtros y la busqueda corren sobre lo que ya se cargo. Con la
+            bandeja paginada eso puede confundir -- "no aparece" y "todavia no
+            se ha traido" se ven igual -- asi que se dice. */}
+        {!quedanMas && conversations.length > 0 && (
+          <p className="p-4 text-center text-xs text-muted">
+            {conversations.length} chats · no hay más
+          </p>
+        )}
+        {quedanMas && (query || activeFilterCount > 0) && (
+          <p className="px-4 pb-4 text-center text-xs text-muted">
+            Se está buscando entre los {conversations.length} chats cargados.
+          </p>
+        )}
       </PullToRefresh>
     </aside>
   );

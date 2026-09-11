@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
 import { MAX_PINNED_CONVERSATIONS } from "@/lib/inbox/pins";
+import { loadInboxPage, type InboxCursor } from "@/lib/inbox/load";
 
 /**
  * Fija o quita una conversación de la parte de arriba de la bandeja.
@@ -46,4 +47,21 @@ export async function setConversationPinned(conversationId: string, pinned: bool
 
   revalidatePath("/dashboard/inbox");
   return { success: true as const };
+}
+
+/**
+ * Trae la siguiente pagina de la bandeja.
+ *
+ * Se pagina por cursor y no por numero de pagina porque la lista se reordena
+ * sola: cada mensaje entrante sube su conversacion. Con `offset`, una que
+ * subiera entre dos peticiones se veria dos veces, y otra que bajara no se
+ * veria nunca.
+ */
+export async function cargarMasConversaciones(cursor: InboxCursor) {
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
+
+  const { conversations, hayMas } = await loadInboxPage(supabase, workspaceId, { cursor });
+  return { conversations, hayMas };
 }
