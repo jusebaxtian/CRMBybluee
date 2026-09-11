@@ -4,7 +4,7 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
   const { processDueAutomationRuns } = await import("@/lib/automations/scheduler");
-  const { expireTrials, expireLapsedActiveSubscriptions } = await import("@/lib/billing/scheduler");
+  const { expireTrials, expireLapsedActiveSubscriptions, cleanupAbandonedBoldOrders } = await import("@/lib/billing/scheduler");
   const { processAiFollowups } = await import("@/lib/ai/followups");
   const { cleanupOldNotifications } = await import("@/lib/notifications/scheduler");
   const { processDueCampaigns } = await import("@/lib/campaigns/scheduler");
@@ -49,6 +49,12 @@ export async function register() {
   setInterval(() => {
     deleteStaleUnactivatedWorkspaces().catch((err) => {
       console.error("stale workspace cleanup tick failed:", err);
+    });
+  }, 60 * 60_000);
+
+  setInterval(() => {
+    cleanupAbandonedBoldOrders().catch((err) => {
+      console.error("abandoned Bold order cleanup tick failed:", err);
     });
   }, 60 * 60_000);
 }

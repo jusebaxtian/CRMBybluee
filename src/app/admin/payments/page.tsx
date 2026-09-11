@@ -16,6 +16,14 @@ export default async function AdminPaymentsPage() {
   const { data: payments } = await supabase
     .from("payments")
     .select("id, provider, amount_cents, status, proof_path, created_at, workspace_id, workspaces(name)")
+    // Una orden de Bold sin confirmar no es un pago: la pagina de Facturacion
+    // tiene que crearla al renderizar para que el boton de Bold funcione, asi
+    // que abrir esa pagina y no pagar deja una fila "pending". Mostrarlas aqui
+    // llenaba la lista de intentos que nunca existieron. Cuando Bold confirma,
+    // la fila pasa a "approved" y aparece.
+    // Excluye "orden de Bold sin confirmar", que es NO(bold Y pendiente Y sin
+    // comprobante); por De Morgan, eso es cualquiera de las tres negaciones.
+    .or("provider.neq.bold,status.neq.pending,proof_path.not.is.null")
     .order("created_at", { ascending: false })
     .limit(50);
 
