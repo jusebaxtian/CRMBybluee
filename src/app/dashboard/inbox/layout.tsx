@@ -21,6 +21,11 @@ export default async function InboxLayout({
   // lo indicaba. El resto de paginas las trae cargarMasConversaciones.
   const { conversations, hayMas } = await loadInboxPage(supabase, workspaceId ?? "");
 
+  // La insignia de no leidos cuenta sobre todo el espacio, no sobre la pagina.
+  const { data: sinLeer } = await supabase.rpc("inbox_unread_count", {
+    p_workspace_id: workspaceId ?? "",
+  });
+
   const { data: channels } = workspaceId
     ? await supabase
         .from("whatsapp_accounts")
@@ -57,6 +62,7 @@ export default async function InboxLayout({
           <ConversationListPanel
             conversations={conversations}
             hayMas={hayMas}
+            unreadConversationsCount={Number(sinLeer ?? 0)}
             contacts={contacts ?? []}
             allTags={workspaceTags ?? []}
             agents={agents}

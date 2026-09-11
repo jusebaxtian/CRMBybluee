@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
 import { MAX_PINNED_CONVERSATIONS } from "@/lib/inbox/pins";
-import { loadInboxPage, type InboxCursor } from "@/lib/inbox/load";
+import { loadInboxPage, type InboxCursor, type InboxFilters } from "@/lib/inbox/load";
 
 /**
  * Fija o quita una conversación de la parte de arriba de la bandeja.
@@ -50,18 +50,28 @@ export async function setConversationPinned(conversationId: string, pinned: bool
 }
 
 /**
- * Trae la siguiente pagina de la bandeja.
+ * Trae una pagina de la bandeja, ya filtrada.
  *
  * Se pagina por cursor y no por numero de pagina porque la lista se reordena
  * sola: cada mensaje entrante sube su conversacion. Con `offset`, una que
  * subiera entre dos peticiones se veria dos veces, y otra que bajara no se
  * veria nunca.
+ *
+ * Los filtros van al servidor y no al navegador porque la bandeja esta
+ * paginada: filtrar sobre las cuarenta cargadas mostraria resultados de esas
+ * cuarenta y no de las 9.991 que existen.
  */
-export async function cargarMasConversaciones(cursor: InboxCursor) {
+export async function cargarConversaciones(entrada: {
+  cursor?: InboxCursor | null;
+  filters?: InboxFilters;
+}) {
   const ctx = await requireWorkspace();
   if ("error" in ctx) return { error: ctx.error };
   const { supabase, workspaceId } = ctx;
 
-  const { conversations, hayMas } = await loadInboxPage(supabase, workspaceId, { cursor });
+  const { conversations, hayMas } = await loadInboxPage(supabase, workspaceId, {
+    cursor: entrada.cursor ?? null,
+    filters: entrada.filters,
+  });
   return { conversations, hayMas };
 }

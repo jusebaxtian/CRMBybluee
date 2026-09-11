@@ -70,53 +70,78 @@ const CAMPOS =
  */
 export type InboxCursor = { pinnedAt: string | null; lastMessageAt: string };
 
+/** Los siete filtros de la bandeja, tal como los ofrece la barra de la lista. */
+export type InboxFilters = {
+  query?: string;
+  channel?: string | null;
+  tagIds?: string[];
+  /** "" o ausente = todos, "unassigned" = sin asignar, o el id de un agente. */
+  assigned?: string | null;
+  unreadOnly?: boolean;
+  needsHuman?: boolean;
+  expiringSoon?: boolean;
+};
+
+type PageRow = {
+  conversation_id: string;
+  pinned_at: string | null;
+  last_message_at: string;
+  last_body: string | null;
+  last_message_type: string | null;
+  last_direction: string | null;
+  last_inbound_at: string | null;
+  unread_count: number;
+};
+
+/**
+ * Trae una pagina ya filtrada y ordenada.
+ *
+ * El filtrado ocurre en la base y no aqui: dos de los siete filtros --no
+ * leidos y por vencer-- dependen de los mensajes, no de columnas de
+ * `conversations`. Hacerlos en el navegador obligaba a traerse el espacio
+ * entero, que es de donde venia todo el problema.
+ *
+ * Son dos consultas: la funcion decide QUE conversaciones y en que orden, y
+ * PostgREST trae las filas completas con contacto y etiquetas. Se reordenan
+ * aqui porque PostgREST no respeta el orden de la lista de ids.
+ */
 export async function loadInboxPage(
   supabase: SupabaseClient,
   workspaceId: string,
-  opciones: { cursor?: InboxCursor | null; pageSize?: number } = {}
+  opciones: { cursor?: InboxCursor | null; pageSize?: number; filters?: InboxFilters } = {}
 ): Promise<{ conversations: InboxConversation[]; hayMas: boolean }> {
   const tamano = opciones.pageSize ?? INBOX_PAGE_SIZE;
+  const f = opciones.filters ?? {};
 
-  let consulta = supabase
-    .from("conversations")
-    .select(CAMPOS)
-    .eq("workspace_id", workspaceId)
-    .order("pinned_at", { ascending: false, nullsFirst: false })
-    .order("last_message_at", { ascending: false })
-    // Se pide una fila de mas para saber si quedan, sin contar el total.
-    .limit(tamano + 1);
-
-  const cursor = opciones.cursor;
-  if (cursor) {
-    // Las fijadas van primero, asi que continuar significa: o seguimos entre
-    // las fijadas y con fecha anterior, o ya pasamos a las no fijadas.
-    consulta = cursor.pinnedAt
-      ? consulta.or(
-          `and(pinned_at.eq.${cursor.pinnedAt},last_message_at.lt.${cursor.lastMessageAt}),pinned_at.is.null`
-        )
-      : consulta.is("pinned_at", null).lt("last_message_at", cursor.lastMessageAt);
-  }
-
-  const { data: filas } = await consulta;
-  const pagina = (filas ?? []).slice(0, tamano);
-  const hayMas = (filas ?? []).length > tamano;
-
-  if (pagina.length === 0) return { conversations: [], hayMas: false };
-
-  // El resumen se pide solo de lo que se va a pintar. Pedirlo del espacio
-  // entero devolvia 5 MB desde la base, de los que PostgREST entregaba 1.000
-  // filas sin orden: de las 1.000 visibles, 913 se quedaban sin vista previa.
-  const { data: resumenes } = await supabase.rpc("inbox_conversation_summaries_for", {
+  const { data: pagina } = await supabase.rpc("inbox_page", {
     p_workspace_id: workspaceId,
-    p_conversation_ids: pagina.map((c) => c.id as string),
+    // Se pide una fila de mas para saber si quedan, sin contar el total.
+    p_limit: tamano + 1,
+    p_cursor_pinned_at: opciones.cursor?.pinnedAt ?? null,
+    p_cursor_last_message_at: opciones.cursor?.lastMessageAt ?? null,
+    p_query: f.query?.trim() || null,
+    p_channel: f.channel || null,
+    p_tag_ids: f.tagIds && f.tagIds.length > 0 ? f.tagIds : null,
+    p_assigned: f.assigned || null,
+    p_unread_only: !!f.unreadOnly,
+    p_needs_human: !!f.needsHuman,
+    p_expiring_soon: !!f.expiringSoon,
   });
 
-  const porConversacion = new Map(
-    ((resumenes ?? []) as SummaryRow[]).map((s) => [s.conversation_id, s])
-  );
+  const filas = ((pagina ?? []) as PageRow[]).slice(0, tamano);
+  const hayMas = ((pagina ?? []) as PageRow[]).length > tamano;
+  if (filas.length === 0) return { conversations: [], hayMas: false };
 
-  const conversations = pagina.map((c) => {
-    const resumen = porConversacion.get(c.id as string);
+  const { data: completas } = await supabase
+    .from("conversations")
+    .select(CAMPOS)
+    .in("id", filas.map((r) => r.conversation_id));
+
+  const porId = new Map((completas ?? []).map((c) => [c.id as string, c]));
+
+  const conversations = filas.flatMap((r) => {
+    const c = porId.get(r.conversation_id);
+    if (!c) return [];
     const contacto = c.contacts as unknown as {
       name: string | null;
       wa_id: string;
@@ -124,18 +149,19 @@ export async function loadInboxPage(
       contact_tags: { tags: { id: string; name: string; color: string } | null }[];
     };
 
-    return {
-      id: c.id as string,
-      last_message_at: c.last_message_at as string,
-      pinnedAt: (c.pinned_at as string | null) ?? null,
+    return [{
+      id: r.conversation_id,
+      last_message_at: r.last_message_at,
+      pinnedAt: r.pinned_at,
       whatsappAccountId: c.whatsapp_account_id as string | null,
-      lastMessagePreview: resumen
-        ? resumen.last_body ?? ETIQUETA_MEDIA[resumen.last_message_type ?? ""] ?? "Mensaje"
-        : null,
-      answered: resumen ? resumen.last_direction === "out" : true,
-      unreadCount: Number(resumen?.unread_count ?? 0),
+      lastMessagePreview:
+        r.last_direction === null
+          ? null
+          : r.last_body ?? ETIQUETA_MEDIA[r.last_message_type ?? ""] ?? "Mensaje",
+      answered: r.last_direction === null ? true : r.last_direction === "out",
+      unreadCount: Number(r.unread_count ?? 0),
       assignedAgentId: c.assigned_agent_id as string | null,
-      lastInboundAt: resumen?.last_inbound_at ?? null,
+      lastInboundAt: r.last_inbound_at,
       fromAds: !!c.ad_source_id,
       adHeadline: c.ad_headline as string | null,
       likelyBlocked: contacto.likely_blocked,
@@ -144,7 +170,7 @@ export async function loadInboxPage(
       tags: contacto.contact_tags
         .map((ct) => ct.tags)
         .filter((t): t is { id: string; name: string; color: string } => t !== null),
-    };
+    }];
   });
 
   return { conversations, hayMas };

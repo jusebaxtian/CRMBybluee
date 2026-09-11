@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Search, SlidersHorizontal, X, Clock, Megaphone, ShieldAlert, Bot, Check, Pin, PinOff } from "lucide-react";
-import { setConversationPinned, cargarMasConversaciones } from "@/app/actions/conversations";
+import { setConversationPinned, cargarConversaciones } from "@/app/actions/conversations";
 import { NewMessageButton } from "@/components/inbox/new-message-button";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { useMessageWindow } from "@/lib/use-message-window";
@@ -81,6 +81,7 @@ export function ConversationListPanel({
   agents,
   channels,
   hayMas,
+  unreadConversationsCount,
 }: {
   conversations: Conversation[];
   contacts: Contact[];
@@ -88,42 +89,18 @@ export function ConversationListPanel({
   agents: Agent[];
   channels: Channel[];
   hayMas: boolean;
+  unreadConversationsCount: number;
 }) {
   const pathname = usePathname();
 
-  // La primera pagina llega del servidor; las siguientes se acumulan aqui.
-  // Cuando el servidor manda una primera pagina nueva (llego un mensaje y
-  // router.refresh() volvio a renderizar), se descartan las acumuladas: la
-  // lista se reordeno y los cursores viejos ya no encajan.
-  const [extra, setExtra] = useState<Conversation[]>([]);
+  // La primera pagina llega renderizada del servidor. En cuanto se toca un
+  // filtro o la busqueda, la lista pasa a pedirse por accion: filtrar en el
+  // navegador mostraria resultados de las cuarenta cargadas y no de las miles
+  // que existen.
+  const [filtradas, setFiltradas] = useState<Conversation[] | null>(null);
   const [quedanMas, setQuedanMas] = useState(hayMas);
   const [cargando, setCargando] = useState(false);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
-
-  useEffect(() => {
-    setExtra([]);
-    setQuedanMas(hayMas);
-  }, [primeraPagina, hayMas]);
-
-  const conversations = useMemo(() => [...primeraPagina, ...extra], [primeraPagina, extra]);
-
-  async function cargarMas() {
-    const ultima = conversations[conversations.length - 1];
-    if (!ultima || cargando) return;
-    setCargando(true);
-    setErrorCarga(null);
-    const resultado = await cargarMasConversaciones({
-      pinnedAt: ultima.pinnedAt,
-      lastMessageAt: ultima.last_message_at,
-    });
-    setCargando(false);
-    if ("error" in resultado) {
-      setErrorCarga(resultado.error ?? "No se pudieron cargar más chats.");
-      return;
-    }
-    setExtra((previas) => [...previas, ...resultado.conversations]);
-    setQuedanMas(resultado.hayMas);
-  }
 
   const [query, setQuery] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -133,6 +110,79 @@ export function ConversationListPanel({
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [expiringSoon, setExpiringSoon] = useState(false);
   const [needsHumanOnly, setNeedsHumanOnly] = useState(false);
+  // Los filtros activos, en la forma que espera el servidor.
+  const filtros = useMemo(
+    () => ({
+      query,
+      channel: channelFilter || null,
+      tagIds: selectedTagIds,
+      assigned: assignedFilter || null,
+      unreadOnly,
+      needsHuman: needsHumanOnly,
+      expiringSoon,
+    }),
+    [query, channelFilter, selectedTagIds, assignedFilter, unreadOnly, expiringSoon, needsHumanOnly]
+  );
+
+  const hayFiltros =
+    query.trim() !== "" ||
+    channelFilter !== "" ||
+    selectedTagIds.length > 0 ||
+    assignedFilter !== "" ||
+    unreadOnly ||
+    expiringSoon ||
+    needsHumanOnly;
+
+  // Se espera un momento antes de consultar: sin esto, escribir "maria"
+  // lanzaria cinco peticiones y pintaria la que llegara ultima, que no tiene
+  // por que ser la del texto completo.
+  useEffect(() => {
+    if (!hayFiltros) {
+      setFiltradas(null);
+      setQuedanMas(hayMas);
+      return;
+    }
+    let vigente = true;
+    setCargando(true);
+    const id = setTimeout(async () => {
+      const resultado = await cargarConversaciones({ filters: filtros });
+      if (!vigente) return;
+      setCargando(false);
+      if ("error" in resultado) {
+        setErrorCarga(resultado.error ?? "No se pudo buscar.");
+        return;
+      }
+      setErrorCarga(null);
+      setFiltradas(resultado.conversations);
+      setQuedanMas(resultado.hayMas);
+    }, 300);
+    return () => {
+      vigente = false;
+      clearTimeout(id);
+    };
+  }, [filtros, hayFiltros, hayMas]);
+
+  // Sin filtros manda el servidor; con filtros, lo ultimo que se pidio.
+  const lista = filtradas ?? primeraPagina;
+
+  async function cargarMas() {
+    const ultima = lista[lista.length - 1];
+    if (!ultima || cargando) return;
+    setCargando(true);
+    setErrorCarga(null);
+    const resultado = await cargarConversaciones({
+      cursor: { pinnedAt: ultima.pinnedAt, lastMessageAt: ultima.last_message_at },
+      filters: hayFiltros ? filtros : undefined,
+    });
+    setCargando(false);
+    if ("error" in resultado) {
+      setErrorCarga(resultado.error ?? "No se pudieron cargar más chats.");
+      return;
+    }
+    setFiltradas([...lista, ...resultado.conversations]);
+    setQuedanMas(resultado.hayMas);
+  }
+
   const [, startTransition] = useTransition();
   const [pinError, setPinError] = useState<string | null>(null);
 
@@ -159,38 +209,8 @@ export function ConversationListPanel({
     return () => clearInterval(id);
   }, []);
 
-  const filtered = useMemo(() => {
-    return conversations.filter((c) => {
-      if (query && !c.contact.wa_id.includes(query)) return false;
-      if (channelFilter && c.whatsappAccountId !== channelFilter) return false;
-      if (unreadOnly && c.unreadCount === 0) return false;
-      if (needsHumanOnly && !c.needsHuman) return false;
-      if (expiringSoon && !isWindowExpiringSoon(c.lastInboundAt, now)) return false;
-      if (
-        selectedTagIds.length > 0 &&
-        !c.tags.some((t) => selectedTagIds.includes(t.id))
-      )
-        return false;
-      if (assignedFilter === "unassigned" && c.assignedAgentId) return false;
-      if (
-        assignedFilter &&
-        assignedFilter !== "unassigned" &&
-        c.assignedAgentId !== assignedFilter
-      )
-        return false;
-      return true;
-    });
-  }, [
-    conversations,
-    query,
-    channelFilter,
-    unreadOnly,
-    expiringSoon,
-    needsHumanOnly,
-    now,
-    selectedTagIds,
-    assignedFilter,
-  ]);
+  // El filtrado ocurre en la base: `lista` ya viene filtrada y ordenada.
+  const filtered = lista;
 
   const activeFilterCount =
     selectedTagIds.length +
@@ -199,12 +219,8 @@ export function ConversationListPanel({
     (expiringSoon ? 1 : 0) +
     (needsHumanOnly ? 1 : 0);
 
-  // Total chats with unread messages — independent of the active filters,
-  // so this badge always reflects "how many I haven't opened yet".
-  const unreadConversationsCount = useMemo(
-    () => conversations.filter((c) => c.unreadCount > 0).length,
-    [conversations]
-  );
+  // Llega contado desde la base. Contarlo sobre la lista daria el numero de
+  // la pagina cargada, no el del espacio, y diria de menos sin avisar.
 
   function toggleTag(id: string) {
     setSelectedTagIds((prev) =>
@@ -567,14 +583,10 @@ export function ConversationListPanel({
         {/* Los filtros y la busqueda corren sobre lo que ya se cargo. Con la
             bandeja paginada eso puede confundir -- "no aparece" y "todavia no
             se ha traido" se ven igual -- asi que se dice. */}
-        {!quedanMas && conversations.length > 0 && (
+        {!quedanMas && lista.length > 0 && (
           <p className="p-4 text-center text-xs text-muted">
-            {conversations.length} chats · no hay más
-          </p>
-        )}
-        {quedanMas && (query || activeFilterCount > 0) && (
-          <p className="px-4 pb-4 text-center text-xs text-muted">
-            Se está buscando entre los {conversations.length} chats cargados.
+            {lista.length} {lista.length === 1 ? "chat" : "chats"}
+            {hayFiltros ? " encontrados" : " · no hay más"}
           </p>
         )}
       </PullToRefresh>
