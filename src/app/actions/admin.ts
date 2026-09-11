@@ -87,6 +87,16 @@ export async function deleteWorkspace(workspaceId: string) {
     .select("user_id")
     .eq("workspace_id", workspaceId);
 
+  // Se leen antes de borrar: despues no habria de donde sacarlos, y el
+  // registro sin nombre no sirve para demostrar nada.
+  const { data: espacio } = await supabase
+    .from("workspaces")
+    .select("name")
+    .eq("id", workspaceId)
+    .maybeSingle();
+
+  const { data: quienBorra } = await supabase.auth.getUser();
+
   const admin = createAdminClient();
 
   // Los archivos van PRIMERO, mientras el espacio todavia existe.
@@ -109,6 +119,27 @@ export async function deleteWorkspace(workspaceId: string) {
   // subscriptions, etc.) before the owner accounts themselves are removed.
   const { error } = await admin.from("workspaces").delete().eq("id", workspaceId);
   if (error) return { error: error.message };
+
+  // Constancia de que se hizo, y cuando.
+  //
+  // La pagina /eliminar-datos promete atender una solicitud "en un plazo
+  // maximo de 30 dias". Sin registro, cumplir y no poder probarlo se parece
+  // demasiado a no cumplir. La fila no tiene clave foranea al espacio: tiene
+  // que sobrevivir justo a lo que documenta.
+  //
+  // Si falla, se avisa pero no se deshace el borrado: los datos ya no estan y
+  // fingir lo contrario seria peor.
+  const { error: errorRegistro } = await admin.from("data_deletion_log").insert({
+    scope: "workspace",
+    workspace_id: workspaceId,
+    workspace_name: espacio?.name ?? null,
+    executed_by: quienBorra?.user?.id ?? null,
+    files_deleted: archivos.borrados,
+    notes: "Borrado completo del espacio desde el panel de administracion.",
+  });
+  if (errorRegistro) {
+    console.error(`deleteWorkspace ${workspaceId}: no se pudo registrar el borrado`, errorRegistro);
+  }
 
   console.log(`deleteWorkspace ${workspaceId}: ${archivos.borrados} archivo(s) eliminado(s)`);
 
