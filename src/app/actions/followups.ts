@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceId } from "@/lib/workspace";
+import { requireWorkspace } from "@/lib/auth/with-workspace";
 
 // Mirrors src/app/actions/automations.ts's create/update logic almost
 // exactly — kept as a separate copy (not a shared import) so this feature's
@@ -103,9 +103,9 @@ export async function createFollowupSequence(_prevState: unknown, formData: Form
   const validationError = validateSequenceActions(actions);
   if (validationError) return { error: validationError };
 
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const { data: sequence, error } = await supabase
     .from("automations")
@@ -143,9 +143,9 @@ export async function updateFollowupSequence(_prevState: unknown, formData: Form
   const validationError = validateSequenceActions(actions);
   if (validationError) return { error: validationError };
 
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const { error } = await supabase
     .from("automations")

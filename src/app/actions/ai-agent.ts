@@ -1,13 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getWorkspaceId } from "@/lib/workspace";
 import { callAiProvider, type ChatTurn } from "@/lib/ai/providers";
 import { buildSystemPrompt, interpretAiReply, customerRequestedHuman } from "@/lib/ai/agent";
 import { mediaKindFromMime, validateMediaFile } from "@/lib/whatsapp/media-limits";
 import { toPublicUrl } from "@/lib/supabase/config";
+import { requireWorkspace } from "@/lib/auth/with-workspace";
 
 const defaultModel: Record<"openai" | "anthropic", string> = {
   openai: "gpt-4o-mini",
@@ -53,9 +52,9 @@ export async function saveAiAgent(_prevState: unknown, formData: FormData) {
     };
   }
 
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   // Editing an already-connected agent doesn't require re-pasting the key —
   // the field starts empty (we never send the stored key back to the
@@ -116,9 +115,9 @@ export async function testAiAgentMessage(
   history: { role: "user" | "assistant"; content: string }[],
   message: string
 ) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const { data: agent } = await supabase
     .from("ai_agents")
@@ -184,9 +183,9 @@ export async function testAiAgentMessage(
 // currently-active automation (tagged disabled_by_ai so we know which ones
 // to restore), and turning it off brings back exactly those.
 export async function toggleAiAgentActive(isActive: boolean) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   if (isActive) {
     const { error: pauseError } = await supabase
@@ -239,9 +238,9 @@ export async function addAiAgentMedia(_prevState: unknown, formData: FormData) {
   const validationError = validateMediaFile(kind, file);
   if (validationError) return { error: validationError };
 
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const admin = createAdminClient();
   const path = `${workspaceId}/ai-agent-media/${Date.now()}-${file.name}`;
@@ -289,9 +288,9 @@ export async function editAiAgentMedia(_prevState: unknown, formData: FormData) 
     return { error: "Describe cuándo debe usarlo el agente (ej: \"pregunten cómo pagar\")." };
   }
 
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const update: Record<string, unknown> = { label, trigger_description: triggerDescription };
 
@@ -332,9 +331,9 @@ export async function editAiAgentMedia(_prevState: unknown, formData: FormData) 
 }
 
 export async function deleteAiAgentMedia(id: string) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   await supabase.from("ai_agent_media").delete().eq("id", id).eq("workspace_id", workspaceId);
   revalidatePath("/dashboard/settings");
@@ -342,9 +341,9 @@ export async function deleteAiAgentMedia(id: string) {
 }
 
 export async function setAiManuallyPaused(conversationId: string, paused: boolean) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const { error } = await supabase
     .from("conversations")
@@ -361,9 +360,9 @@ export async function setAiManuallyPaused(conversationId: string, paused: boolea
 // pause flag (agent chose to take over) — one button reactivates the AI on
 // this chat regardless of which reason paused it.
 export async function clearAiHandoff(conversationId: string) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const { error } = await supabase
     .from("conversations")

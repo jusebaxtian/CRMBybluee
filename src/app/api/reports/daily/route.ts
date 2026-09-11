@@ -3,12 +3,13 @@ import ExcelJS from "exceljs";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
 import { bogotaDayRange } from "@/lib/reports/day";
+import { NO_WORKSPACE_ERROR } from "@/lib/auth/with-workspace";
 
 export async function GET() {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
   if (!workspaceId) {
-    return NextResponse.json({ error: "No se encontró tu workspace." }, { status: 401 });
+    return NextResponse.json({ error: NO_WORKSPACE_ERROR }, { status: 401 });
   }
 
   const role = await getWorkspaceRole(supabase, workspaceId);

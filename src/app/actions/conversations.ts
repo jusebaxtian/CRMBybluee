@@ -1,8 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceId } from "@/lib/workspace";
+import { requireWorkspace } from "@/lib/auth/with-workspace";
 import { MAX_PINNED_CONVERSATIONS } from "@/lib/inbox/pins";
 
 /**
@@ -12,9 +11,12 @@ import { MAX_PINNED_CONVERSATIONS } from "@/lib/inbox/pins";
  * un chat, sus agentes también lo ven arriba.
  */
 export async function setConversationPinned(conversationId: string, pinned: boolean) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  // Se devuelve un literal y no `ctx`: si se retorna el objeto tipado del
+  // ayudante, TypeScript infiere otra union y los consumidores que hacen
+  // `result?.error` dejan de compilar.
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   if (pinned) {
     // Se cuenta antes de escribir. No es a prueba de dos personas fijando en

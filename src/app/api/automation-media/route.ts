@@ -5,6 +5,7 @@ import { getWorkspaceId } from "@/lib/workspace";
 import { validateMediaMime, validateMediaSize, type MediaKind } from "@/lib/whatsapp/media-limits";
 import { transcodeVideoToH264 } from "@/lib/whatsapp/video-transcode";
 import { toPublicUrl } from "@/lib/supabase/config";
+import { NO_WORKSPACE_ERROR } from "@/lib/auth/with-workspace";
 
 const mediaKindByActionType: Record<string, MediaKind> = {
   send_image: "image",
@@ -20,7 +21,7 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
   if (!workspaceId) {
-    return NextResponse.json({ error: "No se encontró tu workspace." }, { status: 401 });
+    return NextResponse.json({ error: NO_WORKSPACE_ERROR }, { status: 401 });
   }
 
   const formData = await request.formData();

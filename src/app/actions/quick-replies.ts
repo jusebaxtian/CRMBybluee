@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceId } from "@/lib/workspace";
 import { executeAction, type AutomationAction } from "@/lib/automations/engine";
+import { requireWorkspace } from "@/lib/auth/with-workspace";
 
 type ActionInput = {
   action_type:
@@ -67,9 +67,9 @@ export async function createQuickReply(_prevState: unknown, formData: FormData) 
   const validationError = validateActions(actions);
   if (validationError) return { error: validationError };
 
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const { data: quickReply, error } = await supabase
     .from("quick_replies")

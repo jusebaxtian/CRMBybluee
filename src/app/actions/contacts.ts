@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache";
 import ExcelJS from "exceljs";
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceId } from "@/lib/workspace";
 import { maybeTrackPurchaseFromTag } from "@/lib/meta/conversions";
 import { normalizeWaId } from "@/lib/phone";
+import { requireWorkspace } from "@/lib/auth/with-workspace";
 
 type ImportRow = {
   phone: string;
@@ -103,9 +103,9 @@ export async function importContactsFile(formData: FormData) {
   const file = formData.get("file") as File | null;
   if (!file) return { error: "No se recibió ningún archivo." };
 
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const isExcel = file.name.toLowerCase().endsWith(".xlsx");
   const rawRows = isExcel
@@ -214,9 +214,9 @@ export async function createContact(_prevState: unknown, formData: FormData) {
 
   if (phone.length < 8) return { error: "Ingresa un número válido con código de país." };
 
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const { error } = await supabase.from("contacts").upsert(
     { workspace_id: workspaceId, wa_id: phone, name: name || null },
@@ -242,9 +242,9 @@ export async function updateContactNotes(contactId: string, notes: string) {
 }
 
 export async function updateContact(contactId: string, name: string, phone: string) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const cleanPhone = phone.replace(/[^0-9]/g, "");
   if (cleanPhone.length < 8) return { error: "Ingresa un número válido con código de país." };
@@ -263,9 +263,9 @@ export async function updateContact(contactId: string, name: string, phone: stri
 const MAX_BULK_DELETE = 1000;
 
 export async function bulkDeleteContacts(contactIds: string[]) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
   if (contactIds.length === 0) return { error: "No hay contactos seleccionados." };
   // Enforced here too, not just in the UI — the RPC itself (see 0073) can
   // handle far more than this in one call, but capping the batch size keeps
@@ -290,9 +290,9 @@ export async function bulkDeleteContacts(contactIds: string[]) {
 }
 
 export async function bulkAddTagToContacts(contactIds: string[], tagId: string) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
   if (contactIds.length === 0) return { error: "No hay contactos seleccionados." };
   if (!tagId) return { error: "Selecciona una etiqueta." };
 

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
 import { runTagAddedAutomations } from "@/lib/automations/engine";
 import { maybeTrackPurchaseFromTag } from "@/lib/meta/conversions";
+import { requireWorkspace } from "@/lib/auth/with-workspace";
 
 export async function createTag(_prevState: unknown, formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
@@ -13,9 +14,9 @@ export async function createTag(_prevState: unknown, formData: FormData) {
   const marksPurchase = formData.get("marksPurchase") === "on";
   if (!name) return { error: "El nombre es obligatorio." };
 
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const { error } = await supabase.from("tags").insert({
     workspace_id: workspaceId,
@@ -39,9 +40,9 @@ export async function updateTag(
   const color = input.color.trim();
   if (!name) return { error: "El nombre es obligatorio." };
 
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const { error } = await supabase
     .from("tags")
@@ -125,9 +126,9 @@ export async function toggleContactTag(input: {
 // Persists the drag-and-drop order from the dashboard's tag stats table —
 // `orderedTagIds` is the full list in its new order, position = index.
 export async function reorderTags(orderedTagIds: string[]) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   await Promise.all(
     orderedTagIds.map((tagId, index) =>

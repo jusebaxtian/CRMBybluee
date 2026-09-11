@@ -4,10 +4,10 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPlatformAdmin } from "@/lib/admin";
-import { getWorkspaceId } from "@/lib/workspace";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { generateBoldIntegritySignature, getBoldTransactionStatus } from "@/lib/bold";
 import { addBillingCycle } from "@/lib/billing/cycle";
+import { requireWorkspace } from "@/lib/auth/with-workspace";
 
 async function getWorkspaceBillingCycle(
   supabase: SupabaseClient,
@@ -37,9 +37,9 @@ type BoldOrderResult =
 // recomputes the amount to charge from whatever plan is now on the
 // workspace, so this must run before createBoldOrder/manual transfer.
 export async function selectWorkspacePlan(planId: string) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const { data: plan } = await supabase
     .from("plans")
@@ -60,9 +60,9 @@ export async function selectWorkspacePlan(planId: string) {
 }
 
 export async function createBoldOrder(amountCents: number): Promise<BoldOrderResult> {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   // Our DB/UI store prices as "amount_cents" (COP * 100, e.g. 15000000 = $150.000)
   // for consistent display everywhere else, but Bold's data-amount expects the
@@ -158,9 +158,9 @@ export async function confirmBoldPayment(orderId: string, txStatus: string | nul
 }
 
 export async function uploadPaymentProof(formData: FormData) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const file = formData.get("proof") as File | null;
   const amountStr = String(formData.get("amount") ?? "");

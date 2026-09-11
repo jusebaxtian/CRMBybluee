@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isPlatformAdmin } from "@/lib/admin";
-import { getWorkspaceId } from "@/lib/workspace";
+import { requireWorkspace } from "@/lib/auth/with-workspace";
 
 export async function createNotification(_prevState: unknown, formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
@@ -66,9 +66,11 @@ export async function deleteNotification(notificationId: string) {
 }
 
 export async function markNotificationRead(notificationId: string) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return;
+  const ctx = await requireWorkspace();
+  // Esta accion no informa errores: se dispara al abrir la campana y nadie
+  // mira lo que devuelve. Sin espacio de trabajo simplemente no marca nada.
+  if ("error" in ctx) return;
+  const { supabase, workspaceId } = ctx;
 
   await supabase
     .from("notification_reads")

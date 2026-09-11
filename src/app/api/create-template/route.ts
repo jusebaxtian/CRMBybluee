@@ -11,6 +11,7 @@ import { getWorkspaceId } from "@/lib/workspace";
 import { validateMediaFile, validateMediaMime, validateMediaSize } from "@/lib/whatsapp/media-limits";
 import { transcodeVideoToH264 } from "@/lib/whatsapp/video-transcode";
 import { toPublicUrl } from "@/lib/supabase/config";
+import { NO_WORKSPACE_ERROR } from "@/lib/auth/with-workspace";
 
 // Plain REST endpoint (not a Server Action) so the client can submit via
 // XMLHttpRequest and get real upload progress for the header file — fetch/
@@ -90,7 +91,7 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
   if (!workspaceId) {
-    return NextResponse.json({ error: "No se encontró tu workspace." }, { status: 401 });
+    return NextResponse.json({ error: NO_WORKSPACE_ERROR }, { status: 401 });
   }
 
   const { data: account } = await supabase

@@ -21,10 +21,11 @@ import {
 } from "@/lib/whatsapp/graph";
 import { validateMediaMime, validateMediaSize } from "@/lib/whatsapp/media-limits";
 import { transcodeVideoToH264 } from "@/lib/whatsapp/video-transcode";
-import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
+import { getWorkspaceRole } from "@/lib/workspace";
 import { buildTemplateSendParams } from "@/lib/whatsapp/variables";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { toPublicUrl } from "@/lib/supabase/config";
+import { requireWorkspace } from "@/lib/auth/with-workspace";
 
 const execFileAsync = promisify(execFile);
 
@@ -194,9 +195,9 @@ export async function connectWhatsApp(input: {
 }
 
 export async function disconnectWhatsApp(password: string, accountId: string) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const role = await getWorkspaceRole(supabase, workspaceId);
   if (role !== "owner" && role !== "admin") {
@@ -230,9 +231,9 @@ export async function disconnectWhatsApp(password: string, accountId: string) {
 }
 
 export async function renameWhatsAppAccount(accountId: string, label: string) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const { error } = await supabase
     .from("whatsapp_accounts")
@@ -500,9 +501,9 @@ export async function sendMessage(input: {
 }
 
 export async function sendMessageToContact(input: { contactId: string; body: string }) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const { data: contact } = await supabase
     .from("contacts")
@@ -624,9 +625,9 @@ export async function sendTemplateToConversation(input: {
 // The Dataset ID from Events Manager that Click-to-WhatsApp Conversions API
 // events get sent to — see src/lib/meta/conversions.ts for where it's used.
 export async function saveCtwaDatasetId(datasetId: string, accountId: string) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const { error } = await supabase
     .from("whatsapp_accounts")

@@ -2,13 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { validateMediaMime, validateMediaSize } from "@/lib/whatsapp/media-limits";
-import { getWorkspaceId } from "@/lib/workspace";
 import { resolveCampaignAudience, type AudienceParams } from "@/lib/campaigns/audience";
 import { startCampaignSend } from "@/lib/campaigns/send";
 import { toPublicUrl } from "@/lib/supabase/config";
+import { requireWorkspace } from "@/lib/auth/with-workspace";
 
 function readAudienceParams(formData: FormData, sendType: "template" | "free_text"): AudienceParams {
   return {
@@ -41,9 +40,9 @@ function readScheduledAt(formData: FormData): { scheduledAt: string | null; erro
 }
 
 export async function uploadCampaignMedia(formData: FormData) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const file = formData.get("file") as File | null;
   const mediaKind = String(formData.get("mediaKind") ?? "") as "image" | "video" | "document";
@@ -72,9 +71,9 @@ export async function uploadCampaignMedia(formData: FormData) {
 // before creating anything — same audience resolution the real create/edit
 // actions use, so the number never lies.
 export async function previewAudienceCount(formData: FormData) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const sendType = String(formData.get("sendType") ?? "template") as "template" | "free_text";
   const { contactIds } = await resolveCampaignAudience(supabase, workspaceId, readAudienceParams(formData, sendType));
@@ -102,9 +101,9 @@ export async function createCampaign(_prevState: unknown, formData: FormData) {
   const { scheduledAt, error: scheduleError } = readScheduledAt(formData);
   if (scheduleError) return { error: scheduleError };
 
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const { data: campaign, error } = await supabase
     .from("campaigns")
@@ -166,9 +165,9 @@ export async function createCampaign(_prevState: unknown, formData: FormData) {
 // the filters may have changed. Only allowed while status is "draft" (once
 // it's sending/completed/failed, editing wouldn't reach anyone new).
 export async function updateCampaign(campaignId: string, _prevState: unknown, formData: FormData) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const { data: existing } = await supabase
     .from("campaigns")
@@ -252,9 +251,9 @@ export async function updateCampaign(campaignId: string, _prevState: unknown, fo
 }
 
 export async function deleteCampaign(campaignId: string) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const { data: existing } = await supabase
     .from("campaigns")
@@ -275,9 +274,12 @@ export async function deleteCampaign(campaignId: string) {
 }
 
 export async function sendCampaign(campaignId: string) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No autenticado." };
+  // Decia "No autenticado.", pero la condicion no es esa: el usuario tiene
+  // sesion y lo que falta es el espacio de trabajo. Ahora dice lo mismo que
+  // las demas acciones.
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   // startCampaignSend awaits only the fast setup checks, then keeps sending
   // in the background — a campaign with thousands of recipients used to

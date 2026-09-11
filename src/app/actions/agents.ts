@@ -1,14 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
+import { getWorkspaceRole } from "@/lib/workspace";
+import { requireWorkspace } from "@/lib/auth/with-workspace";
 
 async function requireOwnerOrAdmin() {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." } as const;
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error } as const;
+  const { supabase, workspaceId } = ctx;
 
   const role = await getWorkspaceRole(supabase, workspaceId);
   if (role !== "owner" && role !== "admin") {
@@ -114,9 +114,9 @@ export async function deleteAgentProfile(userId: string) {
 }
 
 export async function assignConversationAgent(conversationId: string, agentId: string | null) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const { error } = await supabase
     .from("conversations")

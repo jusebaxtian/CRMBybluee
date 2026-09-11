@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   createMetaTemplate,
@@ -10,15 +9,14 @@ import {
   uploadTemplateHeaderExample,
   type TemplateButtonInput,
 } from "@/lib/whatsapp/graph";
-import { getWorkspaceId } from "@/lib/workspace";
 import { validateMediaFile } from "@/lib/whatsapp/media-limits";
 import { toPublicUrl } from "@/lib/supabase/config";
+import { requireWorkspace } from "@/lib/auth/with-workspace";
 
 export async function syncTemplates() {
-  const supabase = await createClient();
-
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const { data: account } = await supabase
     .from("whatsapp_accounts")
@@ -113,9 +111,9 @@ export async function syncTemplates() {
 // creation time), so sends fail until the actual file is provided here
 // once. Same storage path/flow as create-template-form's own upload.
 export async function setTemplateHeaderMedia(templateId: string, formData: FormData) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const { data: template } = await supabase
     .from("templates")
@@ -216,9 +214,9 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
   // QR, URL, QR is rejected) — reorder rather than trust the UI's order.
   buttons.sort((a, b) => (a.type === b.type ? 0 : a.type === "QUICK_REPLY" ? -1 : 1));
 
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const { data: account } = await supabase
     .from("whatsapp_accounts")
@@ -326,9 +324,9 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
 }
 
 export async function deleteTemplate(templateId: string) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const { data: template } = await supabase
     .from("templates")

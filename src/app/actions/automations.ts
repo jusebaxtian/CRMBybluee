@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getWorkspaceId } from "@/lib/workspace";
 import { runActionsForAutomation } from "@/lib/automations/engine";
 import { toPublicUrl } from "@/lib/supabase/config";
+import { requireWorkspace } from "@/lib/auth/with-workspace";
 
 type ActionInput = {
   action_type:
@@ -61,9 +61,9 @@ function actionRow(a: ActionInput, automationId: string, index: number) {
 }
 
 export async function uploadAutomationActionMedia(formData: FormData) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const file = formData.get("file") as File | null;
   if (!file || file.size === 0) return { error: "Selecciona un archivo." };
@@ -135,9 +135,9 @@ export async function createAutomation(_prevState: unknown, formData: FormData) 
     }
   }
 
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   // The AI agent and keyword/tag automations are mutually exclusive (see
   // toggleAiAgentActive) — a new one created while the AI is on starts
@@ -231,9 +231,9 @@ export async function updateAutomation(_prevState: unknown, formData: FormData) 
     }
   }
 
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const { error } = await supabase
     .from("automations")
@@ -259,9 +259,9 @@ export async function updateAutomation(_prevState: unknown, formData: FormData) 
 }
 
 export async function toggleAutomationActive(automationId: string, isActive: boolean) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   // The AI agent and keyword/tag automations are mutually exclusive (see
   // toggleAiAgentActive) — while the AI is on, automations stay paused and
@@ -301,9 +301,9 @@ export async function deleteAutomation(automationId: string) {
 // by an event. Both automation and contact are re-checked against the
 // caller's workspace so an id from another tenant can't be run here.
 export async function runAutomationManually(automationId: string, contactId: string) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const { data: automation } = await supabase
     .from("automations")
@@ -337,9 +337,9 @@ export async function runAutomationManually(automationId: string, contactId: str
 // wait-for-reply state) so the next matching message/tap fires everything
 // again, as if they'd never triggered any automation before.
 export async function resetContactAutomationHistory(contactId: string) {
-  const supabase = await createClient();
-  const workspaceId = await getWorkspaceId(supabase);
-  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
 
   const { data: contact } = await supabase
     .from("contacts")
