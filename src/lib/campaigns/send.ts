@@ -113,18 +113,28 @@ async function prepareCampaignSend(
   const account = await resolveSendAccount(supabase, workspaceId, campaign.whatsapp_account_id);
   if (!account) return { error: "Este workspace no tiene WhatsApp conectado." };
 
-  // started_at es lo que la lista muestra como fecha del envio; created_at
-  // solo dice cuando se creo el borrador.
+  const ahora = new Date().toISOString();
+
   await supabase
     .from("campaigns")
     // last_progress_at arranca junto con el envio: sin el, el planificador
     // veria la campaña en "sending" sin latido y la daria por estancada.
-    .update({
-      status: "sending",
-      started_at: new Date().toISOString(),
-      last_progress_at: new Date().toISOString(),
-    })
+    .update({ status: "sending", last_progress_at: ahora })
     .eq("id", campaignId);
+
+  // started_at es lo que la lista muestra como fecha del envio; created_at
+  // solo dice cuando se creo el borrador.
+  //
+  // Se escribe solo si estaba vacio, porque esta funcion tambien corre al
+  // reanudar una campaña estancada. Antes se reescribia siempre: una campaña
+  // interrumpida de noche y reanudada por la mañana aparecia fechada en la
+  // reanudacion, no en su envio real. Visto en la prueba de matar el
+  // trabajador a mitad de envio: 13:15 paso a 13:26.
+  await supabase
+    .from("campaigns")
+    .update({ started_at: ahora })
+    .eq("id", campaignId)
+    .is("started_at", null);
 
   return { data: { campaign, template, templateHeaderMedia, account } };
 }
