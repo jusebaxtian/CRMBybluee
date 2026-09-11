@@ -29,6 +29,25 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
+## Pruebas
+
+```bash
+npm test          # una pasada
+npm run test:watch  # re-ejecuta al guardar
+```
+
+Vitest en entorno `node`. Cubren lógica pura, sin red ni base de datos, así que
+corren en menos de medio segundo.
+
+| Archivo | Qué protege |
+|---|---|
+| `src/lib/workspace.test.ts` | **Aislamiento entre clientes.** Que una cookie de suplantación falsificada no dé acceso al espacio de otro |
+| `src/lib/whatsapp/variables.test.ts` | Qué se pone en `{{1}}`. Meta rechaza el envío si el parámetro va vacío o trae saltos de línea |
+| `src/lib/reports/day.test.ts` | Que el corte del día sea en hora de Colombia (UTC-5) y no en la del servidor |
+| `src/lib/automations/engine.test.ts` | La exclusión por etiqueta, que apaga **todas** las automatizaciones, la IA y los seguimientos |
+
+Al tocar cualquiera de esos módulos, corre las pruebas antes de desplegar.
+
 ## Deploy on Vercel
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
