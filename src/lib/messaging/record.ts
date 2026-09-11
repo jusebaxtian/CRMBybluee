@@ -94,3 +94,56 @@ export async function recordOutboundMessage(
 
   return { error: insercion.error?.message ?? actualizacion.error?.message ?? null };
 }
+
+/**
+ * Tipo del mensaje entrante, tal como lo nombra Meta.
+ *
+ * Es `string` a proposito. Hoy llegan text, image, audio, video, document,
+ * sticker, button, reaction, contacts y unsupported, pero el conjunto lo
+ * define Meta y puede crecer sin avisar. La columna es `text` sin
+ * restriccion de valores (las que si existen son sobre `direction` y
+ * `status`), asi que una union cerrada aqui romperia la compilacion sin
+ * proteger nada en la base: guardaria el tipo nuevo igual.
+ */
+export type InboundMessageType = string;
+
+export type InboundMessage = {
+  conversationId: string;
+  messageType: InboundMessageType;
+  waMessageId: string;
+  /** Hora que reporta Meta, no la de recepcion: el webhook puede llegar tarde. */
+  createdAt: string;
+  body?: string | null;
+  mediaUrl?: string | null;
+  mediaMimeType?: string | null;
+  contextWaMessageId?: string | null;
+};
+
+/**
+ * Persiste un mensaje entrante.
+ *
+ * A diferencia de la saliente, esta NO adelanta `conversations`, y no es un
+ * olvido. La ingesta crea la conversacion con un upsert que ya fija
+ * `last_message_at` con la marca de Meta, y ese upsert tiene que ir antes
+ * porque de el sale el `conversation_id`. Adelantarla otra vez aqui la
+ * pisaria con la hora de recepcion, que no es la misma cuando el webhook
+ * llega tarde.
+ */
+export async function recordInboundMessage(
+  supabase: SupabaseClient,
+  message: InboundMessage
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.from("messages").insert({
+    conversation_id: message.conversationId,
+    direction: "in",
+    message_type: message.messageType,
+    body: message.body ?? null,
+    media_url: message.mediaUrl ?? null,
+    media_mime_type: message.mediaMimeType ?? null,
+    wa_message_id: message.waMessageId,
+    context_wa_message_id: message.contextWaMessageId ?? null,
+    status: "delivered",
+    created_at: message.createdAt,
+  });
+  return { error: error?.message ?? null };
+}

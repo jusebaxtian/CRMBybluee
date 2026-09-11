@@ -12,6 +12,7 @@ import { notifyNewMessage } from "@/lib/push/send";
 import { maybeRespondWithAiAgent } from "@/lib/ai/agent";
 import { transcribeAudio } from "@/lib/ai/providers";
 import { toPublicUrl } from "@/lib/supabase/config";
+import { recordInboundMessage } from "@/lib/messaging/record";
 
 // Translates the most common Cloud API delivery-failure codes into a short,
 // actionable message an agent can actually understand — the raw error is
@@ -392,17 +393,15 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
               (message.document?.filename ?? null) ??
               (audioTranscript ? `🎙️ ${audioTranscript}` : null);
 
-        const { error: insertError } = await supabase.from("messages").insert({
-          conversation_id: conversation.id,
-          direction: "in",
-          message_type: isButtonTap ? "button" : message.type,
+        const { error: insertError } = await recordInboundMessage(supabase, {
+          conversationId: conversation.id,
+          messageType: isButtonTap ? "button" : message.type,
           body: messageBody,
-          media_url: mediaUrl,
-          media_mime_type: mediaMimeType,
-          wa_message_id: message.id,
-          context_wa_message_id: contextWaMessageId,
-          status: "delivered",
-          created_at: new Date(Number(message.timestamp) * 1000).toISOString(),
+          mediaUrl,
+          mediaMimeType,
+          waMessageId: message.id,
+          contextWaMessageId,
+          createdAt: new Date(Number(message.timestamp) * 1000).toISOString(),
         });
         // This insert's error used to go unchecked — a failure here looked
         // identical to the webhook never having arrived at all.

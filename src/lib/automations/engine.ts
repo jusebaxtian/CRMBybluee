@@ -10,6 +10,7 @@ import {
 import { maybeTrackPurchaseFromTag } from "@/lib/meta/conversions";
 import { substituteContactVariables, buildTemplateSendParams } from "@/lib/whatsapp/variables";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
+import { recordOutboundMessage } from "@/lib/messaging/record";
 
 export type Automation = {
   id: string;
@@ -238,15 +239,13 @@ export async function executeAction(
         : await sendTextMessage(account.phone_number_id, account.access_token, contact.wa_id, body);
 
     if (conversationId) {
-      await supabase.from("messages").insert({
-        conversation_id: conversationId,
-        direction: "out",
-        message_type: "text",
+      await recordOutboundMessage(supabase, {
+        conversationId,
+        messageType: "text",
         body,
         buttons: urlButton ? [urlButton] : quickReplyButtons && quickReplyButtons.length > 0 ? quickReplyButtons : null,
-        wa_message_id: result.messages[0]?.id,
-        status: "sent",
-        via_automation_id: automation.id,
+        waMessageId: result.messages[0]?.id,
+        viaAutomationId: automation.id,
       });
     }
   }
@@ -288,15 +287,13 @@ export async function executeAction(
     );
 
     if (conversationId) {
-      await supabase.from("messages").insert({
-        conversation_id: conversationId,
-        direction: "out",
-        message_type: mediaType,
+      await recordOutboundMessage(supabase, {
+        conversationId,
+        messageType: mediaType,
         body: mediaType === "document" ? action.media_filename : action.message_body,
-        media_url: action.media_url,
-        wa_message_id: result.messages[0]?.id,
-        status: "sent",
-        via_automation_id: automation.id,
+        mediaUrl: action.media_url,
+        waMessageId: result.messages[0]?.id,
+        viaAutomationId: automation.id,
       });
     }
   }
@@ -324,25 +321,17 @@ export async function executeAction(
     );
 
     if (conversationId) {
-      await supabase.from("messages").insert({
-        conversation_id: conversationId,
-        direction: "out",
-        message_type: headerMedia ? headerMedia.type : "template",
+      await recordOutboundMessage(supabase, {
+        conversationId,
+        messageType: headerMedia ? headerMedia.type : "template",
         body: action.templates.body_text || `[Plantilla: ${action.templates.meta_template_name}]`,
-        media_url: headerMedia?.link ?? null,
-        wa_message_id: result.messages[0]?.id,
-        status: "sent",
-        via_automation_id: automation.id,
+        mediaUrl: headerMedia?.link ?? null,
+        waMessageId: result.messages[0]?.id,
+        viaAutomationId: automation.id,
       });
     }
   }
 
-  if (conversationId) {
-    await supabase
-      .from("conversations")
-      .update({ last_message_at: new Date().toISOString() })
-      .eq("id", conversationId);
-  }
 }
 
 async function fetchActions(

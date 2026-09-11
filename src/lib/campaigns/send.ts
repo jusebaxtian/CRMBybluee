@@ -4,6 +4,7 @@ import { mediaKindFromMime } from "@/lib/whatsapp/media-limits";
 import { substituteContactVariables, buildTemplateSendParams } from "@/lib/whatsapp/variables";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { isWindowOpen } from "@/lib/whatsapp/message-window";
+import { recordOutboundMessage } from "@/lib/messaging/record";
 
 // media_filename doesn't carry a mime type — infer a close-enough one from
 // its extension just to pick the right WhatsApp media kind (image/video/
@@ -307,20 +308,14 @@ async function runCampaignSendLoop(
 
         const conversationId = await getOrCreateConversation(supabase, workspaceId, recipient.contact_id, account.id);
         if (conversationId) {
-          await supabase.from("messages").insert({
-            conversation_id: conversationId,
-            direction: "out",
-            message_type: templateHeaderMedia ? templateHeaderMedia.type : "template",
+          await recordOutboundMessage(supabase, {
+            conversationId,
+            messageType: templateHeaderMedia ? templateHeaderMedia.type : "template",
             body: template.body_text,
-            media_url: templateHeaderMedia?.link ?? null,
-            wa_message_id: result.messages[0]?.id,
-            status: "sent",
-            exclude_from_followups: true,
+            mediaUrl: templateHeaderMedia?.link ?? null,
+            waMessageId: result.messages[0]?.id,
+            excludeFromFollowups: true,
           });
-          await supabase
-            .from("conversations")
-            .update({ last_message_at: new Date().toISOString() })
-            .eq("id", conversationId);
         }
 
         await supabase
@@ -375,22 +370,16 @@ async function runCampaignSendLoop(
         }
 
         if (conversationId) {
-          await supabase.from("messages").insert({
-            conversation_id: conversationId,
-            direction: "out",
-            message_type: mediaKind ?? "text",
+          await recordOutboundMessage(supabase, {
+            conversationId,
+            messageType: mediaKind ?? "text",
             body: personalizedBody,
-            media_url: campaign.media_url,
-            wa_message_id: result.messages[0]?.id,
-            status: "sent",
+            mediaUrl: campaign.media_url,
+            waMessageId: result.messages[0]?.id,
             // Mass campaigns run fully independent of follow-up sequences —
             // this must not cancel/reset/start one (see the DB trigger).
-            exclude_from_followups: true,
+            excludeFromFollowups: true,
           });
-          await supabase
-            .from("conversations")
-            .update({ last_message_at: new Date().toISOString() })
-            .eq("id", conversationId);
         }
 
         await supabase

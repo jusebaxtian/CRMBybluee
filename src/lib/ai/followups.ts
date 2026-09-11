@@ -6,6 +6,7 @@ import { isContactExcludedFromAutomations } from "@/lib/automations/engine";
 import { buildTemplateSendParams } from "@/lib/whatsapp/variables";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { isWindowOpen } from "@/lib/whatsapp/message-window";
+import { recordOutboundMessage } from "@/lib/messaging/record";
 
 const HISTORY_LIMIT = 20;
 // WhatsApp's customer-service window: free text is only allowed within 24h
@@ -191,14 +192,12 @@ async function sendFollowup(
     if (!text) return;
 
     const result = await sendTextMessage(account.phone_number_id, account.access_token, contact.wa_id, text);
-    await supabase.from("messages").insert({
-      conversation_id: conversationId,
-      direction: "out",
-      message_type: "text",
+    await recordOutboundMessage(supabase, {
+      conversationId,
+      messageType: "text",
       body: text,
-      wa_message_id: result.messages[0]?.id,
-      status: "sent",
-      exclude_from_followups: true,
+      waMessageId: result.messages[0]?.id,
+      excludeFromFollowups: true,
     });
   } else {
     if (!template) return;
@@ -222,20 +221,14 @@ async function sendFollowup(
       headerMedia,
       buttonUrlParam
     );
-    await supabase.from("messages").insert({
-      conversation_id: conversationId,
-      direction: "out",
-      message_type: headerMedia ? headerMedia.type : "template",
+    await recordOutboundMessage(supabase, {
+      conversationId,
+      messageType: headerMedia ? headerMedia.type : "template",
       body: template.body_text,
-      media_url: headerMedia?.link ?? null,
-      wa_message_id: result.messages[0]?.id,
-      status: "sent",
-      exclude_from_followups: true,
+      mediaUrl: headerMedia?.link ?? null,
+      waMessageId: result.messages[0]?.id,
+      excludeFromFollowups: true,
     });
   }
 
-  await supabase
-    .from("conversations")
-    .update({ last_message_at: new Date().toISOString() })
-    .eq("id", conversationId);
 }

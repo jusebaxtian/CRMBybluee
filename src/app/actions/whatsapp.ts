@@ -26,6 +26,7 @@ import { buildTemplateSendParams } from "@/lib/whatsapp/variables";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { toPublicUrl } from "@/lib/supabase/config";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
+import { recordOutboundMessage } from "@/lib/messaging/record";
 
 const execFileAsync = promisify(execFile);
 
@@ -269,25 +270,17 @@ async function sendToConversation(
     );
 
     // Independent writes — no need to wait on one before starting the other.
-    await Promise.all([
-      supabase.from("messages").insert({
-        conversation_id: conversationId,
-        direction: "out",
-        message_type: "text",
-        body,
-        wa_message_id: result.messages[0]?.id,
-        context_wa_message_id: replyToWaMessageId ?? null,
-        status: "sent",
-        // Flags this as a human agent actively answering — campaigns skip a
-        // contact with a recent sent_by_support message so a mass send
-        // doesn't interrupt a conversation someone's live in right now.
-        sent_by_support: true,
-      }),
-      supabase
-        .from("conversations")
-        .update({ last_message_at: new Date().toISOString() })
-        .eq("id", conversationId),
-    ]);
+    await recordOutboundMessage(supabase, {
+      conversationId,
+      messageType: "text",
+      body,
+      waMessageId: result.messages[0]?.id,
+      contextWaMessageId: replyToWaMessageId ?? null,
+      // Flags this as a human agent actively answering — campaigns skip a
+      // contact with a recent sent_by_support message so a mass send
+      // doesn't interrupt a conversation someone's live in right now.
+      sentBySupport: true,
+    });
 
     revalidatePath(`/dashboard/inbox/${conversationId}`);
     revalidatePath("/dashboard/inbox");
@@ -436,23 +429,15 @@ export async function sendChatMedia(formData: FormData) {
       uploadFilename
     );
 
-    await Promise.all([
-      supabase.from("messages").insert({
-        conversation_id: conversationId,
-        direction: "out",
-        message_type: mediaType,
-        body: mediaType === "document" ? uploadFilename : null,
-        media_url: publicUrl,
-        media_mime_type: uploadContentType,
-        wa_message_id: result.messages[0]?.id,
-        status: "sent",
-        sent_by_support: true,
-      }),
-      supabase
-        .from("conversations")
-        .update({ last_message_at: new Date().toISOString() })
-        .eq("id", conversationId),
-    ]);
+    await recordOutboundMessage(supabase, {
+      conversationId,
+      messageType: mediaType,
+      body: mediaType === "document" ? uploadFilename : null,
+      mediaUrl: publicUrl,
+      mediaMimeType: uploadContentType,
+      waMessageId: result.messages[0]?.id,
+      sentBySupport: true,
+    });
 
     revalidatePath(`/dashboard/inbox/${conversationId}`);
     revalidatePath("/dashboard/inbox");
@@ -597,22 +582,14 @@ export async function sendTemplateToConversation(input: {
       buttonUrlParam
     );
 
-    await Promise.all([
-      supabase.from("messages").insert({
-        conversation_id: input.conversationId,
-        direction: "out",
-        message_type: headerMedia ? headerMedia.type : "template",
-        body: template.body_text || `[Plantilla: ${template.meta_template_name}]`,
-        media_url: headerMedia?.link ?? null,
-        wa_message_id: result.messages[0]?.id,
-        status: "sent",
-        sent_by_support: true,
-      }),
-      supabase
-        .from("conversations")
-        .update({ last_message_at: new Date().toISOString() })
-        .eq("id", input.conversationId),
-    ]);
+    await recordOutboundMessage(supabase, {
+      conversationId: input.conversationId,
+      messageType: headerMedia ? headerMedia.type : "template",
+      body: template.body_text || `[Plantilla: ${template.meta_template_name}]`,
+      mediaUrl: headerMedia?.link ?? null,
+      waMessageId: result.messages[0]?.id,
+      sentBySupport: true,
+    });
 
     revalidatePath(`/dashboard/inbox/${input.conversationId}`);
     revalidatePath("/dashboard/inbox");
