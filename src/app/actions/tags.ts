@@ -1,8 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceId } from "@/lib/workspace";
 import { runTagAddedAutomations } from "@/lib/automations/engine";
 import { maybeTrackPurchaseFromTag } from "@/lib/meta/conversions";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
@@ -67,11 +65,15 @@ export async function updateTag(
 // a follow-up sequence is first scheduled and again right before it fires;
 // keyword/tag_added automations check it inline before running.
 export async function toggleTagExcludesFollowups(tagId: string, excludesFollowups: boolean) {
-  const supabase = await createClient();
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
+
   const { error } = await supabase
     .from("tags")
     .update({ excludes_followups: excludesFollowups })
-    .eq("id", tagId);
+    .eq("id", tagId)
+    .eq("workspace_id", workspaceId);
   if (error) return { error: error.message };
   revalidatePath("/dashboard/tags");
   return { success: true as const };
@@ -81,16 +83,28 @@ export async function toggleTagExcludesFollowups(tagId: string, excludesFollowup
 // Purchase event back to Meta's Conversions API using their conversation's
 // ctwa_clid, if they came from a Click-to-WhatsApp ad — see src/lib/meta/conversions.ts.
 export async function toggleTagMarksPurchase(tagId: string, marksPurchase: boolean) {
-  const supabase = await createClient();
-  const { error } = await supabase.from("tags").update({ marks_purchase: marksPurchase }).eq("id", tagId);
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
+
+  const { error } = await supabase
+    .from("tags")
+    .update({ marks_purchase: marksPurchase })
+    .eq("id", tagId)
+    .eq("workspace_id", workspaceId);
   if (error) return { error: error.message };
   revalidatePath("/dashboard/tags");
   return { success: true as const };
 }
 
 export async function deleteTag(tagId: string) {
-  const supabase = await createClient();
-  await supabase.from("tags").delete().eq("id", tagId);
+  const ctx = await requireWorkspace();
+  // Sigue devolviendo void: el boton que la llama no muestra errores. Sin
+  // espacio de trabajo no hay nada que borrar.
+  if ("error" in ctx) return;
+  const { supabase, workspaceId } = ctx;
+
+  await supabase.from("tags").delete().eq("id", tagId).eq("workspace_id", workspaceId);
   revalidatePath("/dashboard/tags");
   revalidatePath("/dashboard/contacts");
 }
@@ -100,18 +114,30 @@ export async function toggleContactTag(input: {
   tagId: string;
   assign: boolean;
 }) {
-  const supabase = await createClient();
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return;
+  const { supabase, workspaceId } = ctx;
+
+  // La etiqueta se comprueba a mano porque RLS no la cubre. La politica de
+  // contact_tags valida el contacto (`exists (select 1 from contacts c where
+  // c.id = contact_id and is_workspace_member(c.workspace_id))`) y nada mas:
+  // con el UUID de una etiqueta ajena se le podria pegar a un contacto
+  // propio. El contacto si queda protegido por esa politica.
+  const { data: tag } = await supabase
+    .from("tags")
+    .select("id")
+    .eq("id", input.tagId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (!tag) return;
 
   if (input.assign) {
     await supabase
       .from("contact_tags")
       .insert({ contact_id: input.contactId, tag_id: input.tagId });
 
-    const workspaceId = await getWorkspaceId(supabase);
-    if (workspaceId) {
-      await runTagAddedAutomations(supabase, workspaceId, input.contactId, input.tagId);
-      await maybeTrackPurchaseFromTag(supabase, workspaceId, input.contactId, input.tagId);
-    }
+    await runTagAddedAutomations(supabase, workspaceId, input.contactId, input.tagId);
+    await maybeTrackPurchaseFromTag(supabase, workspaceId, input.contactId, input.tagId);
   } else {
     await supabase
       .from("contact_tags")
