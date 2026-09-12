@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Search, SlidersHorizontal, X, Clock, Megaphone, ShieldAlert, Bot, Check, Pin, PinOff } from "lucide-react";
@@ -101,6 +101,7 @@ export function ConversationListPanel({
   const [quedanMas, setQuedanMas] = useState(hayMas);
   const [cargando, setCargando] = useState(false);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
+  const ultimosFiltrosRef = useRef<typeof filtros | null>(null);
 
   const [query, setQuery] = useState("");
   // Si se llega con un filtro en la URL (desde el dashboard), el panel de
@@ -156,7 +157,12 @@ export function ConversationListPanel({
       return;
     }
     let vigente = true;
-    setCargando(true);
+    // Solo se atenua la lista cuando cambian los filtros. Un refresco de
+    // fondo (realtime, volver de un chat) re-consulta en silencio: si
+    // atenuara, la lista parpadearia con cada mensaje que entra.
+    const cambiaronFiltros = ultimosFiltrosRef.current !== filtros;
+    ultimosFiltrosRef.current = filtros;
+    if (cambiaronFiltros) setCargando(true);
     const id = setTimeout(async () => {
       const resultado = await cargarConversaciones({ filters: filtros });
       if (!vigente) return;
@@ -173,7 +179,13 @@ export function ConversationListPanel({
       vigente = false;
       clearTimeout(id);
     };
-  }, [filtros, hayFiltros, hayMas]);
+    // `primeraPagina` entra en las dependencias a proposito: cambia cada vez
+    // que el servidor vuelve a renderizar (RealtimeRefresh dispara
+    // router.refresh() con cualquier cambio en `conversations`, incluido
+    // marcarla como leida al abrirla). Sin esto, la lista filtrada se pedia
+    // una sola vez y un chat ya leido o respondido seguia apareciendo en
+    // "No leidos" hasta tocar un filtro.
+  }, [filtros, hayFiltros, hayMas, primeraPagina]);
 
   // Sin filtros manda el servidor; con filtros, lo ultimo que se pidio.
   const lista = filtradas ?? primeraPagina;
