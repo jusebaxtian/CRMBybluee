@@ -56,20 +56,18 @@ export type Cuenta = {
   fechaRenovacion: string | null;
 };
 
-/** Dias que dura cada ciclo. `plans.billing_cycle` solo tiene estos valores. */
-const DIAS_POR_CICLO: Record<string, number> = { monthly: 30, semiannual: 180 };
-const DIAS_DE_PRUEBA = 7;
+const DIA_MS = 86_400_000;
 
 export async function cargarCuenta(supabase: SupabaseClient, workspaceId: string): Promise<Cuenta> {
   const [{ data: ws }, { data: sub }] = await Promise.all([
     supabase
       .from("workspaces")
-      .select("status, trial_ends_at, plans(name, billing_cycle)")
+      .select("status, trial_ends_at, created_at, plans(name, billing_cycle)")
       .eq("id", workspaceId)
       .maybeSingle(),
     supabase
       .from("subscriptions")
-      .select("current_period_end")
+      .select("current_period_end, created_at")
       .eq("workspace_id", workspaceId)
       .eq("status", "active")
       .order("current_period_end", { ascending: false })
@@ -81,10 +79,18 @@ export async function cargarCuenta(supabase: SupabaseClient, workspaceId: string
   const enPrueba = ws?.status === "trialing";
   const fin = enPrueba ? ws?.trial_ends_at : sub?.current_period_end;
 
-  const diasRestantes = fin
-    ? Math.ceil((new Date(fin).getTime() - Date.now()) / 86_400_000)
-    : null;
-  const diasTotales = enPrueba ? DIAS_DE_PRUEBA : (DIAS_POR_CICLO[plan?.billing_cycle ?? ""] ?? 30);
+  // El periodo se mide con las fechas REALES, no con el ciclo nominal del
+  // plan. Un plan "mensual" puede llevar un acuerdo anual puesto desde admin
+  // (los hay con 373 dias), y con el ciclo nominal salia "0 / 30" para todo
+  // cliente con mas de 30 dias por delante. No hay current_period_start: el
+  // inicio es la creacion de la suscripcion (o del espacio, en prueba).
+  const inicio = enPrueba ? ws?.created_at : sub?.created_at;
+
+  const diasRestantes = fin ? Math.ceil((new Date(fin).getTime() - Date.now()) / DIA_MS) : null;
+  const diasTotales =
+    fin && inicio
+      ? Math.max(1, Math.round((new Date(fin).getTime() - new Date(inicio).getTime()) / DIA_MS))
+      : Math.max(1, diasRestantes ?? 1);
 
   // El color lo decide el tiempo que queda, no el estado de facturacion:
   // una cuenta "active" a 3 dias de vencer tiene que verse ambar.

@@ -65,7 +65,7 @@ export async function Kpis({ rango, etiquetaPeriodo }: { rango: RangoFechas; eti
         cifra={n(k.sinResponder)}
         pie={
           k.sinResponder > 0 ? (
-            <Link href="/dashboard/inbox?filtro=no-leidos" className="text-dash-green-text hover:underline">
+            <Link href="/dashboard/inbox?filtro=sin-responder" className="text-dash-green-text hover:underline">
               Responder ahora →
             </Link>
           ) : (

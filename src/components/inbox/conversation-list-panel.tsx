@@ -103,7 +103,10 @@ export function ConversationListPanel({
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
 
   const [query, setQuery] = useState("");
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  // Si se llega con un filtro en la URL (desde el dashboard), el panel de
+  // filtros arranca abierto: asi se ve cual esta activo y como quitarlo.
+  const filtroEnUrl = useSearchParams().get("filtro");
+  const [filtersOpen, setFiltersOpen] = useState(filtroEnUrl !== null);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [assignedFilter, setAssignedFilter] = useState<string>(""); // "" = all, "unassigned", or agent id
   const [channelFilter, setChannelFilter] = useState<string>(""); // "" = all channels
@@ -112,6 +115,10 @@ export function ConversationListPanel({
   // forma de enlazar a la bandeja ya filtrada.
   const filtroInicial = useSearchParams().get("filtro");
   const [unreadOnly, setUnreadOnly] = useState(filtroInicial === "no-leidos");
+  // "Sin responder" (el cliente hablo de ultimo) no es "no leido" (hay
+  // entrantes desde que se abrio el chat): un chat abierto y no contestado es
+  // lo primero y no lo segundo. El dashboard enlaza aqui.
+  const [unansweredOnly, setUnansweredOnly] = useState(filtroInicial === "sin-responder");
   const [expiringSoon, setExpiringSoon] = useState(false);
   const [needsHumanOnly, setNeedsHumanOnly] = useState(false);
   // Los filtros activos, en la forma que espera el servidor.
@@ -122,10 +129,11 @@ export function ConversationListPanel({
       tagIds: selectedTagIds,
       assigned: assignedFilter || null,
       unreadOnly,
+      unansweredOnly,
       needsHuman: needsHumanOnly,
       expiringSoon,
     }),
-    [query, channelFilter, selectedTagIds, assignedFilter, unreadOnly, expiringSoon, needsHumanOnly]
+    [query, channelFilter, selectedTagIds, assignedFilter, unreadOnly, unansweredOnly, expiringSoon, needsHumanOnly]
   );
 
   const hayFiltros =
@@ -134,6 +142,7 @@ export function ConversationListPanel({
     selectedTagIds.length > 0 ||
     assignedFilter !== "" ||
     unreadOnly ||
+    unansweredOnly ||
     expiringSoon ||
     needsHumanOnly;
 
@@ -220,6 +229,7 @@ export function ConversationListPanel({
     selectedTagIds.length +
     (assignedFilter ? 1 : 0) +
     (unreadOnly ? 1 : 0) +
+    (unansweredOnly ? 1 : 0) +
     (expiringSoon ? 1 : 0) +
     (needsHumanOnly ? 1 : 0);
 
@@ -236,6 +246,7 @@ export function ConversationListPanel({
     setSelectedTagIds([]);
     setAssignedFilter("");
     setUnreadOnly(false);
+    setUnansweredOnly(false);
     setExpiringSoon(false);
     setNeedsHumanOnly(false);
   }
@@ -333,6 +344,18 @@ export function ConversationListPanel({
               }`}
             >
               No leídos
+            </button>
+            <button
+              type="button"
+              onClick={() => setUnansweredOnly((v) => !v)}
+              title="El cliente escribió de último y nadie ha contestado"
+              className={`self-start rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                unansweredOnly
+                  ? "border-primary bg-primary text-white"
+                  : "border-border text-muted hover:text-foreground"
+              }`}
+            >
+              Sin responder
             </button>
             <button
               type="button"

@@ -78,6 +78,8 @@ export type InboxFilters = {
   /** "" o ausente = todos, "unassigned" = sin asignar, o el id de un agente. */
   assigned?: string | null;
   unreadOnly?: boolean;
+  /** El cliente hablo de ultimo y nadie ha contestado. No es lo mismo que no leido. */
+  unansweredOnly?: boolean;
   needsHuman?: boolean;
   expiringSoon?: boolean;
 };
@@ -126,6 +128,7 @@ export async function loadInboxPage(
     p_unread_only: !!f.unreadOnly,
     p_needs_human: !!f.needsHuman,
     p_expiring_soon: !!f.expiringSoon,
+    p_unanswered_only: !!f.unansweredOnly,
   });
 
   const filas = ((pagina ?? []) as PageRow[]).slice(0, tamano);

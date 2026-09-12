@@ -26,7 +26,7 @@ export async function Pendientes() {
       <header className="flex items-center justify-between">
         <h2 className="font-dash-ui text-[15px] font-semibold text-dash-text">Pendientes de responder</h2>
         <Link
-          href="/dashboard/inbox?filtro=no-leidos"
+          href="/dashboard/inbox?filtro=sin-responder"
           className="font-dash-ui text-[12px] font-semibold text-dash-green-text hover:underline"
         >
           Ver todo
