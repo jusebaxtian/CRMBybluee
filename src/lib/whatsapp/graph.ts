@@ -80,6 +80,27 @@ export async function getPhoneNumberStatus(
   );
 }
 
+export type WabaStatus = {
+  name: string;
+  /** APPROVED, PENDING, REJECTED... la revision de la cuenta de WhatsApp Business. */
+  account_review_status?: string;
+};
+
+/**
+ * Estado de revision de la cuenta de WhatsApp Business (WABA).
+ *
+ * Es lo mas cercano a "portafolio verificado" que devuelve el token del
+ * Embedded Signup. La verificacion del negocio dueño (business
+ * verification_status) exige el permiso business_management, que ese token
+ * no tiene: Meta responde "(#200) Requires business_management permission".
+ * Conseguirlo obliga a cambiar la app en Meta y pasar revision.
+ */
+export async function getWabaStatus(wabaId: string, accessToken: string): Promise<WabaStatus> {
+  return graphFetch(`/${wabaId}?fields=name,account_review_status`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+}
+
 export async function sendTextMessage(
   phoneNumberId: string,
   accessToken: string,

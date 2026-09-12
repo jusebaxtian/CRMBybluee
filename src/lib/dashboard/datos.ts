@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getPhoneNumberStatus } from "@/lib/whatsapp/graph";
+import { getPhoneNumberStatus, getWabaStatus } from "@/lib/whatsapp/graph";
 
 /**
  * Datos del dashboard del cliente.
@@ -120,6 +120,12 @@ export type ConexionApi = {
   /** name_status de Meta: si el nombre para mostrar esta aprobado. */
   nombreVerificado: boolean | null;
   nombreParaMostrar: string | null;
+  /**
+   * account_review_status del WABA. Lo mas cercano a "portafolio verificado"
+   * que devuelve el token: la verificacion del negocio exige un permiso que
+   * el Embedded Signup no concede.
+   */
+  cuentaRevision: "aprobada" | "pendiente" | "rechazada" | null;
 };
 
 export type Conexiones = { conexiones: ConexionApi[]; maxPermitidoPlan: number };
@@ -140,10 +146,10 @@ const CALIDAD: Record<string, ConexionApi["calidad"]> = {
 };
 
 export async function cargarConexiones(supabase: SupabaseClient, workspaceId: string): Promise<Conexiones> {
-  const [{ data: cuentas }, { data: ws }, { count: abiertas }] = await Promise.all([
+  const [{ data: cuentas }, { data: ws }, { data: uso }] = await Promise.all([
     supabase
       .from("whatsapp_accounts")
-      .select("id, phone_number_id, access_token, display_phone_number, label, status")
+      .select("id, phone_number_id, waba_id, access_token, display_phone_number, label, status")
       .eq("workspace_id", workspaceId)
       .order("connected_at", { ascending: true }),
     supabase
@@ -151,14 +157,15 @@ export async function cargarConexiones(supabase: SupabaseClient, workspaceId: st
       .select("plan_id, plans(max_whatsapp_numbers)")
       .eq("id", workspaceId)
       .maybeSingle(),
-    // Meta cuenta por ventana movil de 24 h, no por dia natural. Es por
-    // espacio, no por numero: con varios numeros es una aproximacion.
-    supabase
-      .from("conversation_opens")
-      .select("id", { count: "exact", head: true })
-      .eq("workspace_id", workspaceId)
-      .gte("opened_at", new Date(Date.now() - 86_400_000).toISOString()),
+    // Usuarios distintos a los que se les mando plantilla en 24 h, por
+    // numero: es lo que Meta cuenta contra el limite. Antes salia de
+    // conversation_opens, que esta vacia en todo el sistema.
+    supabase.rpc("dashboard_uso_diario", { p_workspace_id: workspaceId }),
   ]);
+
+  const usadoPorCuenta = new Map(
+    ((uso ?? []) as { whatsapp_account_id: string | null; contactos: number }[]).map((u) => [u.whatsapp_account_id, Number(u.contactos)])
+  );
 
   const plan = ws?.plans as unknown as { max_whatsapp_numbers: number } | null;
   const maxPermitidoPlan = plan?.max_whatsapp_numbers ?? 1;
@@ -166,14 +173,19 @@ export async function cargarConexiones(supabase: SupabaseClient, workspaceId: st
   const conexiones = await Promise.all(
     (cuentas ?? []).map(async (c): Promise<ConexionApi> => {
       let meta: Awaited<ReturnType<typeof getPhoneNumberStatus>> | null = null;
+      let waba: Awaited<ReturnType<typeof getWabaStatus>> | null = null;
       try {
-        meta = await getPhoneNumberStatus(c.phone_number_id, c.access_token);
+        [meta, waba] = await Promise.all([
+          getPhoneNumberStatus(c.phone_number_id, c.access_token),
+          c.waba_id ? getWabaStatus(c.waba_id, c.access_token) : Promise.resolve(null),
+        ]);
       } catch {
         // Meta caido o token vencido: la tarjeta se pinta con lo que hay en
         // la base y las metricas en blanco, no se cae el dashboard entero.
       }
 
       const limiteDiario = meta?.messaging_limit_tier ? (LIMITE_POR_TRAMO[meta.messaging_limit_tier] ?? null) : null;
+      const revision = waba?.account_review_status;
 
       return {
         id: c.id,
@@ -182,9 +194,15 @@ export async function cargarConexiones(supabase: SupabaseClient, workspaceId: st
         estado: c.status === "frozen" ? "bloqueado" : meta ? "conectado" : "revision",
         calidad: meta?.quality_rating ? (CALIDAD[meta.quality_rating] ?? null) : null,
         limiteDiario,
-        usadoHoy: limiteDiario !== null ? (abiertas ?? 0) : null,
-        nombreVerificado: meta?.name_status ? meta.name_status === "APPROVED" : null,
+        usadoHoy: limiteDiario !== null ? (usadoPorCuenta.get(c.id) ?? 0) : null,
+        // AVAILABLE_WITHOUT_REVIEW es un nombre aprobado que no necesito
+        // revision; es el estado mas comun. Tratarlo como pendiente pintaba
+        // "Nombre pendiente" en numeros perfectamente sanos.
+        nombreVerificado: meta?.name_status
+          ? meta.name_status === "APPROVED" || meta.name_status === "AVAILABLE_WITHOUT_REVIEW"
+          : null,
         nombreParaMostrar: meta?.verified_name ?? null,
+        cuentaRevision: !revision ? null : revision === "APPROVED" ? "aprobada" : revision === "REJECTED" ? "rechazada" : "pendiente",
       };
     })
   );

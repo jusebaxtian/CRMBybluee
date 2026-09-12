@@ -32,13 +32,18 @@ function Tarjeta({ c }: { c: ConexionApi }) {
     <article className={`rounded-[13px] border bg-dash-card-nested p-4 ${e.borde}`} aria-label={`Número ${c.numero}`}>
       <div className="flex items-center justify-between gap-2">
         <span className={`whitespace-nowrap font-dash-ui text-[10.5px] font-bold tracking-[.5px] ${e.texto}`}>● {e.etiqueta}</span>
-        {c.nombreVerificado !== null && (
+        {c.cuentaRevision !== null && (
           <span
             className={`whitespace-nowrap rounded-[20px] px-2 py-0.5 font-dash-ui text-[10.5px] font-semibold ${
-              c.nombreVerificado ? "bg-dash-green-13 text-dash-green-text" : "bg-[rgba(251,191,36,0.13)] text-dash-amber"
+              c.cuentaRevision === "aprobada"
+                ? "bg-dash-green-13 text-dash-green-text"
+                : c.cuentaRevision === "rechazada"
+                  ? "bg-[rgba(248,113,113,0.13)] text-dash-red"
+                  : "bg-[rgba(251,191,36,0.13)] text-dash-amber"
             }`}
+            title="Revisión de la cuenta de WhatsApp Business en Meta"
           >
-            {c.nombreVerificado ? "✅ Nombre verificado" : "⏳ Nombre pendiente"}
+            {c.cuentaRevision === "aprobada" ? "✅ Cuenta aprobada" : c.cuentaRevision === "rechazada" ? "❌ Cuenta rechazada" : "⏳ En revisión"}
           </span>
         )}
       </div>
@@ -79,6 +84,13 @@ function Tarjeta({ c }: { c: ConexionApi }) {
           <div className="mt-1.5 h-[5px] overflow-hidden rounded-[3px] bg-dash-track" aria-hidden>
             <div className={`h-full rounded-[3px] transition-[width] duration-[400ms] ease-out ${e.barra}`} style={{ width: `${pctLimite}%` }} />
           </div>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <dt className="whitespace-nowrap font-dash-ui text-[11.5px] font-medium text-dash-text-2">Nombre en Meta</dt>
+          <dd className={`font-dash-ui text-[11.5px] font-semibold ${c.nombreVerificado === null ? "text-dash-text-3" : c.nombreVerificado ? "text-dash-green-text" : "text-dash-amber"}`}>
+            {c.nombreVerificado === null ? "—" : c.nombreVerificado ? "Verificado" : "Pendiente"}
+          </dd>
         </div>
       </dl>
     </article>
