@@ -5,8 +5,15 @@
 -- periodo al servidor y contarlos en JavaScript, que en el espacio grande son
 -- decenas de miles de filas por carga de pantalla.
 --
--- Las tres reciben el espacio como parametro y son SECURITY INVOKER: corren
--- con los permisos de quien llama y RLS impide leer otro espacio.
+-- Las tres son SECURITY DEFINER, como inbox_page. La primera version era
+-- SECURITY INVOKER "para que RLS protegiera", y RLS protegia evaluando su
+-- politica por cada uno de los 37.970 mensajes: dashboard_mensajes tardaba
+-- 126 ms como superusuario y se caia por timeout a traves de PostgREST.
+--
+-- La proteccion de inquilino se hace a mano y explicita: cada funcion
+-- comprueba con is_workspace_member() que quien llama pertenece al espacio
+-- que pide, y si no, devuelve vacio. Es la misma funcion que usan las
+-- politicas RLS.
 --
 -- Cada una devuelve el periodo actual Y el anterior en una sola pasada, para
 -- que los deltas ("+21%") no cuesten una segunda consulta.
@@ -22,12 +29,15 @@ create or replace function dashboard_tiempo_respuesta(
 returns table (actual_seg numeric, anterior_seg numeric)
 language sql
 stable
+security definer
+set search_path to 'public'
 as $$
   with entrantes as (
     select m.id, m.conversation_id, m.created_at
     from messages m
     join conversations c on c.id = m.conversation_id
     where c.workspace_id = p_workspace_id
+      and is_workspace_member(p_workspace_id)
       and m.direction = 'in'
       and m.created_at >= p_desde and m.created_at <= p_hasta
   ),
@@ -66,6 +76,8 @@ returns table (
 )
 language sql
 stable
+security definer
+set search_path to 'public'
 as $$
   select
     count(*) filter (where m.direction = 'out' and m.created_at >= p_corte),
@@ -75,6 +87,7 @@ as $$
   from messages m
   join conversations c on c.id = m.conversation_id
   where c.workspace_id = p_workspace_id
+    and is_workspace_member(p_workspace_id)
     and m.created_at >= p_desde and m.created_at <= p_hasta;
 $$;
 
@@ -88,6 +101,8 @@ create or replace function dashboard_leads_por_dia(
 returns table (dia date, nuevos bigint, meta_ads bigint)
 language sql
 stable
+security definer
+set search_path to 'public'
 as $$
   select
     (ct.created_at at time zone 'America/Bogota')::date as dia,
@@ -98,6 +113,7 @@ as $$
     )) as meta_ads
   from contacts ct
   where ct.workspace_id = p_workspace_id
+    and is_workspace_member(p_workspace_id)
     and ct.created_at >= p_desde and ct.created_at <= p_hasta
   group by 1
   order by 1;
