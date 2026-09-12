@@ -28,8 +28,11 @@ export function ConnectWhatsAppButton({
   label = "Conectar WhatsApp",
   askLabel = false,
   disabled = false,
+  className,
 }: {
   label?: string;
+  /** Sustituye el estilo del boton; el dashboard lo viste con su propio diseño. */
+  className?: string;
   /** Show a "nombre de este canal" field (Ventas, Soporte…) before connecting — used once a workspace already has one number and is adding another. */
   askLabel?: boolean;
   disabled?: boolean;
@@ -148,7 +151,10 @@ export function ConnectWhatsAppButton({
         type="button"
         onClick={launchSignup}
         disabled={disabled || !sdkReady || status === "connecting"}
-        className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
+        className={
+          className ??
+          "mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
+        }
       >
         {status === "connecting" ? "Conectando..." : label}
       </button>

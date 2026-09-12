@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Search, SlidersHorizontal, X, Clock, Megaphone, ShieldAlert, Bot, Check, Pin, PinOff } from "lucide-react";
 import { setConversationPinned, cargarConversaciones } from "@/app/actions/conversations";
 import { NewMessageButton } from "@/components/inbox/new-message-button";
@@ -107,7 +107,11 @@ export function ConversationListPanel({
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [assignedFilter, setAssignedFilter] = useState<string>(""); // "" = all, "unassigned", or agent id
   const [channelFilter, setChannelFilter] = useState<string>(""); // "" = all channels
-  const [unreadOnly, setUnreadOnly] = useState(false);
+  // Arranca con "no leidos" activo si se llega desde el dashboard con
+  // ?filtro=no-leidos. Antes los filtros eran solo estado local y no habia
+  // forma de enlazar a la bandeja ya filtrada.
+  const filtroInicial = useSearchParams().get("filtro");
+  const [unreadOnly, setUnreadOnly] = useState(filtroInicial === "no-leidos");
   const [expiringSoon, setExpiringSoon] = useState(false);
   const [needsHumanOnly, setNeedsHumanOnly] = useState(false);
   // Los filtros activos, en la forma que espera el servidor.

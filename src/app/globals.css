@@ -24,7 +24,35 @@
   --error-active: var(--color-red-600);
   --info: var(--color-blue-400);
   --accent-purple: var(--color-purple-400);
+
+  /* Dashboard del cliente (rediseño 1a). Namespaced con dash- para no
+     tocar la paleta del resto del panel: valores exactos del README de
+     diseño. */
+  --dash-bg: #0d1110;
+  --dash-card: #121715;
+  --dash-card-nested: #101614;
+  --dash-text: #e8f2ec;
+  --dash-text-2: rgba(232, 242, 236, 0.5);
+  --dash-text-3: rgba(232, 242, 236, 0.45);
+  --dash-border: rgba(255, 255, 255, 0.08);
+  --dash-border-soft: rgba(255, 255, 255, 0.07);
+  --dash-surface-subtle: rgba(255, 255, 255, 0.06);
+  --dash-track: rgba(255, 255, 255, 0.07);
+  --dash-green: #22c55e;
+  --dash-green-text: #4ade80;
+  --dash-on-green: #04150b;
+  --dash-green-7: rgba(34, 197, 94, 0.07);
+  --dash-green-13: rgba(34, 197, 94, 0.13);
+  --dash-green-20: rgba(34, 197, 94, 0.2);
+  --dash-green-28: rgba(34, 197, 94, 0.28);
+  --dash-amber: #fbbf24;
+  --dash-amber-30: rgba(251, 191, 36, 0.3);
+  --dash-red: #f87171;
+  --dash-red-7: rgba(248, 113, 113, 0.07);
+  --dash-red-28: rgba(248, 113, 113, 0.28);
+  --dash-skeleton: rgba(255, 255, 255, 0.05);
 }
+
 
 @theme inline {
   --color-background: var(--background);
@@ -42,6 +70,31 @@
   --color-error-active: var(--error-active);
   --color-info: var(--info);
   --color-accent-purple: var(--accent-purple);
+  --color-dash-bg: var(--dash-bg);
+  --color-dash-card: var(--dash-card);
+  --color-dash-card-nested: var(--dash-card-nested);
+  --color-dash-text: var(--dash-text);
+  --color-dash-text-2: var(--dash-text-2);
+  --color-dash-text-3: var(--dash-text-3);
+  --color-dash-border: var(--dash-border);
+  --color-dash-border-soft: var(--dash-border-soft);
+  --color-dash-surface-subtle: var(--dash-surface-subtle);
+  --color-dash-track: var(--dash-track);
+  --color-dash-green: var(--dash-green);
+  --color-dash-green-text: var(--dash-green-text);
+  --color-dash-on-green: var(--dash-on-green);
+  --color-dash-green-7: var(--dash-green-7);
+  --color-dash-green-13: var(--dash-green-13);
+  --color-dash-green-20: var(--dash-green-20);
+  --color-dash-green-28: var(--dash-green-28);
+  --color-dash-amber: var(--dash-amber);
+  --color-dash-amber-30: var(--dash-amber-30);
+  --color-dash-red: var(--dash-red);
+  --color-dash-red-7: var(--dash-red-7);
+  --color-dash-red-28: var(--dash-red-28);
+  --color-dash-skeleton: var(--dash-skeleton);
+  --font-dash-display: var(--font-space-grotesk), system-ui, sans-serif;
+  --font-dash-ui: var(--font-manrope), system-ui, sans-serif;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
