@@ -81,12 +81,32 @@ export function ConnectWhatsAppButton({
         return;
       }
 
-      const result = await connectWhatsApp({
-        code,
-        wabaId: signupData.waba_id,
-        phoneNumberId: signupData.phone_number_id,
-        label: channelLabel,
-      });
+      let result: Awaited<ReturnType<typeof connectWhatsApp>>;
+      try {
+        result = await connectWhatsApp({
+          code,
+          wabaId: signupData.waba_id,
+          phoneNumberId: signupData.phone_number_id,
+          label: channelLabel,
+        });
+      } catch (err) {
+        // Si la plataforma se desplegó mientras esta pestaña estaba abierta,
+        // el id de la acción de servidor ya no existe y Next responde 404
+        // ("Server action not found."). Antes esto quedaba sin capturar: el
+        // botón se quedaba en "Conectando…" para siempre y el usuario volvía
+        // a intentar sin éxito. Se avisa y se recarga para que el siguiente
+        // intento salga con el código nuevo.
+        const texto = err instanceof Error ? err.message : String(err);
+        const desplegado = /server action not found|older or newer deployment/i.test(texto);
+        setStatus("error");
+        setMessage(
+          desplegado
+            ? "La plataforma se actualizó mientras tenías esta página abierta. Se recargará en unos segundos; vuelve a pulsar Conectar."
+            : "No se pudo completar la conexión. Recarga la página e intenta de nuevo."
+        );
+        if (desplegado) setTimeout(() => window.location.reload(), 3000);
+        return;
+      }
 
       if ("error" in result) {
         setStatus("error");
