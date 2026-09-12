@@ -4,7 +4,6 @@ import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
 import { rangoDe, cargarAviso, type Periodo } from "@/lib/dashboard/datos";
 import { TagStatsTable } from "@/components/tags/tag-stats-table";
-import { PeriodoSelector } from "@/components/dashboard/periodo-selector";
 import { Bloque } from "@/components/dashboard/bloque";
 import { Aviso } from "@/components/dashboard/aviso";
 import { EstadoCuenta } from "@/components/dashboard/estado-cuenta";
@@ -26,6 +25,9 @@ function leerPeriodo(params: Record<string, string | string[] | undefined>): Per
   if (desde && hasta && /^\d{4}-\d{2}-\d{2}$/.test(desde) && /^\d{4}-\d{2}-\d{2}$/.test(hasta)) {
     return { tipo: "rango", desde, hasta };
   }
+  // Sin selector en pantalla (decision del 12 sep 2026): los indicadores
+  // se calculan sobre los ultimos 7 dias. Los parametros de URL siguen
+  // funcionando por si algun dia vuelve.
   const p = typeof params.periodo === "string" ? params.periodo : "7d";
   return { tipo: p === "hoy" || p === "30d" ? p : "7d" };
 }
@@ -102,11 +104,6 @@ export default async function DashboardPage({
           </h1>
           <p className="mt-0.5 text-[13px] capitalize text-dash-text-2">{fecha}</p>
         </div>
-        <PeriodoSelector
-          activo={periodo.tipo}
-          desde={periodo.tipo === "rango" ? periodo.desde : null}
-          hasta={periodo.tipo === "rango" ? periodo.hasta : null}
-        />
       </header>
 
       {locked && (
