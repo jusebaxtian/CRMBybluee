@@ -54,11 +54,20 @@ function WindowExpiredBadge({ lastInboundAt }: { lastInboundAt: string | null })
 // — an agent still has time to send a quick follow-up before it locks.
 function WindowExpiringSoonBadge({
   lastInboundAt,
-  now,
 }: {
   lastInboundAt: string | null;
-  now: number;
 }) {
+  // El reloj vive aqui, en la insignia, y no en la lista. Antes estaba en el
+  // padre y hacia re-renderizar las cuarenta filas completas cada segundo,
+  // para una cifra que se muestra en minutos. Solo se montan las insignias de
+  // los chats por vencer (pocos), y avanzan cada medio minuto, que basta para
+  // un contador de minutos.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
   if (!isWindowExpiringSoon(lastInboundAt, now)) return null;
   const m = Math.floor(msRemainingInWindow(lastInboundAt, now) / 60_000);
   return (
@@ -199,15 +208,6 @@ export function ConversationListPanel({
 
   const channelColor = new Map(channels.map((c, i) => [c.id, CHANNEL_COLORS[i % CHANNEL_COLORS.length]]));
   const channelName = (c: Channel) => c.label || c.display_phone_number;
-
-  // Only needed to keep the "por vencer" filter and its badges live —
-  // ticks once a second so a conversation drops out of the list the moment
-  // it crosses the 2h or 10s edge, without a manual refresh.
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
 
   // El filtrado ocurre en la base: `lista` ya viene filtrada y ordenada.
   const filtered = lista;
@@ -424,14 +424,17 @@ export function ConversationListPanel({
         </div>
       )}
 
-      <PullToRefresh className="flex-1">
+      <PullToRefresh className={`flex-1 transition-opacity ${cargando && filtered.length > 0 ? "opacity-50" : ""}`}>
         {pinError && (
           <p className="border-b border-border bg-warning/10 px-4 py-2 text-xs text-warning">
             {pinError}
           </p>
         )}
-        {filtered.length === 0 && (
+        {filtered.length === 0 && !cargando && (
           <p className="p-6 text-center text-sm text-muted">Sin resultados.</p>
+        )}
+        {cargando && filtered.length === 0 && (
+          <p className="p-6 text-center text-sm text-muted">Buscando…</p>
         )}
         {filtered.map((conv) => {
           const active = pathname === `/dashboard/inbox/${conv.id}`;
@@ -440,10 +443,14 @@ export function ConversationListPanel({
               key={conv.id}
               href={`/dashboard/inbox/${conv.id}`}
               className={`group flex items-center gap-3 border-b border-border px-4 py-3 ${
+                conv.pinnedAt ? "border-l-2 border-l-primary bg-primary/10 hover:bg-primary/15" : ""
+              } ${
                 active
-                  ? "bg-surface-hover"
+                  ? conv.pinnedAt
+                    ? "bg-primary/15"
+                    : "bg-surface-hover"
                   : conv.pinnedAt
-                    ? "bg-primary/5 hover:bg-surface-hover"
+                    ? ""
                     : "hover:bg-surface-hover"
               }`}
             >
@@ -497,7 +504,7 @@ export function ConversationListPanel({
                   </p>
                   <span className="flex shrink-0 items-center gap-1">
                     <WindowExpiredBadge lastInboundAt={conv.lastInboundAt} />
-                    <WindowExpiringSoonBadge lastInboundAt={conv.lastInboundAt} now={now} />
+                    <WindowExpiringSoonBadge lastInboundAt={conv.lastInboundAt} />
                     <button
                       type="button"
                       // La fila entera es un <Link>: sin esto, fijar navegaria
@@ -509,13 +516,17 @@ export function ConversationListPanel({
                       }}
                       title={conv.pinnedAt ? "Quitar de fijados" : "Fijar arriba"}
                       aria-label={conv.pinnedAt ? "Quitar de fijados" : "Fijar arriba"}
-                      className={`rounded p-0.5 ${
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors ${
                         conv.pinnedAt
-                          ? "text-primary"
-                          : "text-muted/0 hover:text-muted focus:text-muted group-hover:text-muted/70"
+                          ? "bg-primary/20 text-primary hover:bg-primary/30"
+                          : "text-muted/0 hover:bg-surface-hover hover:text-muted focus:text-muted group-hover:text-muted/70"
                       }`}
                     >
-                      {conv.pinnedAt ? <Pin size={11} /> : <PinOff size={11} />}
+                      {conv.pinnedAt ? (
+                        <Pin size={16} className="fill-current" />
+                      ) : (
+                        <PinOff size={16} />
+                      )}
                     </button>
                     <span className="text-[10px] text-muted">
                       {new Date(conv.last_message_at).toLocaleTimeString("es-CO", {
