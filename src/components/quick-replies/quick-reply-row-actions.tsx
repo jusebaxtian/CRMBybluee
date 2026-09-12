@@ -3,8 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Pencil, Trash2 } from "lucide-react";
-import { toggleQuickReplyActive, deleteQuickReply } from "@/app/actions/quick-replies";
+import { Pencil, Trash2, Copy } from "lucide-react";
+import { toggleQuickReplyActive, deleteQuickReply, duplicateQuickReply } from "@/app/actions/quick-replies";
 
 export function QuickReplyRowActions({
   quickReplyId,
@@ -23,6 +23,17 @@ export function QuickReplyRowActions({
     await toggleQuickReplyActive(quickReplyId, !isActive);
     setPending(false);
     router.refresh();
+  }
+
+  async function handleDuplicate() {
+    setPending(true);
+    const result = await duplicateQuickReply(quickReplyId);
+    setPending(false);
+    if ("error" in result) {
+      alert(result.error);
+      return;
+    }
+    router.push(`/dashboard/quick-replies/${result.id}`);
   }
 
   async function handleDelete() {
@@ -55,6 +66,16 @@ export function QuickReplyRowActions({
       >
         <Pencil size={14} />
       </Link>
+      <button
+        type="button"
+        onClick={handleDuplicate}
+        disabled={pending}
+        className="text-muted hover:text-foreground disabled:opacity-50"
+        title="Duplicar"
+        aria-label="Duplicar"
+      >
+        <Copy size={14} />
+      </button>
       <button
         type="button"
         onClick={handleDelete}
