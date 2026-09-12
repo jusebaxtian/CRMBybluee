@@ -5,7 +5,7 @@ import { cargarCuenta, type Cuenta } from "@/lib/dashboard/datos";
 
 const ESTADO: Record<Cuenta["estado"], { etiqueta: string; texto: string; fondo: string; punto: string }> = {
   activo: { etiqueta: "ACTIVO", texto: "text-dash-green-text", fondo: "bg-dash-green-13", punto: "bg-dash-green" },
-  por_vencer: { etiqueta: "POR VENCER", texto: "text-dash-amber", fondo: "bg-[rgba(251,191,36,0.13)]", punto: "bg-dash-amber" },
+  por_vencer: { etiqueta: "POR VENCER", texto: "text-dash-amber", fondo: "bg-[rgba(234,179,8,0.13)]", punto: "bg-dash-amber" },
   vencido: { etiqueta: "VENCIDO", texto: "text-dash-red", fondo: "bg-[rgba(248,113,113,0.13)]", punto: "bg-dash-red" },
 };
 
@@ -88,7 +88,7 @@ export async function EstadoCuenta() {
         </Link>
         <Link
           href="/dashboard/billing?renovar=1"
-          className="flex-1 rounded-[10px] bg-dash-green p-[10px] text-center font-dash-ui text-[12.5px] font-bold text-dash-on-green transition-colors duration-150 hover:bg-[#1fb355]"
+          className="flex-1 rounded-[10px] bg-dash-green p-[10px] text-center font-dash-ui text-[12.5px] font-bold text-dash-on-green transition-colors duration-150 hover:bg-[var(--primary-hover)]"
         >
           Renovar ahora
         </Link>

@@ -117,7 +117,7 @@ export default async function DashboardPage({
       </header>
 
       {locked && (
-        <div className="rounded-[13px] border border-dash-amber-30 bg-[rgba(251,191,36,0.08)] p-4 text-[13px] text-dash-amber">
+        <div className="rounded-[13px] border border-dash-amber-30 bg-[rgba(234,179,8,0.08)] p-4 text-[13px] text-dash-amber">
           El módulo &quot;{locked}&quot; no está incluido en tu plan actual. Contacta a soporte para activarlo.
         </div>
       )}

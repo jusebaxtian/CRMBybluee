@@ -5,7 +5,7 @@ import { cargarConexiones, type ConexionApi } from "@/lib/dashboard/datos";
 import { ConnectWhatsAppButton } from "@/components/whatsapp/connect-whatsapp-button";
 
 const BOTON_PRIMARIO =
-  "inline-flex items-center gap-1.5 rounded-[10px] bg-dash-green px-4 py-[10px] font-dash-ui text-[12.5px] font-bold text-dash-on-green transition-colors duration-150 hover:bg-[#1fb355] disabled:opacity-50";
+  "inline-flex items-center gap-1.5 rounded-[10px] bg-dash-green px-4 py-[10px] font-dash-ui text-[12.5px] font-bold text-dash-on-green transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:opacity-50";
 
 const ESTADO: Record<ConexionApi["estado"], { etiqueta: string; texto: string; borde: string; barra: string }> = {
   conectado: { etiqueta: "CONECTADO", texto: "text-dash-green-text", borde: "border-dash-green-28", barra: "bg-dash-green" },
@@ -39,7 +39,7 @@ function Tarjeta({ c }: { c: ConexionApi }) {
                 ? "bg-dash-green-13 text-dash-green-text"
                 : c.cuentaRevision === "rechazada"
                   ? "bg-[rgba(248,113,113,0.13)] text-dash-red"
-                  : "bg-[rgba(251,191,36,0.13)] text-dash-amber"
+                  : "bg-[rgba(234,179,8,0.13)] text-dash-amber"
             }`}
             title="Revisión de la cuenta de WhatsApp Business en Meta"
           >
@@ -99,7 +99,7 @@ function Tarjeta({ c }: { c: ConexionApi }) {
 
 function SlotVacio({ n, plan }: { n: number; plan: string }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-[10px] rounded-[13px] border border-dashed border-[rgba(34,197,94,0.35)] bg-[rgba(34,197,94,0.04)] p-4 text-center">
+    <div className="flex flex-col items-center justify-center gap-[10px] rounded-[13px] border border-dashed border-[rgba(27,168,74,0.35)] bg-[rgba(27,168,74,0.04)] p-4 text-center">
       <span aria-hidden className="text-[22px]">➕</span>
       <p className="font-dash-ui text-[13px] font-semibold text-dash-text">Espacio {n} disponible</p>
       <p className="font-dash-ui text-[11.5px] leading-[1.45] text-dash-text-3">{plan}</p>
@@ -119,7 +119,7 @@ export async function Conexiones() {
   const textoPlan = `Tu plan ${nombrePlan} permite hasta ${maxPermitidoPlan} ${maxPermitidoPlan === 1 ? "número" : "números"}`;
 
   const contenedor =
-    "rounded-[15px] border border-dash-green-20 bg-[linear-gradient(180deg,var(--dash-green-7),rgba(34,197,94,0.02))] p-5";
+    "rounded-[15px] border border-dash-green-20 bg-[linear-gradient(180deg,var(--dash-green-7),rgba(27,168,74,0.02))] p-5";
 
   if (conexiones.length === 0) {
     return (
@@ -127,13 +127,13 @@ export async function Conexiones() {
         <span aria-hidden className="text-[30px]">🔴</span>
         <div className="min-w-0 flex-1">
           <h2 className="font-dash-display text-[17px] font-bold tracking-[-.2px] text-dash-text">Aún no tienes ninguna API conectada</h2>
-          <p className="mt-1 font-dash-ui text-[12.5px] leading-[1.5] text-[rgba(232,242,236,0.55)]">
+          <p className="mt-1 font-dash-ui text-[12.5px] leading-[1.5] text-[var(--muted)]">
             Conecta tu número de WhatsApp Business para enviar y recibir mensajes. {textoPlan}.
           </p>
         </div>
         <ConnectWhatsAppButton
           label="💬 Conectar WhatsApp"
-          className="flex-none rounded-[12px] bg-dash-green px-[22px] py-[14px] font-dash-ui text-[14px] font-bold text-dash-on-green transition-colors duration-150 hover:bg-[#1fb355] disabled:opacity-50"
+          className="flex-none rounded-[12px] bg-dash-green px-[22px] py-[14px] font-dash-ui text-[14px] font-bold text-dash-on-green transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:opacity-50"
         />
       </section>
     );
@@ -153,7 +153,7 @@ export async function Conexiones() {
         </div>
         <Link
           href="/dashboard/settings"
-          className="rounded-[10px] border border-[rgba(34,197,94,0.3)] px-[14px] py-2 font-dash-ui text-[12px] font-semibold text-dash-green-text transition-colors duration-150 hover:bg-dash-green-13"
+          className="rounded-[10px] border border-[rgba(27,168,74,0.3)] px-[14px] py-2 font-dash-ui text-[12px] font-semibold text-dash-green-text transition-colors duration-150 hover:bg-dash-green-13"
         >
           Administrar
         </Link>

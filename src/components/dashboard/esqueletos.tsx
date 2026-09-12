@@ -33,7 +33,7 @@ export function EsqueletoKpis() {
 
 export function EsqueletoConexiones() {
   return (
-    <div className="rounded-[15px] border border-dash-green-20 bg-[linear-gradient(180deg,var(--dash-green-7),rgba(34,197,94,0.02))] p-5">
+    <div className="rounded-[15px] border border-dash-green-20 bg-[linear-gradient(180deg,var(--dash-green-7),rgba(27,168,74,0.02))] p-5">
       <Hueso className="h-4 w-56" />
       <div className="mt-4 grid grid-cols-[repeat(3,minmax(0,1fr))] gap-3 max-[1100px]:grid-cols-[repeat(2,minmax(0,1fr))] max-[700px]:grid-cols-[minmax(0,1fr)]">
         {[0, 1, 2].map((i) => (

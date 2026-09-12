@@ -68,7 +68,7 @@ export async function LeadsPorDia({ rango }: { rango: RangoFechas }) {
               </div>
               <span
                 className={`truncate font-dash-ui text-[11px] ${
-                  d.esHoy ? "font-semibold text-dash-green-text" : "font-medium text-[rgba(232,242,236,0.4)]"
+                  d.esHoy ? "font-semibold text-dash-green-text" : "font-medium text-[var(--muted)]"
                 } ${i % cadaN !== 0 && !d.esHoy ? "invisible" : ""}`}
               >
                 {d.etiqueta}

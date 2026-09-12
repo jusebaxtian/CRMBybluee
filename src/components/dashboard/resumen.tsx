@@ -42,7 +42,7 @@ export async function Resumen({ rango }: { rango: RangoFechas }) {
         <h2 className={TITULO}>Mensajes</h2>
         <div className="flex flex-col gap-3">
           <Barra etiqueta="Enviados" valor={r.mensajes.enviados} maximo={maxMsg} color="bg-dash-green" />
-          <Barra etiqueta="Recibidos" valor={r.mensajes.recibidos} maximo={maxMsg} color="bg-[rgba(34,197,94,0.45)]" />
+          <Barra etiqueta="Recibidos" valor={r.mensajes.recibidos} maximo={maxMsg} color="bg-[rgba(27,168,74,0.45)]" />
         </div>
       </section>
 
@@ -71,7 +71,7 @@ export async function Resumen({ rango }: { rango: RangoFechas }) {
 
       <section aria-label="Sistema" className={TARJETA}>
         <h2 className={TITULO}>Sistema</h2>
-        <ul className="flex flex-col gap-2.5 font-dash-ui text-[12.5px] font-medium text-[rgba(232,242,236,0.6)]">
+        <ul className="flex flex-col gap-2.5 font-dash-ui text-[12.5px] font-medium text-[var(--muted)]">
           <li className="flex items-center gap-2.5">
             <Punto estado={r.sistema.apiOk ? "ok" : "mal"} />
             {r.sistema.apiOk ? "API de Meta conectada" : "API de Meta sin conectar"}

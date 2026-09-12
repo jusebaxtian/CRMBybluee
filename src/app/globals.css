@@ -25,29 +25,31 @@
   --info: var(--color-blue-400);
   --accent-purple: var(--color-purple-400);
 
-  /* Dashboard del cliente (rediseño 1a). Namespaced con dash- para no
-     tocar la paleta del resto del panel: valores exactos del README de
-     diseño. */
-  --dash-bg: #0d1110;
-  --dash-card: #121715;
-  --dash-card-nested: #101614;
-  --dash-text: #e8f2ec;
-  --dash-text-2: rgba(232, 242, 236, 0.5);
-  --dash-text-3: rgba(232, 242, 236, 0.45);
-  --dash-border: rgba(255, 255, 255, 0.08);
-  --dash-border-soft: rgba(255, 255, 255, 0.07);
-  --dash-surface-subtle: rgba(255, 255, 255, 0.06);
-  --dash-track: rgba(255, 255, 255, 0.07);
-  --dash-green: #22c55e;
-  --dash-green-text: #4ade80;
-  --dash-on-green: #04150b;
-  --dash-green-7: rgba(34, 197, 94, 0.07);
-  --dash-green-13: rgba(34, 197, 94, 0.13);
-  --dash-green-20: rgba(34, 197, 94, 0.2);
-  --dash-green-28: rgba(34, 197, 94, 0.28);
-  --dash-amber: #fbbf24;
-  --dash-amber-30: rgba(251, 191, 36, 0.3);
-  --dash-red: #f87171;
+  /* Dashboard del cliente (rediseño 1a). El diseño traia su propia paleta
+     verde; Sebastian pidio el 12 sep 2026 que use la de la app. Las
+     variables se conservan --el dashboard entero se viste con ellas-- pero
+     apuntan a los tokens de arriba, asi que un cambio de paleta global lo
+     arrastra solo. Los tintes se derivan de --primary (#1ba84a). */
+  --dash-bg: var(--background);
+  --dash-card: var(--surface);
+  --dash-card-nested: var(--surface-hover);
+  --dash-text: var(--foreground);
+  --dash-text-2: var(--muted);
+  --dash-text-3: color-mix(in srgb, var(--muted) 85%, transparent);
+  --dash-border: var(--border);
+  --dash-border-soft: var(--border);
+  --dash-surface-subtle: var(--surface-hover);
+  --dash-track: var(--border);
+  --dash-green: var(--primary);
+  --dash-green-text: var(--success);
+  --dash-on-green: #ffffff;
+  --dash-green-7: rgba(27, 168, 74, 0.07);
+  --dash-green-13: rgba(27, 168, 74, 0.13);
+  --dash-green-20: rgba(27, 168, 74, 0.2);
+  --dash-green-28: rgba(27, 168, 74, 0.28);
+  --dash-amber: var(--warning);
+  --dash-amber-30: rgba(234, 179, 8, 0.3);
+  --dash-red: var(--error);
   --dash-red-7: rgba(248, 113, 113, 0.07);
   --dash-red-28: rgba(248, 113, 113, 0.28);
   --dash-skeleton: rgba(255, 255, 255, 0.05);
