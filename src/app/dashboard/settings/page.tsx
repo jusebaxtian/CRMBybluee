@@ -11,6 +11,7 @@ import { SettingsTabs } from "@/components/layout/settings-tabs";
 import { WhatsAppApiPanel } from "@/components/whatsapp/whatsapp-api-panel";
 import { AiAgentPanel } from "@/components/ai-agent/ai-agent-panel";
 import { CtwaDatasetForm } from "@/components/whatsapp/ctwa-dataset-form";
+import { limiteDeNumeros } from "@/lib/whatsapp/limite-numeros";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -38,7 +39,13 @@ export default async function SettingsPage() {
     : { data: null };
   // null = unlimited (Semestral), 0 = not included in this plan (Inicial), 3 = Pro.
   const maxAgents = plan?.max_agents ?? null;
-  const maxWhatsappNumbers = plan?.max_whatsapp_numbers ?? 1;
+  // Plan + cupo extra concedido desde admin. El helper es el mismo que usa la
+  // accion de conectar, asi que la pantalla y la comprobacion no pueden
+  // discrepar.
+  const limiteNumeros = workspaceId
+    ? await limiteDeNumeros(supabase, workspaceId)
+    : { plan: 1, extra: 0, total: 1 };
+  const maxWhatsappNumbers = limiteNumeros.total;
 
   const { data: whatsappAccounts } = workspaceId
     ? await supabase

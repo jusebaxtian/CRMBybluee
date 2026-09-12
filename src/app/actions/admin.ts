@@ -181,6 +181,34 @@ export async function updateWorkspacePhone(workspaceId: string, phone: string) {
   return { success: true };
 }
 
+/**
+ * Cupo de numeros de WhatsApp adicional para un espacio concreto.
+ *
+ * El tope viene del plan. Cuando un cliente pide un numero mas de los que
+ * trae su plan, se le concede aqui, solo a el, sin cambiarle el plan ni crear
+ * uno a medida. El tope efectivo (plan + extra) lo calcula
+ * lib/whatsapp/limite-numeros.ts, que usan tanto la accion de conectar como
+ * la pantalla de ajustes del cliente.
+ */
+export async function updateWorkspaceExtraNumbers(workspaceId: string, extra: string) {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
+
+  const valor = Number.parseInt(extra, 10);
+  if (!Number.isInteger(valor) || valor < 0 || valor > 50) {
+    return { error: "Debe ser un número entre 0 y 50." };
+  }
+
+  const { error } = await supabase
+    .from("workspaces")
+    .update({ extra_whatsapp_numbers: valor })
+    .eq("id", workspaceId);
+
+  if (error) return { error: error.message };
+  revalidatePath(`/admin/workspaces/${workspaceId}`);
+  return { success: true };
+}
+
 // Edits the date that gates access for this workspace — trial_ends_at while
 // they're on a trial (so a trial can be extended or shortened and the
 // scheduler in src/lib/billing/scheduler.ts picks up the new date as-is,
