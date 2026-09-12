@@ -178,3 +178,16 @@ export async function sendQuickReply(quickReplyId: string, contactId: string) {
     return { error: err instanceof Error ? err.message : "No se pudo enviar." };
   }
 }
+
+/** Duplica una respuesta rapida con sus acciones. Nace desactivada. */
+export async function duplicateQuickReply(quickReplyId: string) {
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase } = ctx;
+
+  const { data: nuevoId, error } = await supabase.rpc("duplicar_respuesta_rapida", { p_id: quickReplyId });
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard/quick-replies");
+  return { success: true as const, id: nuevoId as string };
+}

@@ -359,3 +359,23 @@ export async function resetContactAutomationHistory(contactId: string) {
 
   return { success: true as const };
 }
+
+/**
+ * Duplica una automatizacion o un seguimiento (misma tabla).
+ *
+ * La copia la hace la base en una sola funcion, con todas las columnas y sus
+ * acciones, y nace desactivada: dos activas con la misma palabra clave
+ * dispararian las dos. RLS impide duplicar algo de otro espacio.
+ */
+export async function duplicateAutomation(automationId: string) {
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase } = ctx;
+
+  const { data: nuevoId, error } = await supabase.rpc("duplicar_automatizacion", { p_id: automationId });
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard/automations");
+  revalidatePath("/dashboard/followups");
+  return { success: true as const, id: nuevoId as string };
+}

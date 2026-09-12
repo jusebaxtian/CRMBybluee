@@ -3,8 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Pencil, Trash2 } from "lucide-react";
-import { toggleAutomationActive, deleteAutomation } from "@/app/actions/automations";
+import { Pencil, Trash2, Copy } from "lucide-react";
+import { toggleAutomationActive, deleteAutomation, duplicateAutomation } from "@/app/actions/automations";
 
 export function AutomationRowActions({
   automationId,
@@ -28,6 +28,19 @@ export function AutomationRowActions({
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Tras duplicar se abre la copia para editarla: es para lo que se duplica.
+  async function handleDuplicate() {
+    setPending(true);
+    const result = await duplicateAutomation(automationId);
+    setPending(false);
+    if ("error" in result) {
+      alert(result.error);
+      return;
+    }
+    const base = editHref ?? `/dashboard/automations/${automationId}`;
+    router.push(base.replace(automationId, result.id));
+  }
 
   async function handleToggle() {
     if (lockedByAi && !isActive) return;
@@ -81,6 +94,16 @@ export function AutomationRowActions({
       >
         <Pencil size={14} />
       </Link>
+      <button
+        type="button"
+        onClick={handleDuplicate}
+        disabled={pending}
+        className="text-muted hover:text-foreground disabled:opacity-50"
+        title="Duplicar"
+        aria-label="Duplicar"
+      >
+        <Copy size={14} />
+      </button>
       <button
         type="button"
         onClick={handleDelete}
