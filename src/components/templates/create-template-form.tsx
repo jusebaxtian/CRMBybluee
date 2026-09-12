@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CATEGORIA_PLANTILLA_POR_DEFECTO } from "@/lib/templates/defaults";
 
 const headerAccept: Record<string, string> = {
   image: "image/jpeg,image/png",
@@ -44,7 +45,7 @@ function submitWithProgress(
 export function CreateTemplateForm() {
   const router = useRouter();
   const [name, setName] = useState("");
-  const [category, setCategory] = useState("UTILITY");
+  const [category, setCategory] = useState<string>(CATEGORIA_PLANTILLA_POR_DEFECTO);
   const [language, setLanguage] = useState("es");
   const [bodyText, setBodyText] = useState("");
   const [headerKind, setHeaderKind] = useState<"none" | "text" | "image" | "video" | "document">(
@@ -77,7 +78,7 @@ export function CreateTemplateForm() {
       } else {
         setSuccess(true);
         setName("");
-        setCategory("UTILITY");
+        setCategory(CATEGORIA_PLANTILLA_POR_DEFECTO);
         setLanguage("es");
         setBodyText("");
         setHeaderKind("none");
