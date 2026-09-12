@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { Space_Grotesk, Manrope } from "next/font/google";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
 import { rangoDe, cargarAviso, type Periodo } from "@/lib/dashboard/datos";
@@ -20,12 +19,6 @@ import {
   EsqueletoConexiones,
   EsqueletoFila,
 } from "@/components/dashboard/esqueletos";
-
-// Las dos fuentes del diseño se cargan solo en esta pantalla: el resto del
-// panel sigue con Geist. next/font expone cada una como variable CSS, que
-// globals.css mapea a font-dash-display y font-dash-ui.
-const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], weight: ["600", "700"], variable: "--font-space-grotesk" });
-const manrope = Manrope({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-manrope" });
 
 function leerPeriodo(params: Record<string, string | string[] | undefined>): Periodo {
   const desde = typeof params.desde === "string" ? params.desde : null;
@@ -101,7 +94,7 @@ export default async function DashboardPage({
   const tagStats = (tagsRaw ?? []).map((t) => ({ id: t.id, name: t.name, color: t.color, count: countByTagId.get(t.id) ?? 0 }));
 
   return (
-    <div className={`${spaceGrotesk.variable} ${manrope.variable} -m-4 flex flex-col gap-5 bg-dash-bg p-6 font-dash-ui text-dash-text sm:-m-5 sm:px-7`}>
+    <div className={`-m-4 flex flex-col gap-5 bg-dash-bg p-6 font-dash-ui text-dash-text sm:-m-5 sm:px-7`}>
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-dash-display text-[22px] font-bold tracking-[-.4px] text-dash-text">
