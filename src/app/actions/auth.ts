@@ -25,10 +25,11 @@ export async function signup(
 ): Promise<AuthFormState> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  const fullName = String(formData.get("fullName") ?? "").trim();
   const companyName = String(formData.get("companyName") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim().replace(/[^\d]/g, "");
 
-  if (!email || !password || !companyName || !phone) {
+  if (!email || !password || !fullName || !companyName || !phone) {
     return { error: "Completa todos los campos." };
   }
   if (password.length < 8) {
@@ -40,6 +41,9 @@ export async function signup(
   const { error: signUpError } = await supabase.auth.signUp({
     email,
     password,
+    // Mismo sitio donde guardan su nombre los agentes (actions/agents.ts):
+    // user_metadata.full_name. Asi el admin lo lee igual para todos.
+    options: { data: { full_name: fullName } },
   });
 
   if (signUpError) {

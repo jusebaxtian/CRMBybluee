@@ -71,10 +71,12 @@ export default async function AdminOverviewPage({
       ]);
 
       let email = "—";
+      let ownerName: string | null = null;
       let lastSignInAt: string | null = null;
       if (owner?.user_id) {
         const { data } = await admin.auth.admin.getUserById(owner.user_id);
         email = data.user?.email ?? "—";
+        ownerName = (data.user?.user_metadata?.full_name as string | undefined) ?? null;
         lastSignInAt = data.user?.last_sign_in_at ?? null;
       }
 
@@ -83,6 +85,7 @@ export default async function AdminOverviewPage({
       return {
         id: w.id,
         name: w.name,
+        ownerName,
         email,
         plan: plan?.name ?? "—",
         status: w.status,
@@ -101,7 +104,7 @@ export default async function AdminOverviewPage({
 
   const query = (q ?? "").trim().toLowerCase();
   let filteredRows = query
-    ? rows.filter((r) => r.email.toLowerCase().includes(query))
+    ? rows.filter((r) => r.email.toLowerCase().includes(query) || (r.ownerName ?? "").toLowerCase().includes(query))
     : rows;
 
   const fromDate = from ? new Date(from) : null;
@@ -210,7 +213,11 @@ export default async function AdminOverviewPage({
             {filteredRows.map((r) => (
               <tr key={r.id} className="border-b border-border last:border-b-0">
                 <td className="px-5 py-3">
-                  <p className="text-foreground">{r.email}</p>
+                  {/* Nombre de la persona, correo, empresa. Los espacios
+                      anteriores a este campo no tienen nombre y muestran
+                      solo las dos lineas de siempre. */}
+                  {r.ownerName && <p className="font-medium text-foreground">{r.ownerName}</p>}
+                  <p className={r.ownerName ? "text-xs text-muted" : "text-foreground"}>{r.email}</p>
                   <p className="text-xs text-muted">{r.name}</p>
                 </td>
                 <td className="px-5 py-3 text-foreground">
