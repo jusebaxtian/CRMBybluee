@@ -85,7 +85,7 @@ export function TagStatsTable({
   const hasDateFilter = !!(from || to);
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-5">
+    <div className="rounded-[13px] border border-border bg-surface p-5">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <TagIcon size={16} className="text-primary" />

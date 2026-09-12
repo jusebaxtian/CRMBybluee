@@ -68,7 +68,7 @@ export default async function DashboardLayout({
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-8 text-center">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Cuenta desactivada</h1>
+          <h1 className="font-dash-display text-[22px] font-bold tracking-[-.4px] text-foreground">Cuenta desactivada</h1>
           <p className="mt-2 max-w-sm text-sm text-muted">
             Tu acceso a esta cuenta fue desactivado. Contacta a soporte si crees que esto es un error.
           </p>

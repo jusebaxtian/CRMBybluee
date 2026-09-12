@@ -51,11 +51,11 @@ export default async function ContactsPage() {
           <AddContactForm />
           <ImportContactsButton />
         </div>
-        <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-surface p-16 text-center">
+        <div className="flex flex-col items-center justify-center rounded-[13px] border border-border bg-surface p-16 text-center">
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-hover text-muted">
             <Users size={22} />
           </div>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-dash-ui text-[15px] font-semibold text-foreground">
             Todavía no tienes contactos
           </h2>
           <p className="mt-1 max-w-md text-sm text-muted">

@@ -110,7 +110,7 @@ export function CreateTemplateForm() {
             onChange={(e) => setName(e.target.value)}
             placeholder="promo_verano"
             pattern="[a-z0-9_]+"
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
           />
           <p className="mt-1 text-xs text-muted">minúsculas, números y _</p>
         </div>
@@ -123,7 +123,7 @@ export function CreateTemplateForm() {
             name="category"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
           >
             <option value="UTILITY">Utilidad</option>
             <option value="MARKETING">Marketing</option>
@@ -139,7 +139,7 @@ export function CreateTemplateForm() {
             name="language"
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
           >
             <option value="es">Español</option>
             <option value="es_CO">Español (Colombia)</option>
@@ -157,7 +157,7 @@ export function CreateTemplateForm() {
           name="headerKind"
           value={headerKind}
           onChange={(e) => setHeaderKind(e.target.value as typeof headerKind)}
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+          className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
         >
           <option value="none">Sin encabezado</option>
           <option value="text">Texto</option>
@@ -177,7 +177,7 @@ export function CreateTemplateForm() {
             value={headerText}
             onChange={(e) => setHeaderText(e.target.value)}
             placeholder="Texto del encabezado"
-            className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            className="mt-2 w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
           />
         )}
 
@@ -209,7 +209,7 @@ export function CreateTemplateForm() {
           value={bodyText}
           onChange={(e) => setBodyText(e.target.value)}
           placeholder="Hola {{1}}, tenemos una promoción especial para ti..."
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+          className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
         />
         <p className="mt-1 text-xs text-muted">
           Usa {"{{1}}"}, {"{{2}}"}, etc. para variables (ej. nombre del contacto).
@@ -227,7 +227,7 @@ export function CreateTemplateForm() {
           maxLength={60}
           value={footerText}
           onChange={(e) => setFooterText(e.target.value)}
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+          className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
         />
       </div>
 

@@ -78,7 +78,7 @@ export default async function CampaignDetailPage({
             <ArrowLeft size={18} />
           </Link>
           <div>
-            <h1 className="text-lg font-semibold text-foreground">{campaign.name}</h1>
+            <h1 className="font-dash-display text-[22px] font-bold tracking-[-.4px] text-foreground">{campaign.name}</h1>
             <p className="text-xs text-muted">
               {campaign.send_type === "free_text"
                 ? `Mensaje libre${campaign.message_body ? `: "${campaign.message_body.slice(0, 60)}${campaign.message_body.length > 60 ? "..." : ""}"` : ""}${campaign.media_url ? " (con adjunto)" : ""}`

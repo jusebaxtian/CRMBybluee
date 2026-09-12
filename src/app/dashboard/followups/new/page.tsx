@@ -34,8 +34,8 @@ export default async function NewFollowupSequencePage() {
 
   return (
     <div className="mx-auto max-w-lg">
-      <div className="rounded-xl border border-border bg-surface p-6">
-        <h1 className="mb-4 text-lg font-semibold text-foreground">Nuevo seguimiento</h1>
+      <div className="rounded-[13px] border border-border bg-surface p-6">
+        <h1 className="mb-4 font-dash-display text-[22px] font-bold tracking-[-.4px] text-foreground">Nuevo seguimiento</h1>
         <NewFollowupSequenceForm
           tags={tags ?? []}
           templates={templates ?? []}

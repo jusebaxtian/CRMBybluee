@@ -64,7 +64,7 @@ export default async function SettingsPage() {
   );
 
   const agentsSection = (
-    <div className="rounded-xl border border-border bg-surface p-5">
+    <div className="rounded-[13px] border border-border bg-surface p-5">
       <div className="mb-4 flex items-center gap-2">
         <Users size={18} className="text-primary" />
         <h2 className="text-base font-semibold text-foreground">
@@ -140,7 +140,7 @@ export default async function SettingsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-xl font-semibold text-foreground">Configuración</h1>
+        <h1 className="font-dash-display text-[22px] font-bold tracking-[-.4px] text-foreground">Configuración</h1>
         <p className="mt-1 text-sm text-muted">
           Gestiona los agentes de respuesta y tu conexión con WhatsApp API.
         </p>

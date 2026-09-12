@@ -63,7 +63,7 @@ function EditMediaButton({ item }: { item: MediaItem }) {
           onClick={() => setOpen(false)}
         >
           <div
-            className="w-full max-w-sm rounded-xl border border-border bg-surface p-4 shadow-lg"
+            className="w-full max-w-sm rounded-[13px] border border-border bg-surface p-4 shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
             <p className="mb-3 text-sm font-semibold text-foreground">Editar adjunto</p>
@@ -77,7 +77,7 @@ function EditMediaButton({ item }: { item: MediaItem }) {
                   type="text"
                   required
                   defaultValue={item.label}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+                  className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
                 />
               </div>
 
@@ -90,7 +90,7 @@ function EditMediaButton({ item }: { item: MediaItem }) {
                   type="text"
                   required
                   defaultValue={item.trigger_description}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+                  className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
                 />
               </div>
 
@@ -180,7 +180,7 @@ export function AiAgentMediaLibrary({ items }: { items: MediaItem[] }) {
               type="text"
               required
               placeholder="qr_pago"
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+              className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
             />
           </div>
           <div>
@@ -190,7 +190,7 @@ export function AiAgentMediaLibrary({ items }: { items: MediaItem[] }) {
               type="text"
               required
               placeholder="QR de pago"
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+              className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
             />
           </div>
         </div>
@@ -204,7 +204,7 @@ export function AiAgentMediaLibrary({ items }: { items: MediaItem[] }) {
             type="text"
             required
             placeholder="pregunten cómo pagar o pidan el QR"
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
           />
         </div>
 

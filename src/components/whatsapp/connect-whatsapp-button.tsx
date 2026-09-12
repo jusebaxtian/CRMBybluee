@@ -143,7 +143,7 @@ export function ConnectWhatsAppButton({
           value={channelLabel}
           onChange={(e) => setChannelLabel(e.target.value)}
           placeholder="Nombre de este canal (ej: Ventas, Soporte)"
-          className="mt-4 w-full max-w-xs rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+          className="mt-4 w-full max-w-xs rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
         />
       )}
 
@@ -153,7 +153,7 @@ export function ConnectWhatsAppButton({
         disabled={disabled || !sdkReady || status === "connecting"}
         className={
           className ??
-          "mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
+          "mt-3 rounded-[10px] bg-primary px-4 py-[10px] text-[12.5px] font-bold text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
         }
       >
         {status === "connecting" ? "Conectando..." : label}

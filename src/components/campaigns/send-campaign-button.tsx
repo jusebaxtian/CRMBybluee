@@ -33,7 +33,7 @@ export function SendCampaignButton({ campaignId }: { campaignId: string }) {
         type="button"
         onClick={handleClick}
         disabled={pending || started}
-        className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
+        className="flex items-center gap-2 rounded-[10px] bg-primary px-4 py-[10px] text-[12.5px] font-bold text-white hover:bg-primary-hover disabled:opacity-50"
       >
         <Send size={14} />
         {pending ? "Iniciando..." : started ? "Enviando en segundo plano..." : "Enviar campaña"}

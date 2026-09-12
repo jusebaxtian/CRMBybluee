@@ -164,7 +164,7 @@ export function AiAgentPanel({
             name="provider"
             value={provider}
             onChange={(e) => setProvider(e.target.value as "openai" | "anthropic")}
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
           >
             <option value="openai">OpenAI (GPT)</option>
             <option value="anthropic">Anthropic (Claude)</option>
@@ -184,7 +184,7 @@ export function AiAgentPanel({
                   ? "sk-..."
                   : "sk-ant-..."
             }
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
           />
           <p className="mt-1 text-[11px] text-muted">
             {agent
@@ -202,7 +202,7 @@ export function AiAgentPanel({
             type="text"
             defaultValue={agent?.model ?? ""}
             placeholder={provider === "openai" ? "gpt-4o-mini" : "claude-sonnet-5"}
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
           />
         </div>
 
@@ -213,7 +213,7 @@ export function AiAgentPanel({
             type="text"
             defaultValue={agent?.agent_name ?? ""}
             placeholder="Ej: Camila"
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
           />
         </div>
 
@@ -228,7 +228,7 @@ export function AiAgentPanel({
             placeholder={
               "Ej: Vendemos zapatos deportivos. Precios entre $80.000 y $250.000. Envío gratis en pedidos +$150.000. Tono cercano, cero formal, usa emojis con moderación. Si preguntan por descuentos, ofrece 10% pagando de contado."
             }
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
           />
           <p className="mt-1 text-[11px] text-muted">
             Entre más detalle des (productos, precios, políticas, tono), mejor va a vender.
@@ -307,7 +307,7 @@ export function AiAgentPanel({
                           value={step.focus}
                           onChange={(e) => updateStep(i, { focus: e.target.value })}
                           placeholder="Enfoque de este seguimiento (ej: invitar al grupo, enviar testimonios...)"
-                          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+                          className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
                         />
                       </div>
                     </div>
@@ -327,7 +327,7 @@ export function AiAgentPanel({
                 <select
                   name="followupTemplateId"
                   defaultValue={agent?.followup_template_id ?? ""}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+                  className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
                 >
                   <option value="">Selecciona una plantilla aprobada</option>
                   {templates.map((t) => (

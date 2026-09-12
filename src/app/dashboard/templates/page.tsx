@@ -55,7 +55,7 @@ export default async function TemplatesPage() {
     <div className="flex flex-col gap-6">
       <CampaignsTabs enabledModules={enabledModules} />
 
-      <div className="rounded-xl border border-border bg-surface p-6">
+      <div className="rounded-[13px] border border-border bg-surface p-6">
         <h2 className="mb-4 text-sm font-semibold text-foreground">Crear nueva plantilla</h2>
         <CreateTemplateForm />
       </div>
@@ -66,7 +66,7 @@ export default async function TemplatesPage() {
         ni se pueden usar aquí — créala arriba para que quede disponible.
       </div>
 
-      <div className="rounded-xl border border-border bg-surface p-5">
+      <div className="rounded-[13px] border border-border bg-surface p-5">
         <SyncTemplatesButton />
         <p className="mt-2 text-xs text-muted">
           Sincroniza para traer el estado más reciente de aprobación de las plantillas creadas
@@ -75,11 +75,11 @@ export default async function TemplatesPage() {
       </div>
 
       {!templates || templates.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-surface p-16 text-center">
+        <div className="flex flex-col items-center justify-center rounded-[13px] border border-border bg-surface p-16 text-center">
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-hover text-muted">
             <FileText size={22} />
           </div>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-dash-ui text-[15px] font-semibold text-foreground">
             Todavía no tienes plantillas
           </h2>
           <p className="mt-1 max-w-md text-sm text-muted">
@@ -92,7 +92,7 @@ export default async function TemplatesPage() {
             const headerFormat = t.header_format as "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | null;
             const buttons = t.buttons as { type: "URL" | "QUICK_REPLY"; text: string; url?: string }[] | null;
             return (
-              <div key={t.id} className="flex flex-col rounded-xl border border-border bg-surface p-5">
+              <div key={t.id} className="flex flex-col rounded-[13px] border border-border bg-surface p-5">
                 <div className="mb-3 flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate font-medium text-foreground">{t.meta_template_name}</p>

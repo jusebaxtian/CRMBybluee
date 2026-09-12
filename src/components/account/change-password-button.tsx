@@ -82,7 +82,7 @@ export function ChangePasswordButton({
           onClick={() => setOpen(false)}
         >
           <div
-            className="w-full max-w-sm rounded-xl border border-border bg-surface p-5 shadow-lg"
+            className="w-full max-w-sm rounded-[13px] border border-border bg-surface p-5 shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="mb-1 text-sm font-semibold text-foreground">
@@ -104,7 +104,7 @@ export function ChangePasswordButton({
                   type="password"
                   required
                   minLength={8}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+                  className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
                 />
               </div>
               <div>
@@ -117,7 +117,7 @@ export function ChangePasswordButton({
                   type="password"
                   required
                   minLength={8}
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+                  className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
                 />
               </div>
 

@@ -20,14 +20,14 @@ export function AgentProfileForm() {
           type="text"
           required
           placeholder="Nombre"
-          className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+          className="rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
         />
         <input
           name="email"
           type="email"
           required
           placeholder="correo@ejemplo.com"
-          className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+          className="rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
         />
         <input
           name="password"
@@ -35,7 +35,7 @@ export function AgentProfileForm() {
           required
           minLength={8}
           placeholder="Contraseña (mín. 8)"
-          className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+          className="rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
         />
       </div>
 

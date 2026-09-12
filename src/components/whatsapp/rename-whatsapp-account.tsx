@@ -27,7 +27,7 @@ export function RenameWhatsAppAccount({
         className="group flex items-center gap-1.5 text-left"
         title="Renombrar canal"
       >
-        <h2 className="text-lg font-semibold text-foreground">{label || fallback}</h2>
+        <h2 className="font-dash-ui text-[15px] font-semibold text-foreground">{label || fallback}</h2>
         <Pencil size={13} className="text-muted opacity-0 group-hover:opacity-100" />
       </button>
     );

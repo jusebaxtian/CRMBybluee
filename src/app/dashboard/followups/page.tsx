@@ -29,7 +29,7 @@ export default async function FollowupsPage() {
       <div className="flex justify-end">
         <Link
           href="/dashboard/followups/new"
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover"
+          className="flex items-center gap-2 rounded-[10px] bg-primary px-4 py-[10px] text-[12.5px] font-bold text-white hover:bg-primary-hover"
         >
           <Plus size={16} />
           Nuevo seguimiento
@@ -37,11 +37,11 @@ export default async function FollowupsPage() {
       </div>
 
       {!sequences || sequences.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-surface p-16 text-center">
+        <div className="flex flex-col items-center justify-center rounded-[13px] border border-border bg-surface p-16 text-center">
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-hover text-muted">
             <History size={22} />
           </div>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-dash-ui text-[15px] font-semibold text-foreground">
             Todavía no tienes seguimientos
           </h2>
           <p className="mt-1 max-w-md text-sm text-muted">
@@ -50,7 +50,7 @@ export default async function FollowupsPage() {
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-surface">
+        <div className="overflow-hidden rounded-[13px] border border-border bg-surface">
           {sequences.map((s) => {
             const steps = ((s.automation_actions ?? []) as { delay_seconds: number }[])
               .slice()

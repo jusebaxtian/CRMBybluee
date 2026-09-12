@@ -24,16 +24,16 @@ export default async function TagsPage() {
     <div className="flex flex-col gap-6">
       <CampaignsTabs enabledModules={enabledModules} />
 
-      <div className="rounded-xl border border-border bg-surface p-5">
+      <div className="rounded-[13px] border border-border bg-surface p-5">
         <CreateTagForm />
       </div>
 
       {!tags || tags.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-surface p-16 text-center">
+        <div className="flex flex-col items-center justify-center rounded-[13px] border border-border bg-surface p-16 text-center">
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-hover text-muted">
             <TagIcon size={22} />
           </div>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-dash-ui text-[15px] font-semibold text-foreground">
             Todavía no tienes etiquetas
           </h2>
           <p className="mt-1 max-w-md text-sm text-muted">
@@ -41,7 +41,7 @@ export default async function TagsPage() {
           </p>
         </div>
       ) : (
-        <div className="rounded-xl border border-border bg-surface">
+        <div className="rounded-[13px] border border-border bg-surface">
           <div className="grid grid-cols-[20px_1fr_70px_auto_70px] items-center gap-3 border-b border-border px-4 py-2 text-[10px] font-medium uppercase tracking-wide text-muted">
             <span />
             <span>Etiqueta</span>
