@@ -27,6 +27,7 @@ import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { toPublicUrl } from "@/lib/supabase/config";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
 import { recordOutboundMessage } from "@/lib/messaging/record";
+import { limiteDeNumeros } from "@/lib/whatsapp/limite-numeros";
 
 const execFileAsync = promisify(execFile);
 
@@ -114,15 +115,8 @@ export async function connectWhatsApp(input: {
 
   if (!membership) return { error: "No se encontró tu workspace." };
 
-  const { data: workspace } = await supabase
-    .from("workspaces")
-    .select("plan_id")
-    .eq("id", membership.workspace_id)
-    .maybeSingle();
-  const { data: plan } = workspace?.plan_id
-    ? await supabase.from("plans").select("max_whatsapp_numbers").eq("id", workspace.plan_id).maybeSingle()
-    : { data: null };
-  const maxNumbers = plan?.max_whatsapp_numbers ?? 1;
+  // Plan + cupo extra concedido desde admin a este espacio.
+  const { total: maxNumbers } = await limiteDeNumeros(supabase, membership.workspace_id);
 
   const { count: currentCount } = await supabase
     .from("whatsapp_accounts")

@@ -8,6 +8,7 @@ import { WorkspaceAdminEditor } from "@/components/admin/workspace-admin-editor"
 import { EditClientFields } from "@/components/admin/edit-client-fields";
 import { NotifyActivationButton } from "@/components/admin/notify-activation-button";
 import { getActivationTemplateConfig } from "@/app/actions/admin-whatsapp";
+import { limiteDeNumeros } from "@/lib/whatsapp/limite-numeros";
 
 export default async function AdminWorkspaceDetailPage({
   params,
@@ -19,7 +20,7 @@ export default async function AdminWorkspaceDetailPage({
 
   const { data: workspace } = await supabase
     .from("workspaces")
-    .select("id, name, status, plan_id, trial_ends_at, created_at, signup_ip, phone")
+    .select("id, name, status, plan_id, trial_ends_at, created_at, signup_ip, phone, extra_whatsapp_numbers")
     .eq("id", id)
     .maybeSingle();
 
@@ -69,6 +70,8 @@ export default async function AdminWorkspaceDetailPage({
     .order("accessed_at", { ascending: false })
     .limit(5);
 
+  const limiteNumeros = await limiteDeNumeros(supabase, id);
+
   const { data: owner } = await supabase
     .from("workspace_members")
     .select("user_id")
@@ -114,6 +117,8 @@ export default async function AdminWorkspaceDetailPage({
           workspaceId={workspace.id}
           workspaceName={workspace.name}
           workspacePhone={workspace.phone}
+          extraNumbers={workspace.extra_whatsapp_numbers ?? 0}
+          planNumbers={limiteNumeros.plan}
           ownerId={owner?.user_id ?? null}
           ownerEmail={ownerEmail}
         />
