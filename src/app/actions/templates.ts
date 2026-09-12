@@ -12,6 +12,7 @@ import {
 import { validateMediaFile } from "@/lib/whatsapp/media-limits";
 import { toPublicUrl } from "@/lib/supabase/config";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
+import { CATEGORIA_PLANTILLA_POR_DEFECTO } from "@/lib/templates/defaults";
 
 export async function syncTemplates() {
   const ctx = await requireWorkspace();
@@ -161,7 +162,7 @@ export async function setTemplateHeaderMedia(templateId: string, formData: FormD
 export async function createTemplate(_prevState: unknown, formData: FormData) {
   const name = String(formData.get("name") ?? "").trim().toLowerCase();
   const language = String(formData.get("language") ?? "es");
-  const category = String(formData.get("category") ?? "UTILITY") as
+  const category = String(formData.get("category") ?? CATEGORIA_PLANTILLA_POR_DEFECTO) as
     | "MARKETING"
     | "UTILITY"
     | "AUTHENTICATION";
