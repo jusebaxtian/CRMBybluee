@@ -7,6 +7,7 @@ import { logAdminAccess, startImpersonation } from "@/app/actions/admin";
 import { WorkspaceAdminEditor } from "@/components/admin/workspace-admin-editor";
 import { EditClientFields } from "@/components/admin/edit-client-fields";
 import { NotifyActivationButton } from "@/components/admin/notify-activation-button";
+import { ClienteEnMiChat, type ClienteDeEspacio } from "@/components/admin/cliente-en-mi-chat";
 import { getActivationTemplateConfig } from "@/app/actions/admin-whatsapp";
 
 export default async function AdminWorkspaceDetailPage({
@@ -86,6 +87,10 @@ export default async function AdminWorkspaceDetailPage({
     lastSignInAt = data.user?.last_sign_in_at ?? null;
   }
 
+  // Con quién habló el administrador para vender este espacio (0096).
+  const { data: clienteRows } = await supabase.rpc("admin_cliente_de_espacio", { p_workspace_id: id });
+  const cliente = ((clienteRows ?? []) as ClienteDeEspacio[])[0] ?? null;
+
   const daysSinceLastSignIn = lastSignInAt
     ? Math.max(0, Math.floor((Date.now() - new Date(lastSignInAt).getTime()) / (1000 * 60 * 60 * 24)))
     : null;
@@ -128,6 +133,8 @@ export default async function AdminWorkspaceDetailPage({
           />
         </div>
       </div>
+
+      <ClienteEnMiChat workspaceId={workspace.id} cliente={cliente} />
 
       <WorkspaceAdminEditor
         workspaceId={workspace.id}

@@ -43,6 +43,14 @@ export default async function AdminOverviewPage({
     .order("created_at", { ascending: false });
 
   const { data: connectedAccounts } = await supabase.from("whatsapp_accounts").select("workspace_id");
+  // Contacto de la bandeja del administrador que compró cada espacio (0096).
+  const { data: clientes } = await supabase.rpc("admin_clientes_de_espacios");
+  const clientePorWorkspace = new Map(
+    ((clientes ?? []) as { workspace_id: string; contact_name: string | null; wa_id: string }[]).map((c) => [
+      c.workspace_id,
+      c.contact_name ?? c.wa_id,
+    ])
+  );
   const connectedWorkspaceIds = new Set((connectedAccounts ?? []).map((a) => a.workspace_id));
 
   const ipCounts = new Map<string, number>();
@@ -91,6 +99,7 @@ export default async function AdminOverviewPage({
         createdAt: w.created_at,
         renewalDate: subscription?.current_period_end ?? w.trial_ends_at ?? null,
         phone: w.phone ?? null,
+        cliente: clientePorWorkspace.get(w.id) ?? null,
         hasWhatsapp: connectedWorkspaceIds.has(w.id),
         signupIp: w.signup_ip,
         sharedIp: w.signup_ip ? (ipCounts.get(w.signup_ip) ?? 0) > 1 : false,
@@ -215,6 +224,11 @@ export default async function AdminOverviewPage({
                 </td>
                 <td className="px-5 py-3 text-foreground">
                   <p>{r.phone ?? "—"}</p>
+                  {r.cliente && (
+                    <p className="text-xs text-muted" title="Contacto en tu bandeja">
+                      💬 {r.cliente}
+                    </p>
+                  )}
                   <span
                     title={r.hasWhatsapp ? "API de WhatsApp conectada" : "Sin API de WhatsApp conectada"}
                     className="mt-1 inline-block"

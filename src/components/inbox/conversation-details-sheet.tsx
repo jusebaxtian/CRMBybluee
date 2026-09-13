@@ -9,6 +9,7 @@ import { ConversationFollowupsToggle } from "@/components/inbox/conversation-fol
 import { ContactBlockedNotice } from "@/components/inbox/contact-blocked-notice";
 import { AiHandoffNotice } from "@/components/inbox/ai-handoff-notice";
 import { ConversationAiToggle } from "@/components/inbox/conversation-ai-toggle";
+import { EspacioDelClienteCard, type EspacioDelCliente } from "@/components/inbox/espacio-del-cliente";
 
 type Agent = { id: string; name: string | null; email: string };
 type Tag = { id: string; name: string; color: string };
@@ -34,6 +35,7 @@ export function ConversationDetailsSheet({
   adSourceId,
   adHeadline,
   adBody,
+  espaciosDelCliente = [],
 }: {
   contactName: string | null;
   contactWaId: string;
@@ -54,6 +56,8 @@ export function ConversationDetailsSheet({
   adSourceId: string | null;
   adHeadline: string | null;
   adBody: string | null;
+  /** Solo llega con datos para el administrador de la plataforma. */
+  espaciosDelCliente?: EspacioDelCliente[];
 }) {
   const [open, setOpen] = useState(false);
 
@@ -98,6 +102,8 @@ export function ConversationDetailsSheet({
               </p>
               <p className="text-sm text-muted">{contactWaId}</p>
             </div>
+
+            <EspacioDelClienteCard espacios={espaciosDelCliente} />
 
             {likelyBlocked && <ContactBlockedNotice contactId={contactId} />}
             {(aiHandoffRequested || aiManuallyPaused) && (
