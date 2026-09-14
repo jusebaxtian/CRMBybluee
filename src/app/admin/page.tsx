@@ -83,6 +83,8 @@ export default async function AdminOverviewPage({
     const ownerId = ownerPor.get(w.id);
     const usuario = ownerId ? userPor.get(ownerId) : undefined;
     const email = usuario?.email ?? "—";
+    // Nombre de la persona (lo captura el registro en user_metadata.full_name).
+    const fullName = (usuario?.user_metadata?.full_name as string | undefined)?.trim() || null;
     const lastSignInAt: string | null = usuario?.last_sign_in_at ?? null;
     const subscription = subPor.has(w.id) ? { current_period_end: subPor.get(w.id)! } : null;
 
@@ -92,6 +94,7 @@ export default async function AdminOverviewPage({
         id: w.id,
         name: w.name,
         email,
+        fullName,
         plan: plan?.name ?? "—",
         status: w.status,
         everActivated: w.ever_activated,
@@ -109,7 +112,7 @@ export default async function AdminOverviewPage({
 
   const query = (q ?? "").trim().toLowerCase();
   let filteredRows = query
-    ? rows.filter((r) => r.email.toLowerCase().includes(query))
+    ? rows.filter((r) => r.email.toLowerCase().includes(query) || (r.fullName ?? "").toLowerCase().includes(query))
     : rows;
 
   const fromDate = from ? new Date(from) : null;
@@ -219,6 +222,7 @@ export default async function AdminOverviewPage({
               <tr key={r.id} className="border-b border-border last:border-b-0">
                 <td className="px-5 py-3">
                   <p className="text-foreground">{r.email}</p>
+                  {r.fullName && <p className="text-xs text-foreground/80">{r.fullName}</p>}
                   <p className="text-xs text-muted">{r.name}</p>
                 </td>
                 <td className="px-5 py-3 text-foreground">
