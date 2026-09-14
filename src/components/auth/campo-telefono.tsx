@@ -3,7 +3,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { INPUT_AUTH } from "@/components/auth/campos";
+import { INPUT_AUTH, INPUT_AUTH_BASE } from "@/components/auth/campos";
 import { listaDePaises, PAIS_POR_DEFECTO, type Pais } from "@/lib/auth/telefono";
 
 /**
@@ -99,8 +99,8 @@ export function CampoTelefono({
           aria-expanded={abierto}
           aria-label={`País: ${pais.nombre} ${pais.indicativo}`}
           className={cn(
-            INPUT_AUTH,
-            "flex w-[150px] shrink-0 items-center gap-2 px-3 text-left sm:w-[172px]",
+            INPUT_AUTH_BASE,
+            "flex w-[118px] shrink-0 items-center gap-2 px-3 text-left sm:w-[172px]",
             error && "border-error"
           )}
         >
@@ -112,6 +112,7 @@ export function CampoTelefono({
 
         <input
           id={`${id}-numero`}
+          className={cn(INPUT_AUTH, "min-w-0 flex-1")}
           name="phone"
           type="tel"
           inputMode="numeric"
@@ -123,7 +124,6 @@ export function CampoTelefono({
           placeholder="Número de WhatsApp"
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? `${id}-error` : undefined}
-          className={INPUT_AUTH}
         />
 
         {abierto && (

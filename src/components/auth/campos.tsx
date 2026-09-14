@@ -5,9 +5,10 @@ import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Button, type ButtonProps } from "@/components/ui/button";
 
-/** Clases base de los inputs de autenticacion: mismas que el resto del panel, con alto comodo para tactil. */
-export const INPUT_AUTH =
-  "h-12 w-full rounded-[10px] border border-border bg-surface px-3.5 text-[14px] text-foreground outline-none transition-colors placeholder:text-muted/70 hover:border-muted/40 focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:border-error aria-[invalid=true]:focus:ring-error/20";
+/** Clases base de los inputs de autenticacion (sin ancho): mismas que el resto del panel, con alto comodo para tactil. */
+export const INPUT_AUTH_BASE =
+  "h-12 rounded-[10px] border border-border bg-surface px-3.5 text-[14px] text-foreground outline-none transition-colors placeholder:text-muted/70 hover:border-muted/40 focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 aria-[invalid=true]:border-error aria-[invalid=true]:focus:ring-error/20";
+export const INPUT_AUTH = `w-full ${INPUT_AUTH_BASE}`;
 
 export function Campo({
   etiqueta,
