@@ -5,14 +5,12 @@ import { DeleteTagButton } from "@/components/tags/delete-tag-button";
 import { EditTagButton } from "@/components/tags/edit-tag-button";
 import { TagFollowupsToggle } from "@/components/tags/tag-followups-toggle";
 import { getWorkspaceId } from "@/lib/workspace";
-import { requireModule, getEnabledModuleKeys } from "@/lib/entitlements";
-import { CampaignsTabs } from "@/components/layout/campaigns-tabs";
+import { requireModule } from "@/lib/entitlements";
 
 export default async function TagsPage() {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
   await requireModule(supabase, workspaceId, "tags");
-  const enabledModules = await getEnabledModuleKeys(supabase, workspaceId);
 
   const { data: tags } = await supabase
     .from("tags")
@@ -22,7 +20,6 @@ export default async function TagsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <CampaignsTabs enabledModules={enabledModules} />
 
       <div className="rounded-[13px] border border-border bg-surface p-5">
         <CreateTagForm />

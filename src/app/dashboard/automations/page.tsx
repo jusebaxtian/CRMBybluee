@@ -3,14 +3,12 @@ import { Zap, Plus, Bot } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { AutomationRowActions } from "@/components/automations/automation-row-actions";
 import { getWorkspaceId } from "@/lib/workspace";
-import { requireModule, getEnabledModuleKeys } from "@/lib/entitlements";
-import { CampaignsTabs } from "@/components/layout/campaigns-tabs";
+import { requireModule } from "@/lib/entitlements";
 
 export default async function AutomationsPage() {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
   await requireModule(supabase, workspaceId, "automations");
-  const enabledModules = await getEnabledModuleKeys(supabase, workspaceId);
 
   const { data: automations } = await supabase
     .from("automations")
@@ -31,7 +29,6 @@ export default async function AutomationsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <CampaignsTabs enabledModules={enabledModules} />
 
       {aiAgentActive && (
         <div className="flex items-center gap-3 rounded-xl border border-warning/30 bg-warning/10 p-4">

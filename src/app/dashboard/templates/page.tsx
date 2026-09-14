@@ -3,8 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { SyncTemplatesButton } from "@/components/templates/sync-templates-button";
 import { CreateTemplateForm } from "@/components/templates/create-template-form";
 import { getWorkspaceId } from "@/lib/workspace";
-import { requireModule, getEnabledModuleKeys } from "@/lib/entitlements";
-import { CampaignsTabs } from "@/components/layout/campaigns-tabs";
+import { requireModule } from "@/lib/entitlements";
 import { DeleteTemplateButton } from "@/components/templates/delete-template-button";
 import { TemplatePreview } from "@/components/templates/template-preview";
 import { TemplateHeaderMediaUpload } from "@/components/templates/template-header-media-upload";
@@ -32,7 +31,6 @@ export default async function TemplatesPage() {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
   await requireModule(supabase, workspaceId, "templates");
-  const enabledModules = await getEnabledModuleKeys(supabase, workspaceId);
 
   const { data: templates } = await supabase
     .from("templates")
@@ -53,7 +51,6 @@ export default async function TemplatesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <CampaignsTabs enabledModules={enabledModules} />
 
       <div className="rounded-[13px] border border-border bg-surface p-6">
         <h2 className="mb-4 text-sm font-semibold text-foreground">Crear nueva plantilla</h2>
