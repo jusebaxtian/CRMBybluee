@@ -593,13 +593,15 @@ export function ConversationListPanel({
                       }}
                       title={conv.pinnedAt ? "Quitar de fijados" : "Fijar arriba"}
                       aria-label={conv.pinnedAt ? "Quitar de fijados" : "Fijar arriba"}
-                      className={`rounded p-0.5 ${
+                      // Siempre visible y con area de toque de 32px: en el
+                      // celular no hay "pasar el cursor" que lo revele.
+                      className={`-my-1 flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
                         conv.pinnedAt
-                          ? "text-primary"
-                          : "text-muted/0 hover:text-muted focus:text-muted group-hover:text-muted/70"
+                          ? "text-primary hover:bg-primary/10"
+                          : "text-muted/60 hover:bg-surface-hover hover:text-foreground"
                       }`}
                     >
-                      {conv.pinnedAt ? <Pin size={11} /> : <PinOff size={11} />}
+                      {conv.pinnedAt ? <Pin size={16} /> : <PinOff size={16} />}
                     </button>
                     <span className="text-[10px] text-muted">
                       {new Date(conv.last_message_at).toLocaleTimeString("es-CO", {
