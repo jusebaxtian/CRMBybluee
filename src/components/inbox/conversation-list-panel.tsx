@@ -315,7 +315,7 @@ export function ConversationListPanel({
       {/* Filtros rapidos (excluyentes entre si) + el resto en un panel flotante
           que se cierra al hacer clic fuera. Todo aplica al instante. */}
       <div className="relative border-b border-border px-3 py-2.5">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none]">
           <button
             type="button"
             onClick={() => {
@@ -684,7 +684,7 @@ export function ConversationListPanel({
 
 /** Pastilla de filtro rapido: mismo look que las de canal, con variante ambar para "Por vencer". */
 function pill(activa: boolean, tono: "primary" | "warning" = "primary"): string {
-  const base = "flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors";
+  const base = "flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-2 py-1 text-[11.5px] font-medium transition-colors";
   if (!activa) return `${base} border-border text-muted hover:text-foreground`;
   return tono === "warning"
     ? `${base} border-warning bg-warning/15 text-warning`
