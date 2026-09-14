@@ -24,41 +24,24 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const origin = origenPublico(request);
   const code = searchParams.get("code");
-  const tokenHash = searchParams.get("token_hash");
-  const tipo = searchParams.get("type");
   const errorDescription = searchParams.get("error_description");
-  const supabase = await createClient();
 
-  if (code) {
-    // Google (OAuth PKCE) y el enlace de recuperacion que manda Supabase.
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) {
-      console.error("auth callback: no se pudo canjear el codigo:", error.message);
-      return NextResponse.redirect(`${origin}/login?error=enlace`);
-    }
-  } else if (tokenHash && tipo === "recovery") {
-    // Segundo formato oficial del enlace de recuperacion (token_hash).
-    const { error } = await supabase.auth.verifyOtp({ type: "recovery", token_hash: tokenHash });
-    if (error) {
-      console.error("auth callback: enlace de recuperacion invalido:", error.message);
-      return NextResponse.redirect(`${origin}/recuperar?error=enlace`);
-    }
-  } else {
+  if (!code) {
     const motivo = errorDescription ? encodeURIComponent(errorDescription) : "google";
     return NextResponse.redirect(`${origin}/login?error=${motivo}`);
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  if (error) {
+    console.error("google callback: no se pudo canjear el codigo:", error.message);
+    return NextResponse.redirect(`${origin}/login?error=google`);
   }
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return NextResponse.redirect(`${origin}/login?error=enlace`);
-
-  // Enlace de "recuperar contraseña": la sesion ya esta creada, va directo a
-  // la pantalla de nueva contraseña. Solo rutas internas, nunca una URL ajena.
-  const next = searchParams.get("next");
-  if (next && next.startsWith("/") && !next.startsWith("//")) {
-    return NextResponse.redirect(`${origin}${next}`);
-  }
+  if (!user) return NextResponse.redirect(`${origin}/login?error=google`);
 
   const { data: membership } = await supabase
     .from("workspace_members")

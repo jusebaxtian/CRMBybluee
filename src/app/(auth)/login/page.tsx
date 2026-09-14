@@ -8,7 +8,6 @@ import { login, type AuthFormState } from "@/app/actions/auth";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Campo, CampoContrasena, BotonEnviar, ErrorFormulario } from "@/components/auth/campos";
 import { GoogleButton } from "@/components/auth/google-button";
-import { RECUPERACION_POR_CORREO } from "@/lib/auth/telefono";
 
 function LoginForm() {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(login, undefined);
@@ -49,22 +48,15 @@ function LoginForm() {
             error={state?.errores?.password}
             disabled={pending}
           />
-          {RECUPERACION_POR_CORREO && (
-            <div className="mt-2 text-right">
-              <Link href="/recuperar" className="text-[13px] font-medium text-primary hover:underline">
-                ¿Olvidaste tu contraseña?
-              </Link>
-            </div>
-          )}
+          <div className="mt-2 text-right">
+            <Link href="/recuperar" className="text-[13px] font-medium text-primary hover:underline">
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </div>
         </div>
 
         <ErrorFormulario>
-          {state?.error ??
-            (errorGoogle === "enlace"
-              ? "Ese enlace venció o ya fue usado. Pide uno nuevo desde \"¿Olvidaste tu contraseña?\"."
-              : errorGoogle
-                ? "No se pudo entrar con Google. Intenta de nuevo o usa tu correo."
-                : null)}
+          {state?.error ?? (errorGoogle ? "No se pudo entrar con Google. Intenta de nuevo o usa tu correo." : null)}
         </ErrorFormulario>
 
         <BotonEnviar cargando={pending} textoCargando="Entrando...">

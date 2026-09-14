@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { componerTelefono } from "@/lib/auth/telefono";
+import { enviarCodigoPorWhatsApp, verificarCodigo, cambiarContrasena, CODIGO_VIGENCIA_MIN } from "@/lib/auth/recuperacion";
 
 // nginx forwards the real client IP via X-Forwarded-For (may be a chain of
 // "client, proxy1, proxy2" — the first entry is the actual visitor).
@@ -12,14 +13,6 @@ async function getClientIp(): Promise<string | null> {
   const forwardedFor = headerStore.get("x-forwarded-for");
   if (forwardedFor) return forwardedFor.split(",")[0].trim();
   return headerStore.get("x-real-ip");
-}
-
-/** Dominio que ve el navegador (detras de nginx request.url es localhost). */
-async function origenPublico(): Promise<string> {
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
-  const proto = h.get("x-forwarded-proto") ?? "https";
-  return `${proto}://${host}`;
 }
 
 export type AuthFormState =
@@ -149,11 +142,11 @@ export async function logout() {
 }
 
 /**
- * Recuperar contraseña: Supabase manda el correo con un enlace que vuelve
- * por /auth/callback?next=/restablecer. La respuesta es la misma exista o no
- * el correo, para no revelar que cuentas hay.
+ * Recuperar contraseña por WhatsApp (sin correo). Paso 1: el cliente da su
+ * correo y recibe un codigo en el WhatsApp de su espacio. La respuesta es la
+ * misma exista o no la cuenta, para no revelar que correos hay.
  */
-export async function solicitarRecuperacion(
+export async function solicitarCodigoRecuperacion(
   _prevState: AuthFormState,
   formData: FormData
 ): Promise<AuthFormState> {
@@ -162,50 +155,63 @@ export async function solicitarRecuperacion(
     return { errores: { email: "Revisa el correo: no parece válido." }, valores: { email } };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${await origenPublico()}/auth/callback?next=/restablecer`,
-  });
-  if (error) {
-    console.error("recuperar contraseña:", error.message);
-    if (error.message.toLowerCase().includes("rate limit")) {
-      return { error: "Ya enviamos un correo hace poco. Revisa tu bandeja o espera unos minutos.", valores: { email } };
+  const r = await enviarCodigoPorWhatsApp(email);
+  if (!r.ok) {
+    if (r.motivo === "demasiados") {
+      return { error: "Ya te enviamos varios códigos. Espera 15 minutos y vuelve a intentar.", valores: { email } };
     }
+    if (r.motivo === "sin_canal" || r.motivo === "envio") {
+      return { error: "No pudimos enviar el código por WhatsApp. Escríbenos a soporte y te ayudamos.", valores: { email } };
+    }
+    // sin_cuenta / sin_whatsapp: misma pantalla que si hubiera salido, sin pistas.
   }
 
   return {
-    ok: "Si ese correo tiene una cuenta, te enviamos un enlace para crear una contraseña nueva. Revisa también la carpeta de spam.",
-    valores: { email },
+    ok: r.ok
+      ? `Te enviamos un código de ${CODIGO_VIGENCIA_MIN} minutos al WhatsApp ${r.telefonoEnmascarado}.`
+      : `Si ese correo tiene una cuenta con WhatsApp registrado, le enviamos un código de ${CODIGO_VIGENCIA_MIN} minutos.`,
+    valores: { email, paso: "codigo" },
   };
 }
 
-/** Nueva contraseña desde el enlace del correo (la sesion de recuperacion ya esta activa). */
-export async function restablecerContrasena(
+/** Paso 2: codigo + contraseña nueva. Si todo cuadra, entra directo. */
+export async function restablecerConCodigo(
   _prevState: AuthFormState,
   formData: FormData
 ): Promise<AuthFormState> {
+  const email = textoDe(formData, "email").toLowerCase();
+  const codigo = textoDe(formData, "codigo").replace(/\D/g, "");
   const password = String(formData.get("password") ?? "");
   const passwordConfirm = String(formData.get("passwordConfirm") ?? "");
+  const valores = { email, paso: "codigo" };
 
   const errores: Record<string, string> = {};
+  if (codigo.length !== 6) errores.codigo = "El código tiene 6 dígitos.";
   if (password.length < MIN_CONTRASENA) errores.password = `Mínimo ${MIN_CONTRASENA} caracteres.`;
   if (passwordConfirm !== password) errores.passwordConfirm = "Las contraseñas no coinciden.";
-  if (Object.keys(errores).length > 0) return { errores };
+  if (Object.keys(errores).length > 0) return { errores, valores };
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "El enlace venció o ya fue usado. Pide uno nuevo." };
-
-  const { error } = await supabase.auth.updateUser({ password });
-  if (error) {
-    if (error.message.toLowerCase().includes("different from the old")) {
-      return { errores: { password: "Debe ser distinta a la contraseña anterior." } };
-    }
-    return { error: "No pudimos guardar la contraseña. Intenta de nuevo." };
+  const v = await verificarCodigo(email, codigo);
+  if (!v.ok) {
+    const textos = {
+      sin_cuenta: "Código incorrecto.",
+      sin_codigo: "Ese código ya se usó o no existe. Pide uno nuevo.",
+      vencido: "El código venció. Pide uno nuevo.",
+      incorrecto: "Código incorrecto. Revisa el mensaje de WhatsApp.",
+      bloqueado: "Demasiados intentos con este código. Pide uno nuevo.",
+    } as const;
+    return { errores: { codigo: textos[v.motivo] }, valores };
   }
 
+  const fallo = await cambiarContrasena(v.userId, password);
+  if (fallo) {
+    console.error("recuperacion: no se pudo cambiar la contraseña:", fallo);
+    return { error: "No pudimos guardar la contraseña. Intenta de nuevo.", valores };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) redirect("/login");
   redirect("/dashboard");
 }
 
