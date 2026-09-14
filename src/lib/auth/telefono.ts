@@ -73,3 +73,12 @@ export function componerTelefono(iso: string, local: string): TelefonoCompuesto 
     digitos: e164.slice(1),
   };
 }
+
+/**
+ * Recuperacion de contraseña por correo: desactivada porque la plataforma no
+ * tiene SMTP (decision del 14 sep 2026). Se reemplaza por el codigo por
+ * WhatsApp; mientras tanto, el cliente escribe a soporte y el admin cambia la
+ * clave desde Admin. Con false, el login no muestra el enlace y /recuperar y
+ * /restablecer responden 404.
+ */
+export const RECUPERACION_POR_CORREO = false;
