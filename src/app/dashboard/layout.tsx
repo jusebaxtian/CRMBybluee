@@ -156,6 +156,7 @@ export default async function DashboardLayout({
       supportWhatsappNumber={supportWhatsappNumber}
       supportWhatsappMessage={supportWhatsappMessage}
       userEmail={user.email ?? ""}
+      avatarUrl={typeof user.user_metadata?.avatar_url === "string" ? user.user_metadata.avatar_url : null}
       notifications={notificationsWithRead}
       workspaceId={workspaceId}
       planId={workspace?.plan_id ?? null}
