@@ -21,7 +21,7 @@ import {
 } from "@/lib/whatsapp/graph";
 import { validateMediaMime, validateMediaSize } from "@/lib/whatsapp/media-limits";
 import { transcodeVideoToH264 } from "@/lib/whatsapp/video-transcode";
-import { getWorkspaceRole } from "@/lib/workspace";
+import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
 import { buildTemplateSendParams } from "@/lib/whatsapp/variables";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { toPublicUrl } from "@/lib/supabase/config";
@@ -105,14 +105,13 @@ export async function connectWhatsApp(input: {
   } = await supabase.auth.getUser();
   if (!user) return { error: "No autenticado." };
 
-  const { data: membership } = await supabase
-    .from("workspace_members")
-    .select("workspace_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
-
-  if (!membership) return { error: "No se encontró tu workspace." };
+  // El espacio activo, no la membresia del usuario: cuando el admin entra
+  // "como el cliente" (impersonacion), el numero debe quedar en el espacio
+  // del cliente. Antes se guardaba en el espacio del admin y al recargar el
+  // cliente aparecia sin API (caso Tomas Inversiones, 14 sep 2026).
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const membership = { workspace_id: workspaceId };
 
   const { data: workspace } = await supabase
     .from("workspaces")
