@@ -41,12 +41,9 @@ export function Sidebar({
   unreadMessagesCount = 0,
   supportWhatsappNumber,
   supportWhatsappMessage,
-  avatarUrl = null,
   onNavigate,
 }: {
   workspaceName: string;
-  /** Foto de perfil (la de Google cuando entro por ahi); sin foto se muestra la inicial. */
-  avatarUrl?: string | null;
   workspaceRole?: string | null;
   billingLocked?: boolean;
   isPlatformAdmin?: boolean;
@@ -145,19 +142,9 @@ export function Sidebar({
       {/* Tarjeta de usuario */}
       <div className="mt-auto flex flex-col gap-2">
         <div className="flex items-center gap-[10px] rounded-[11px] border border-border bg-background p-[11px]">
-          {avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- dominio externo (Google), sin optimizar
-            <img
-              src={avatarUrl}
-              alt=""
-              referrerPolicy="no-referrer"
-              className="h-[30px] w-[30px] shrink-0 rounded-full object-cover"
-            />
-          ) : (
-            <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-primary text-[13px] font-bold text-white">
-              {workspaceName.charAt(0).toUpperCase()}
-            </div>
-          )}
+          <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-primary text-[13px] font-bold text-white">
+            {workspaceName.charAt(0).toUpperCase()}
+          </div>
           <div className="min-w-0">
             <p className="truncate text-[12.5px] font-semibold text-foreground">{workspaceName}</p>
             <p className="text-[11px] text-muted">{workspaceRole === "agent" ? "Agente" : "Administrador"}</p>

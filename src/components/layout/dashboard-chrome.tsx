@@ -28,7 +28,6 @@ export function DashboardChrome({
   supportWhatsappNumber,
   supportWhatsappMessage,
   userEmail,
-  avatarUrl = null,
   notifications,
   workspaceId = null,
   planId = null,
@@ -47,7 +46,6 @@ export function DashboardChrome({
   supportWhatsappNumber?: string | null;
   supportWhatsappMessage?: string | null;
   userEmail: string;
-  avatarUrl?: string | null;
   notifications: Notification[];
   workspaceId?: string | null;
   planId?: string | null;
@@ -87,7 +85,6 @@ export function DashboardChrome({
         }`}
       >
         <Sidebar
-          avatarUrl={avatarUrl}
           workspaceName={workspaceName}
           workspaceRole={workspaceRole}
           billingLocked={billingLocked}
