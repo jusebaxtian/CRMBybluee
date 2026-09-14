@@ -43,6 +43,13 @@ export async function GET(request: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.redirect(`${origin}/login?error=google`);
 
+  // Enlace de "recuperar contraseña": la sesion ya esta creada, va directo a
+  // la pantalla de nueva contraseña. Solo rutas internas, nunca una URL ajena.
+  const next = searchParams.get("next");
+  if (next && next.startsWith("/") && !next.startsWith("//")) {
+    return NextResponse.redirect(`${origin}${next}`);
+  }
+
   const { data: membership } = await supabase
     .from("workspace_members")
     .select("workspace_id")

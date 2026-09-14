@@ -3,76 +3,69 @@
 import { Suspense, useActionState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { Mail } from "lucide-react";
 import { login, type AuthFormState } from "@/app/actions/auth";
+import { AuthShell } from "@/components/auth/auth-shell";
+import { Campo, CampoContrasena, BotonEnviar, ErrorFormulario } from "@/components/auth/campos";
 import { GoogleButton } from "@/components/auth/google-button";
 
 function LoginForm() {
-  const [state, action, pending] = useActionState<AuthFormState, FormData>(
-    login,
-    undefined
-  );
+  const [state, action, pending] = useActionState<AuthFormState, FormData>(login, undefined);
   // /auth/callback vuelve aqui con ?error=... si Google no completo el ingreso.
   const errorGoogle = useSearchParams().get("error");
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-6">
-      <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-8 shadow-sm">
-        <div className="mb-6 flex items-center gap-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="ByBluee" className="h-8 w-8 rounded-lg" />
-          <span className="text-lg font-semibold text-foreground">ByBluee</span>
-        </div>
-        <h1 className="mb-6 text-2xl font-semibold text-foreground">
-          Inicia sesión
-        </h1>
-        <GoogleButton />
-        {errorGoogle && !state?.error && (
-          <p className="mb-4 text-sm text-red-400">No se pudo entrar con Google. Intenta de nuevo o usa tu correo.</p>
-        )}
-        <form action={action} className="flex flex-col gap-4">
-          <div>
-            <label htmlFor="email" className="mb-1 block text-sm font-medium text-muted">
-              Correo
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              required
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-            />
-          </div>
-          <div>
-            <label htmlFor="password" className="mb-1 block text-sm font-medium text-muted">
-              Contraseña
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              required
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-            />
-          </div>
-          {state?.error && (
-            <p className="text-sm text-red-400">{state.error}</p>
-          )}
-          <button
-            type="submit"
-            disabled={pending}
-            className="mt-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
-          >
-            {pending ? "Entrando..." : "Entrar"}
-          </button>
-        </form>
-        <p className="mt-4 text-center text-sm text-muted">
-          ¿No tienes cuenta?{" "}
-          <Link href="/signup" className="font-medium text-primary hover:underline">
+    <AuthShell
+      titulo="Ingresa a tu cuenta"
+      descripcion="Escribe tu correo y contraseña para entrar a tu CRM."
+      pie={
+        <>
+          ¿No tienes una cuenta?{" "}
+          <Link href="/signup" className="font-semibold text-primary hover:underline">
             Regístrate
           </Link>
-        </p>
-      </div>
-    </div>
+        </>
+      }
+    >
+      <form action={action} noValidate className="flex flex-col gap-4">
+        <Campo
+          etiqueta="Correo electrónico"
+          name="email"
+          type="email"
+          autoComplete="email"
+          placeholder="tu@empresa.com"
+          defaultValue={state?.valores?.email ?? ""}
+          error={state?.errores?.email}
+          icono={<Mail size={16} />}
+          disabled={pending}
+        />
+        <div>
+          <CampoContrasena
+            etiqueta="Contraseña"
+            name="password"
+            autoComplete="current-password"
+            placeholder="Tu contraseña"
+            error={state?.errores?.password}
+            disabled={pending}
+          />
+          <div className="mt-2 text-right">
+            <Link href="/recuperar" className="text-[13px] font-medium text-primary hover:underline">
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </div>
+        </div>
+
+        <ErrorFormulario>
+          {state?.error ?? (errorGoogle ? "No se pudo entrar con Google. Intenta de nuevo o usa tu correo." : null)}
+        </ErrorFormulario>
+
+        <BotonEnviar cargando={pending} textoCargando="Entrando...">
+          Iniciar sesión
+        </BotonEnviar>
+      </form>
+
+      <GoogleButton posicion="abajo" />
+    </AuthShell>
   );
 }
 

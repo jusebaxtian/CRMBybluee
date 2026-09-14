@@ -2,99 +2,97 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
+import { Mail, User, Building2 } from "lucide-react";
 import { signup, type AuthFormState } from "@/app/actions/auth";
+import { AuthShell } from "@/components/auth/auth-shell";
+import { Campo, CampoContrasena, BotonEnviar, ErrorFormulario } from "@/components/auth/campos";
+import { CampoTelefono } from "@/components/auth/campo-telefono";
 import { GoogleButton } from "@/components/auth/google-button";
 
 export default function SignupPage() {
-  const [state, action, pending] = useActionState<AuthFormState, FormData>(
-    signup,
-    undefined
-  );
+  const [state, action, pending] = useActionState<AuthFormState, FormData>(signup, undefined);
+  const v = state?.valores ?? {};
+  const e = state?.errores ?? {};
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-6">
-      <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-8 shadow-sm">
-        <div className="mb-6 flex items-center gap-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="ByBluee" className="h-8 w-8 rounded-lg" />
-          <span className="text-lg font-semibold text-foreground">ByBluee</span>
-        </div>
-        <h1 className="mb-1 text-2xl font-semibold text-foreground">
-          Crea tu cuenta
-        </h1>
-        <p className="mb-6 text-sm text-muted">
-          Crea tu cuenta y empieza a vender por WhatsApp.
-        </p>
-        <GoogleButton texto="Registrarme con Google" />
-        <form action={action} className="flex flex-col gap-4">
-          <div>
-            <label htmlFor="companyName" className="mb-1 block text-sm font-medium text-muted">
-              Nombre de tu empresa
-            </label>
-            <input
-              id="companyName"
-              name="companyName"
-              type="text"
-              required
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-            />
-          </div>
-          <div>
-            <label htmlFor="phone" className="mb-1 block text-sm font-medium text-muted">
-              Número de WhatsApp
-            </label>
-            <input
-              id="phone"
-              name="phone"
-              type="tel"
-              placeholder="Ej: 573001234567"
-              required
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-            />
-          </div>
-          <div>
-            <label htmlFor="email" className="mb-1 block text-sm font-medium text-muted">
-              Correo
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              required
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-            />
-          </div>
-          <div>
-            <label htmlFor="password" className="mb-1 block text-sm font-medium text-muted">
-              Contraseña
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              required
-              minLength={8}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-            />
-          </div>
-          {state?.error && (
-            <p className="text-sm text-red-400">{state.error}</p>
-          )}
-          <button
-            type="submit"
-            disabled={pending}
-            className="mt-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
-          >
-            {pending ? "Creando cuenta..." : "Crear cuenta"}
-          </button>
-        </form>
-        <p className="mt-4 text-center text-sm text-muted">
-          ¿Ya tienes cuenta?{" "}
-          <Link href="/login" className="font-medium text-primary hover:underline">
-            Inicia sesión
+    <AuthShell
+      titulo="Crea tu cuenta"
+      descripcion="Empieza a vender por WhatsApp con la API oficial. Sin tarjeta, en menos de un minuto."
+      ancho="max-w-[440px]"
+      pie={
+        <>
+          ¿Ya tienes una cuenta?{" "}
+          <Link href="/login" className="font-semibold text-primary hover:underline">
+            Iniciar sesión
           </Link>
-        </p>
-      </div>
-    </div>
+        </>
+      }
+    >
+      <form action={action} noValidate className="flex flex-col gap-4">
+        <Campo
+          etiqueta="Nombre del cliente"
+          name="fullName"
+          autoComplete="name"
+          placeholder="Nombre completo"
+          defaultValue={v.fullName ?? ""}
+          error={e.fullName}
+          icono={<User size={16} />}
+          disabled={pending}
+        />
+        <Campo
+          etiqueta="Nombre de la empresa"
+          name="companyName"
+          autoComplete="organization"
+          placeholder="Nombre de la empresa"
+          defaultValue={v.companyName ?? ""}
+          error={e.companyName}
+          icono={<Building2 size={16} />}
+          disabled={pending}
+        />
+        <CampoTelefono
+          error={e.phone}
+          paisInicial={v.phoneCountry || undefined}
+          numeroInicial={v.phone ?? ""}
+          disabled={pending}
+        />
+        <Campo
+          etiqueta="Correo electrónico"
+          name="email"
+          type="email"
+          autoComplete="email"
+          placeholder="tu@empresa.com"
+          defaultValue={v.email ?? ""}
+          error={e.email}
+          icono={<Mail size={16} />}
+          disabled={pending}
+        />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <CampoContrasena
+            etiqueta="Contraseña"
+            name="password"
+            autoComplete="new-password"
+            placeholder="Mínimo 8 caracteres"
+            error={e.password}
+            disabled={pending}
+          />
+          <CampoContrasena
+            etiqueta="Confirmar contraseña"
+            name="passwordConfirm"
+            autoComplete="new-password"
+            placeholder="Repite la contraseña"
+            error={e.passwordConfirm}
+            disabled={pending}
+          />
+        </div>
+
+        <ErrorFormulario>{state?.error}</ErrorFormulario>
+
+        <BotonEnviar cargando={pending} textoCargando="Creando tu cuenta...">
+          Crear cuenta
+        </BotonEnviar>
+      </form>
+
+      <GoogleButton texto="Registrarme con Google" posicion="abajo" />
+    </AuthShell>
   );
 }
