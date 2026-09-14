@@ -237,13 +237,33 @@ export function ConversationListPanel({
   // El filtrado ocurre en la base: `lista` ya viene filtrada y ordenada.
   const filtered = lista;
 
-  const activeFilterCount =
-    selectedTagIds.length +
-    (assignedFilter ? 1 : 0) +
-    (unreadOnly ? 1 : 0) +
-    (unansweredOnly ? 1 : 0) +
-    (expiringSoon ? 1 : 0) +
-    (needsHumanOnly ? 1 : 0);
+  // Panel flotante: se cierra al hacer clic fuera o con Escape; los filtros
+  // ya quedaron aplicados (cada cambio de estado re-consulta al servidor).
+  const panelFiltrosRef = useRef<HTMLDivElement>(null);
+  const botonFiltrosRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!filtersOpen) return;
+    function fuera(e: MouseEvent | TouchEvent) {
+      const t = e.target as Node;
+      if (panelFiltrosRef.current?.contains(t) || botonFiltrosRef.current?.contains(t)) return;
+      setFiltersOpen(false);
+    }
+    function tecla(e: KeyboardEvent) {
+      if (e.key === "Escape") setFiltersOpen(false);
+    }
+    document.addEventListener("mousedown", fuera);
+    document.addEventListener("touchstart", fuera);
+    document.addEventListener("keydown", tecla);
+    return () => {
+      document.removeEventListener("mousedown", fuera);
+      document.removeEventListener("touchstart", fuera);
+      document.removeEventListener("keydown", tecla);
+    };
+  }, [filtersOpen]);
+
+  // Solo los filtros que viven dentro del panel (los rapidos se ven solos).
+  const otrosFiltrosActivos =
+    selectedTagIds.length + (assignedFilter ? 1 : 0) + (unansweredOnly ? 1 : 0) + (needsHumanOnly ? 1 : 0);
 
   // Llega contado desde la base. Contarlo sobre la lista daria el numero de
   // la pagina cargada, no el del espacio, y diria de menos sin avisar.
@@ -290,24 +310,68 @@ export function ConversationListPanel({
             className="w-full bg-transparent text-sm text-foreground outline-none"
           />
         </div>
-        <button
-          type="button"
-          onClick={() => setFiltersOpen((v) => !v)}
-          className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${
-            filtersOpen || activeFilterCount > 0
-              ? "border-primary text-primary"
-              : "border-border text-muted hover:text-foreground"
-          }`}
-          title="Filtros"
-        >
-          <SlidersHorizontal size={16} />
-          {activeFilterCount > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-medium text-white">
-              {activeFilterCount}
-            </span>
-          )}
-        </button>
       </div>
+
+      {/* Filtros rapidos (excluyentes entre si) + el resto en un panel flotante
+          que se cierra al hacer clic fuera. Todo aplica al instante. */}
+      <div className="relative border-b border-border px-3 py-2.5">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              setUnreadOnly(false);
+              setExpiringSoon(false);
+            }}
+            className={pill(!unreadOnly && !expiringSoon)}
+          >
+            Todos
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setUnreadOnly(true);
+              setExpiringSoon(false);
+            }}
+            className={pill(unreadOnly)}
+          >
+            No leídos
+            {unreadConversationsCount > 0 && !unreadOnly && (
+              <span className="ml-0.5 rounded-full bg-primary/15 px-1.5 text-[10px] text-primary">{unreadConversationsCount}</span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setExpiringSoon(true);
+              setUnreadOnly(false);
+            }}
+            title="Ventana de 24h por vencer (menos de 2 horas)"
+            className={pill(expiringSoon, "warning")}
+          >
+            <Clock size={11} />
+            Por vencer 2h
+          </button>
+          <button
+            ref={botonFiltrosRef}
+            type="button"
+            onClick={() => setFiltersOpen((v) => !v)}
+            aria-expanded={filtersOpen}
+            aria-label="Más filtros"
+            title="Más filtros"
+            className={`relative ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors ${
+              filtersOpen || otrosFiltrosActivos > 0
+                ? "border-primary text-primary"
+                : "border-border text-muted hover:text-foreground"
+            }`}
+          >
+            <SlidersHorizontal size={15} />
+            {otrosFiltrosActivos > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-medium text-white">
+                {otrosFiltrosActivos}
+              </span>
+            )}
+          </button>
+        </div>
 
       {channels.length > 1 && (
         <div className="flex flex-wrap gap-1.5 border-b border-border px-3 py-2.5">
@@ -343,20 +407,14 @@ export function ConversationListPanel({
         </div>
       )}
 
-      {filtersOpen && (
-        <div className="flex flex-col gap-3 border-b border-border bg-background/50 p-3">
+        {filtersOpen && (
+        <div
+          ref={panelFiltrosRef}
+          role="dialog"
+          aria-label="Más filtros"
+          className="absolute left-3 right-3 top-[calc(100%-4px)] z-30 flex flex-col gap-3 rounded-[12px] border border-border bg-surface p-3 shadow-[0_18px_40px_rgba(0,0,0,0.45)] animate-[filtros-in_0.15s_ease-out]"
+        >
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setUnreadOnly((v) => !v)}
-              className={`self-start rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                unreadOnly
-                  ? "border-primary bg-primary text-white"
-                  : "border-border text-muted hover:text-foreground"
-              }`}
-            >
-              No leídos
-            </button>
             <button
               type="button"
               onClick={() => setUnansweredOnly((v) => !v)}
@@ -368,19 +426,6 @@ export function ConversationListPanel({
               }`}
             >
               Sin responder
-            </button>
-            <button
-              type="button"
-              onClick={() => setExpiringSoon((v) => !v)}
-              title="Ventana de 24h por vencer (entre 10 segundos y 2 horas)"
-              className={`flex items-center gap-1 self-start rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                expiringSoon
-                  ? "border-warning bg-warning text-black"
-                  : "border-border text-muted hover:text-foreground"
-              }`}
-            >
-              <Clock size={12} />
-              Por vencer (2h)
             </button>
             <button
               type="button"
@@ -450,10 +495,13 @@ export function ConversationListPanel({
             </div>
           )}
 
-          {activeFilterCount > 0 && (
+          {otrosFiltrosActivos > 0 && (
             <button
               type="button"
-              onClick={clearFilters}
+              onClick={() => {
+                clearFilters();
+                setFiltersOpen(false);
+              }}
               className="flex items-center gap-1 self-start text-xs text-muted hover:text-foreground"
             >
               <X size={12} />
@@ -461,7 +509,8 @@ export function ConversationListPanel({
             </button>
           )}
         </div>
-      )}
+        )}
+      </div>
 
       <PullToRefresh className="flex-1">
         {pinError && (
@@ -631,4 +680,13 @@ export function ConversationListPanel({
       </PullToRefresh>
     </aside>
   );
+}
+
+/** Pastilla de filtro rapido: mismo look que las de canal, con variante ambar para "Por vencer". */
+function pill(activa: boolean, tono: "primary" | "warning" = "primary"): string {
+  const base = "flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors";
+  if (!activa) return `${base} border-border text-muted hover:text-foreground`;
+  return tono === "warning"
+    ? `${base} border-warning bg-warning/15 text-warning`
+    : `${base} border-primary bg-primary/15 text-primary`;
 }
