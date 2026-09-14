@@ -1,9 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceId } from "@/lib/workspace";
 import { rangoDe, cargarAviso, type Periodo } from "@/lib/dashboard/datos";
-import { TagStatsTable } from "@/components/tags/tag-stats-table";
 import { Bloque } from "@/components/dashboard/bloque";
 import { Aviso } from "@/components/dashboard/aviso";
 import { EstadoCuenta } from "@/components/dashboard/estado-cuenta";
@@ -12,6 +10,7 @@ import { Kpis } from "@/components/dashboard/kpis";
 import { LeadsPorDia } from "@/components/dashboard/leads-por-dia";
 import { Pendientes } from "@/components/dashboard/pendientes";
 import { Resumen } from "@/components/dashboard/resumen";
+import { Etiquetas } from "@/components/dashboard/etiquetas";
 import {
   EsqueletoTarjeta,
   EsqueletoKpis,
@@ -46,16 +45,12 @@ export default async function DashboardPage({
   const locked = typeof params.locked === "string" ? params.locked : null;
   const tagsFrom = typeof params.tagsFrom === "string" ? params.tagsFrom : null;
   const tagsTo = typeof params.tagsTo === "string" ? params.tagsTo : null;
-  const tagsFromIso = tagsFrom ? new Date(`${tagsFrom}T00:00:00`).toISOString() : null;
-  const tagsToIso = tagsTo ? new Date(`${tagsTo}T23:59:59.999`).toISOString() : null;
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-
-  const workspaceId = await getWorkspaceId(supabase);
 
   const periodo = leerPeriodo(params);
   const rango = rangoDe(periodo);
@@ -73,27 +68,6 @@ export default async function DashboardPage({
     month: "long",
     timeZone: "America/Bogota",
   });
-
-  // --- Tabla de etiquetas: ya existia y se conserva bajo el diseño nuevo. ---
-  let contactsCountQuery = workspaceId
-    ? supabase.from("contacts").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId)
-    : null;
-  if (contactsCountQuery && tagsFromIso) contactsCountQuery = contactsCountQuery.gte("created_at", tagsFromIso);
-  if (contactsCountQuery && tagsToIso) contactsCountQuery = contactsCountQuery.lte("created_at", tagsToIso);
-
-  const [{ data: tagsRaw }, { data: tagCounts }, { count: totalContacts }] = await Promise.all([
-    workspaceId
-      ? supabase.from("tags").select("id, name, color").eq("workspace_id", workspaceId).order("position")
-      : Promise.resolve({ data: [] as { id: string; name: string; color: string }[] }),
-    workspaceId
-      ? supabase.rpc("tag_contact_counts", { p_workspace_id: workspaceId, p_created_from: tagsFromIso, p_created_to: tagsToIso })
-      : Promise.resolve({ data: [] as { tag_id: string; contact_count: number }[] }),
-    contactsCountQuery ?? Promise.resolve({ count: 0 }),
-  ]);
-  const countByTagId = new Map(
-    ((tagCounts ?? []) as { tag_id: string; contact_count: number }[]).map((r) => [r.tag_id, Number(r.contact_count)])
-  );
-  const tagStats = (tagsRaw ?? []).map((t) => ({ id: t.id, name: t.name, color: t.color, count: countByTagId.get(t.id) ?? 0 }));
 
   return (
     <div className={`-m-4 flex flex-col gap-5 bg-dash-bg p-6 font-dash-ui text-dash-text sm:-m-5 sm:px-7`}>
@@ -163,7 +137,12 @@ export default async function DashboardPage({
         </Suspense>
       </Bloque>
 
-      <TagStatsTable tags={tagStats} totalContacts={totalContacts ?? 0} dateFrom={tagsFrom} dateTo={tagsTo} />
+      {/* Fila 6: tablero de etiquetas (conserva el filtro tagsFrom/tagsTo) */}
+      <Bloque nombre="las etiquetas">
+        <Suspense fallback={<EsqueletoFila alto="h-[320px]" />}>
+          <Etiquetas creadoDesde={tagsFrom} creadoHasta={tagsTo} />
+        </Suspense>
+      </Bloque>
     </div>
   );
 }

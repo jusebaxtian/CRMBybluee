@@ -469,3 +469,71 @@ export async function cargarAviso(supabase: SupabaseClient): Promise<{ imagenUrl
   const { data } = await supabase.from("platform_settings").select("value").eq("key", "dashboard_banner_url").maybeSingle();
   return data?.value ? { imagenUrl: data.value } : null;
 }
+
+// ---------------------------------------------------------------------------
+// Tablero de etiquetas: contactos de una etiqueta con su ultimo mensaje.
+// ---------------------------------------------------------------------------
+
+export type ContactoEtiqueta = {
+  id: string;
+  /** Conversacion para abrir el chat; null si el contacto nunca ha escrito. */
+  conversacionId: string | null;
+  nombre: string;
+  inicial: string;
+  /** Ultimo mensaje (o tipo de adjunto), vacio si no hay conversacion. */
+  contexto: string;
+  /** "hace 3h", "ayer", "12 mar"; null sin mensajes. */
+  hace: string | null;
+  /** El ultimo mensaje lo mando el contacto y esta sin responder. */
+  sinResponder: boolean;
+};
+
+export function describirHace(fechaIso: string | null): string | null {
+  if (!fechaIso) return null;
+  const min = Math.max(0, Math.floor((Date.now() - new Date(fechaIso).getTime()) / 60_000));
+  if (min < 60) return `hace ${min}m`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `hace ${h}h`;
+  const d = Math.floor(h / 24);
+  if (d === 1) return "ayer";
+  if (d < 7) return `hace ${d} días`;
+  return new Date(fechaIso).toLocaleDateString("es-CO", { day: "numeric", month: "short", timeZone: "America/Bogota" });
+}
+
+export async function cargarContactosDeEtiqueta(
+  supabase: SupabaseClient,
+  workspaceId: string,
+  tagId: string,
+  opciones: { limite: number; desde: number; creadoDesde?: string | null; creadoHasta?: string | null }
+): Promise<ContactoEtiqueta[]> {
+  const { data } = await supabase.rpc("dashboard_contactos_por_etiqueta", {
+    p_workspace_id: workspaceId,
+    p_tag_id: tagId,
+    p_limit: opciones.limite,
+    p_offset: opciones.desde,
+    p_created_from: opciones.creadoDesde ?? null,
+    p_created_to: opciones.creadoHasta ?? null,
+  });
+
+  return ((data ?? []) as {
+    contact_id: string;
+    name: string | null;
+    wa_id: string;
+    conversation_id: string | null;
+    last_message_at: string | null;
+    last_body: string | null;
+    last_message_type: string | null;
+    last_direction: string | null;
+  }[]).map((f) => {
+    const nombre = f.name?.trim() || f.wa_id || "—";
+    return {
+      id: f.contact_id,
+      conversacionId: f.conversation_id,
+      nombre,
+      inicial: nombre.charAt(0).toUpperCase(),
+      contexto: f.conversation_id ? (f.last_body ?? ETIQUETA_MEDIA[f.last_message_type ?? ""] ?? "Mensaje") : "Sin conversación",
+      hace: describirHace(f.last_message_at),
+      sinResponder: f.last_direction === "in",
+    };
+  });
+}
