@@ -3,6 +3,7 @@ import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
 import { ConnectWhatsAppButton } from "@/components/whatsapp/connect-whatsapp-button";
 import { DisconnectWhatsAppButton } from "@/components/whatsapp/disconnect-whatsapp-button";
 import { RenameWhatsAppAccount } from "@/components/whatsapp/rename-whatsapp-account";
+import { BusinessProfileEditor } from "@/components/whatsapp/business-profile-editor";
 import type { PhoneNumberStatus } from "@/lib/whatsapp/graph";
 
 const qualityLabel: Record<string, string> = {
@@ -103,6 +104,12 @@ function AccountCard({
               Límite: {messagingLimitLabel[phoneStatus.messaging_limit_tier] ?? phoneStatus.messaging_limit_tier}
             </span>
           )}
+        </div>
+      )}
+
+      {!frozen && (
+        <div className="mt-4">
+          <BusinessProfileEditor accountId={account.id} />
         </div>
       )}
 

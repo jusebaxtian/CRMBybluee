@@ -477,3 +477,61 @@ export async function sendTemplateMessage(
     }),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Perfil de negocio de WhatsApp (lo que ve el cliente al abrir el perfil del
+// numero): foto, descripcion, direccion, correo, sitios web y categoria.
+// El nombre visible NO se edita por aqui: lo aprueba Meta en WhatsApp Manager.
+// ---------------------------------------------------------------------------
+
+export type BusinessProfile = {
+  about?: string;
+  address?: string;
+  description?: string;
+  email?: string;
+  profile_picture_url?: string;
+  websites?: string[];
+  vertical?: string;
+};
+
+export const BUSINESS_VERTICALS = [
+  "UNDEFINED",
+  "OTHER",
+  "AUTO",
+  "BEAUTY",
+  "APPAREL",
+  "EDU",
+  "ENTERTAIN",
+  "EVENT_PLAN",
+  "FINANCE",
+  "GROCERY",
+  "GOVT",
+  "HOTEL",
+  "HEALTH",
+  "NONPROFIT",
+  "PROF_SERVICES",
+  "RETAIL",
+  "TRAVEL",
+  "RESTAURANT",
+  "NOT_A_BIZ",
+] as const;
+
+export async function getBusinessProfile(phoneNumberId: string, accessToken: string): Promise<BusinessProfile> {
+  const data = await graphFetch(
+    `/${phoneNumberId}/whatsapp_business_profile?fields=about,address,description,email,profile_picture_url,websites,vertical`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  return (data?.data?.[0] ?? {}) as BusinessProfile;
+}
+
+export async function updateBusinessProfile(
+  phoneNumberId: string,
+  accessToken: string,
+  profile: Partial<Omit<BusinessProfile, "profile_picture_url">> & { profile_picture_handle?: string }
+): Promise<void> {
+  await graphFetch(`/${phoneNumberId}/whatsapp_business_profile`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ messaging_product: "whatsapp", ...profile }),
+  });
+}
