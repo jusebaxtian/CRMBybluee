@@ -58,33 +58,33 @@ export default async function AdminOverviewPage({
     if (w.signup_ip) ipCounts.set(w.signup_ip, (ipCounts.get(w.signup_ip) ?? 0) + 1);
   }
 
-  const rows = await Promise.all(
-    (workspaces ?? []).map(async (w) => {
-      const [{ data: owner }, { data: subscription }] = await Promise.all([
-        supabase
-          .from("workspace_members")
-          .select("user_id")
-          .eq("workspace_id", w.id)
-          .eq("role", "owner")
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from("subscriptions")
-          .select("current_period_end")
-          .eq("workspace_id", w.id)
-          .eq("status", "active")
-          .order("current_period_end", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-      ]);
+  // Antes: por cada espacio, 2 consultas + 1 llamada al servicio de auth
+  // (getUserById), y GoTrue las atiende casi en serie: ~2 s con 25 clientes.
+  // Ahora: dueños y suscripciones en una consulta cada una, y un solo
+  // listUsers para correos y ultimo acceso (~150 ms).
+  const ids = (workspaces ?? []).map((w) => w.id);
+  const [{ data: owners }, { data: subs }, { data: usersPage }] = await Promise.all([
+    supabase.from("workspace_members").select("workspace_id, user_id").in("workspace_id", ids).eq("role", "owner"),
+    supabase
+      .from("subscriptions")
+      .select("workspace_id, current_period_end")
+      .in("workspace_id", ids)
+      .eq("status", "active")
+      .order("current_period_end", { ascending: false }),
+    admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+  ]);
+  const ownerPor = new Map((owners ?? []).map((o) => [o.workspace_id, o.user_id]));
+  // Ordenadas por vencimiento descendente: la primera de cada espacio es la vigente.
+  const subPor = new Map<string, string>();
+  for (const sub of subs ?? []) if (!subPor.has(sub.workspace_id)) subPor.set(sub.workspace_id, sub.current_period_end);
+  const userPor = new Map((usersPage?.users ?? []).map((u) => [u.id, u]));
 
-      let email = "—";
-      let lastSignInAt: string | null = null;
-      if (owner?.user_id) {
-        const { data } = await admin.auth.admin.getUserById(owner.user_id);
-        email = data.user?.email ?? "—";
-        lastSignInAt = data.user?.last_sign_in_at ?? null;
-      }
+  const rows = (workspaces ?? []).map((w) => {
+    const ownerId = ownerPor.get(w.id);
+    const usuario = ownerId ? userPor.get(ownerId) : undefined;
+    const email = usuario?.email ?? "—";
+    const lastSignInAt: string | null = usuario?.last_sign_in_at ?? null;
+    const subscription = subPor.has(w.id) ? { current_period_end: subPor.get(w.id)! } : null;
 
       const plan = w.plans as unknown as { name: string } | null;
 
@@ -105,8 +105,7 @@ export default async function AdminOverviewPage({
         sharedIp: w.signup_ip ? (ipCounts.get(w.signup_ip) ?? 0) > 1 : false,
         lastSignInAt,
       };
-    })
-  );
+  });
 
   const query = (q ?? "").trim().toLowerCase();
   let filteredRows = query
