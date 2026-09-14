@@ -125,7 +125,8 @@ export async function Conexiones() {
     return (
       <section aria-label="Conexiones de WhatsApp API" className={`${contenedor} flex flex-wrap items-center gap-[18px]`}>
         <span aria-hidden className="text-[30px]">🔴</span>
-        <div className="min-w-0 flex-1">
+        {/* En movil el texto ocupa la fila y el boton pasa abajo a todo el ancho. */}
+        <div className="min-w-[220px] flex-1 basis-[260px]">
           <h2 className="font-dash-display text-[17px] font-bold tracking-[-.2px] text-dash-text">Aún no tienes ninguna API conectada</h2>
           <p className="mt-1 font-dash-ui text-[12.5px] leading-[1.5] text-[var(--muted)]">
             Conecta tu número de WhatsApp Business para enviar y recibir mensajes. {textoPlan}.
@@ -133,7 +134,7 @@ export async function Conexiones() {
         </div>
         <ConnectWhatsAppButton
           label="💬 Conectar WhatsApp"
-          className="flex-none rounded-[12px] bg-dash-green px-[22px] py-[14px] font-dash-ui text-[14px] font-bold text-dash-on-green transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:opacity-50"
+          className="w-full flex-none rounded-[12px] bg-dash-green px-[22px] py-[14px] font-dash-ui text-[14px] font-bold text-dash-on-green transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:opacity-50 sm:w-auto"
         />
       </section>
     );
