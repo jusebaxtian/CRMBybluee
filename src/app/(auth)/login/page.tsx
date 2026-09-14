@@ -8,10 +8,12 @@ import { login, type AuthFormState } from "@/app/actions/auth";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Campo, CampoContrasena, BotonEnviar, ErrorFormulario } from "@/components/auth/campos";
 import { GoogleButton } from "@/components/auth/google-button";
+import { useEntrarGuardando } from "@/components/auth/use-entrar-guardando";
 import { RECUPERACION_POR_CORREO } from "@/lib/auth/telefono";
 
 function LoginForm() {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(login, undefined);
+  const { alEnviar } = useEntrarGuardando(state);
   // /auth/callback vuelve aqui con ?error=... si Google no completo el ingreso.
   const errorGoogle = useSearchParams().get("error");
 
@@ -28,12 +30,12 @@ function LoginForm() {
         </>
       }
     >
-      <form action={action} noValidate className="flex flex-col gap-4">
+      <form action={action} onSubmit={alEnviar} noValidate className="flex flex-col gap-4">
         <Campo
           etiqueta="Correo electrónico"
           name="email"
           type="email"
-          autoComplete="email"
+          autoComplete="username"
           placeholder="tu@empresa.com"
           defaultValue={state?.valores?.email ?? ""}
           error={state?.errores?.email}

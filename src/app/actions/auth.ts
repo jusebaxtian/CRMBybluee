@@ -116,7 +116,8 @@ export async function signup(
     return { error: "Tu cuenta quedó creada, pero no pudimos crear tu espacio. Escríbenos a soporte.", valores };
   }
 
-  redirect("/dashboard");
+  // El cliente guarda usuario/contraseña en el navegador y navega al panel.
+  return { ok: "entrar", valores: { email } };
 }
 
 export async function login(
@@ -139,7 +140,7 @@ export async function login(
     return { error: "Correo o contraseña incorrectos.", valores: { email } };
   }
 
-  redirect("/dashboard");
+  return { ok: "entrar", valores: { email } };
 }
 
 export async function logout() {

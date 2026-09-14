@@ -8,9 +8,11 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { Campo, CampoContrasena, BotonEnviar, ErrorFormulario } from "@/components/auth/campos";
 import { CampoTelefono } from "@/components/auth/campo-telefono";
 import { GoogleButton } from "@/components/auth/google-button";
+import { useEntrarGuardando } from "@/components/auth/use-entrar-guardando";
 
 export default function SignupPage() {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(signup, undefined);
+  const { alEnviar } = useEntrarGuardando(state);
   const v = state?.valores ?? {};
   const e = state?.errores ?? {};
 
@@ -28,7 +30,7 @@ export default function SignupPage() {
         </>
       }
     >
-      <form action={action} noValidate className="flex flex-col gap-4">
+      <form action={action} onSubmit={alEnviar} noValidate className="flex flex-col gap-4">
         <Campo
           etiqueta="Nombre del cliente"
           name="fullName"
@@ -59,7 +61,7 @@ export default function SignupPage() {
           etiqueta="Correo electrónico"
           name="email"
           type="email"
-          autoComplete="email"
+          autoComplete="username"
           placeholder="tu@empresa.com"
           defaultValue={v.email ?? ""}
           error={e.email}
