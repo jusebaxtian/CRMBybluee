@@ -10,8 +10,19 @@ import { createClient } from "@/lib/supabase/server";
  * - Es nueva: a completar el registro, porque Google no nos da el nombre del
  *   negocio ni el WhatsApp, y sin ellos no se crea el espacio.
  */
+/**
+ * Detras de nginx, request.url trae la direccion interna (http://localhost:3000);
+ * la redireccion tiene que ir al dominio que ve el navegador.
+ */
+function origenPublico(request: NextRequest): string {
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  const proto = request.headers.get("x-forwarded-proto") ?? "https";
+  return host ? `${proto}://${host}` : new URL(request.url).origin;
+}
+
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
+  const origin = origenPublico(request);
   const code = searchParams.get("code");
   const errorDescription = searchParams.get("error_description");
 
