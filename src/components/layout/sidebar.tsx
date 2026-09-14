@@ -113,7 +113,7 @@ export function Sidebar({
             return ready ? (
               <Link
                 key={href}
-                href={href === "/dashboard/inbox" && unreadMessagesCount > 0 ? "/dashboard/inbox?filtro=sin-responder" : href}
+                href={href}
                 className="block"
                 onClick={onNavigate}
                 aria-current={active ? "page" : undefined}

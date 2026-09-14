@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Search, SlidersHorizontal, X, Clock, Megaphone, ShieldAlert, Bot, Check, Pin, PinOff } from "lucide-react";
 import { setConversationPinned, cargarConversaciones } from "@/app/actions/conversations";
 import { NewMessageButton } from "@/components/inbox/new-message-button";
@@ -104,22 +104,18 @@ export function ConversationListPanel({
   const ultimosFiltrosRef = useRef<typeof filtros | null>(null);
 
   const [query, setQuery] = useState("");
-  // Si se llega con un filtro en la URL (desde el dashboard), el panel de
-  // filtros arranca abierto: asi se ve cual esta activo y como quitarlo.
-  const filtroEnUrl = useSearchParams().get("filtro");
-  const [filtersOpen, setFiltersOpen] = useState(filtroEnUrl !== null);
+  // La bandeja siempre abre en "Todos" y con el panel de filtros cerrado
+  // (decision del 14 sep 2026): los filtros los elige la persona. Los
+  // enlaces del dashboard llevan a la bandeja sin preseleccionar nada.
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [assignedFilter, setAssignedFilter] = useState<string>(""); // "" = all, "unassigned", or agent id
   const [channelFilter, setChannelFilter] = useState<string>(""); // "" = all channels
-  // Arranca con "no leidos" activo si se llega desde el dashboard con
-  // ?filtro=no-leidos. Antes los filtros eran solo estado local y no habia
-  // forma de enlazar a la bandeja ya filtrada.
-  const filtroInicial = useSearchParams().get("filtro");
-  const [unreadOnly, setUnreadOnly] = useState(filtroInicial === "no-leidos");
+  const [unreadOnly, setUnreadOnly] = useState(false);
   // "Sin responder" (el cliente hablo de ultimo) no es "no leido" (hay
   // entrantes desde que se abrio el chat): un chat abierto y no contestado es
-  // lo primero y no lo segundo. El dashboard enlaza aqui.
-  const [unansweredOnly, setUnansweredOnly] = useState(filtroInicial === "sin-responder");
+  // lo primero y no lo segundo.
+  const [unansweredOnly, setUnansweredOnly] = useState(false);
   const [expiringSoon, setExpiringSoon] = useState(false);
   const [needsHumanOnly, setNeedsHumanOnly] = useState(false);
   // Los filtros activos, en la forma que espera el servidor.
