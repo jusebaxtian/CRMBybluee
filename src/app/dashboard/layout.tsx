@@ -124,17 +124,15 @@ export default async function DashboardLayout({
     read: readIds.has(n.id),
   }));
 
-  // El badge de Conversaciones cuenta chats SIN RESPONDER (el cliente hablo
-  // de ultimo), el mismo numero que muestra el dashboard. Antes contaba
-  // mensajes no leidos, que es otra cosa y no cuadraba con la tarjeta.
-  const { count: unansweredCount } = workspaceId
-    ? await supabase
-        .from("conversations")
-        .select("id", { count: "exact", head: true })
-        .eq("workspace_id", workspaceId)
-        .eq("last_message_direction", "in")
-    : { count: 0 };
-  const unreadMessagesCount = unansweredCount ?? 0;
+  // La insignia de Conversaciones cuenta chats NO LEIDOS (con entrantes desde
+  // la ultima vez que se abrio el chat), que es lo que la gente entiende como
+  // "pendiente de ver". Decision del 14 sep 2026: contaba "sin responder" y
+  // a un cliente le marcaba 99+ por chats viejos ya vistos. "Sin responder"
+  // sigue en el dashboard y como filtro de la bandeja.
+  const { data: noLeidos } = workspaceId
+    ? await supabase.rpc("inbox_unread_count", { p_workspace_id: workspaceId })
+    : { data: 0 };
+  const unreadMessagesCount = Number(noLeidos ?? 0);
 
   const { data: supportSettings } = await supabase
     .from("platform_settings")
