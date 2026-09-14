@@ -68,7 +68,7 @@ export default async function DashboardLayout({
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-8 text-center">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Cuenta desactivada</h1>
+          <h1 className="font-dash-display text-[22px] font-bold tracking-[-.4px] text-foreground">Cuenta desactivada</h1>
           <p className="mt-2 max-w-sm text-sm text-muted">
             Tu acceso a esta cuenta fue desactivado. Contacta a soporte si crees que esto es un error.
           </p>
@@ -124,10 +124,17 @@ export default async function DashboardLayout({
     read: readIds.has(n.id),
   }));
 
-  const { data: unreadCountResult } = workspaceId
-    ? await supabase.rpc("workspace_unread_messages_count", { p_workspace_id: workspaceId })
-    : { data: 0 };
-  const unreadMessagesCount = unreadCountResult ?? 0;
+  // El badge de Conversaciones cuenta chats SIN RESPONDER (el cliente hablo
+  // de ultimo), el mismo numero que muestra el dashboard. Antes contaba
+  // mensajes no leidos, que es otra cosa y no cuadraba con la tarjeta.
+  const { count: unansweredCount } = workspaceId
+    ? await supabase
+        .from("conversations")
+        .select("id", { count: "exact", head: true })
+        .eq("workspace_id", workspaceId)
+        .eq("last_message_direction", "in")
+    : { count: 0 };
+  const unreadMessagesCount = unansweredCount ?? 0;
 
   const { data: supportSettings } = await supabase
     .from("platform_settings")

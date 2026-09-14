@@ -56,6 +56,22 @@ export async function updateSession(request: NextRequest) {
         .limit(1)
         .maybeSingle();
 
+      // Entro con Google y todavia no creo su espacio: nada del panel tiene
+      // sentido sin espacio, asi que primero completa el registro. Los
+      // administradores de la plataforma sin espacio propio no aplican.
+      if (!membership) {
+        const { data: adminRow } = await supabase
+          .from("platform_admins")
+          .select("user_id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (!adminRow) {
+          const url = request.nextUrl.clone();
+          url.pathname = "/completar-registro";
+          return NextResponse.redirect(url);
+        }
+      }
+
       const workspaceStatus = (membership as unknown as { workspaces: { status: string } | null })
         ?.workspaces?.status;
 

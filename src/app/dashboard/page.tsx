@@ -1,11 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { Space_Grotesk, Manrope } from "next/font/google";
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceId } from "@/lib/workspace";
 import { rangoDe, cargarAviso, type Periodo } from "@/lib/dashboard/datos";
-import { TagStatsTable } from "@/components/tags/tag-stats-table";
-import { PeriodoSelector } from "@/components/dashboard/periodo-selector";
 import { Bloque } from "@/components/dashboard/bloque";
 import { Aviso } from "@/components/dashboard/aviso";
 import { EstadoCuenta } from "@/components/dashboard/estado-cuenta";
@@ -14,6 +10,7 @@ import { Kpis } from "@/components/dashboard/kpis";
 import { LeadsPorDia } from "@/components/dashboard/leads-por-dia";
 import { Pendientes } from "@/components/dashboard/pendientes";
 import { Resumen } from "@/components/dashboard/resumen";
+import { Etiquetas } from "@/components/dashboard/etiquetas";
 import {
   EsqueletoTarjeta,
   EsqueletoKpis,
@@ -21,18 +18,15 @@ import {
   EsqueletoFila,
 } from "@/components/dashboard/esqueletos";
 
-// Las dos fuentes del diseño se cargan solo en esta pantalla: el resto del
-// panel sigue con Geist. next/font expone cada una como variable CSS, que
-// globals.css mapea a font-dash-display y font-dash-ui.
-const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], weight: ["600", "700"], variable: "--font-space-grotesk" });
-const manrope = Manrope({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-manrope" });
-
 function leerPeriodo(params: Record<string, string | string[] | undefined>): Periodo {
   const desde = typeof params.desde === "string" ? params.desde : null;
   const hasta = typeof params.hasta === "string" ? params.hasta : null;
   if (desde && hasta && /^\d{4}-\d{2}-\d{2}$/.test(desde) && /^\d{4}-\d{2}-\d{2}$/.test(hasta)) {
     return { tipo: "rango", desde, hasta };
   }
+  // Sin selector en pantalla (decision del 12 sep 2026): los indicadores
+  // se calculan sobre los ultimos 7 dias. Los parametros de URL siguen
+  // funcionando por si algun dia vuelve.
   const p = typeof params.periodo === "string" ? params.periodo : "7d";
   return { tipo: p === "hoy" || p === "30d" ? p : "7d" };
 }
@@ -51,16 +45,12 @@ export default async function DashboardPage({
   const locked = typeof params.locked === "string" ? params.locked : null;
   const tagsFrom = typeof params.tagsFrom === "string" ? params.tagsFrom : null;
   const tagsTo = typeof params.tagsTo === "string" ? params.tagsTo : null;
-  const tagsFromIso = tagsFrom ? new Date(`${tagsFrom}T00:00:00`).toISOString() : null;
-  const tagsToIso = tagsTo ? new Date(`${tagsTo}T23:59:59.999`).toISOString() : null;
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-
-  const workspaceId = await getWorkspaceId(supabase);
 
   const periodo = leerPeriodo(params);
   const rango = rangoDe(periodo);
@@ -79,29 +69,8 @@ export default async function DashboardPage({
     timeZone: "America/Bogota",
   });
 
-  // --- Tabla de etiquetas: ya existia y se conserva bajo el diseño nuevo. ---
-  let contactsCountQuery = workspaceId
-    ? supabase.from("contacts").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId)
-    : null;
-  if (contactsCountQuery && tagsFromIso) contactsCountQuery = contactsCountQuery.gte("created_at", tagsFromIso);
-  if (contactsCountQuery && tagsToIso) contactsCountQuery = contactsCountQuery.lte("created_at", tagsToIso);
-
-  const [{ data: tagsRaw }, { data: tagCounts }, { count: totalContacts }] = await Promise.all([
-    workspaceId
-      ? supabase.from("tags").select("id, name, color").eq("workspace_id", workspaceId).order("position")
-      : Promise.resolve({ data: [] as { id: string; name: string; color: string }[] }),
-    workspaceId
-      ? supabase.rpc("tag_contact_counts", { p_workspace_id: workspaceId, p_created_from: tagsFromIso, p_created_to: tagsToIso })
-      : Promise.resolve({ data: [] as { tag_id: string; contact_count: number }[] }),
-    contactsCountQuery ?? Promise.resolve({ count: 0 }),
-  ]);
-  const countByTagId = new Map(
-    ((tagCounts ?? []) as { tag_id: string; contact_count: number }[]).map((r) => [r.tag_id, Number(r.contact_count)])
-  );
-  const tagStats = (tagsRaw ?? []).map((t) => ({ id: t.id, name: t.name, color: t.color, count: countByTagId.get(t.id) ?? 0 }));
-
   return (
-    <div className={`${spaceGrotesk.variable} ${manrope.variable} -m-4 flex flex-col gap-5 bg-dash-bg p-6 font-dash-ui text-dash-text sm:-m-5 sm:px-7`}>
+    <div className={`-m-4 flex flex-col gap-5 bg-dash-bg p-6 font-dash-ui text-dash-text sm:-m-5 sm:px-7`}>
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-dash-display text-[22px] font-bold tracking-[-.4px] text-dash-text">
@@ -109,11 +78,6 @@ export default async function DashboardPage({
           </h1>
           <p className="mt-0.5 text-[13px] capitalize text-dash-text-2">{fecha}</p>
         </div>
-        <PeriodoSelector
-          activo={periodo.tipo}
-          desde={periodo.tipo === "rango" ? periodo.desde : null}
-          hasta={periodo.tipo === "rango" ? periodo.hasta : null}
-        />
       </header>
 
       {locked && (
@@ -173,7 +137,12 @@ export default async function DashboardPage({
         </Suspense>
       </Bloque>
 
-      <TagStatsTable tags={tagStats} totalContacts={totalContacts ?? 0} dateFrom={tagsFrom} dateTo={tagsTo} />
+      {/* Fila 6: tablero de etiquetas (conserva el filtro tagsFrom/tagsTo) */}
+      <Bloque nombre="las etiquetas">
+        <Suspense fallback={<EsqueletoFila alto="h-[320px]" />}>
+          <Etiquetas creadoDesde={tagsFrom} creadoHasta={tagsTo} />
+        </Suspense>
+      </Bloque>
     </div>
   );
 }

@@ -11,6 +11,8 @@ import { SettingsTabs } from "@/components/layout/settings-tabs";
 import { WhatsAppApiPanel } from "@/components/whatsapp/whatsapp-api-panel";
 import { AiAgentPanel } from "@/components/ai-agent/ai-agent-panel";
 import { CtwaDatasetForm } from "@/components/whatsapp/ctwa-dataset-form";
+import { limiteDeNumeros } from "@/lib/whatsapp/limite-numeros";
+import { limiteDeAgentes } from "@/lib/agentes/limite-agentes";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -26,19 +28,15 @@ export default async function SettingsPage() {
 
   const agents = await listWorkspaceAgents(supabase, workspaceId);
 
-  const { data: workspacePlan } = workspaceId
-    ? await supabase.from("workspaces").select("plan_id").eq("id", workspaceId).maybeSingle()
-    : { data: null };
-  const { data: plan } = workspacePlan?.plan_id
-    ? await supabase
-        .from("plans")
-        .select("max_agents, max_whatsapp_numbers")
-        .eq("id", workspacePlan.plan_id)
-        .maybeSingle()
-    : { data: null };
-  // null = unlimited (Semestral), 0 = not included in this plan (Inicial), 3 = Pro.
-  const maxAgents = plan?.max_agents ?? null;
-  const maxWhatsappNumbers = plan?.max_whatsapp_numbers ?? 1;
+  // Plan + cupo extra concedido desde admin; null = ilimitado, 0 = sin agentes.
+  const maxAgents = workspaceId ? (await limiteDeAgentes(supabase, workspaceId)).total : null;
+  // Plan + cupo extra concedido desde admin. El helper es el mismo que usa la
+  // accion de conectar, asi que la pantalla y la comprobacion no pueden
+  // discrepar.
+  const limiteNumeros = workspaceId
+    ? await limiteDeNumeros(supabase, workspaceId)
+    : { plan: 1, extra: 0, total: 1 };
+  const maxWhatsappNumbers = limiteNumeros.total;
 
   const { data: whatsappAccounts } = workspaceId
     ? await supabase
@@ -64,7 +62,7 @@ export default async function SettingsPage() {
   );
 
   const agentsSection = (
-    <div className="rounded-xl border border-border bg-surface p-5">
+    <div className="rounded-[13px] border border-border bg-surface p-5">
       <div className="mb-4 flex items-center gap-2">
         <Users size={18} className="text-primary" />
         <h2 className="text-base font-semibold text-foreground">
@@ -140,7 +138,7 @@ export default async function SettingsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-xl font-semibold text-foreground">Configuración</h1>
+        <h1 className="font-dash-display text-[22px] font-bold tracking-[-.4px] text-foreground">Configuración</h1>
         <p className="mt-1 text-sm text-muted">
           Gestiona los agentes de respuesta y tu conexión con WhatsApp API.
         </p>

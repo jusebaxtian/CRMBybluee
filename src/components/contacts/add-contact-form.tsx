@@ -22,7 +22,7 @@ export function AddContactForm() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover"
+        className="flex items-center gap-2 rounded-[10px] bg-primary px-4 py-[10px] text-[12.5px] font-bold text-white hover:bg-primary-hover"
       >
         <UserPlus size={14} />
         Agregar contacto
@@ -45,7 +45,7 @@ export function AddContactForm() {
                 id="name"
                 name="name"
                 type="text"
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+                className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
               />
             </div>
             <div>
@@ -58,7 +58,7 @@ export function AddContactForm() {
                 type="text"
                 required
                 placeholder="573001234567"
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+                className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
               />
             </div>
             {state && "error" in state && <p className="text-xs text-red-400">{state.error}</p>}

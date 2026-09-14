@@ -3,6 +3,7 @@ import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
 import { ConnectWhatsAppButton } from "@/components/whatsapp/connect-whatsapp-button";
 import { DisconnectWhatsAppButton } from "@/components/whatsapp/disconnect-whatsapp-button";
 import { RenameWhatsAppAccount } from "@/components/whatsapp/rename-whatsapp-account";
+import { BusinessProfileEditor } from "@/components/whatsapp/business-profile-editor";
 import type { PhoneNumberStatus } from "@/lib/whatsapp/graph";
 
 const qualityLabel: Record<string, string> = {
@@ -106,6 +107,12 @@ function AccountCard({
         </div>
       )}
 
+      {!frozen && (
+        <div className="mt-4">
+          <BusinessProfileEditor accountId={account.id} />
+        </div>
+      )}
+
       <div className="mt-5 grid grid-cols-1 gap-3 border-t border-border pt-4 sm:grid-cols-2">
         <div>
           <p className="text-xs text-muted">ID de cuenta de WhatsApp Business (WABA)</p>
@@ -134,11 +141,11 @@ export function WhatsAppApiPanel({
 
   if (accounts.length === 0) {
     return (
-      <div className="rounded-xl border border-border bg-surface p-6">
+      <div className="rounded-[13px] border border-border bg-surface p-6">
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-hover text-muted">
           <MessageSquareOff size={22} />
         </div>
-        <h2 className="text-center text-lg font-semibold text-foreground">
+        <h2 className="text-center font-dash-ui text-[15px] font-semibold text-foreground">
           WhatsApp no está conectado
         </h2>
         <p className="mx-auto mt-1 max-w-md text-center text-sm text-muted">

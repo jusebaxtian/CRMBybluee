@@ -2,8 +2,7 @@ import Link from "next/link";
 import { Megaphone, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
-import { requireModule, getEnabledModuleKeys } from "@/lib/entitlements";
-import { CampaignsTabs } from "@/components/layout/campaigns-tabs";
+import { requireModule } from "@/lib/entitlements";
 import { StatBadge, StatusBadge } from "@/components/campaigns/stat-badge";
 
 const statusLabel: Record<string, string> = {
@@ -55,7 +54,6 @@ export default async function CampaignsPage() {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
   await requireModule(supabase, workspaceId, "campaigns");
-  const enabledModules = await getEnabledModuleKeys(supabase, workspaceId);
 
   const { data: campaigns } = await supabase
     .from("campaigns")
@@ -87,12 +85,11 @@ export default async function CampaignsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <CampaignsTabs enabledModules={enabledModules} />
 
       <div className="flex justify-end">
         <Link
           href="/dashboard/campaigns/new"
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover"
+          className="flex items-center gap-2 rounded-[10px] bg-primary px-4 py-[10px] text-[12.5px] font-bold text-white hover:bg-primary-hover"
         >
           <Plus size={16} />
           Nueva campaña
@@ -100,11 +97,11 @@ export default async function CampaignsPage() {
       </div>
 
       {!campaigns || campaigns.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-surface p-16 text-center">
+        <div className="flex flex-col items-center justify-center rounded-[13px] border border-border bg-surface p-16 text-center">
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-hover text-muted">
             <Megaphone size={22} />
           </div>
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className="font-dash-ui text-[15px] font-semibold text-foreground">
             Todavía no tienes campañas
           </h2>
           <p className="mt-1 max-w-md text-sm text-muted">
@@ -112,7 +109,7 @@ export default async function CampaignsPage() {
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-surface">
+        <div className="overflow-hidden rounded-[13px] border border-border bg-surface">
           {campaigns.map((c) => {
             const template = c.templates as unknown as { meta_template_name: string } | null;
             const count = countsByCampaign.get(c.id);

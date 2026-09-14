@@ -52,7 +52,7 @@ export function ImportContactsButton() {
           type="button"
           onClick={() => setShowHelp(true)}
           disabled={pending}
-          className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-hover disabled:opacity-50"
+          className="flex items-center gap-2 rounded-[10px] border border-border bg-surface-hover/40 px-4 py-[10px] text-[12.5px] font-semibold text-foreground hover:bg-surface-hover disabled:opacity-50"
         >
           <Upload size={14} />
           {pending ? "Importando..." : "Importar Excel"}
@@ -60,7 +60,7 @@ export function ImportContactsButton() {
         <a
           href="/api/contacts/import-template"
           download
-          className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-hover"
+          className="flex items-center gap-2 rounded-[10px] border border-border bg-surface-hover/40 px-4 py-[10px] text-[12.5px] font-semibold text-foreground hover:bg-surface-hover"
         >
           <Download size={14} />
           Descargar plantilla
@@ -73,7 +73,7 @@ export function ImportContactsButton() {
 
       {showHelp && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-xl border border-border bg-surface p-6 shadow-lg">
+          <div className="w-full max-w-lg rounded-[13px] border border-border bg-surface p-6 shadow-lg">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-2">
                 <Info size={18} className="text-primary" />
@@ -122,7 +122,7 @@ export function ImportContactsButton() {
                   setShowHelp(false);
                   inputRef.current?.click();
                 }}
-                className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover"
+                className="flex items-center gap-2 rounded-[10px] bg-primary px-4 py-[10px] text-[12.5px] font-bold text-white hover:bg-primary-hover"
               >
                 <Upload size={14} />
                 Elegir archivo

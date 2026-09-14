@@ -107,7 +107,7 @@ export function DashboardChrome({
           impersonatedOwnerId={impersonatedOwnerId}
           onMenuClick={() => setMobileNavOpen(true)}
         />
-        <main className="flex-1 p-4 pb-20 sm:p-5 sm:pb-20 lg:pb-5">{children}</main>
+        <main className="flex-1 p-4 pb-20 font-dash-ui sm:p-5 sm:pb-20 lg:pb-5">{children}</main>
         <MobileBottomNav
           workspaceRole={workspaceRole}
           billingLocked={billingLocked}

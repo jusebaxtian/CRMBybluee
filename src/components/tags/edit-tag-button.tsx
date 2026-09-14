@@ -72,7 +72,7 @@ export function EditTagButton({
           onClick={() => setOpen(false)}
         >
           <div
-            className="w-full max-w-xs rounded-xl border border-border bg-surface p-4 shadow-lg"
+            className="w-full max-w-xs rounded-[13px] border border-border bg-surface p-4 shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
             <label className="mb-1 block text-xs font-medium text-muted">Nombre</label>

@@ -47,7 +47,7 @@ export function DisconnectWhatsAppButton({ accountId }: { accountId: string }) {
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-5">
+          <div className="w-full max-w-sm rounded-[13px] border border-border bg-surface p-5">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-foreground">Confirmar desconexión</h3>
               <button
@@ -71,7 +71,7 @@ export function DisconnectWhatsAppButton({ accountId }: { accountId: string }) {
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleConfirm()}
               placeholder="Tu contraseña"
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+              className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
             />
 
             {error && <p className="mt-2 text-xs text-red-400">{error}</p>}

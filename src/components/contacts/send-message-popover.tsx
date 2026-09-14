@@ -59,7 +59,7 @@ export function SendMessagePopover({
             onChange={(e) => setBody(e.target.value)}
             rows={3}
             placeholder="Escribe tu mensaje..."
-            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
+            className="w-full rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary"
           />
           {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
           <button

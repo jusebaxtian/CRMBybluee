@@ -508,7 +508,7 @@ export function AutomationActionsBuilder({
                 onChange={(e) => updateAction(index, { message_body: e.target.value })}
                 rows={2}
                 placeholder="Mensaje a enviar... usa {{nombre}} para el nombre del contacto"
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+                className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
               />
               <p className="text-[11px] text-muted">
                 Escribe <code className="rounded bg-surface-hover px-1">{"{{nombre}}"}</code> donde quieras que
@@ -526,7 +526,7 @@ export function AutomationActionsBuilder({
             <select
               value={action.tag_id}
               onChange={(e) => updateAction(index, { tag_id: e.target.value })}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+              className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
             >
               {tags.length === 0 && <option value="">No hay etiquetas</option>}
               {tags.map((t) => (
@@ -612,7 +612,7 @@ export function AutomationActionsBuilder({
                   onChange={(e) => updateAction(index, { message_body: e.target.value })}
                   rows={2}
                   placeholder="Texto que acompaña la imagen/video/documento (opcional)"
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+                  className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
                 />
               )}
             </div>
@@ -622,7 +622,7 @@ export function AutomationActionsBuilder({
             <select
               value={action.target_agent_id}
               onChange={(e) => updateAction(index, { target_agent_id: e.target.value })}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+              className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
             >
               {agents.length === 0 && <option value="">No tienes agentes creados</option>}
               {agents.map((a) => (
@@ -653,7 +653,7 @@ export function AutomationActionsBuilder({
                       onChange={(e) =>
                         updateAgentShare(index, shareIndex, { agent_id: e.target.value })
                       }
-                      className="flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
+                      className="flex-1 rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary"
                     >
                       {agents
                         .filter((a) => a.id === share.agent_id || !usedIds.has(a.id))
@@ -673,7 +673,7 @@ export function AutomationActionsBuilder({
                           percent: Math.max(0, Math.min(100, Number(e.target.value) || 0)),
                         })
                       }
-                      className="w-16 rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
+                      className="w-16 rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary"
                     />
                     <span className="text-xs text-muted">%</span>
                     <button
@@ -715,7 +715,7 @@ export function AutomationActionsBuilder({
               <select
                 value={action.template_id}
                 onChange={(e) => updateAction(index, { template_id: e.target.value })}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+                className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
               >
                 {approvedTemplates.length === 0 && (
                   <option value="">No tienes plantillas aprobadas</option>
@@ -740,7 +740,7 @@ export function AutomationActionsBuilder({
               <select
                 value={action.quick_reply_id}
                 onChange={(e) => updateAction(index, { quick_reply_id: e.target.value })}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+                className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
               >
                 {quickReplies.length === 0 && <option value="">No tienes respuestas rápidas</option>}
                 {quickReplies.map((qr) => (

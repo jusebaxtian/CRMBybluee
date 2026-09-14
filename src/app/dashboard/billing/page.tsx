@@ -84,7 +84,7 @@ export default async function BillingPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="rounded-xl border border-border bg-surface p-5">
+      <div className="rounded-[13px] border border-border bg-surface p-5">
         <p className="text-sm text-muted">Plan actual</p>
         <div className="mt-1 flex items-baseline gap-2">
           <p className="text-2xl font-semibold text-foreground">
@@ -129,7 +129,7 @@ export default async function BillingPage({
 
       {canPay && (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="rounded-xl border border-border bg-surface p-5">
+        <div className="rounded-[13px] border border-border bg-surface p-5">
           <div className="mb-3 flex items-center gap-2">
             <CreditCard size={18} className="text-primary" />
             <p className="font-medium text-foreground">Pagar con tarjeta (Bold)</p>
@@ -151,7 +151,7 @@ export default async function BillingPage({
           )}
         </div>
 
-        <div className="rounded-xl border border-border bg-surface p-5">
+        <div className="rounded-[13px] border border-border bg-surface p-5">
           <div className="mb-3 flex items-center gap-2">
             <Landmark size={18} className="text-primary" />
             <p className="font-medium text-foreground">Transferencia manual</p>
@@ -171,7 +171,7 @@ export default async function BillingPage({
       </div>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-border bg-surface">
+      <div className="overflow-hidden rounded-[13px] border border-border bg-surface">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-border text-muted">

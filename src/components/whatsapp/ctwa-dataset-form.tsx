@@ -34,7 +34,7 @@ export function CtwaDatasetForm({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-5">
+    <div className="rounded-[13px] border border-border bg-surface p-5">
       <div className="mb-2 flex items-center gap-2">
         <Target size={16} className="text-primary" />
         <h3 className="text-sm font-semibold text-foreground">
@@ -54,7 +54,7 @@ export function CtwaDatasetForm({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder="Dataset ID (ej: 1234567890)"
-          className="w-full max-w-xs rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+          className="w-full max-w-xs rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
         />
         <Button onClick={handleSave} disabled={pending}>
           {pending ? "Guardando..." : "Guardar"}

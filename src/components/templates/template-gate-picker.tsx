@@ -54,7 +54,7 @@ export function TemplateGatePicker({
           <select
             value={selectedId}
             onChange={(e) => setSelectedId(e.target.value)}
-            className="w-full flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            className="w-full flex-1 rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
           >
             {templates.map((t) => (
               <option key={t.id} value={t.id}>
@@ -66,7 +66,7 @@ export function TemplateGatePicker({
             type="button"
             onClick={handleSend}
             disabled={pending}
-            className="flex shrink-0 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
+            className="flex shrink-0 items-center justify-center gap-2 rounded-[10px] bg-primary px-4 py-[10px] text-[12.5px] font-bold text-white hover:bg-primary-hover disabled:opacity-50"
           >
             <Send size={14} />
             {pending ? "Enviando..." : "Enviar plantilla"}

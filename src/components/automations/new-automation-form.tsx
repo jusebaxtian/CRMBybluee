@@ -56,7 +56,7 @@ export function NewAutomationForm({
           required
           defaultValue={automation?.name}
           placeholder="Bienvenida a nuevos clientes"
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+          className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
         />
       </div>
 
@@ -66,7 +66,7 @@ export function NewAutomationForm({
           name="triggerType"
           value={triggerType}
           onChange={(e) => setTriggerType(e.target.value as TriggerType)}
-          className="mb-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+          className="mb-2 w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
         >
           <option value="tag_added">Cuando se asigna una etiqueta</option>
           <option value="keyword">Cuando llega un mensaje con una palabra clave</option>
@@ -80,7 +80,7 @@ export function NewAutomationForm({
             name="triggerTagId"
             required
             defaultValue={automation?.trigger_tag_id ?? ""}
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
           >
             {tags.length === 0 && <option value="">No tienes etiquetas creadas</option>}
             {tags.map((t) => (
@@ -97,7 +97,7 @@ export function NewAutomationForm({
               required
               defaultValue={automation?.trigger_keyword ?? ""}
               placeholder="Texto exacto del botón (ej: Sí, me interesa)"
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+              className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
             />
             <p className="mt-1 text-xs text-muted">
               Debe coincidir exactamente con el texto del botón que configuraste en una plantilla, automatización
@@ -112,7 +112,7 @@ export function NewAutomationForm({
               required
               defaultValue={automation?.trigger_keyword ?? ""}
               placeholder="ej: hola, saludos, buenos días, buenas tardes"
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+              className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
             />
             <p className="mt-1 text-xs text-muted">
               Puedes poner varias palabras separadas por coma — se activa si el mensaje contiene

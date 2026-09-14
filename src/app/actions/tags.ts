@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { runTagAddedAutomations } from "@/lib/automations/engine";
 import { maybeTrackPurchaseFromTag } from "@/lib/meta/conversions";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
+import { cargarContactosDeEtiqueta } from "@/lib/dashboard/datos";
 
 export async function createTag(_prevState: unknown, formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
@@ -164,4 +165,22 @@ export async function reorderTags(orderedTagIds: string[]) {
 
   revalidatePath("/dashboard");
   return { success: true as const };
+}
+
+/** "Ver mas" del tablero de etiquetas del dashboard: siguiente tanda de contactos. */
+export async function cargarMasContactosDeEtiqueta(input: {
+  tagId: string;
+  desde: number;
+  creadoDesde?: string | null;
+  creadoHasta?: string | null;
+}) {
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const contactos = await cargarContactosDeEtiqueta(ctx.supabase, ctx.workspaceId, input.tagId, {
+    limite: 20,
+    desde: input.desde,
+    creadoDesde: input.creadoDesde,
+    creadoHasta: input.creadoHasta,
+  });
+  return { contactos };
 }

@@ -137,7 +137,7 @@ export function NewCampaignForm({
           type="text"
           required
           defaultValue={initialValues?.name ?? ""}
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+          className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
         />
       </div>
 
@@ -147,7 +147,7 @@ export function NewCampaignForm({
           <select
             value={whatsappAccountId}
             onChange={(e) => setWhatsappAccountId(e.target.value)}
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
           >
             {whatsappAccounts.map((a) => (
               <option key={a.id} value={a.id}>
@@ -163,7 +163,7 @@ export function NewCampaignForm({
         <select
           value={sendType}
           onChange={(e) => setSendType(e.target.value as SendType)}
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+          className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
         >
           <option value="template">Plantilla aprobada</option>
           <option value="free_text">Mensaje libre (sin plantilla)</option>
@@ -185,7 +185,7 @@ export function NewCampaignForm({
               name="templateId"
               required
               defaultValue={initialValues?.templateId ?? undefined}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+              className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
             >
               {templates.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -207,7 +207,7 @@ export function NewCampaignForm({
             rows={3}
             placeholder="Escribe el mensaje..."
             defaultValue={initialValues?.messageBody ?? ""}
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
           />
           <div>
             <label className="mb-1 block text-xs font-medium text-muted">
@@ -220,7 +220,7 @@ export function NewCampaignForm({
                 setMediaUrl("");
                 setMediaFilename("");
               }}
-              className="mb-2 w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
+              className="mb-2 w-full rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary"
             >
               <option value="">Ninguno</option>
               <option value="image">Imagen</option>
@@ -372,7 +372,7 @@ export function NewCampaignForm({
                 type="date"
                 value={createdFrom}
                 onChange={(e) => setCreatedFrom(e.target.value)}
-                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
+                className="w-full rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary"
               />
             </div>
             <div>
@@ -385,7 +385,7 @@ export function NewCampaignForm({
                 type="date"
                 value={createdTo}
                 onChange={(e) => setCreatedTo(e.target.value)}
-                className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
+                className="w-full rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary"
               />
             </div>
           </div>
@@ -461,7 +461,7 @@ export function NewCampaignForm({
               onChange={(e) => setScheduledAt(e.target.value)}
               min={toLocalInputValue(new Date().toISOString())}
               required={sendMode === "schedule"}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+              className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
             />
             <p className="mt-1 text-xs text-muted">
               Se enviará sola a esa hora, sin que tengas que volver a entrar.
@@ -475,7 +475,7 @@ export function NewCampaignForm({
       <button
         type="submit"
         disabled={pending || uploading || (sendType === "template" && templates.length === 0)}
-        className="mt-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
+        className="mt-2 rounded-[10px] bg-primary px-4 py-[10px] text-[12.5px] font-bold text-white hover:bg-primary-hover disabled:opacity-50"
       >
         {pending ? "Guardando..." : mode === "edit" ? "Guardar cambios" : "Crear campaña"}
       </button>

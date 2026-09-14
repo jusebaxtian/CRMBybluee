@@ -43,6 +43,14 @@ export default async function AdminOverviewPage({
     .order("created_at", { ascending: false });
 
   const { data: connectedAccounts } = await supabase.from("whatsapp_accounts").select("workspace_id");
+  // Contacto de la bandeja del administrador que compró cada espacio (0096).
+  const { data: clientes } = await supabase.rpc("admin_clientes_de_espacios");
+  const clientePorWorkspace = new Map(
+    ((clientes ?? []) as { workspace_id: string; contact_name: string | null; wa_id: string }[]).map((c) => [
+      c.workspace_id,
+      c.contact_name ?? c.wa_id,
+    ])
+  );
   const connectedWorkspaceIds = new Set((connectedAccounts ?? []).map((a) => a.workspace_id));
 
   const ipCounts = new Map<string, number>();
@@ -50,33 +58,35 @@ export default async function AdminOverviewPage({
     if (w.signup_ip) ipCounts.set(w.signup_ip, (ipCounts.get(w.signup_ip) ?? 0) + 1);
   }
 
-  const rows = await Promise.all(
-    (workspaces ?? []).map(async (w) => {
-      const [{ data: owner }, { data: subscription }] = await Promise.all([
-        supabase
-          .from("workspace_members")
-          .select("user_id")
-          .eq("workspace_id", w.id)
-          .eq("role", "owner")
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from("subscriptions")
-          .select("current_period_end")
-          .eq("workspace_id", w.id)
-          .eq("status", "active")
-          .order("current_period_end", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-      ]);
+  // Antes: por cada espacio, 2 consultas + 1 llamada al servicio de auth
+  // (getUserById), y GoTrue las atiende casi en serie: ~2 s con 25 clientes.
+  // Ahora: dueños y suscripciones en una consulta cada una, y un solo
+  // listUsers para correos y ultimo acceso (~150 ms).
+  const ids = (workspaces ?? []).map((w) => w.id);
+  const [{ data: owners }, { data: subs }, { data: usersPage }] = await Promise.all([
+    supabase.from("workspace_members").select("workspace_id, user_id").in("workspace_id", ids).eq("role", "owner"),
+    supabase
+      .from("subscriptions")
+      .select("workspace_id, current_period_end")
+      .in("workspace_id", ids)
+      .eq("status", "active")
+      .order("current_period_end", { ascending: false }),
+    admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+  ]);
+  const ownerPor = new Map((owners ?? []).map((o) => [o.workspace_id, o.user_id]));
+  // Ordenadas por vencimiento descendente: la primera de cada espacio es la vigente.
+  const subPor = new Map<string, string>();
+  for (const sub of subs ?? []) if (!subPor.has(sub.workspace_id)) subPor.set(sub.workspace_id, sub.current_period_end);
+  const userPor = new Map((usersPage?.users ?? []).map((u) => [u.id, u]));
 
-      let email = "—";
-      let lastSignInAt: string | null = null;
-      if (owner?.user_id) {
-        const { data } = await admin.auth.admin.getUserById(owner.user_id);
-        email = data.user?.email ?? "—";
-        lastSignInAt = data.user?.last_sign_in_at ?? null;
-      }
+  const rows = (workspaces ?? []).map((w) => {
+    const ownerId = ownerPor.get(w.id);
+    const usuario = ownerId ? userPor.get(ownerId) : undefined;
+    const email = usuario?.email ?? "—";
+    // Nombre de la persona (lo captura el registro en user_metadata.full_name).
+    const fullName = (usuario?.user_metadata?.full_name as string | undefined)?.trim() || null;
+    const lastSignInAt: string | null = usuario?.last_sign_in_at ?? null;
+    const subscription = subPor.has(w.id) ? { current_period_end: subPor.get(w.id)! } : null;
 
       const plan = w.plans as unknown as { name: string } | null;
 
@@ -84,6 +94,7 @@ export default async function AdminOverviewPage({
         id: w.id,
         name: w.name,
         email,
+        fullName,
         plan: plan?.name ?? "—",
         status: w.status,
         everActivated: w.ever_activated,
@@ -91,17 +102,17 @@ export default async function AdminOverviewPage({
         createdAt: w.created_at,
         renewalDate: subscription?.current_period_end ?? w.trial_ends_at ?? null,
         phone: w.phone ?? null,
+        cliente: clientePorWorkspace.get(w.id) ?? null,
         hasWhatsapp: connectedWorkspaceIds.has(w.id),
         signupIp: w.signup_ip,
         sharedIp: w.signup_ip ? (ipCounts.get(w.signup_ip) ?? 0) > 1 : false,
         lastSignInAt,
       };
-    })
-  );
+  });
 
   const query = (q ?? "").trim().toLowerCase();
   let filteredRows = query
-    ? rows.filter((r) => r.email.toLowerCase().includes(query))
+    ? rows.filter((r) => r.email.toLowerCase().includes(query) || (r.fullName ?? "").toLowerCase().includes(query))
     : rows;
 
   const fromDate = from ? new Date(from) : null;
@@ -211,10 +222,16 @@ export default async function AdminOverviewPage({
               <tr key={r.id} className="border-b border-border last:border-b-0">
                 <td className="px-5 py-3">
                   <p className="text-foreground">{r.email}</p>
+                  {r.fullName && <p className="text-xs text-foreground/80">{r.fullName}</p>}
                   <p className="text-xs text-muted">{r.name}</p>
                 </td>
                 <td className="px-5 py-3 text-foreground">
                   <p>{r.phone ?? "—"}</p>
+                  {r.cliente && (
+                    <p className="text-xs text-muted" title="Contacto en tu bandeja">
+                      💬 {r.cliente}
+                    </p>
+                  )}
                   <span
                     title={r.hasWhatsapp ? "API de WhatsApp conectada" : "Sin API de WhatsApp conectada"}
                     className="mt-1 inline-block"

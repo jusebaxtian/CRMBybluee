@@ -44,7 +44,7 @@ export function NewQuickReplyForm({
           required
           defaultValue={quickReply?.name}
           placeholder="Horario de atención"
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+          className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
         />
       </div>
 

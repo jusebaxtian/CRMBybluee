@@ -7,6 +7,8 @@ import {
   updateOwnerEmail,
   updateOwnerPassword,
   updateWorkspacePhone,
+  updateWorkspaceExtraNumbers,
+  updateWorkspaceExtraAgents,
 } from "@/app/actions/admin";
 
 function EditableField({
@@ -68,12 +70,21 @@ export function EditClientFields({
   workspaceId,
   workspaceName,
   workspacePhone,
+  extraNumbers,
+  planAgents,
+  extraAgents,
+  planNumbers,
   ownerId,
   ownerEmail,
 }: {
   workspaceId: string;
   workspaceName: string;
   workspacePhone: string | null;
+  extraNumbers: number;
+  /** Agentes que trae el plan: null = ilimitado. */
+  planAgents: number | null;
+  extraAgents: number;
+  planNumbers: number;
   ownerId: string | null;
   ownerEmail: string | null;
 }) {
@@ -90,6 +101,20 @@ export function EditClientFields({
         type="tel"
         placeholder="Ej: 573001234567"
         onSave={(v) => updateWorkspacePhone(workspaceId, v)}
+      />
+      <EditableField
+        label={`Números de WhatsApp adicionales (el plan incluye ${planNumbers})`}
+        initialValue={String(extraNumbers)}
+        type="number"
+        placeholder="0"
+        onSave={(v) => updateWorkspaceExtraNumbers(workspaceId, v)}
+      />
+      <EditableField
+        label={`Agentes de respuesta adicionales (el plan incluye ${planAgents === null ? "ilimitados" : planAgents})`}
+        initialValue={String(extraAgents)}
+        type="number"
+        placeholder="0"
+        onSave={(v) => updateWorkspaceExtraAgents(workspaceId, v)}
       />
       {ownerId ? (
         <>

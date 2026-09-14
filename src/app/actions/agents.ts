@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getWorkspaceRole } from "@/lib/workspace";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
+import { limiteDeAgentes } from "@/lib/agentes/limite-agentes";
 
 async function requireOwnerOrAdmin() {
   const ctx = await requireWorkspace();
@@ -31,18 +32,9 @@ export async function createAgentProfile(_prevState: unknown, formData: FormData
   if (!email) return { error: "El correo es obligatorio." };
   if (password.length < 8) return { error: "La contraseña debe tener al menos 8 caracteres." };
 
-  const { data: workspace } = await supabase
-    .from("workspaces")
-    .select("plan_id")
-    .eq("id", workspaceId)
-    .maybeSingle();
-
-  const { data: plan } = workspace?.plan_id
-    ? await supabase.from("plans").select("max_agents").eq("id", workspace.plan_id).maybeSingle()
-    : { data: null };
-
-  // max_agents null means unlimited; 0 means the plan doesn't include agents at all.
-  const maxAgents = plan?.max_agents ?? null;
+  // Plan + cupo extra concedido desde admin (lib/agentes/limite-agentes.ts).
+  // null = ilimitado; 0 = ni el plan ni el extra incluyen agentes.
+  const { total: maxAgents } = await limiteDeAgentes(supabase, workspaceId);
   if (maxAgents === 0) {
     return { error: "Tu plan actual no incluye agentes de respuesta. Mejora tu plan para agregarlos." };
   }

@@ -231,7 +231,7 @@ export function ContactsTable({
                 <select
                   value={tagFilter}
                   onChange={(e) => setTagFilter(e.target.value)}
-                  className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
+                  className="w-full rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary"
                 >
                   <option value="">Todas</option>
                   {allTags.map((t) => (
@@ -247,7 +247,7 @@ export function ContactsTable({
                   type="date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
+                  className="w-full rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary"
                 />
               </div>
               <div>
@@ -256,7 +256,7 @@ export function ContactsTable({
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
-                  className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary"
+                  className="w-full rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary"
                 />
               </div>
               {activeFilterCount > 0 && (
@@ -356,7 +356,7 @@ export function ContactsTable({
 
       {error && <p className="text-xs text-red-400">{error}</p>}
 
-      <div className="overflow-visible rounded-xl border border-border bg-surface">
+      <div className="overflow-visible rounded-[13px] border border-border bg-surface">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-border text-muted">
@@ -517,7 +517,7 @@ export function ContactsTable({
 
       {deleteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-lg">
+          <div className="w-full max-w-md rounded-[13px] border border-border bg-surface p-6 shadow-lg">
             <div className="flex items-center gap-2 text-red-400">
               <AlertTriangle size={18} />
               <h3 className="text-base font-semibold">Eliminar contactos</h3>

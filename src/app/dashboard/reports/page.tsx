@@ -57,13 +57,13 @@ export default async function ReportsPage() {
 
   return (
     <div className="mx-auto max-w-3xl p-4 sm:p-6">
-      <h1 className="text-xl font-semibold text-foreground">Reportes</h1>
+      <h1 className="font-dash-display text-[22px] font-bold tracking-[-.4px] text-foreground">Reportes</h1>
       <p className="mt-1 text-sm text-muted">
         Exporta la información de tu workspace a Excel para control y respaldo.
       </p>
 
       <div className="mt-6 space-y-3">
-        <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-surface p-4">
+        <div className="flex items-center justify-between gap-4 rounded-[13px] border border-border bg-surface p-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
               <UserPlus size={18} />
@@ -84,7 +84,7 @@ export default async function ReportsPage() {
           </a>
         </div>
 
-        <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-surface p-4">
+        <div className="flex items-center justify-between gap-4 rounded-[13px] border border-border bg-surface p-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
               <UserPlus size={18} />
@@ -105,7 +105,7 @@ export default async function ReportsPage() {
           </a>
         </div>
 
-        <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-surface p-4">
+        <div className="flex items-center justify-between gap-4 rounded-[13px] border border-border bg-surface p-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
               <Users size={18} />

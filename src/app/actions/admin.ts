@@ -181,6 +181,51 @@ export async function updateWorkspacePhone(workspaceId: string, phone: string) {
   return { success: true };
 }
 
+/**
+ * Cupo de numeros de WhatsApp adicional para un espacio concreto.
+ *
+ * El tope viene del plan. Cuando un cliente pide un numero mas de los que
+ * trae su plan, se le concede aqui, solo a el, sin cambiarle el plan ni crear
+ * uno a medida. El tope efectivo (plan + extra) lo calcula
+ * lib/whatsapp/limite-numeros.ts, que usan tanto la accion de conectar como
+ * la pantalla de ajustes del cliente.
+ */
+export async function updateWorkspaceExtraNumbers(workspaceId: string, extra: string) {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
+
+  const valor = Number.parseInt(extra, 10);
+  if (!Number.isInteger(valor) || valor < 0 || valor > 50) {
+    return { error: "Debe ser un número entre 0 y 50." };
+  }
+
+  const { error } = await supabase
+    .from("workspaces")
+    .update({ extra_whatsapp_numbers: valor })
+    .eq("id", workspaceId);
+
+  if (error) return { error: error.message };
+  revalidatePath(`/admin/workspaces/${workspaceId}`);
+  return { success: true };
+}
+
+/** Cupo de agentes de respuesta adicional para un espacio concreto (mismo criterio que los numeros). */
+export async function updateWorkspaceExtraAgents(workspaceId: string, extra: string) {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
+
+  const valor = Number.parseInt(extra, 10);
+  if (!Number.isInteger(valor) || valor < 0 || valor > 100) {
+    return { error: "Debe ser un número entre 0 y 100." };
+  }
+
+  const { error } = await supabase.from("workspaces").update({ extra_agents: valor }).eq("id", workspaceId);
+
+  if (error) return { error: error.message };
+  revalidatePath(`/admin/workspaces/${workspaceId}`);
+  return { success: true };
+}
+
 // Edits the date that gates access for this workspace — trial_ends_at while
 // they're on a trial (so a trial can be extended or shortened and the
 // scheduler in src/lib/billing/scheduler.ts picks up the new date as-is,
@@ -349,4 +394,56 @@ export async function updateWorkspaceStatus(workspaceId: string, status: string)
   revalidatePath(`/admin/workspaces/${workspaceId}`);
   revalidatePath("/admin");
   return { success: true };
+}
+
+// --- Cliente en mi chat -----------------------------------------------------
+// Relaciona el espacio de un cliente con el contacto de la bandeja del
+// administrador que lo compró. El cruce automático por teléfono vive en SQL
+// (migración 0096); esto solo fija o quita el vínculo manual.
+
+export async function vincularClienteDeEspacio(workspaceId: string, contactId: string | null) {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
+
+  const { error } = await supabase
+    .from("workspaces")
+    .update({ cliente_contact_id: contactId })
+    .eq("id", workspaceId);
+
+  if (error) return { error: error.message };
+  revalidatePath(`/admin/workspaces/${workspaceId}`);
+  revalidatePath("/admin");
+  return { success: true };
+}
+
+/** Busca contactos en la bandeja del administrador por nombre o número. */
+export async function buscarContactosDelAdmin(termino: string) {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." as const };
+  const q = termino.trim();
+  if (q.length < 3) return { contactos: [] };
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "No autenticado." as const };
+
+  const { data: membresias } = await supabase.from("workspace_members").select("workspace_id").eq("user_id", user.id);
+  const misEspacios = (membresias ?? []).map((m) => m.workspace_id);
+  if (misEspacios.length === 0) return { contactos: [] };
+
+  const soloDigitos = q.replace(/\D/g, "");
+  const filtros = [`name.ilike.%${q.replace(/[%,]/g, "")}%`];
+  if (soloDigitos.length >= 3) filtros.push(`wa_id.ilike.%${soloDigitos}%`);
+
+  const { data, error } = await supabase
+    .from("contacts")
+    .select("id, name, wa_id")
+    .in("workspace_id", misEspacios)
+    .or(filtros.join(","))
+    .order("created_at", { ascending: false })
+    .limit(8);
+
+  if (error) return { error: error.message };
+  return { contactos: (data ?? []) as { id: string; name: string | null; wa_id: string }[] };
 }

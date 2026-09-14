@@ -15,7 +15,7 @@ export async function Aviso() {
   return (
     <section
       aria-label="Avisos y novedades"
-      className="flex min-h-[238px] flex-col overflow-hidden rounded-[13px] border border-dash-border bg-dash-card"
+      className="flex flex-col overflow-hidden rounded-[13px] border border-dash-border bg-dash-card min-[901px]:min-h-[238px]"
     >
       <header className="flex items-center justify-between border-b border-dash-border-soft px-4 py-[13px]">
         <div className="flex items-center gap-2 font-dash-ui text-[13.5px] font-semibold text-dash-text">
@@ -26,12 +26,15 @@ export async function Aviso() {
           Nuevo
         </span>
       </header>
-      <div className="relative min-h-0 flex-1">
+      {/* Escritorio: la imagen llena la tarjeta (recorte por los bordes).
+          Movil y tablet (<=900px, donde la fila pasa a una columna): la
+          imagen se ve completa, a su proporcion, para que el texto se lea. */}
+      <div className="relative min-[901px]:min-h-0 min-[901px]:flex-1">
         {/* eslint-disable-next-line @next/next/no-img-element -- URL externa administrada desde admin */}
         <img
           src={aviso.imagenUrl}
           alt="Aviso del equipo ByBluee"
-          className="absolute inset-0 h-full w-full object-cover"
+          className="block h-auto w-full min-[901px]:absolute min-[901px]:inset-0 min-[901px]:h-full min-[901px]:object-cover"
         />
       </div>
     </section>

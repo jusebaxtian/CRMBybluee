@@ -7,7 +7,10 @@ import { logAdminAccess, startImpersonation } from "@/app/actions/admin";
 import { WorkspaceAdminEditor } from "@/components/admin/workspace-admin-editor";
 import { EditClientFields } from "@/components/admin/edit-client-fields";
 import { NotifyActivationButton } from "@/components/admin/notify-activation-button";
+import { ClienteEnMiChat, type ClienteDeEspacio } from "@/components/admin/cliente-en-mi-chat";
 import { getActivationTemplateConfig } from "@/app/actions/admin-whatsapp";
+import { limiteDeNumeros } from "@/lib/whatsapp/limite-numeros";
+import { limiteDeAgentes } from "@/lib/agentes/limite-agentes";
 
 export default async function AdminWorkspaceDetailPage({
   params,
@@ -19,7 +22,7 @@ export default async function AdminWorkspaceDetailPage({
 
   const { data: workspace } = await supabase
     .from("workspaces")
-    .select("id, name, status, plan_id, trial_ends_at, created_at, signup_ip, phone")
+    .select("id, name, status, plan_id, trial_ends_at, created_at, signup_ip, phone, extra_whatsapp_numbers, extra_agents")
     .eq("id", id)
     .maybeSingle();
 
@@ -69,6 +72,9 @@ export default async function AdminWorkspaceDetailPage({
     .order("accessed_at", { ascending: false })
     .limit(5);
 
+  const limiteNumeros = await limiteDeNumeros(supabase, id);
+  const planAgents = (await limiteDeAgentes(supabase, id)).plan;
+
   const { data: owner } = await supabase
     .from("workspace_members")
     .select("user_id")
@@ -85,6 +91,10 @@ export default async function AdminWorkspaceDetailPage({
     ownerEmail = data.user?.email ?? null;
     lastSignInAt = data.user?.last_sign_in_at ?? null;
   }
+
+  // Con quién habló el administrador para vender este espacio (0096).
+  const { data: clienteRows } = await supabase.rpc("admin_cliente_de_espacio", { p_workspace_id: id });
+  const cliente = ((clienteRows ?? []) as ClienteDeEspacio[])[0] ?? null;
 
   const daysSinceLastSignIn = lastSignInAt
     ? Math.max(0, Math.floor((Date.now() - new Date(lastSignInAt).getTime()) / (1000 * 60 * 60 * 24)))
@@ -114,6 +124,10 @@ export default async function AdminWorkspaceDetailPage({
           workspaceId={workspace.id}
           workspaceName={workspace.name}
           workspacePhone={workspace.phone}
+          extraNumbers={workspace.extra_whatsapp_numbers ?? 0}
+          planAgents={planAgents}
+          extraAgents={workspace.extra_agents ?? 0}
+          planNumbers={limiteNumeros.plan}
           ownerId={owner?.user_id ?? null}
           ownerEmail={ownerEmail}
         />
@@ -128,6 +142,8 @@ export default async function AdminWorkspaceDetailPage({
           />
         </div>
       </div>
+
+      <ClienteEnMiChat workspaceId={workspace.id} cliente={cliente} />
 
       <WorkspaceAdminEditor
         workspaceId={workspace.id}

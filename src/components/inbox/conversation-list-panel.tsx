@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Search, SlidersHorizontal, X, Clock, Megaphone, ShieldAlert, Bot, Check, Pin, PinOff } from "lucide-react";
 import { setConversationPinned, cargarConversaciones } from "@/app/actions/conversations";
 import { NewMessageButton } from "@/components/inbox/new-message-button";
@@ -104,22 +104,18 @@ export function ConversationListPanel({
   const ultimosFiltrosRef = useRef<typeof filtros | null>(null);
 
   const [query, setQuery] = useState("");
-  // Si se llega con un filtro en la URL (desde el dashboard), el panel de
-  // filtros arranca abierto: asi se ve cual esta activo y como quitarlo.
-  const filtroEnUrl = useSearchParams().get("filtro");
-  const [filtersOpen, setFiltersOpen] = useState(filtroEnUrl !== null);
+  // La bandeja siempre abre en "Todos" y con el panel de filtros cerrado
+  // (decision del 14 sep 2026): los filtros los elige la persona. Los
+  // enlaces del dashboard llevan a la bandeja sin preseleccionar nada.
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [assignedFilter, setAssignedFilter] = useState<string>(""); // "" = all, "unassigned", or agent id
   const [channelFilter, setChannelFilter] = useState<string>(""); // "" = all channels
-  // Arranca con "no leidos" activo si se llega desde el dashboard con
-  // ?filtro=no-leidos. Antes los filtros eran solo estado local y no habia
-  // forma de enlazar a la bandeja ya filtrada.
-  const filtroInicial = useSearchParams().get("filtro");
-  const [unreadOnly, setUnreadOnly] = useState(filtroInicial === "no-leidos");
+  const [unreadOnly, setUnreadOnly] = useState(false);
   // "Sin responder" (el cliente hablo de ultimo) no es "no leido" (hay
   // entrantes desde que se abrio el chat): un chat abierto y no contestado es
-  // lo primero y no lo segundo. El dashboard enlaza aqui.
-  const [unansweredOnly, setUnansweredOnly] = useState(filtroInicial === "sin-responder");
+  // lo primero y no lo segundo.
+  const [unansweredOnly, setUnansweredOnly] = useState(false);
   const [expiringSoon, setExpiringSoon] = useState(false);
   const [needsHumanOnly, setNeedsHumanOnly] = useState(false);
   // Los filtros activos, en la forma que espera el servidor.
@@ -237,13 +233,33 @@ export function ConversationListPanel({
   // El filtrado ocurre en la base: `lista` ya viene filtrada y ordenada.
   const filtered = lista;
 
-  const activeFilterCount =
-    selectedTagIds.length +
-    (assignedFilter ? 1 : 0) +
-    (unreadOnly ? 1 : 0) +
-    (unansweredOnly ? 1 : 0) +
-    (expiringSoon ? 1 : 0) +
-    (needsHumanOnly ? 1 : 0);
+  // Panel flotante: se cierra al hacer clic fuera o con Escape; los filtros
+  // ya quedaron aplicados (cada cambio de estado re-consulta al servidor).
+  const panelFiltrosRef = useRef<HTMLDivElement>(null);
+  const botonFiltrosRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!filtersOpen) return;
+    function fuera(e: MouseEvent | TouchEvent) {
+      const t = e.target as Node;
+      if (panelFiltrosRef.current?.contains(t) || botonFiltrosRef.current?.contains(t)) return;
+      setFiltersOpen(false);
+    }
+    function tecla(e: KeyboardEvent) {
+      if (e.key === "Escape") setFiltersOpen(false);
+    }
+    document.addEventListener("mousedown", fuera);
+    document.addEventListener("touchstart", fuera);
+    document.addEventListener("keydown", tecla);
+    return () => {
+      document.removeEventListener("mousedown", fuera);
+      document.removeEventListener("touchstart", fuera);
+      document.removeEventListener("keydown", tecla);
+    };
+  }, [filtersOpen]);
+
+  // Solo los filtros que viven dentro del panel (los rapidos se ven solos).
+  const otrosFiltrosActivos =
+    selectedTagIds.length + (assignedFilter ? 1 : 0) + (unansweredOnly ? 1 : 0) + (needsHumanOnly ? 1 : 0);
 
   // Llega contado desde la base. Contarlo sobre la lista daria el numero de
   // la pagina cargada, no el del espacio, y diria de menos sin avisar.
@@ -267,7 +283,7 @@ export function ConversationListPanel({
     <aside className="flex h-full w-full shrink-0 flex-col border-r border-border bg-surface lg:w-80">
       <div className="flex items-center justify-between border-b border-border px-4 py-4">
         <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold text-foreground">Conversaciones</h2>
+          <h2 className="font-dash-ui text-[15px] font-semibold text-foreground">Conversaciones</h2>
           {unreadConversationsCount > 0 && (
             <span
               title="Chats sin abrir"
@@ -290,24 +306,68 @@ export function ConversationListPanel({
             className="w-full bg-transparent text-sm text-foreground outline-none"
           />
         </div>
-        <button
-          type="button"
-          onClick={() => setFiltersOpen((v) => !v)}
-          className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${
-            filtersOpen || activeFilterCount > 0
-              ? "border-primary text-primary"
-              : "border-border text-muted hover:text-foreground"
-          }`}
-          title="Filtros"
-        >
-          <SlidersHorizontal size={16} />
-          {activeFilterCount > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-medium text-white">
-              {activeFilterCount}
-            </span>
-          )}
-        </button>
       </div>
+
+      {/* Filtros rapidos (excluyentes entre si) + el resto en un panel flotante
+          que se cierra al hacer clic fuera. Todo aplica al instante. */}
+      <div className="relative border-b border-border px-3 py-2.5">
+        <div className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none]">
+          <button
+            type="button"
+            onClick={() => {
+              setUnreadOnly(false);
+              setExpiringSoon(false);
+            }}
+            className={pill(!unreadOnly && !expiringSoon)}
+          >
+            Todos
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setUnreadOnly(true);
+              setExpiringSoon(false);
+            }}
+            className={pill(unreadOnly)}
+          >
+            No leídos
+            {unreadConversationsCount > 0 && !unreadOnly && (
+              <span className="ml-0.5 rounded-full bg-primary/15 px-1.5 text-[10px] text-primary">{unreadConversationsCount}</span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setExpiringSoon(true);
+              setUnreadOnly(false);
+            }}
+            title="Ventana de 24h por vencer (menos de 2 horas)"
+            className={pill(expiringSoon, "warning")}
+          >
+            <Clock size={11} />
+            Por vencer 2h
+          </button>
+          <button
+            ref={botonFiltrosRef}
+            type="button"
+            onClick={() => setFiltersOpen((v) => !v)}
+            aria-expanded={filtersOpen}
+            aria-label="Más filtros"
+            title="Más filtros"
+            className={`relative ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors ${
+              filtersOpen || otrosFiltrosActivos > 0
+                ? "border-primary text-primary"
+                : "border-border text-muted hover:text-foreground"
+            }`}
+          >
+            <SlidersHorizontal size={15} />
+            {otrosFiltrosActivos > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-medium text-white">
+                {otrosFiltrosActivos}
+              </span>
+            )}
+          </button>
+        </div>
 
       {channels.length > 1 && (
         <div className="flex flex-wrap gap-1.5 border-b border-border px-3 py-2.5">
@@ -343,20 +403,14 @@ export function ConversationListPanel({
         </div>
       )}
 
-      {filtersOpen && (
-        <div className="flex flex-col gap-3 border-b border-border bg-background/50 p-3">
+        {filtersOpen && (
+        <div
+          ref={panelFiltrosRef}
+          role="dialog"
+          aria-label="Más filtros"
+          className="absolute left-3 right-3 top-[calc(100%-4px)] z-30 flex flex-col gap-3 rounded-[12px] border border-border bg-surface p-3 shadow-[0_18px_40px_rgba(0,0,0,0.45)] animate-[filtros-in_0.15s_ease-out]"
+        >
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setUnreadOnly((v) => !v)}
-              className={`self-start rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                unreadOnly
-                  ? "border-primary bg-primary text-white"
-                  : "border-border text-muted hover:text-foreground"
-              }`}
-            >
-              No leídos
-            </button>
             <button
               type="button"
               onClick={() => setUnansweredOnly((v) => !v)}
@@ -368,19 +422,6 @@ export function ConversationListPanel({
               }`}
             >
               Sin responder
-            </button>
-            <button
-              type="button"
-              onClick={() => setExpiringSoon((v) => !v)}
-              title="Ventana de 24h por vencer (entre 10 segundos y 2 horas)"
-              className={`flex items-center gap-1 self-start rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                expiringSoon
-                  ? "border-warning bg-warning text-black"
-                  : "border-border text-muted hover:text-foreground"
-              }`}
-            >
-              <Clock size={12} />
-              Por vencer (2h)
             </button>
             <button
               type="button"
@@ -450,10 +491,13 @@ export function ConversationListPanel({
             </div>
           )}
 
-          {activeFilterCount > 0 && (
+          {otrosFiltrosActivos > 0 && (
             <button
               type="button"
-              onClick={clearFilters}
+              onClick={() => {
+                clearFilters();
+                setFiltersOpen(false);
+              }}
               className="flex items-center gap-1 self-start text-xs text-muted hover:text-foreground"
             >
               <X size={12} />
@@ -461,7 +505,8 @@ export function ConversationListPanel({
             </button>
           )}
         </div>
-      )}
+        )}
+      </div>
 
       <PullToRefresh className="flex-1">
         {pinError && (
@@ -548,13 +593,15 @@ export function ConversationListPanel({
                       }}
                       title={conv.pinnedAt ? "Quitar de fijados" : "Fijar arriba"}
                       aria-label={conv.pinnedAt ? "Quitar de fijados" : "Fijar arriba"}
-                      className={`rounded p-0.5 ${
+                      // Siempre visible y con area de toque de 32px: en el
+                      // celular no hay "pasar el cursor" que lo revele.
+                      className={`-my-1 flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
                         conv.pinnedAt
-                          ? "text-primary"
-                          : "text-muted/0 hover:text-muted focus:text-muted group-hover:text-muted/70"
+                          ? "text-primary hover:bg-primary/10"
+                          : "text-muted/60 hover:bg-surface-hover hover:text-foreground"
                       }`}
                     >
-                      {conv.pinnedAt ? <Pin size={11} /> : <PinOff size={11} />}
+                      {conv.pinnedAt ? <Pin size={16} /> : <PinOff size={16} />}
                     </button>
                     <span className="text-[10px] text-muted">
                       {new Date(conv.last_message_at).toLocaleTimeString("es-CO", {
@@ -631,4 +678,13 @@ export function ConversationListPanel({
       </PullToRefresh>
     </aside>
   );
+}
+
+/** Pastilla de filtro rapido: mismo look que las de canal, con variante ambar para "Por vencer". */
+function pill(activa: boolean, tono: "primary" | "warning" = "primary"): string {
+  const base = "flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-2 py-1 text-[11.5px] font-medium transition-colors";
+  if (!activa) return `${base} border-border text-muted hover:text-foreground`;
+  return tono === "warning"
+    ? `${base} border-warning bg-warning/15 text-warning`
+    : `${base} border-primary bg-primary/15 text-primary`;
 }

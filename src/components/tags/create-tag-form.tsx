@@ -29,7 +29,7 @@ export function CreateTagForm() {
       <button
         type="submit"
         disabled={pending}
-        className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
+        className="rounded-[10px] bg-primary px-4 py-[10px] text-[12.5px] font-bold text-white hover:bg-primary-hover disabled:opacity-50"
       >
         {pending ? "Creando..." : "Crear etiqueta"}
       </button>

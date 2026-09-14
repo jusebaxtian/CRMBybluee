@@ -16,6 +16,8 @@ import { ConversationAiToggle } from "@/components/inbox/conversation-ai-toggle"
 import { getWorkspaceId } from "@/lib/workspace";
 import { listWorkspaceAgents } from "@/lib/agents";
 import { isPhoneNumber } from "@/lib/whatsapp/identity";
+import { isPlatformAdmin } from "@/lib/admin";
+import { EspacioDelClienteCard, type EspacioDelCliente } from "@/components/inbox/espacio-del-cliente";
 
 export default async function ConversationPage({
   params,
@@ -105,6 +107,14 @@ export default async function ConversationPage({
     likely_blocked: boolean;
     contact_tags: { tag_id: string; tags: { excludes_followups: boolean } | null }[];
   };
+  // Solo el administrador de la plataforma: qué espacio compró este contacto
+  // (migración 0096). Para cualquier otro usuario la función devuelve vacío.
+  let espaciosDelCliente: EspacioDelCliente[] = [];
+  if (await isPlatformAdmin(supabase)) {
+    const { data } = await supabase.rpc("admin_espacio_de_contacto", { p_contact_id: conversation.contact_id });
+    espaciosDelCliente = (data ?? []) as EspacioDelCliente[];
+  }
+
   const assignedTagIds = contact.contact_tags.map((ct) => ct.tag_id);
   const excludedFromFollowupsByTag = contact.contact_tags.some((ct) => ct.tags?.excludes_followups);
 
@@ -216,6 +226,7 @@ export default async function ConversationPage({
             adSourceId={conversation.ad_source_id}
             adHeadline={conversation.ad_headline}
             adBody={conversation.ad_body}
+            espaciosDelCliente={espaciosDelCliente}
           />
         </div>
 
@@ -241,6 +252,8 @@ export default async function ConversationPage({
             {isPhoneNumber(contact.wa_id) ? contact.wa_id : "Usuario (sin número)"}
           </p>
         </div>
+
+        <EspacioDelClienteCard espacios={espaciosDelCliente} />
 
         {contact.likely_blocked && <ContactBlockedNotice contactId={conversation.contact_id} />}
         {(conversation.ai_handoff_requested || conversation.ai_manually_paused) && (

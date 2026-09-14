@@ -21,12 +21,13 @@ import {
 } from "@/lib/whatsapp/graph";
 import { validateMediaMime, validateMediaSize } from "@/lib/whatsapp/media-limits";
 import { transcodeVideoToH264 } from "@/lib/whatsapp/video-transcode";
-import { getWorkspaceRole } from "@/lib/workspace";
+import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
 import { buildTemplateSendParams } from "@/lib/whatsapp/variables";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { toPublicUrl } from "@/lib/supabase/config";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
 import { recordOutboundMessage } from "@/lib/messaging/record";
+import { limiteDeNumeros } from "@/lib/whatsapp/limite-numeros";
 
 const execFileAsync = promisify(execFile);
 
@@ -105,24 +106,16 @@ export async function connectWhatsApp(input: {
   } = await supabase.auth.getUser();
   if (!user) return { error: "No autenticado." };
 
-  const { data: membership } = await supabase
-    .from("workspace_members")
-    .select("workspace_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
+  // El espacio activo, no la membresia del usuario: cuando el admin entra
+  // "como el cliente" (impersonacion), el numero debe quedar en el espacio
+  // del cliente. Antes se guardaba en el espacio del admin y al recargar el
+  // cliente aparecia sin API (caso Tomas Inversiones, 14 sep 2026).
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "No se encontró tu workspace." };
+  const membership = { workspace_id: workspaceId };
 
-  if (!membership) return { error: "No se encontró tu workspace." };
-
-  const { data: workspace } = await supabase
-    .from("workspaces")
-    .select("plan_id")
-    .eq("id", membership.workspace_id)
-    .maybeSingle();
-  const { data: plan } = workspace?.plan_id
-    ? await supabase.from("plans").select("max_whatsapp_numbers").eq("id", workspace.plan_id).maybeSingle()
-    : { data: null };
-  const maxNumbers = plan?.max_whatsapp_numbers ?? 1;
+  // Plan + cupo extra concedido desde admin a este espacio.
+  const { total: maxNumbers } = await limiteDeNumeros(supabase, membership.workspace_id);
 
   const { count: currentCount } = await supabase
     .from("whatsapp_accounts")

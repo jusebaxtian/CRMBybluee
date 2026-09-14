@@ -55,7 +55,7 @@ export function NewMessageButton({
           type="button"
           onClick={() => setOpen((o) => !o)}
           disabled={contacts.length === 0}
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-50"
+          className="flex items-center gap-2 rounded-[10px] bg-primary px-4 py-[10px] text-[12.5px] font-bold text-white hover:bg-primary-hover disabled:opacity-50"
           title={contacts.length === 0 ? "No tienes contactos todavía" : undefined}
         >
           <Plus size={14} />
@@ -79,7 +79,7 @@ export function NewMessageButton({
             id="contact"
             value={contactId}
             onChange={(e) => setContactId(e.target.value)}
-            className="mb-3 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            className="mb-3 w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
           >
             {contacts.map((c) => (
               <option key={c.id} value={c.id}>
@@ -96,7 +96,7 @@ export function NewMessageButton({
             value={body}
             onChange={(e) => setBody(e.target.value)}
             rows={3}
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+            className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
           />
 
           {error && <p className="mt-2 text-xs text-red-400">{error}</p>}

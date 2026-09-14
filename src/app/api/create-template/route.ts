@@ -12,6 +12,7 @@ import { validateMediaFile, validateMediaMime, validateMediaSize } from "@/lib/w
 import { transcodeVideoToH264 } from "@/lib/whatsapp/video-transcode";
 import { toPublicUrl } from "@/lib/supabase/config";
 import { NO_WORKSPACE_ERROR } from "@/lib/auth/with-workspace";
+import { CATEGORIA_PLANTILLA_POR_DEFECTO } from "@/lib/templates/defaults";
 
 // Plain REST endpoint (not a Server Action) so the client can submit via
 // XMLHttpRequest and get real upload progress for the header file — fetch/
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const name = String(formData.get("name") ?? "").trim().toLowerCase();
   const language = String(formData.get("language") ?? "es");
-  const category = String(formData.get("category") ?? "UTILITY") as
+  const category = String(formData.get("category") ?? CATEGORIA_PLANTILLA_POR_DEFECTO) as
     | "MARKETING"
     | "UTILITY"
     | "AUTHENTICATION";
