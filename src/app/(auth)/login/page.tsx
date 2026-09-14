@@ -1,14 +1,18 @@
 "use client";
 
-import { useActionState } from "react";
+import { Suspense, useActionState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { login, type AuthFormState } from "@/app/actions/auth";
+import { GoogleButton } from "@/components/auth/google-button";
 
-export default function LoginPage() {
+function LoginForm() {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(
     login,
     undefined
   );
+  // /auth/callback vuelve aqui con ?error=... si Google no completo el ingreso.
+  const errorGoogle = useSearchParams().get("error");
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
@@ -21,6 +25,10 @@ export default function LoginPage() {
         <h1 className="mb-6 text-2xl font-semibold text-foreground">
           Inicia sesión
         </h1>
+        <GoogleButton />
+        {errorGoogle && !state?.error && (
+          <p className="mb-4 text-sm text-red-400">No se pudo entrar con Google. Intenta de nuevo o usa tu correo.</p>
+        )}
         <form action={action} className="flex flex-col gap-4">
           <div>
             <label htmlFor="email" className="mb-1 block text-sm font-medium text-muted">
@@ -65,5 +73,15 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+// useSearchParams obliga a un limite de Suspense para que la pagina siga
+// pudiendo prerenderizarse.
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }

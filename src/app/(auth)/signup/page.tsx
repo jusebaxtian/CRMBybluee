@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { signup, type AuthFormState } from "@/app/actions/auth";
+import { GoogleButton } from "@/components/auth/google-button";
 
 export default function SignupPage() {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(
@@ -24,6 +25,7 @@ export default function SignupPage() {
         <p className="mb-6 text-sm text-muted">
           Crea tu cuenta y empieza a vender por WhatsApp.
         </p>
+        <GoogleButton texto="Registrarme con Google" />
         <form action={action} className="flex flex-col gap-4">
           <div>
             <label htmlFor="companyName" className="mb-1 block text-sm font-medium text-muted">

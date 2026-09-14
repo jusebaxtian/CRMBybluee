@@ -88,3 +88,49 @@ export async function logout() {
   await supabase.auth.signOut();
   redirect("/login");
 }
+
+/**
+ * Segundo paso de quien entra con Google por primera vez: ya tiene usuario
+ * pero no espacio. Pide lo mismo que el registro con correo (negocio y
+ * WhatsApp) y crea el espacio con la misma funcion, para que ambos caminos
+ * dejen los mismos datos.
+ */
+export async function completarRegistro(
+  _prevState: AuthFormState,
+  formData: FormData
+): Promise<AuthFormState> {
+  const companyName = String(formData.get("companyName") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim().replace(/[^\d]/g, "");
+
+  if (!companyName || !phone) {
+    return { error: "Completa todos los campos." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  // Si ya tiene espacio (doble envio, o entro aqui por la URL), no se crea otro.
+  const { data: membership } = await supabase
+    .from("workspace_members")
+    .select("workspace_id")
+    .eq("user_id", user.id)
+    .limit(1)
+    .maybeSingle();
+  if (membership) redirect("/dashboard");
+
+  const signupIp = await getClientIp();
+  const { error: rpcError } = await supabase.rpc("create_workspace_with_owner", {
+    workspace_name: companyName,
+    signup_ip: signupIp,
+    phone,
+  });
+
+  if (rpcError) {
+    return { error: `No se pudo crear el espacio: ${rpcError.message}` };
+  }
+
+  redirect("/dashboard");
+}
