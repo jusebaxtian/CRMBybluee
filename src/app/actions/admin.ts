@@ -209,6 +209,23 @@ export async function updateWorkspaceExtraNumbers(workspaceId: string, extra: st
   return { success: true };
 }
 
+/** Cupo de agentes de respuesta adicional para un espacio concreto (mismo criterio que los numeros). */
+export async function updateWorkspaceExtraAgents(workspaceId: string, extra: string) {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
+
+  const valor = Number.parseInt(extra, 10);
+  if (!Number.isInteger(valor) || valor < 0 || valor > 100) {
+    return { error: "Debe ser un número entre 0 y 100." };
+  }
+
+  const { error } = await supabase.from("workspaces").update({ extra_agents: valor }).eq("id", workspaceId);
+
+  if (error) return { error: error.message };
+  revalidatePath(`/admin/workspaces/${workspaceId}`);
+  return { success: true };
+}
+
 // Edits the date that gates access for this workspace — trial_ends_at while
 // they're on a trial (so a trial can be extended or shortened and the
 // scheduler in src/lib/billing/scheduler.ts picks up the new date as-is,

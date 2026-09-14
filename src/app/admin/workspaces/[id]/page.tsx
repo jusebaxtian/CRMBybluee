@@ -10,6 +10,7 @@ import { NotifyActivationButton } from "@/components/admin/notify-activation-but
 import { ClienteEnMiChat, type ClienteDeEspacio } from "@/components/admin/cliente-en-mi-chat";
 import { getActivationTemplateConfig } from "@/app/actions/admin-whatsapp";
 import { limiteDeNumeros } from "@/lib/whatsapp/limite-numeros";
+import { limiteDeAgentes } from "@/lib/agentes/limite-agentes";
 
 export default async function AdminWorkspaceDetailPage({
   params,
@@ -21,7 +22,7 @@ export default async function AdminWorkspaceDetailPage({
 
   const { data: workspace } = await supabase
     .from("workspaces")
-    .select("id, name, status, plan_id, trial_ends_at, created_at, signup_ip, phone, extra_whatsapp_numbers")
+    .select("id, name, status, plan_id, trial_ends_at, created_at, signup_ip, phone, extra_whatsapp_numbers, extra_agents")
     .eq("id", id)
     .maybeSingle();
 
@@ -72,6 +73,7 @@ export default async function AdminWorkspaceDetailPage({
     .limit(5);
 
   const limiteNumeros = await limiteDeNumeros(supabase, id);
+  const planAgents = (await limiteDeAgentes(supabase, id)).plan;
 
   const { data: owner } = await supabase
     .from("workspace_members")
@@ -123,6 +125,8 @@ export default async function AdminWorkspaceDetailPage({
           workspaceName={workspace.name}
           workspacePhone={workspace.phone}
           extraNumbers={workspace.extra_whatsapp_numbers ?? 0}
+          planAgents={planAgents}
+          extraAgents={workspace.extra_agents ?? 0}
           planNumbers={limiteNumeros.plan}
           ownerId={owner?.user_id ?? null}
           ownerEmail={ownerEmail}
