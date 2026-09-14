@@ -1,14 +1,16 @@
 "use client";
 
-import { useActionState } from "react";
+import { Suspense, useActionState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Mail, MailCheck } from "lucide-react";
 import { solicitarRecuperacion, type AuthFormState } from "@/app/actions/auth";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Campo, BotonEnviar, ErrorFormulario } from "@/components/auth/campos";
 
-export default function RecuperarPage() {
+function RecuperarForm() {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(solicitarRecuperacion, undefined);
+  const enlaceVencido = useSearchParams().get("error") === "enlace";
 
   return (
     <AuthShell
@@ -41,12 +43,22 @@ export default function RecuperarPage() {
             icono={<Mail size={16} />}
             disabled={pending}
           />
-          <ErrorFormulario>{state?.error}</ErrorFormulario>
+          <ErrorFormulario>
+            {state?.error ?? (enlaceVencido ? "Ese enlace venció o ya fue usado. Pide uno nuevo." : null)}
+          </ErrorFormulario>
           <BotonEnviar cargando={pending} textoCargando="Enviando...">
             Enviar enlace
           </BotonEnviar>
         </form>
       )}
     </AuthShell>
+  );
+}
+
+export default function RecuperarPage() {
+  return (
+    <Suspense>
+      <RecuperarForm />
+    </Suspense>
   );
 }

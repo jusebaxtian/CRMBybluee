@@ -11,7 +11,8 @@ export type Pais = {
   iso: CountryCode;
   nombre: string;
   indicativo: string; // "+57"
-  bandera: string; // 🇨🇴
+  bandera: string; // 🇨🇴 (emoji; Windows no lo dibuja, por eso la UI usa banderaUrl)
+  banderaUrl: string; // imagen PNG de flagcdn.com
 };
 
 export const PAIS_POR_DEFECTO: CountryCode = "CO";
@@ -32,6 +33,7 @@ export function listaDePaises(): Pais[] {
       nombre: nombres.of(iso) ?? iso,
       indicativo: `+${getCountryCallingCode(iso)}`,
       bandera: banderaDe(iso),
+      banderaUrl: `https://flagcdn.com/w40/${iso.toLowerCase()}.png`,
     }))
     .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
   return cache;

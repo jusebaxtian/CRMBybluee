@@ -104,7 +104,7 @@ export function CampoTelefono({
             error && "border-error"
           )}
         >
-          <span className="text-[18px] leading-none">{pais.bandera}</span>
+          <Bandera pais={pais} />
           <span className="hidden min-w-0 flex-1 truncate text-[13px] sm:block">{pais.nombre}</span>
           <span className="text-[13px] font-semibold text-muted">{pais.indicativo}</span>
           <ChevronDown size={14} className="ml-auto shrink-0 text-muted" />
@@ -162,7 +162,7 @@ export function CampoTelefono({
                     p.iso === iso && "font-semibold text-success"
                   )}
                 >
-                  <span className="text-[18px] leading-none">{p.bandera}</span>
+                  <Bandera pais={p} />
                   <span className="min-w-0 flex-1 truncate">{p.nombre}</span>
                   <span className="text-muted">{p.indicativo}</span>
                 </li>
@@ -179,5 +179,29 @@ export function CampoTelefono({
         <p className="mt-1.5 text-[12px] text-muted">Solo el número local, sin el indicativo. Ej: 3001234567</p>
       )}
     </div>
+  );
+}
+
+/**
+ * Bandera como imagen: el emoji 🇨🇴 no se dibuja en Windows (Chrome lo muestra
+ * como "CO"). Si la imagen no carga, queda el codigo ISO.
+ */
+function Bandera({ pais }: { pais: Pais }) {
+  return (
+    <span className="flex h-[15px] w-5 shrink-0 items-center justify-center overflow-hidden rounded-[2px] bg-surface-hover text-[9px] font-bold text-muted">
+      {/* eslint-disable-next-line @next/next/no-img-element -- CDN de banderas, sin optimizar */}
+      <img
+        src={pais.banderaUrl}
+        alt={pais.iso}
+        width={20}
+        height={15}
+        loading="lazy"
+        decoding="async"
+        className="h-full w-full object-cover"
+        onError={(e) => {
+          e.currentTarget.replaceWith(document.createTextNode(pais.iso));
+        }}
+      />
+    </span>
   );
 }

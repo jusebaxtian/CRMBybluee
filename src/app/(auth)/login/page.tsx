@@ -56,7 +56,12 @@ function LoginForm() {
         </div>
 
         <ErrorFormulario>
-          {state?.error ?? (errorGoogle ? "No se pudo entrar con Google. Intenta de nuevo o usa tu correo." : null)}
+          {state?.error ??
+            (errorGoogle === "enlace"
+              ? "Ese enlace venció o ya fue usado. Pide uno nuevo desde \"¿Olvidaste tu contraseña?\"."
+              : errorGoogle
+                ? "No se pudo entrar con Google. Intenta de nuevo o usa tu correo."
+                : null)}
         </ErrorFormulario>
 
         <BotonEnviar cargando={pending} textoCargando="Entrando...">
