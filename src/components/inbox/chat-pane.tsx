@@ -5,6 +5,7 @@ import { Paperclip } from "lucide-react";
 import { MessagesScrollArea } from "@/components/inbox/messages-scroll-area";
 import { MessageComposer, type MessageComposerHandle } from "@/components/inbox/message-composer";
 import { TemplateGatePicker } from "@/components/templates/template-gate-picker";
+import { ForwardDialog } from "@/components/inbox/forward-dialog";
 import { useMessageWindow } from "@/lib/use-message-window";
 
 export type OptimisticMessage = {
@@ -41,6 +42,7 @@ export function ChatPane({
 }) {
   const [pending, setPending] = useState<OptimisticMessage[]>([]);
   const [replyingTo, setReplyingTo] = useState<{ waMessageId: string; preview: string } | null>(null);
+  const [reenviando, setReenviando] = useState<{ messageId: string; preview: string } | null>(null);
   const composerRef = useRef<MessageComposerHandle>(null);
   const [dragActive, setDragActive] = useState(false);
   // Counts nested dragenter/dragleave pairs (messages, bubbles, etc. all
@@ -108,7 +110,15 @@ export function ChatPane({
           <p className="text-sm font-medium text-foreground">Suelta el archivo para adjuntarlo</p>
         </div>
       )}
-      <MessagesScrollArea messages={combined} onReply={setReplyingTo} />
+      <MessagesScrollArea messages={combined} onReply={setReplyingTo} onForward={setReenviando} />
+      {reenviando && (
+        <ForwardDialog
+          messageId={reenviando.messageId}
+          preview={reenviando.preview}
+          excludeContactId={contactId}
+          onClose={() => setReenviando(null)}
+        />
+      )}
       {windowOpen ? (
         <MessageComposer
           ref={composerRef}

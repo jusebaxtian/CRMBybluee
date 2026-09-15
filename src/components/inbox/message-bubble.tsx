@@ -1,4 +1,4 @@
-import { FileText, Download, Check, CheckCheck, AlertCircle, Clock, Reply, ExternalLink } from "lucide-react";
+import { FileText, Download, Check, CheckCheck, AlertCircle, Clock, Reply, ExternalLink, Forward } from "lucide-react";
 import { VoiceMessagePlayer } from "@/components/inbox/voice-message-player";
 import { MediaLightbox } from "@/components/inbox/media-lightbox";
 
@@ -47,14 +47,18 @@ function summarize(m: Pick<Message, "message_type" | "body">): string {
   return m.body || "Mensaje";
 }
 
+const REENVIABLES = new Set(["text", "image", "video", "audio", "document"]);
+
 export function MessageBubble({
   message: m,
   quotedMessage,
   onReply,
+  onForward,
 }: {
   message: Message;
   quotedMessage?: Message | null;
   onReply?: (target: { waMessageId: string; preview: string }) => void;
+  onForward?: (target: { messageId: string; preview: string }) => void;
 }) {
   const out = m.direction === "out";
   const time = new Date(m.created_at).toLocaleTimeString("es-CO", {
@@ -84,15 +88,32 @@ export function MessageBubble({
   }
 
   const canReply = !!m.wa_message_id;
+  // Reenviar: texto y adjuntos que sigan disponibles (no plantillas, botones ni reacciones).
+  const canForward =
+    !!onForward && REENVIABLES.has(m.message_type) && (m.message_type === "text" ? !!m.body : !!m.media_url);
+  const botonAccion =
+    "shrink-0 rounded-full p-1.5 text-muted opacity-60 hover:bg-surface-hover hover:text-foreground hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100";
+  const forwardBtn = canForward && (
+    <button
+      type="button"
+      onClick={() => onForward?.({ messageId: m.id, preview: summarize(m) })}
+      title="Reenviar a otro chat"
+      aria-label="Reenviar a otro chat"
+      className={botonAccion}
+    >
+      <Forward size={14} />
+    </button>
+  );
 
   return (
     <div className={`group flex items-center gap-1.5 ${out ? "justify-end" : "justify-start"}`}>
+      {out && forwardBtn}
       {canReply && out && (
         <button
           type="button"
           onClick={() => onReply?.({ waMessageId: m.wa_message_id!, preview: summarize(m) })}
           title="Responder citando este mensaje"
-          className="shrink-0 rounded-full p-1.5 text-muted opacity-60 hover:bg-surface-hover hover:text-foreground hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+          className={botonAccion}
         >
           <Reply size={14} />
         </button>
@@ -204,6 +225,7 @@ export function MessageBubble({
           <Reply size={14} />
         </button>
       )}
+      {!out && forwardBtn}
     </div>
   );
 }

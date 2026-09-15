@@ -179,12 +179,19 @@ export async function connectWhatsApp(input: {
       { onConflict: "workspace_id,phone_number_id" }
     );
 
-    if (error) return { error: error.message };
+    if (error) {
+      console.error(`connectWhatsApp: no se pudo guardar (workspace ${workspaceId}, numero ${input.phoneNumberId}):`, error.message);
+      return { error: error.message };
+    }
 
     revalidatePath("/dashboard");
     return { success: true, displayPhoneNumber: phoneDetails.display_phone_number };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Error desconocido." };
+    // Queda en el log del servidor: hasta ahora el mensaje solo lo veia el
+    // cliente en pantalla y soporte no tenia como saber que fallo.
+    const mensaje = err instanceof Error ? err.message : "Error desconocido.";
+    console.error(`connectWhatsApp: fallo (workspace ${workspaceId}, waba ${input.wabaId}, numero ${input.phoneNumberId}): ${mensaje}`);
+    return { error: mensaje };
   }
 }
 
