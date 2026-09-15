@@ -74,7 +74,7 @@ export async function Kpis({ rango, etiquetaPeriodo }: { rango: RangoFechas; eti
         }
       />
       <Tarjeta
-        etiqueta="Tiempo de respuesta"
+        etiqueta="Tiempo de respuesta (mediana)"
         cifra={formatoTiempo(k.tiempoRespuestaSeg)}
         pie={
           k.deltaTiempoPct !== null ? (

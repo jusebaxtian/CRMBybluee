@@ -24,7 +24,7 @@ export async function LeadsPorDia({ rango }: { rango: RangoFechas }) {
     <section aria-label="Contactos creados por día" className="flex flex-col rounded-[13px] border border-dash-border bg-dash-card p-5">
       <header>
         <h2 className="font-dash-ui text-[15px] font-semibold text-dash-text">Contactos creados por día</h2>
-        <p className="font-dash-ui text-[12px] text-dash-text-2">Últimos 7 días</p>
+        <p className="font-dash-ui text-[12px] text-dash-text-2">Últimos {dias.length || 13} días</p>
       </header>
 
       {dias.length === 0 ? (

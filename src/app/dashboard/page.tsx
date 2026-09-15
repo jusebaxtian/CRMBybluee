@@ -54,6 +54,12 @@ export default async function DashboardPage({
 
   const periodo = leerPeriodo(params);
   const rango = rangoDe(periodo);
+  // El grafico de contactos por dia muestra 13 dias (mas barras, mas tupido),
+  // independientemente del periodo de los KPIs.
+  const ahora = new Date();
+  const hoyBogota = ahora.toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+  const hace12 = new Date(ahora.getTime() - 12 * 86_400_000).toLocaleDateString("en-CA", { timeZone: "America/Bogota" });
+  const rangoGrafico = rangoDe({ tipo: "rango", desde: hace12, hasta: hoyBogota });
   const etiquetaPeriodo =
     periodo.tipo === "hoy" ? "ayer" : periodo.tipo === "7d" ? "la semana anterior" : periodo.tipo === "30d" ? "el mes anterior" : "el periodo anterior";
 
@@ -120,7 +126,7 @@ export default async function DashboardPage({
       <div className="grid grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] gap-4 max-[900px]:grid-cols-[minmax(0,1fr)]">
         <Bloque nombre="el gráfico de leads">
           <Suspense fallback={<EsqueletoFila alto="h-[262px]" />}>
-            <LeadsPorDia rango={rango} />
+            <LeadsPorDia rango={rangoGrafico} />
           </Suspense>
         </Bloque>
         <Bloque nombre="los pendientes">
