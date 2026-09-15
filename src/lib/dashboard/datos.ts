@@ -251,18 +251,18 @@ export async function cargarKpis(supabase: SupabaseClient, workspaceId: string, 
       .lte("created_at", iso(r.hasta));
 
   const [
-    { count: sinResponder },
+    { data: noLeidos },
     { count: contactosNuevos },
     { count: contactosAntes },
     { count: metaAds },
     { data: tiempos },
     { data: enviados },
   ] = await Promise.all([
-    supabase
-      .from("conversations")
-      .select("id", { count: "exact", head: true })
-      .eq("workspace_id", workspaceId)
-      .eq("last_message_direction", "in"),
+    // No leidos (entrantes desde la ultima vez que se abrio el chat), la
+    // misma cifra que la insignia del menu. Decision del 14 sep 2026: antes
+    // era "sin responder" (el cliente hablo de ultimo) y no cuadraba con lo
+    // que la gente entiende como pendiente.
+    supabase.rpc("inbox_unread_count", { p_workspace_id: workspaceId }),
     contactosEn(rango),
     contactosEn(previo),
     supabase
@@ -292,7 +292,7 @@ export async function cargarKpis(supabase: SupabaseClient, workspaceId: string, 
     | undefined;
 
   return {
-    sinResponder: sinResponder ?? 0,
+    sinResponder: Number(noLeidos ?? 0),
     tiempoRespuestaSeg: t?.actual_seg ?? null,
     deltaTiempoPct: t?.actual_seg != null && t?.anterior_seg ? pct(t.actual_seg, t.anterior_seg) : null,
     contactosNuevos: contactosNuevos ?? 0,

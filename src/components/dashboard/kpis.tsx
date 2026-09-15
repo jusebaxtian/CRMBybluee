@@ -61,15 +61,15 @@ export async function Kpis({ rango, etiquetaPeriodo }: { rango: RangoFechas; eti
   return (
     <div className={REJILLA_KPIS}>
       <Tarjeta
-        etiqueta="Sin responder"
+        etiqueta="No leídos"
         cifra={n(k.sinResponder)}
         pie={
           k.sinResponder > 0 ? (
             <Link href="/dashboard/inbox" className="text-dash-green-text hover:underline">
-              Responder ahora →
+              Ver chats →
             </Link>
           ) : (
-            "Todo respondido 🎉"
+            "Todo leído 🎉"
           )
         }
       />
