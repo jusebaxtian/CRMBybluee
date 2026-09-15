@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { normalizarNombrePlantilla } from "@/lib/templates/nombre";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   createMetaTemplate,
@@ -160,7 +161,7 @@ export async function setTemplateHeaderMedia(templateId: string, formData: FormD
 }
 
 export async function createTemplate(_prevState: unknown, formData: FormData) {
-  const name = String(formData.get("name") ?? "").trim().toLowerCase();
+  const name = normalizarNombrePlantilla(String(formData.get("name") ?? ""), { final: true });
   const language = String(formData.get("language") ?? "es");
   const category = String(formData.get("category") ?? CATEGORIA_PLANTILLA_POR_DEFECTO) as
     | "MARKETING"

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Plus, X } from "lucide-react";
+import { normalizarNombrePlantilla } from "@/lib/templates/nombre";
 import { Button } from "@/components/ui/button";
 import { CATEGORIA_PLANTILLA_POR_DEFECTO } from "@/lib/templates/defaults";
 
@@ -108,12 +109,16 @@ export function CreateTemplateForm() {
             type="text"
             required
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            // Se normaliza al escribir: Meta solo acepta minusculas, numeros y _
+            onChange={(e) => setName(normalizarNombrePlantilla(e.target.value))}
             placeholder="promo_verano"
             pattern="[a-z0-9_]+"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
           />
-          <p className="mt-1 text-xs text-muted">minúsculas, números y _</p>
+          <p className="mt-1 text-xs text-muted">Solo minúsculas, números y _ (los espacios se convierten en _ y se quitan las tildes).</p>
         </div>
         <div>
           <label htmlFor="category" className="mb-1 block text-sm font-medium text-muted">
