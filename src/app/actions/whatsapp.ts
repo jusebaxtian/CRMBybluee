@@ -350,19 +350,30 @@ export async function sendChatMedia(formData: FormData) {
   if (mediaType === "audio" && file.type.includes("webm")) {
     try {
       const original = Buffer.from(await file.arrayBuffer());
-      uploadBuffer = await transcodeToOggOpus(original);
+      // Safari/iOS anuncia webm pero graba MP4: se mira la firma real del
+      // archivo. Si es MP4 se envia tal cual (WhatsApp lo acepta); si esta
+      // vacio o roto se avisa claro en vez de mostrar el volcado de ffmpeg.
+      const firma = detectarFormatoAudio(original);
+      if (firma === "vacio") return { error: "La nota de voz quedó vacía. Graba de nuevo." };
+      if (firma === "mp4") {
+        uploadBuffer = original;
+        uploadContentType = "audio/mp4";
+        uploadFilename = file.name.replace(/\.webm$/i, ".m4a");
+      } else if (firma === "desconocido") {
+        return { error: "La grabación llegó en un formato que no se pudo leer. Intenta de nuevo o usa otro navegador." };
+      } else {
+        uploadBuffer = await transcodeToOggOpus(original);
       // WhatsApp's media-link fetcher matches the Content-Type header against
       // its supported-format allowlist exactly — "audio/ogg; codecs=opus" (a
       // valid MIME type in general) doesn't match their "audio/ogg" entry, so
       // the message gets silently marked "failed" after Meta downloads it.
-      uploadContentType = "audio/ogg";
-      uploadFilename = file.name.replace(/\.webm$/i, ".ogg");
+        uploadContentType = "audio/ogg";
+        uploadFilename = file.name.replace(/\.webm$/i, ".ogg");
+      }
     } catch (err) {
-      return {
-        error:
-          "No se pudo procesar la nota de voz: " +
-          (err instanceof Error ? err.message : "error desconocido"),
-      };
+      // El detalle completo va al log; a la persona solo el resumen.
+      console.error("nota de voz: fallo la conversion:", err instanceof Error ? err.message : err);
+      return { error: "No se pudo procesar la nota de voz. Intenta grabarla de nuevo." };
     }
   }
 
@@ -615,4 +626,14 @@ export async function saveCtwaDatasetId(datasetId: string, accountId: string) {
 
   revalidatePath("/dashboard/settings");
   return { success: true as const };
+}
+
+/** Formato real de un audio por su firma binaria (la extension puede mentir). */
+function detectarFormatoAudio(buf: Buffer): "webm" | "mp4" | "vacio" | "desconocido" {
+  if (buf.length < 64) return "vacio";
+  // EBML (webm/matroska): 1A 45 DF A3
+  if (buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) return "webm";
+  // MP4/M4A: "ftyp" en el byte 4
+  if (buf.subarray(4, 8).toString("ascii") === "ftyp") return "mp4";
+  return "desconocido";
 }

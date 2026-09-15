@@ -229,15 +229,17 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
       // MediaRecorder (Chrome/Edge: webm/opus, Safari: often mp4/aac) — using
       // whatever the browser actually records instead of hardcoding "webm"
       // is what makes the local preview player able to decode it.
-      const candidates = [
-        "audio/webm;codecs=opus",
-        "audio/webm",
-        "audio/mp4",
-        "audio/mpeg",
-      ];
+      // Safari/iOS dice que "soporta" audio/webm pero graba MP4 (AAC) por
+      // dentro: el archivo llegaba al servidor como .webm y ffmpeg lo
+      // rechazaba ("EBML header parsing failed"). Ahi se pide MP4 primero,
+      // que es lo que de verdad produce y WhatsApp acepta sin convertir.
+      const esApple = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent) && !/Chrome|CriOS|FxiOS/.test(navigator.userAgent);
+      const candidates = esApple
+        ? ["audio/mp4", "audio/mp4;codecs=mp4a.40.2", "audio/webm;codecs=opus", "audio/webm"]
+        : ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/mpeg"];
       const mimeType =
         candidates.find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
-      recordingMimeTypeRef.current = mimeType || "audio/webm";
+      recordingMimeTypeRef.current = mimeType || (esApple ? "audio/mp4" : "audio/webm");
       const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       audioChunksRef.current = [];
       recorder.ondataavailable = (e) => {
@@ -267,7 +269,11 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
       }
       recorder.onstop = () => {
         recorder.stream.getTracks().forEach((t) => t.stop());
-        resolve(new Blob(audioChunksRef.current, { type: recordingMimeTypeRef.current }));
+        // El tipo real lo dicta el grabador (recorder.mimeType); el que se
+        // pidio puede no ser el que produjo.
+        const tipoReal = recorder.mimeType || recordingMimeTypeRef.current;
+        recordingMimeTypeRef.current = tipoReal;
+        resolve(new Blob(audioChunksRef.current, { type: tipoReal }));
       };
       recorder.stop();
     });
