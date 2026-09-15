@@ -1,19 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Users, Bot } from "lucide-react";
 import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
 
-export function SettingsTabs({
-  agentsContent,
-  whatsappContent,
-  aiAgentContent,
-}: {
+type Tab = "agents" | "whatsapp" | "ai";
+
+type Props = {
   agentsContent: React.ReactNode;
   whatsappContent: React.ReactNode;
   aiAgentContent?: React.ReactNode;
-}) {
-  const [tab, setTab] = useState<"agents" | "whatsapp" | "ai">("agents");
+};
+
+/** ?tab=whatsapp abre directo esa pestaña (enlace desde el dashboard). */
+export function SettingsTabs(props: Props) {
+  return (
+    <Suspense fallback={<SettingsTabsInner {...props} inicial="agents" />}>
+      <SettingsTabsConUrl {...props} />
+    </Suspense>
+  );
+}
+
+function SettingsTabsConUrl(props: Props) {
+  const t = useSearchParams().get("tab");
+  const inicial: Tab = t === "whatsapp" || t === "ai" ? t : "agents";
+  return <SettingsTabsInner {...props} inicial={inicial} />;
+}
+
+function SettingsTabsInner({ agentsContent, whatsappContent, aiAgentContent, inicial }: Props & { inicial: Tab }) {
+  const [tab, setTab] = useState<Tab>(inicial);
 
   return (
     <div>

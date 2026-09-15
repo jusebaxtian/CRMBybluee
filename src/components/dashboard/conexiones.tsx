@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
 import { cargarConexiones, type ConexionApi } from "@/lib/dashboard/datos";
@@ -25,8 +26,6 @@ const REJILLA =
 function Tarjeta({ c }: { c: ConexionApi }) {
   const e = ESTADO[c.estado];
   const q = c.calidad ? CALIDAD[c.calidad] : null;
-  const pctLimite =
-    c.limiteDiario && c.usadoHoy !== null ? Math.min(100, (c.usadoHoy / c.limiteDiario) * 100) : 0;
 
   return (
     <article className={`rounded-[13px] border bg-dash-card-nested p-4 ${e.borde}`} aria-label={`Número ${c.numero}`}>
@@ -72,18 +71,13 @@ function Tarjeta({ c }: { c: ConexionApi }) {
           </dd>
         </div>
 
-        <div>
-          <div className="flex items-center justify-between">
-            <dt className="font-dash-ui text-[11.5px] font-medium text-dash-text-2">Límite diario</dt>
-            <dd className="font-dash-ui text-[12px] font-bold tabular-nums text-dash-text">
-              {c.limiteDiario !== null && c.usadoHoy !== null
-                ? `${c.usadoHoy.toLocaleString("es-CO")} / ${c.limiteDiario.toLocaleString("es-CO")}`
-                : "—"}
-            </dd>
-          </div>
-          <div className="mt-1.5 h-[5px] overflow-hidden rounded-[3px] bg-dash-track" aria-hidden>
-            <div className={`h-full rounded-[3px] transition-[width] duration-[400ms] ease-out ${e.barra}`} style={{ width: `${pctLimite}%` }} />
-          </div>
+        {/* Solo el limite que fija Meta para el numero (sin barra de uso:
+            decision del 14 sep 2026). */}
+        <div className="flex items-center justify-between">
+          <dt className="font-dash-ui text-[11.5px] font-medium text-dash-text-2">Límite diario de Meta</dt>
+          <dd className="font-dash-ui text-[12px] font-bold tabular-nums text-dash-text">
+            {c.limiteDiario !== null ? `${c.limiteDiario.toLocaleString("es-CO")} conversaciones` : "—"}
+          </dd>
         </div>
 
         <div className="flex items-center justify-between">
@@ -93,6 +87,14 @@ function Tarjeta({ c }: { c: ConexionApi }) {
           </dd>
         </div>
       </dl>
+
+      <Link
+        href="/dashboard/settings?tab=whatsapp"
+        className="mt-3 flex items-center justify-center gap-1.5 rounded-[9px] border border-dash-border py-[7px] font-dash-ui text-[12px] font-semibold text-dash-green-text transition-colors hover:bg-dash-green-7"
+      >
+        <Pencil size={12} />
+        Editar información de la API
+      </Link>
     </article>
   );
 }
