@@ -131,10 +131,19 @@ async function resolveContact(
   bsuid: string | null,
   profileName: string | undefined
 ): Promise<{ id: string } | null> {
+  // Regla del nombre (0104): el perfil de WhatsApp solo rellena cuando el
+  // contacto no tiene nombre o cuando el nombre actual vino de WhatsApp. Si
+  // el cliente lo edito o lo subio por Excel (name_source manual/import),
+  // ese nombre manda y no se toca.
+  const nombreSiCorresponde = (existing: { name: string | null; name_source: string | null }) =>
+    profileName && (!existing.name || existing.name_source === "whatsapp" || existing.name_source === null)
+      ? { name: profileName, name_source: "whatsapp" as const }
+      : {};
+
   if (bsuid) {
     const { data: existing } = await supabase
       .from("contacts")
-      .select("id")
+      .select("id, name, name_source")
       .eq("workspace_id", workspaceId)
       .eq("bsuid", bsuid)
       .maybeSingle();
@@ -142,16 +151,29 @@ async function resolveContact(
     if (existing) {
       await supabase
         .from("contacts")
-        .update({ wa_id: waId, ...(profileName ? { name: profileName } : {}) })
+        .update({ wa_id: waId, ...nombreSiCorresponde(existing) })
         .eq("id", existing.id);
       return existing;
     }
   }
 
-  // Only include bsuid in the payload when we actually have one — on
-  // conflict, Supabase's upsert sets every column present in the object, so
-  // passing bsuid: null here would wipe out a bsuid learned from an earlier
-  // message where it happened to be present.
+  const { data: porNumero } = await supabase
+    .from("contacts")
+    .select("id, name, name_source")
+    .eq("workspace_id", workspaceId)
+    .eq("wa_id", waId)
+    .maybeSingle();
+
+  if (porNumero) {
+    // Only include bsuid when we actually have one, so a null never wipes a
+    // bsuid learned from an earlier message.
+    const cambios = { ...nombreSiCorresponde(porNumero), ...(bsuid ? { bsuid } : {}) };
+    if (Object.keys(cambios).length > 0) {
+      await supabase.from("contacts").update(cambios).eq("id", porNumero.id);
+    }
+    return porNumero;
+  }
+
   const { data: contact } = await supabase
     .from("contacts")
     .upsert(
@@ -159,6 +181,7 @@ async function resolveContact(
         workspace_id: workspaceId,
         wa_id: waId,
         name: profileName,
+        name_source: "whatsapp",
         ...(bsuid ? { bsuid } : {}),
       },
       { onConflict: "workspace_id,wa_id", ignoreDuplicates: false }

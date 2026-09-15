@@ -131,15 +131,25 @@ export async function importContactsFile(formData: FormData) {
 
   const phones = rows.map((r) => r.phone);
 
-  const { error: upsertError } = await supabase.from("contacts").upsert(
-    rows.map((r) => ({
-      workspace_id: workspaceId,
-      wa_id: r.phone,
-      name: r.name,
-    })),
-    { onConflict: "workspace_id,wa_id", ignoreDuplicates: false }
-  );
-  if (upsertError) return { error: upsertError.message };
+  // Filas con nombre: el del Excel manda desde ahora (0104). Filas sin
+  // nombre: solo se crea/actualiza el numero, sin borrar el nombre que el
+  // contacto ya tuviera.
+  const conNombre = rows.filter((r) => r.name);
+  const sinNombre = rows.filter((r) => !r.name);
+  if (conNombre.length > 0) {
+    const { error: upsertError } = await supabase.from("contacts").upsert(
+      conNombre.map((r) => ({ workspace_id: workspaceId, wa_id: r.phone, name: r.name, name_source: "import" })),
+      { onConflict: "workspace_id,wa_id", ignoreDuplicates: false }
+    );
+    if (upsertError) return { error: upsertError.message };
+  }
+  if (sinNombre.length > 0) {
+    const { error: upsertError } = await supabase.from("contacts").upsert(
+      sinNombre.map((r) => ({ workspace_id: workspaceId, wa_id: r.phone })),
+      { onConflict: "workspace_id,wa_id", ignoreDuplicates: true }
+    );
+    if (upsertError) return { error: upsertError.message };
+  }
 
   const uniqueTagNames = Array.from(new Set(rows.flatMap((r) => r.tagNames)));
   if (uniqueTagNames.length > 0) {
@@ -219,7 +229,7 @@ export async function createContact(_prevState: unknown, formData: FormData) {
   const { supabase, workspaceId } = ctx;
 
   const { error } = await supabase.from("contacts").upsert(
-    { workspace_id: workspaceId, wa_id: phone, name: name || null },
+    { workspace_id: workspaceId, wa_id: phone, name: name || null, ...(name ? { name_source: "manual" } : {}) },
     { onConflict: "workspace_id,wa_id" }
   );
 
@@ -251,7 +261,9 @@ export async function updateContact(contactId: string, name: string, phone: stri
 
   const { error } = await supabase
     .from("contacts")
-    .update({ name: name.trim() || null, wa_id: cleanPhone })
+    // Editado por el cliente: ese nombre manda desde ahora (0104). Si lo
+    // deja vacio, vuelve a poder rellenarse con el de WhatsApp.
+    .update({ name: name.trim() || null, wa_id: cleanPhone, name_source: name.trim() ? "manual" : "whatsapp" })
     .eq("id", contactId)
     .eq("workspace_id", workspaceId);
 
