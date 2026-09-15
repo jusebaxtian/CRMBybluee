@@ -35,9 +35,9 @@ const execFileAsync = promisify(execFile);
 // audio/mp4 (Safari) — WhatsApp's Cloud API only accepts AAC, AMR, MP3,
 // MP4 audio, or OGG/Opus (its own voice-note format), so webm recordings
 // are silently rejected by Meta. Re-encode to OGG/Opus before sending.
-async function transcodeToOggOpus(buffer: Buffer): Promise<Buffer> {
+async function transcodeToOggOpus(buffer: Buffer, extEntrada: "webm" | "mp4" = "webm"): Promise<Buffer> {
   const id = crypto.randomUUID();
-  const inPath = path.join(tmpdir(), `${id}-in.webm`);
+  const inPath = path.join(tmpdir(), `${id}-in.${extEntrada}`);
   const wavPath = path.join(tmpdir(), `${id}-mid.wav`);
   const outPath = path.join(tmpdir(), `${id}-out.ogg`);
   await writeFile(inPath, buffer);
@@ -333,8 +333,14 @@ export async function sendChatMedia(formData: FormData) {
   // agent picked the file (see friendlyWhatsAppError in ingest.ts). Webm
   // audio and video are exempt from the size check here — both get
   // transcoded below, so their real final size is only known afterward.
-  const isWebmAudio = mediaType === "audio" && file.type.includes("webm");
-  const mimeError = isWebmAudio ? null : validateMediaMime(mediaType, file.type);
+  // Notas de voz grabadas en el navegador: webm (Chrome/Android) o MP4
+  // fragmentado (Safari/iOS). Las dos se convierten a OGG/Opus: el MP4 que
+  // produce Safari Meta lo rechaza tal cual ("mimetype audio/mp4, however on
+  // processing it is application/octet-stream"). Un .m4a/.mp3 adjuntado como
+  // archivo no pasa por aqui.
+  const esNotaDeVoz =
+    mediaType === "audio" && (file.type.includes("webm") || /^nota-de-voz-/i.test(file.name));
+  const mimeError = esNotaDeVoz ? null : validateMediaMime(mediaType, file.type);
   if (mimeError) return { error: "No se pudo enviar: " + mimeError };
   if (mediaType !== "video") {
     const sizeError = validateMediaSize(mediaType, file.size);
@@ -345,31 +351,22 @@ export async function sendChatMedia(formData: FormData) {
   let uploadContentType = file.type;
   let uploadFilename = file.name;
 
-  // Only webm needs converting — WhatsApp already accepts the other formats
-  // browsers might produce (e.g. Safari's audio/mp4).
-  if (mediaType === "audio" && file.type.includes("webm")) {
+  if (esNotaDeVoz) {
     try {
       const original = Buffer.from(await file.arrayBuffer());
-      // Safari/iOS anuncia webm pero graba MP4: se mira la firma real del
-      // archivo. Si es MP4 se envia tal cual (WhatsApp lo acepta); si esta
-      // vacio o roto se avisa claro en vez de mostrar el volcado de ffmpeg.
+      // Formato real por la firma binaria: la extension y el tipo pueden mentir.
       const firma = detectarFormatoAudio(original);
       if (firma === "vacio") return { error: "La nota de voz quedó vacía. Graba de nuevo." };
-      if (firma === "mp4") {
-        uploadBuffer = original;
-        uploadContentType = "audio/mp4";
-        uploadFilename = file.name.replace(/\.webm$/i, ".m4a");
-      } else if (firma === "desconocido") {
+      if (firma === "desconocido") {
         return { error: "La grabación llegó en un formato que no se pudo leer. Intenta de nuevo o usa otro navegador." };
-      } else {
-        uploadBuffer = await transcodeToOggOpus(original);
+      }
+      uploadBuffer = await transcodeToOggOpus(original, firma);
       // WhatsApp's media-link fetcher matches the Content-Type header against
       // its supported-format allowlist exactly — "audio/ogg; codecs=opus" (a
       // valid MIME type in general) doesn't match their "audio/ogg" entry, so
       // the message gets silently marked "failed" after Meta downloads it.
-        uploadContentType = "audio/ogg";
-        uploadFilename = file.name.replace(/\.webm$/i, ".ogg");
-      }
+      uploadContentType = "audio/ogg";
+      uploadFilename = file.name.replace(/\.(webm|mp4|m4a)$/i, "") + ".ogg";
     } catch (err) {
       // El detalle completo va al log; a la persona solo el resumen.
       console.error("nota de voz: fallo la conversion:", err instanceof Error ? err.message : err);
