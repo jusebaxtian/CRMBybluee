@@ -48,6 +48,27 @@ function summarize(m: Pick<Message, "message_type" | "body">): string {
 }
 
 const REENVIABLES = new Set(["text", "image", "video", "audio", "document"]);
+// Adjuntos con boton de descarga (el documento ya tiene su propio enlace).
+const DESCARGABLES = new Set(["image", "video", "audio", "sticker"]);
+
+const EXTENSION: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "video/mp4": "mp4",
+  "audio/ogg": "ogg",
+  "audio/mpeg": "mp3",
+  "audio/mp4": "m4a",
+  "application/pdf": "pdf",
+};
+
+/** Pasa por /api/descargar para que el navegador descargue en vez de abrir. */
+function urlDescarga(m: Pick<Message, "media_url" | "media_mime_type" | "message_type" | "body" | "created_at">): string {
+  const ext = (m.media_mime_type && EXTENSION[m.media_mime_type]) || m.media_url!.split(".").pop()?.split("?")[0] || "bin";
+  const fecha = new Date(m.created_at).toISOString().slice(0, 10);
+  const nombre = m.message_type === "document" && m.body ? m.body : `${m.message_type}-${fecha}.${ext}`;
+  return `/api/descargar?url=${encodeURIComponent(m.media_url!)}&nombre=${encodeURIComponent(nombre)}`;
+}
 
 export function MessageBubble({
   message: m,
@@ -158,9 +179,7 @@ export function MessageBubble({
 
         {m.message_type === "document" && m.media_url && (
           <a
-            href={m.media_url}
-            target="_blank"
-            rel="noopener noreferrer"
+            href={urlDescarga(m)}
             className={`mb-1 flex items-center gap-2 rounded-md border px-2.5 py-2 text-xs ${
               out ? "border-white/30" : "border-border"
             }`}
@@ -173,6 +192,19 @@ export function MessageBubble({
 
         {m.body && m.message_type !== "document" && (
           <p className="whitespace-pre-wrap break-words">{m.body}</p>
+        )}
+
+        {DESCARGABLES.has(m.message_type) && m.media_url && (
+          <a
+            href={urlDescarga(m)}
+            className={`mt-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-medium transition-colors ${
+              out ? "text-white/80 hover:bg-white/10 hover:text-white" : "text-muted hover:bg-background hover:text-foreground"
+            }`}
+            title="Descargar adjunto"
+          >
+            <Download size={12} />
+            Descargar
+          </a>
         )}
 
         {m.buttons && m.buttons.length > 0 && (
