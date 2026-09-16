@@ -58,8 +58,11 @@ export function PlanStatusInline({
     else router.refresh();
   }
 
+  // color-scheme dark + fondo de superficie: la lista desplegable del
+  // navegador sale oscura, no blanca, y las opciones se leen bien.
   const select =
-    "cursor-pointer appearance-none rounded-md border bg-transparent pr-5 outline-none focus:border-primary disabled:opacity-50 " +
+    "cursor-pointer appearance-none rounded-md border bg-surface pr-5 outline-none [color-scheme:dark] focus:border-primary disabled:opacity-50 " +
+    "[&>option]:bg-surface [&>option]:text-foreground [&>option]:py-1 " +
     "bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2210%22 height=%2210%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%239a9aa8%22 stroke-width=%222.5%22><path d=%22m6 9 6 6 6-6%22/></svg>')] bg-[length:10px] bg-[right_6px_center] bg-no-repeat";
 
   return (

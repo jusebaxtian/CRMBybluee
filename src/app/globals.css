@@ -107,6 +107,17 @@ body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
+/* La app es oscura: con color-scheme dark el navegador pinta oscuros los
+   controles nativos (listas de <select>, calendarios, scrollbars) en vez de
+   sacar una lista blanca sobre fondo negro. */
+:root {
+  color-scheme: dark;
+}
+select option {
+  background-color: var(--surface);
+  color: var(--foreground);
+}
+
 @keyframes filtros-in {
   from {
     opacity: 0;
