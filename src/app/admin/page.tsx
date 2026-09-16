@@ -152,17 +152,20 @@ export default async function AdminOverviewPage({
         <p className="text-sm text-muted">{rows.length} cliente(s) registrados</p>
       </div>
 
-      <p className="-mb-2 text-xs text-muted">
-        Totales acumulados — usa el filtro de fechas abajo para acotar la tabla a un periodo.
-      </p>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+      <p className="-mb-3 text-[11px] text-muted">Totales acumulados; el filtro de abajo solo acota la tabla.</p>
+      {/* Tarjetas compactas: icono, cifra y etiqueta en una sola fila. */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
         {kpis.map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="rounded-xl border border-border bg-surface p-4">
-            <div className={`mb-3 flex h-9 w-9 items-center justify-center rounded-lg ${color}`}>
-              <Icon size={17} />
+          <div key={label} className="flex items-center gap-2.5 rounded-[11px] border border-border bg-surface px-3 py-2">
+            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${color}`}>
+              <Icon size={15} />
             </div>
-            <p className="text-2xl font-semibold text-foreground">{value.toLocaleString("es-CO")}</p>
-            <p className="mt-1 text-xs text-muted">{label}</p>
+            <div className="min-w-0">
+              <p className="text-lg font-semibold leading-tight text-foreground">{value.toLocaleString("es-CO")}</p>
+              <p className="truncate text-[11px] leading-tight text-muted" title={label}>
+                {label}
+              </p>
+            </div>
           </div>
         ))}
       </div>
