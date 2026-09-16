@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { connectWhatsApp } from "@/app/actions/whatsapp";
@@ -24,6 +24,13 @@ declare global {
 type SignupData = { waba_id: string; phone_number_id: string };
 type Status = "idle" | "connecting" | "error" | "success";
 
+function detectarEntorno(ua: string): "normal" | "embebido" | "movil" {
+  const embebido =
+    /FBAN|FBAV|FB_IAB|Instagram|WhatsApp|Line\/|; wv\)|WebView/i.test(ua) || (/iPhone|iPad/.test(ua) && !/Safari/.test(ua));
+  const movil = /Android|iPhone|iPad|iPod/i.test(ua);
+  return embebido ? "embebido" : movil ? "movil" : "normal";
+}
+
 export function ConnectWhatsAppButton({
   label = "Conectar WhatsApp",
   askLabel = false,
@@ -41,6 +48,27 @@ export function ConnectWhatsAppButton({
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [sdkReady, setSdkReady] = useState(false);
+  // Navegador embebido (abrir el CRM desde un enlace en WhatsApp, Instagram o
+  // Facebook): no puede abrir la ventana emergente de Meta, asi que el
+  // proceso "termina" en Meta pero nunca vuelve al CRM y no se guarda nada.
+  // Se detecta al montar y se guia a la persona a abrirlo en el navegador.
+  // useSyncExternalStore: en el servidor "normal" y en el cliente el valor
+  // real, sin desajuste de hidratacion ni setState en un efecto.
+  const entorno = useSyncExternalStore(
+    () => () => {},
+    () => detectarEntorno(navigator.userAgent),
+    () => "normal" as const
+  );
+  const [copiado, setCopiado] = useState(false);
+
+  async function copiarEnlace() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopiado(true);
+    } catch {
+      setCopiado(false);
+    }
+  }
   const [channelLabel, setChannelLabel] = useState("");
   const signupDataRef = useRef<SignupData | null>(null);
 
@@ -167,10 +195,34 @@ export function ConnectWhatsAppButton({
         />
       )}
 
+      {entorno === "embebido" && (
+        <div className="mt-3 rounded-[10px] border border-warning/40 bg-warning/10 p-3 text-[13px] text-foreground">
+          <p className="font-semibold text-warning">Abre esta página en tu navegador para conectar</p>
+          <p className="mt-1 text-muted">
+            Estás dentro de una app (WhatsApp, Instagram o Facebook) y Meta no puede abrir aquí la ventana de
+            conexión: el proceso parece terminar pero no se guarda. Copia el enlace y ábrelo en Chrome o Safari, o
+            hazlo desde un computador.
+          </p>
+          <button
+            type="button"
+            onClick={copiarEnlace}
+            className="mt-2 rounded-[9px] border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-surface-hover"
+          >
+            {copiado ? "Enlace copiado ✓" : "Copiar enlace"}
+          </button>
+        </div>
+      )}
+      {entorno === "movil" && (
+        <p className="mt-3 text-[12px] text-muted">
+          Desde el celular funciona en Chrome o Safari. Si la ventana de Meta no se abre o al volver no aparece el
+          número, conéctalo desde un computador.
+        </p>
+      )}
+
       <button
         type="button"
         onClick={launchSignup}
-        disabled={disabled || !sdkReady || status === "connecting"}
+        disabled={disabled || !sdkReady || status === "connecting" || entorno === "embebido"}
         className={
           className ??
           "mt-3 rounded-[10px] bg-primary px-4 py-[10px] text-[12.5px] font-bold text-white transition-colors hover:bg-primary-hover disabled:opacity-50"

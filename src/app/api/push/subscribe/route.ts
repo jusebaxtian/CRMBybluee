@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -20,17 +21,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "invalid subscription" }, { status: 400 });
   }
 
-  const { error } = await supabase.from("push_subscriptions").upsert(
-    {
-      user_id: user.id,
-      endpoint,
-      p256dh,
-      auth_key: authKey,
-    },
+  // El endpoint identifica al dispositivo; si ya estaba registrado con otro
+  // usuario (mismo telefono, otra cuenta, o el admin "entrando como"), la
+  // suscripcion pasa al usuario actual. Con RLS no habia politica de update
+  // y el upsert fallaba con 500 en cada carga de la app.
+  const admin = createAdminClient();
+  await admin.from("push_subscriptions").delete().eq("endpoint", endpoint).neq("user_id", user.id);
+  const { error } = await admin.from("push_subscriptions").upsert(
+    { user_id: user.id, endpoint, p256dh, auth_key: authKey },
     { onConflict: "endpoint" }
   );
 
   if (error) {
+    console.error("push subscribe:", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
