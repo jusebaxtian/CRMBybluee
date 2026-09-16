@@ -1,31 +1,14 @@
 import { Users, CreditCard, Clock, AlertTriangle, Plug, Send } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { PlanStatusInline } from "@/components/admin/plan-status-inline";
-import { WorkspaceRowActions } from "@/components/admin/workspace-row-actions";
-import { EditRenewalDateButton } from "@/components/admin/edit-renewal-date-button";
-import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
-
-function daysSince(dateStr: string): number {
-  return Math.max(
-    0,
-    Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24))
-  );
-}
-
-const statusLabel: Record<string, string> = {
-  trialing: "En prueba",
-  active: "Activo",
-  past_due: "Pago pendiente",
-  canceled: "Cancelado",
-};
+import { ClientesTabla } from "@/components/admin/clientes-tabla";
 
 export default async function AdminOverviewPage({
   searchParams,
 }: {
   searchParams: Promise<{ q?: string; from?: string; to?: string }>;
 }) {
-  const { q, from, to } = await searchParams;
+  await searchParams; // los filtros ahora viven en el cliente (ClientesTabla)
   const supabase = await createClient();
   const admin = createAdminClient();
 
@@ -106,16 +89,6 @@ export default async function AdminOverviewPage({
       };
   });
 
-  const query = (q ?? "").trim().toLowerCase();
-  let filteredRows = query
-    ? rows.filter((r) => r.email.toLowerCase().includes(query) || (r.fullName ?? "").toLowerCase().includes(query))
-    : rows;
-
-  const fromDate = from ? new Date(from) : null;
-  const toDate = to ? new Date(`${to}T23:59:59`) : null;
-  if (fromDate) filteredRows = filteredRows.filter((r) => new Date(r.createdAt) >= fromDate);
-  if (toDate) filteredRows = filteredRows.filter((r) => new Date(r.createdAt) <= toDate);
-
   // KPI cards always reflect all-time totals, independent of the date/email
   // filters above (which only affect the table below) — use those filters
   // to narrow down to a specific period if needed.
@@ -124,12 +97,12 @@ export default async function AdminOverviewPage({
   const trialingClients = rows.filter((r) => r.status === "trialing").length;
   const unpaidClients = rows.filter((r) => r.status === "past_due").length;
 
+  // Con el cliente normal, RLS evalua una funcion por cada una de las ~36k
+  // filas de messages y el conteo tarda 3 s; el admin ya esta verificado en
+  // el layout, asi que va con la clave de servicio (20 ms).
   const [{ count: connectedWhatsappCount }, { count: sentMessagesCount }] = await Promise.all([
-    supabase.from("whatsapp_accounts").select("id", { count: "exact", head: true }),
-    supabase
-      .from("messages")
-      .select("id", { count: "exact", head: true })
-      .eq("direction", "out"),
+    admin.from("whatsapp_accounts").select("id", { count: "exact", head: true }),
+    admin.from("messages").select("id", { count: "exact", head: true }).eq("direction", "out"),
   ]);
 
   const kpis = [
@@ -166,159 +139,7 @@ export default async function AdminOverviewPage({
         ))}
       </div>
 
-      <form className="flex flex-wrap items-center gap-2">
-        <input
-          type="text"
-          name="q"
-          defaultValue={q ?? ""}
-          placeholder="Buscar por correo..."
-          className="w-full max-w-xs rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-        />
-        <div className="flex items-center gap-1.5 text-xs text-muted">
-          <span>Creado entre</span>
-          <input
-            type="date"
-            name="from"
-            defaultValue={from ?? ""}
-            className="rounded-md border border-border bg-background px-2 py-2 text-sm text-foreground outline-none focus:border-primary"
-          />
-          <span>y</span>
-          <input
-            type="date"
-            name="to"
-            defaultValue={to ?? ""}
-            className="rounded-md border border-border bg-background px-2 py-2 text-sm text-foreground outline-none focus:border-primary"
-          />
-        </div>
-        <button
-          type="submit"
-          className="rounded-md bg-primary px-3 py-2 text-xs font-medium text-white hover:bg-primary-hover"
-        >
-          Filtrar
-        </button>
-        {(q || from || to) && (
-          <a href="/admin" className="text-xs text-muted hover:text-foreground">
-            Limpiar
-          </a>
-        )}
-      </form>
-
-      <div className="overflow-x-auto rounded-xl border border-border bg-surface">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-border text-muted">
-              <th className="px-5 py-3 font-medium">Cliente</th>
-              <th className="px-5 py-3 font-medium">Teléfono</th>
-              <th className="px-5 py-3 font-medium">Plan / Estado</th>
-              <th className="px-5 py-3 font-medium">IP de registro</th>
-              <th className="px-5 py-3 font-medium">Última conexión</th>
-              <th className="px-5 py-3 font-medium">Creado / Renovación</th>
-              <th className="px-5 py-3 font-medium"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredRows.map((r) => (
-              <tr key={r.id} className="border-b border-border last:border-b-0">
-                <td className="px-5 py-3">
-                  <p className="text-foreground">{r.email}</p>
-                  {r.fullName && <p className="text-xs text-foreground/80">{r.fullName}</p>}
-                  <p className="text-xs text-muted">{r.name}</p>
-                </td>
-                <td className="px-5 py-3 text-foreground">
-                  <p>{r.phone ?? "—"}</p>
-                  {r.cliente && (
-                    <p className="text-xs text-muted" title="Contacto en tu bandeja">
-                      💬 {r.cliente}
-                    </p>
-                  )}
-                  <span
-                    title={r.hasWhatsapp ? "API de WhatsApp conectada" : "Sin API de WhatsApp conectada"}
-                    className="mt-1 inline-block"
-                  >
-                    <WhatsAppIcon
-                      size={16}
-                      className={r.hasWhatsapp ? "text-success" : "text-muted opacity-50"}
-                    />
-                  </span>
-                </td>
-                <td className="px-5 py-3">
-                  <PlanStatusInline
-                    workspaceId={r.id}
-                    planId={r.planId}
-                    status={r.status}
-                    plans={planesLista ?? []}
-                    etiquetaEstado={
-                      r.status === "past_due" && !r.everActivated ? "Prueba vencida" : statusLabel[r.status] ?? r.status
-                    }
-                  />
-                  <div className="mt-1 flex flex-col gap-1">
-                    {r.accessDisabled && (
-                      <span className="w-fit rounded-full border border-red-400 px-2 py-0.5 text-xs text-red-400">
-                        Acceso desactivado
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-5 py-3">
-                  <p className="text-muted">{r.signupIp ?? "—"}</p>
-                  {r.sharedIp && (
-                    <span
-                      title="Otro workspace se registró desde esta misma IP"
-                      className="mt-1 inline-block w-fit rounded-full border border-warning px-2 py-0.5 text-[10px] text-warning"
-                    >
-                      Posible multicuenta
-                    </span>
-                  )}
-                </td>
-                <td className="px-5 py-3">
-                  {r.lastSignInAt ? (
-                    <>
-                      <p className="text-muted">
-                        {new Date(r.lastSignInAt).toLocaleString("es-CO", {
-                          day: "2-digit",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </p>
-                      <p className="text-xs text-muted">
-                        Hace {daysSince(r.lastSignInAt)} día(s)
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-muted">—</p>
-                  )}
-                </td>
-                <td className="px-5 py-3 text-muted">
-                  <p>{new Date(r.createdAt).toLocaleDateString("es-CO")}</p>
-                  <div className="mt-1 flex items-center gap-1.5 text-xs">
-                    <span>
-                      {r.renewalDate
-                        ? `Renueva: ${new Date(r.renewalDate).toLocaleDateString("es-CO")}`
-                        : "Sin renovación"}
-                    </span>
-                    <EditRenewalDateButton workspaceId={r.id} currentDate={r.renewalDate} />
-                  </div>
-                </td>
-                <td className="px-5 py-3">
-                  <WorkspaceRowActions
-                    workspaceId={r.id}
-                    workspaceName={r.name}
-                    accessDisabled={r.accessDisabled}
-                  />
-                </td>
-              </tr>
-            ))}
-            {filteredRows.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-5 py-6 text-center text-muted">
-                  {query ? "Sin resultados para esa búsqueda." : "Sin clientes registrados."}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <ClientesTabla rows={rows} plans={planesLista ?? []} />
     </div>
   );
 }
