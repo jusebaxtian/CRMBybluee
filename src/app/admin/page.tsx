@@ -1,6 +1,7 @@
 import { Users, CreditCard, Clock, AlertTriangle, Plug, Send } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { PlanStatusInline } from "@/components/admin/plan-status-inline";
 import { WorkspaceRowActions } from "@/components/admin/workspace-row-actions";
 import { EditRenewalDateButton } from "@/components/admin/edit-renewal-date-button";
 import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
@@ -11,13 +12,6 @@ function daysSince(dateStr: string): number {
     Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24))
   );
 }
-
-const statusColor: Record<string, string> = {
-  trialing: "text-warning border-warning",
-  active: "text-success border-success",
-  past_due: "text-red-400 border-red-400",
-  canceled: "text-muted border-border",
-};
 
 const statusLabel: Record<string, string> = {
   trialing: "En prueba",
@@ -38,7 +32,7 @@ export default async function AdminOverviewPage({
   const { data: workspaces } = await supabase
     .from("workspaces")
     .select(
-      "id, name, phone, status, ever_activated, access_disabled, created_at, trial_ends_at, signup_ip, plans(name)"
+      "id, name, phone, status, ever_activated, access_disabled, created_at, trial_ends_at, signup_ip, plan_id, plans(name)"
     )
     .order("created_at", { ascending: false });
 
@@ -63,7 +57,7 @@ export default async function AdminOverviewPage({
   // Ahora: dueños y suscripciones en una consulta cada una, y un solo
   // listUsers para correos y ultimo acceso (~150 ms).
   const ids = (workspaces ?? []).map((w) => w.id);
-  const [{ data: owners }, { data: subs }, { data: usersPage }] = await Promise.all([
+  const [{ data: owners }, { data: subs }, { data: usersPage }, { data: planesLista }] = await Promise.all([
     supabase.from("workspace_members").select("workspace_id, user_id").in("workspace_id", ids).eq("role", "owner"),
     supabase
       .from("subscriptions")
@@ -72,6 +66,7 @@ export default async function AdminOverviewPage({
       .eq("status", "active")
       .order("current_period_end", { ascending: false }),
     admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+    supabase.from("plans").select("id, name").order("name"),
   ]);
   const ownerPor = new Map((owners ?? []).map((o) => [o.workspace_id, o.user_id]));
   // Ordenadas por vencimiento descendente: la primera de cada espacio es la vigente.
@@ -96,6 +91,7 @@ export default async function AdminOverviewPage({
         email,
         fullName,
         plan: plan?.name ?? "—",
+        planId: (w.plan_id as string | null) ?? null,
         status: w.status,
         everActivated: w.ever_activated,
         accessDisabled: w.access_disabled,
@@ -246,15 +242,16 @@ export default async function AdminOverviewPage({
                   </span>
                 </td>
                 <td className="px-5 py-3">
-                  <p className="text-foreground">{r.plan}</p>
+                  <PlanStatusInline
+                    workspaceId={r.id}
+                    planId={r.planId}
+                    status={r.status}
+                    plans={planesLista ?? []}
+                    etiquetaEstado={
+                      r.status === "past_due" && !r.everActivated ? "Prueba vencida" : statusLabel[r.status] ?? r.status
+                    }
+                  />
                   <div className="mt-1 flex flex-col gap-1">
-                    <span
-                      className={`w-fit rounded-full border px-2 py-0.5 text-xs ${statusColor[r.status] ?? ""}`}
-                    >
-                      {r.status === "past_due" && !r.everActivated
-                        ? "Prueba vencida"
-                        : statusLabel[r.status] ?? r.status}
-                    </span>
                     {r.accessDisabled && (
                       <span className="w-fit rounded-full border border-red-400 px-2 py-0.5 text-xs text-red-400">
                         Acceso desactivado
