@@ -9,6 +9,8 @@ import { SUPABASE_URL } from "@/lib/supabase/config";
  * verifico que quien actua es administrador, o el registro con invitacion.
  */
 
+const DIAS_AVISO_CUENTA_CREADA = 3;
+
 export type PlanBasico = { id: string; name: string; price_cents: number; currency: string; billing_cycle: string };
 
 /** Copia el comprobante del chat (bucket chat-media) al bucket de comprobantes de pago. */
@@ -163,6 +165,8 @@ async function avisarCuentaCreada(
     target_workspace_id: contacto.workspace_id,
     cta_label: "Ir a su chat",
     cta_url: conversacion ? `/dashboard/inbox/${conversacion.id}` : "/dashboard/inbox",
+    // Aviso de paso: deja de verse a los 3 dias y el trabajo de limpieza lo borra.
+    ends_at: new Date(Date.now() + DIAS_AVISO_CUENTA_CREADA * 24 * 60 * 60 * 1000).toISOString(),
   });
   if (error) console.error("invitacion de registro: no se pudo crear la notificacion:", error.message);
 }
