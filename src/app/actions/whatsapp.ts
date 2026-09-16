@@ -24,6 +24,7 @@ import { transcodeVideoToH264 } from "@/lib/whatsapp/video-transcode";
 import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
 import { buildTemplateSendParams } from "@/lib/whatsapp/variables";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
+import { abrirConversacion } from "@/lib/whatsapp/conversacion";
 import { toPublicUrl } from "@/lib/supabase/config";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
 import { recordOutboundMessage } from "@/lib/messaging/record";
@@ -505,31 +506,10 @@ export async function sendMessageToContact(input: { contactId: string; body: str
     .single();
   if (!contact) return { error: "Contacto no encontrado." };
 
-  // Leaving whatsapp_account_id unset on a freshly-created conversation used
-  // to leave it null forever — silently breaking every future inbound reply
-  // from this contact (ingest.ts's upsert targets a 3-column unique
-  // constraint including whatsapp_account_id; a null value on the existing
-  // row doesn't match a non-null value being upserted there, so it collides
-  // with the OTHER unique constraint instead). Resolving it here and using
-  // the plain 2-column conflict target (never the 3-column one) avoids that.
-  const account = await resolveSendAccount(supabase, workspaceId, null);
-
-  const { data: conversation, error: convError } = await supabase
-    .from("conversations")
-    .upsert(
-      {
-        workspace_id: workspaceId,
-        contact_id: contact.id,
-        ...(account ? { whatsapp_account_id: account.id } : {}),
-      },
-      { onConflict: "workspace_id,contact_id", ignoreDuplicates: false }
-    )
-    .select("id")
-    .single();
-
-  if (convError || !conversation) {
-    return { error: convError?.message ?? "No se pudo abrir la conversación." };
-  }
+  // Reutiliza el hilo mas reciente del contacto o lo abre con la linea por
+  // defecto (una conversacion por contacto por linea, migracion 0108).
+  const conversation = await abrirConversacion(supabase, workspaceId, contact.id);
+  if (!conversation) return { error: "No se pudo abrir la conversación." };
 
   return sendToConversation(supabase, conversation.id, workspaceId, contact.wa_id, input.body);
 }

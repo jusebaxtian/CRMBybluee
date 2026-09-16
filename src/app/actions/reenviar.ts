@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
+import { abrirConversacion } from "@/lib/whatsapp/conversacion";
 import { sendTextMessage, sendMediaMessage } from "@/lib/whatsapp/graph";
 import { recordOutboundMessage } from "@/lib/messaging/record";
 import { msRemainingInWindow } from "@/lib/whatsapp/message-window";
@@ -72,22 +73,10 @@ export async function reenviarMensaje(input: { messageId: string; contactIds: st
   for (const contacto of contactos ?? []) {
     const nombre = contacto.name?.trim() || contacto.wa_id;
     try {
-      // Misma logica que "nuevo mensaje": abre (o reutiliza) la conversacion
-      // y fija el numero desde el que se responde.
-      const cuentaPorDefecto = await resolveSendAccount(supabase, workspaceId, null);
-      const { data: conversacion, error: errConv } = await supabase
-        .from("conversations")
-        .upsert(
-          {
-            workspace_id: workspaceId,
-            contact_id: contacto.id,
-            ...(cuentaPorDefecto ? { whatsapp_account_id: cuentaPorDefecto.id } : {}),
-          },
-          { onConflict: "workspace_id,contact_id", ignoreDuplicates: false }
-        )
-        .select("id, whatsapp_account_id")
-        .single();
-      if (errConv || !conversacion) throw new Error(errConv?.message ?? "No se pudo abrir el chat.");
+      // Misma logica que "nuevo mensaje": reutiliza el hilo mas reciente del
+      // contacto (o lo abre con la linea por defecto).
+      const conversacion = await abrirConversacion(supabase, workspaceId, contacto.id);
+      if (!conversacion) throw new Error("No se pudo abrir el chat.");
 
       // Fuera de las 24 h Meta rechaza texto libre y adjuntos: se avisa antes
       // de intentar, con el mismo criterio que usa el compositor.

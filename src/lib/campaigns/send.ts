@@ -3,6 +3,7 @@ import { sendTemplateMessage, sendTextMessage, sendMediaMessage, uploadMedia } f
 import { mediaKindFromMime } from "@/lib/whatsapp/media-limits";
 import { substituteContactVariables, buildTemplateSendParams } from "@/lib/whatsapp/variables";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
+import { abrirConversacion } from "@/lib/whatsapp/conversacion";
 import { isWindowOpen } from "@/lib/whatsapp/message-window";
 import { recordOutboundMessage } from "@/lib/messaging/record";
 
@@ -28,31 +29,16 @@ function guessMimeFromFilename(filename: string | null): string {
   return map[ext] ?? "application/pdf";
 }
 
-// Not setting whatsapp_account_id here used to leave it null forever on a
-// freshly-created conversation, which silently broke every future inbound
-// reply from that contact — ingest.ts's own upsert targets a 3-column
-// unique constraint including whatsapp_account_id, and a null value on the
-// existing row doesn't match the non-null value being upserted there, so
-// Postgres collides with the OTHER unique constraint on just
-// (workspace_id, contact_id) instead. The campaign's own send account is
-// already known here (unlike ingest.ts, no extra resolveSendAccount lookup
-// needed per recipient), and this uses the plain 2-column conflict target,
-// never the 3-column one, so no such collision is possible either way.
+// El hilo de la linea desde la que sale el masivo (una conversacion por
+// contacto por linea, migracion 0108).
 async function getOrCreateConversation(
   supabase: SupabaseClient,
   workspaceId: string,
   contactId: string,
   whatsappAccountId: string
 ): Promise<string | null> {
-  const { data } = await supabase
-    .from("conversations")
-    .upsert(
-      { workspace_id: workspaceId, contact_id: contactId, whatsapp_account_id: whatsappAccountId },
-      { onConflict: "workspace_id,contact_id" }
-    )
-    .select("id")
-    .single();
-  return data?.id ?? null;
+  const conversacion = await abrirConversacion(supabase, workspaceId, contactId, whatsappAccountId);
+  return conversacion?.id ?? null;
 }
 
 type PreparedCampaignSend = {
