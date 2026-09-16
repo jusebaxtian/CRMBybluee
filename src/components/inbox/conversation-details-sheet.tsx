@@ -93,14 +93,14 @@ export function ConversationDetailsSheet({
               </button>
             </div>
 
-            <div className="flex flex-col items-center text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/15 text-xl font-semibold text-primary">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-base font-semibold text-primary">
                 {(contactName ?? contactWaId).charAt(0).toUpperCase()}
               </div>
-              <p className="mt-3 text-base font-semibold text-foreground">
-                {contactName ?? contactWaId}
-              </p>
-              <p className="text-sm text-muted">{contactWaId}</p>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-foreground">{contactName ?? contactWaId}</p>
+                <p className="truncate text-xs text-muted">{contactWaId}</p>
+              </div>
             </div>
 
             <EspacioDelClienteCard espacios={espaciosDelCliente} />

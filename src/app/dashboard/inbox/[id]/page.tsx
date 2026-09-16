@@ -241,16 +241,19 @@ export default async function ConversationPage({
       </div>
 
       <aside className="hidden w-72 shrink-0 overflow-y-auto bg-surface p-5 lg:block">
-        <div className="flex flex-col items-center text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/15 text-xl font-semibold text-primary">
+        {/* Una sola linea (inicial · nombre · numero) para liberar alto en el panel. */}
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-base font-semibold text-primary">
             {(contact.name ?? contact.wa_id).charAt(0).toUpperCase()}
           </div>
-          <p className="mt-3 text-base font-semibold text-foreground">
-            {contact.name ?? (isPhoneNumber(contact.wa_id) ? contact.wa_id : "Usuario")}
-          </p>
-          <p className="text-sm text-muted">
-            {isPhoneNumber(contact.wa_id) ? contact.wa_id : "Usuario (sin número)"}
-          </p>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-foreground">
+              {contact.name ?? (isPhoneNumber(contact.wa_id) ? contact.wa_id : "Usuario")}
+            </p>
+            <p className="truncate text-xs text-muted">
+              {isPhoneNumber(contact.wa_id) ? contact.wa_id : "Usuario (sin número)"}
+            </p>
+          </div>
         </div>
 
         <EspacioDelClienteCard espacios={espaciosDelCliente} />
