@@ -1,4 +1,4 @@
-import { FileText, Download, Check, CheckCheck, AlertCircle, Clock, Reply, ExternalLink, Forward } from "lucide-react";
+import { FileText, Download, Check, CheckCheck, AlertCircle, Clock, Reply, ExternalLink, Forward, BadgeDollarSign } from "lucide-react";
 import { VoiceMessagePlayer } from "@/components/inbox/voice-message-player";
 import { MediaLightbox } from "@/components/inbox/media-lightbox";
 
@@ -75,11 +75,14 @@ export function MessageBubble({
   quotedMessage,
   onReply,
   onForward,
+  onRegistrarPago,
 }: {
   message: Message;
   quotedMessage?: Message | null;
   onReply?: (target: { waMessageId: string; preview: string }) => void;
   onForward?: (target: { messageId: string; preview: string }) => void;
+  /** Solo el administrador de la plataforma: registrar un comprobante recibido como pago. */
+  onRegistrarPago?: (target: { messageId: string; preview: string }) => void;
 }) {
   const out = m.direction === "out";
   const time = new Date(m.created_at).toLocaleTimeString("es-CO", {
@@ -123,6 +126,18 @@ export function MessageBubble({
       className={botonAccion}
     >
       <Forward size={14} />
+    </button>
+  );
+
+  const pagoBtn = !!onRegistrarPago && !out && ["image", "document"].includes(m.message_type) && (
+    <button
+      type="button"
+      onClick={() => onRegistrarPago?.({ messageId: m.id, preview: summarize(m) })}
+      title="Registrar este comprobante como pago"
+      aria-label="Registrar pago"
+      className={botonAccion}
+    >
+      <BadgeDollarSign size={14} />
     </button>
   );
 
@@ -258,6 +273,7 @@ export function MessageBubble({
         </button>
       )}
       {!out && forwardBtn}
+      {pagoBtn}
     </div>
   );
 }

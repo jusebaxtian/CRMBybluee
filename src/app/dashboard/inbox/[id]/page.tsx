@@ -110,7 +110,8 @@ export default async function ConversationPage({
   // Solo el administrador de la plataforma: qué espacio compró este contacto
   // (migración 0096). Para cualquier otro usuario la función devuelve vacío.
   let espaciosDelCliente: EspacioDelCliente[] = [];
-  if (await isPlatformAdmin(supabase)) {
+  const esAdmin = await isPlatformAdmin(supabase);
+  if (esAdmin) {
     const { data } = await supabase.rpc("admin_espacio_de_contacto", { p_contact_id: conversation.contact_id });
     espaciosDelCliente = (data ?? []) as EspacioDelCliente[];
   }
@@ -237,6 +238,7 @@ export default async function ConversationPage({
           quickReplies={quickReplies ?? []}
           automations={allAutomations ?? []}
           approvedTemplates={approvedTemplates ?? []}
+          esAdmin={esAdmin}
         />
       </div>
 

@@ -1,6 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { Suspense, useActionState, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { parsePhoneNumberFromString } from "libphonenumber-js/min";
+import { leerInvitacionRegistro } from "@/app/actions/pagos-chat";
 import Link from "next/link";
 import { Mail, User, Building2 } from "lucide-react";
 import { signup, type AuthFormState } from "@/app/actions/auth";
@@ -10,11 +13,29 @@ import { CampoTelefono } from "@/components/auth/campo-telefono";
 import { GoogleButton } from "@/components/auth/google-button";
 import { useEntrarGuardando } from "@/components/auth/use-entrar-guardando";
 
-export default function SignupPage() {
+type Invitacion = { phone: string; plan_name: string; amount_cents: number; currency: string };
+
+function SignupForm() {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(signup, undefined);
   const { alEnviar } = useEntrarGuardando(state);
   const v = state?.valores ?? {};
   const e = state?.errores ?? {};
+
+  // Enlace de registro con pago (?i=token): soporte ya registro el pago
+  // desde el chat; aqui se muestra y se precarga el WhatsApp.
+  const token = useSearchParams().get("i") ?? "";
+  const [invitacion, setInvitacion] = useState<Invitacion | null>(null);
+  useEffect(() => {
+    if (!token) return;
+    let vivo = true;
+    leerInvitacionRegistro(token).then((r) => {
+      if (vivo) setInvitacion(r);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [token]);
+  const telefonoInv = invitacion ? parsePhoneNumberFromString(`+${invitacion.phone}`) : undefined;
 
   return (
     <AuthShell
@@ -31,6 +52,19 @@ export default function SignupPage() {
       }
     >
       <form action={action} onSubmit={alEnviar} noValidate className="flex flex-col gap-4">
+        {token && <input type="hidden" name="invitacion" value={token} />}
+        {invitacion && (
+          <div className="rounded-[12px] border border-primary/30 bg-primary/10 px-3.5 py-3 text-[13px]">
+            <p className="font-semibold text-foreground">Tu pago ya está registrado ✓</p>
+            <p className="mt-0.5 text-muted">
+              Plan <strong className="text-foreground">{invitacion.plan_name}</strong> ·{" "}
+              {new Intl.NumberFormat("es-CO", { style: "currency", currency: invitacion.currency || "COP", maximumFractionDigits: 0 }).format(
+                invitacion.amount_cents / 100
+              )}
+              . Crea tu cuenta y quedará activa de inmediato.
+            </p>
+          </div>
+        )}
         <Campo
           etiqueta="Nombre del cliente"
           name="fullName"
@@ -52,9 +86,10 @@ export default function SignupPage() {
           disabled={pending}
         />
         <CampoTelefono
+          key={telefonoInv ? "inv" : "libre"}
           error={e.phone}
-          paisInicial={v.phoneCountry || undefined}
-          numeroInicial={v.phone ?? ""}
+          paisInicial={v.phoneCountry || telefonoInv?.country || undefined}
+          numeroInicial={v.phone ?? telefonoInv?.nationalNumber ?? ""}
           disabled={pending}
         />
         <Campo
@@ -96,5 +131,15 @@ export default function SignupPage() {
 
       <GoogleButton texto="Registrarme con Google" posicion="abajo" />
     </AuthShell>
+  );
+}
+
+// useSearchParams obliga a un limite de Suspense para que la pagina siga
+// pudiendo prerenderizarse.
+export default function SignupPage() {
+  return (
+    <Suspense>
+      <SignupForm />
+    </Suspense>
   );
 }

@@ -23,10 +23,12 @@ export function MessagesScrollArea({
   messages,
   onReply,
   onForward,
+  onRegistrarPago,
 }: {
   messages: Message[];
   onReply?: (target: { waMessageId: string; preview: string }) => void;
   onForward?: (target: { messageId: string; preview: string }) => void;
+  onRegistrarPago?: (target: { messageId: string; preview: string }) => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastMessageId = messages[messages.length - 1]?.id;
@@ -58,6 +60,7 @@ export function MessagesScrollArea({
           quotedMessage={m.context_wa_message_id ? byWaMessageId.get(m.context_wa_message_id) ?? null : null}
           onReply={onReply}
           onForward={onForward}
+          onRegistrarPago={onRegistrarPago}
         />
       ))}
       <div ref={bottomRef} />

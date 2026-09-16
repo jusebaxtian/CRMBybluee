@@ -6,6 +6,7 @@ import { MessagesScrollArea } from "@/components/inbox/messages-scroll-area";
 import { MessageComposer, type MessageComposerHandle } from "@/components/inbox/message-composer";
 import { TemplateGatePicker } from "@/components/templates/template-gate-picker";
 import { ForwardDialog } from "@/components/inbox/forward-dialog";
+import { RegistrarPagoDialog } from "@/components/inbox/registrar-pago-dialog";
 import { useMessageWindow } from "@/lib/use-message-window";
 
 export type OptimisticMessage = {
@@ -32,6 +33,7 @@ export function ChatPane({
   quickReplies = [],
   automations = [],
   approvedTemplates = [],
+  esAdmin = false,
 }: {
   conversationId: string;
   contactId: string;
@@ -39,10 +41,13 @@ export function ChatPane({
   quickReplies?: { id: string; name: string }[];
   automations?: { id: string; name: string }[];
   approvedTemplates?: ApprovedTemplate[];
+  /** Administrador de la plataforma: habilita "Registrar pago" en los comprobantes recibidos. */
+  esAdmin?: boolean;
 }) {
   const [pending, setPending] = useState<OptimisticMessage[]>([]);
   const [replyingTo, setReplyingTo] = useState<{ waMessageId: string; preview: string } | null>(null);
   const [reenviando, setReenviando] = useState<{ messageId: string; preview: string } | null>(null);
+  const [pagoDe, setPagoDe] = useState<{ messageId: string; preview: string } | null>(null);
   const composerRef = useRef<MessageComposerHandle>(null);
   const [dragActive, setDragActive] = useState(false);
   // Counts nested dragenter/dragleave pairs (messages, bubbles, etc. all
@@ -110,7 +115,13 @@ export function ChatPane({
           <p className="text-sm font-medium text-foreground">Suelta el archivo para adjuntarlo</p>
         </div>
       )}
-      <MessagesScrollArea messages={combined} onReply={setReplyingTo} onForward={setReenviando} />
+      <MessagesScrollArea
+        messages={combined}
+        onReply={setReplyingTo}
+        onForward={setReenviando}
+        onRegistrarPago={esAdmin ? setPagoDe : undefined}
+      />
+      {pagoDe && <RegistrarPagoDialog messageId={pagoDe.messageId} preview={pagoDe.preview} onClose={() => setPagoDe(null)} />}
       {reenviando && (
         <ForwardDialog
           messageId={reenviando.messageId}

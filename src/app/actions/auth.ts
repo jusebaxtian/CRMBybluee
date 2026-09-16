@@ -3,6 +3,8 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { aplicarInvitacionRegistro } from "@/lib/billing/pagos-chat";
 import { componerTelefono } from "@/lib/auth/telefono";
 
 // nginx forwards the real client IP via X-Forwarded-For (may be a chain of
@@ -103,7 +105,7 @@ export async function signup(
 
   // ENABLE_EMAIL_AUTOCONFIRM is on, so signUp already returns an active session.
   const signupIp = await getClientIp();
-  const { error: rpcError } = await supabase.rpc("create_workspace_with_owner", {
+  const { data: nuevoWorkspaceId, error: rpcError } = await supabase.rpc("create_workspace_with_owner", {
     workspace_name: companyName,
     signup_ip: signupIp,
     phone: telefono.digitos,
@@ -114,6 +116,13 @@ export async function signup(
   if (rpcError) {
     console.error("signup: create_workspace_with_owner:", rpcError.message);
     return { error: "Tu cuenta quedó creada, pero no pudimos crear tu espacio. Escríbenos a soporte.", valores };
+  }
+
+  // Registro por enlace de pago (soporte ya registro el pago desde el chat):
+  // el espacio nace activo con el plan pagado. Ver migracion 0105.
+  const invitacion = textoDe(formData, "invitacion");
+  if (invitacion && nuevoWorkspaceId) {
+    await aplicarInvitacionRegistro(createAdminClient(), invitacion, String(nuevoWorkspaceId));
   }
 
   // El cliente guarda usuario/contraseña en el navegador y navega al panel.
