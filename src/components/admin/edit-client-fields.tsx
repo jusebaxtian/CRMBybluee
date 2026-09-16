@@ -50,13 +50,13 @@ function EditableField({
           value={value}
           placeholder={placeholder}
           onChange={(e) => setValue(e.target.value)}
-          className="w-full max-w-xs rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+          className="w-full min-w-0 rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground outline-none focus:border-primary"
         />
         <button
           type="button"
           onClick={handleSave}
           disabled={pending}
-          className="rounded-md bg-primary px-3 py-2 text-xs font-medium text-white hover:bg-primary-hover disabled:opacity-50"
+          className="shrink-0 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-hover disabled:opacity-50"
         >
           {pending ? "..." : "Guardar"}
         </button>
@@ -89,7 +89,7 @@ export function EditClientFields({
   ownerEmail: string | null;
 }) {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2 xl:grid-cols-3">
       <EditableField
         label="Nombre del cliente / negocio"
         initialValue={workspaceName}
