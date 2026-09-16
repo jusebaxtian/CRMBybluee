@@ -14,7 +14,7 @@ export default async function FollowupsPage() {
   const { data: sequences } = await supabase
     .from("automations")
     .select(
-      "id, name, is_active, required_tag_id, tags!automations_required_tag_id_fkey(name), automation_actions(delay_seconds)"
+      "id, name, is_active, required_tag_id, tags!automations_required_tag_id_fkey(name), automation_actions(delay_seconds), whatsapp_accounts(label, display_phone_number)"
     )
     .eq("workspace_id", workspaceId ?? "")
     .eq("trigger_type", "no_reply")
@@ -62,7 +62,15 @@ export default async function FollowupsPage() {
                 className="flex items-center justify-between border-b border-border px-5 py-4 last:border-b-0"
               >
                 <div>
-                  <p className="text-sm font-medium text-foreground">{s.name}</p>
+                  <p className="text-sm font-medium text-foreground">
+                    {s.name}
+                    {s.whatsapp_accounts && (
+                      <span className="ml-2 rounded-full border border-primary/40 px-2 py-0.5 text-[10px] font-medium text-primary">
+                        {(s.whatsapp_accounts as unknown as { label: string | null; display_phone_number: string }).label ||
+                          (s.whatsapp_accounts as unknown as { display_phone_number: string }).display_phone_number}
+                      </span>
+                    )}
+                  </p>
                   <p className="text-xs text-muted">
                     {steps.length} paso{steps.length === 1 ? "" : "s"}
                     {summary && ` · ${summary}`}

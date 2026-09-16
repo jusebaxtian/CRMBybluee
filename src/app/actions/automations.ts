@@ -94,6 +94,7 @@ export async function createAutomation(_prevState: unknown, formData: FormData) 
     | "first_message_of_day";
   const triggerTagId = String(formData.get("triggerTagId") ?? "") || null;
   const triggerKeyword = String(formData.get("triggerKeyword") ?? "").trim() || null;
+  const whatsappAccountId = String(formData.get("whatsappAccountId") ?? "").trim() || null;
   const actionsJson = String(formData.get("actionsJson") ?? "[]");
 
   if (!name) return { error: "El nombre es obligatorio." };
@@ -156,6 +157,7 @@ export async function createAutomation(_prevState: unknown, formData: FormData) 
       trigger_type: triggerType,
       trigger_tag_id: triggerType === "tag_added" ? triggerTagId : null,
       trigger_keyword: triggerType === "keyword" || triggerType === "button_tap" ? triggerKeyword : null,
+      whatsapp_account_id: whatsappAccountId,
       is_active: !aiAgent?.is_active,
     })
     .select("id")
@@ -189,6 +191,7 @@ export async function updateAutomation(_prevState: unknown, formData: FormData) 
     | "first_message_of_day";
   const triggerTagId = String(formData.get("triggerTagId") ?? "") || null;
   const triggerKeyword = String(formData.get("triggerKeyword") ?? "").trim() || null;
+  const whatsappAccountId = String(formData.get("whatsappAccountId") ?? "").trim() || null;
   const actionsJson = String(formData.get("actionsJson") ?? "[]");
 
   if (!automationId) return { error: "Automatización inválida." };
@@ -242,6 +245,7 @@ export async function updateAutomation(_prevState: unknown, formData: FormData) 
       trigger_type: triggerType,
       trigger_tag_id: triggerType === "tag_added" ? triggerTagId : null,
       trigger_keyword: triggerType === "keyword" || triggerType === "button_tap" ? triggerKeyword : null,
+      whatsapp_account_id: whatsappAccountId,
     })
     .eq("id", automationId)
     .eq("workspace_id", workspaceId);

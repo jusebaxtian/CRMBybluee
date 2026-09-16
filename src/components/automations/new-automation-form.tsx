@@ -4,9 +4,10 @@ import { useActionState, useState } from "react";
 import { createAutomation, updateAutomation } from "@/app/actions/automations";
 import { AutomationActionsBuilder, type InitialAction } from "@/components/automations/automation-actions-builder";
 import { Button } from "@/components/ui/button";
+import { SelectorLinea, plantillasParaLinea, type LineaOption } from "@/components/automations/selector-linea";
 
 type Tag = { id: string; name: string };
-type Template = { id: string; meta_template_name: string; language: string; status: string };
+type Template = { id: string; meta_template_name: string; language: string; status: string; waba_id?: string };
 type Agent = { id: string; name: string | null; email: string };
 type QuickReply = { id: string; name: string };
 
@@ -18,6 +19,7 @@ type ExistingAutomation = {
   trigger_type: TriggerType;
   trigger_tag_id: string | null;
   trigger_keyword: string | null;
+  whatsapp_account_id?: string | null;
   actions: InitialAction[];
 };
 
@@ -26,12 +28,14 @@ export function NewAutomationForm({
   templates = [],
   agents = [],
   quickReplies = [],
+  lineas = [],
   automation,
 }: {
   tags: Tag[];
   templates?: Template[];
   agents?: Agent[];
   quickReplies?: QuickReply[];
+  lineas?: LineaOption[];
   automation?: ExistingAutomation;
 }) {
   const [state, action, pending] = useActionState(
@@ -40,10 +44,19 @@ export function NewAutomationForm({
   );
   const [triggerType, setTriggerType] = useState<TriggerType>(automation?.trigger_type ?? "tag_added");
   const [uploading, setUploading] = useState(false);
+  const [lineaId, setLineaId] = useState(automation?.whatsapp_account_id ?? "");
+  const plantillas = plantillasParaLinea(templates, lineas, lineaId);
 
   return (
     <form action={action} className="flex flex-col gap-5">
       {automation && <input type="hidden" name="automationId" value={automation.id} />}
+
+      <SelectorLinea
+        lineas={lineas}
+        value={lineaId}
+        onChange={setLineaId}
+        ayuda="Con una línea elegida, solo se activa con mensajes que entren por esa línea (o, si es por etiqueta, para contactos cuyo chat va por ella)."
+      />
 
       <div>
         <label htmlFor="name" className="mb-1 block text-sm font-medium text-muted">
@@ -136,7 +149,7 @@ export function NewAutomationForm({
         <label className="mb-1 block text-sm font-medium text-muted">Qué hace</label>
         <AutomationActionsBuilder
           tags={tags}
-          templates={templates}
+          templates={plantillas}
           agents={agents}
           quickReplies={quickReplies}
           initialActions={automation?.actions}

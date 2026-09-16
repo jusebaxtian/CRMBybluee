@@ -17,7 +17,7 @@ export default async function EditAutomationPage({
 
   const { data: automation } = await supabase
     .from("automations")
-    .select("id, name, trigger_type, trigger_tag_id, trigger_keyword")
+    .select("id, name, trigger_type, trigger_tag_id, trigger_keyword, whatsapp_account_id")
     .eq("id", id)
     .eq("workspace_id", workspaceId ?? "")
     .maybeSingle();
@@ -40,13 +40,23 @@ export default async function EditAutomationPage({
 
   const { data: templates } = await supabase
     .from("templates")
-    .select("id, meta_template_name, language, status")
+    .select("id, meta_template_name, language, status, waba_id")
     .eq("workspace_id", workspaceId ?? "")
     .eq("created_via", "crm")
     .neq("status", "DELETED")
     .order("meta_template_name");
 
   const agents = await listWorkspaceAgents(supabase, workspaceId);
+
+  // Lineas del espacio: con mas de una, la regla puede limitarse a una
+  // (migracion 0109) y las plantillas se filtran por su WABA.
+  const { data: lineas } = await supabase
+    .from("whatsapp_accounts")
+    .select("id, label, display_phone_number, waba_id")
+    .eq("workspace_id", workspaceId ?? "")
+    .neq("status", "frozen")
+    .order("connected_at");
+
 
   const { data: quickReplies } = await supabase
     .from("quick_replies")
@@ -62,11 +72,13 @@ export default async function EditAutomationPage({
         <NewAutomationForm
           tags={tags ?? []}
           templates={templates ?? []}
+          lineas={lineas ?? []}
           agents={agents}
           quickReplies={quickReplies ?? []}
           automation={{
             id: automation.id,
             name: automation.name,
+            whatsapp_account_id: automation.whatsapp_account_id,
             trigger_type: automation.trigger_type as
               | "tag_added"
               | "keyword"

@@ -13,7 +13,7 @@ export default async function AutomationsPage() {
   const { data: automations } = await supabase
     .from("automations")
     .select(
-      "id, name, trigger_type, trigger_keyword, is_active, tags!automations_trigger_tag_id_fkey(name)"
+      "id, name, trigger_type, trigger_keyword, is_active, tags!automations_trigger_tag_id_fkey(name), whatsapp_accounts(label, display_phone_number)"
     )
     .eq("workspace_id", workspaceId ?? "")
     .order("created_at", { ascending: false });
@@ -77,7 +77,15 @@ export default async function AutomationsPage() {
                 className="flex items-center justify-between border-b border-border px-5 py-4 last:border-b-0"
               >
                 <div>
-                  <p className="text-sm font-medium text-foreground">{a.name}</p>
+                  <p className="text-sm font-medium text-foreground">
+                    {a.name}
+                    {a.whatsapp_accounts && (
+                      <span className="ml-2 rounded-full border border-primary/40 px-2 py-0.5 text-[10px] font-medium text-primary">
+                        {(a.whatsapp_accounts as unknown as { label: string | null; display_phone_number: string }).label ||
+                          (a.whatsapp_accounts as unknown as { display_phone_number: string }).display_phone_number}
+                      </span>
+                    )}
+                  </p>
                   <p className="text-xs text-muted">
                     {a.trigger_type === "tag_added"
                       ? `Se activa al asignar la etiqueta "${tag?.name ?? "—"}"`

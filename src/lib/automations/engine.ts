@@ -465,6 +465,30 @@ export async function resumeAutomationRun(
   }
 }
 
+// Regla por linea (migracion 0109): sin linea en la regla aplica a todas;
+// con linea, solo si el mensaje entro por ella.
+function deLaLinea<T extends { whatsapp_account_id?: string | null }>(
+  automations: T[] | null,
+  whatsappAccountId: string | null | undefined
+): T[] {
+  // Sin dato de linea (llamadas antiguas), no se filtra.
+  if (whatsappAccountId === undefined) return automations ?? [];
+  return (automations ?? []).filter((a) => !a.whatsapp_account_id || a.whatsapp_account_id === whatsappAccountId);
+}
+
+/** Linea del hilo mas reciente del contacto (para reglas por etiqueta, que no traen mensaje). */
+async function lineaDelContacto(supabase: SupabaseClient, workspaceId: string, contactId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from("conversations")
+    .select("whatsapp_account_id")
+    .eq("workspace_id", workspaceId)
+    .eq("contact_id", contactId)
+    .order("last_message_at", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+  return data?.whatsapp_account_id ?? null;
+}
+
 export async function runTagAddedAutomations(
   supabase: SupabaseClient,
   workspaceId: string,
@@ -476,13 +500,16 @@ export async function runTagAddedAutomations(
   // another tag being added — only manual mass campaigns should still reach them.
   if (await isContactExcludedFromAutomations(supabase, contactId)) return;
 
-  const { data: automations } = await supabase
+  const { data: todas } = await supabase
     .from("automations")
-    .select("id, workspace_id")
+    .select("id, workspace_id, whatsapp_account_id")
     .eq("workspace_id", workspaceId)
     .eq("trigger_type", "tag_added")
     .eq("trigger_tag_id", tagId)
     .eq("is_active", true);
+  // Sin mensaje que diga por donde entro, cuenta la linea del hilo mas reciente.
+  const conLinea = (todas ?? []).some((a) => a.whatsapp_account_id);
+  const automations = conLinea ? deLaLinea(todas, await lineaDelContacto(supabase, workspaceId, contactId)) : todas;
 
   for (const automation of automations ?? []) {
     await runActionsForAutomation(supabase, automation, contactId);
@@ -498,12 +525,13 @@ export async function isContactExcludedFromAutomations(
   supabase: SupabaseClient,
   contactId: string
 ): Promise<boolean> {
-  const { data: conversation } = await supabase
+  // Puede tener un hilo por linea (migracion 0108): basta con que uno
+  // tenga los seguimientos apagados.
+  const { data: conversations } = await supabase
     .from("conversations")
     .select("followups_enabled")
-    .eq("contact_id", contactId)
-    .maybeSingle();
-  if (conversation && conversation.followups_enabled === false) return true;
+    .eq("contact_id", contactId);
+  if ((conversations ?? []).some((c) => c.followups_enabled === false)) return true;
 
   const { data: contact } = await supabase
     .from("contacts")
@@ -533,16 +561,18 @@ export async function runKeywordAutomations(
   supabase: SupabaseClient,
   workspaceId: string,
   contactId: string,
-  messageBody: string
+  messageBody: string,
+  whatsappAccountId?: string | null
 ): Promise<boolean> {
   if (await isContactExcludedFromAutomations(supabase, contactId)) return false;
 
-  const { data: automations } = await supabase
+  const { data: todas } = await supabase
     .from("automations")
-    .select("id, workspace_id, trigger_keyword")
+    .select("id, workspace_id, trigger_keyword, whatsapp_account_id")
     .eq("workspace_id", workspaceId)
     .eq("trigger_type", "keyword")
     .eq("is_active", true);
+  const automations = deLaLinea(todas, whatsappAccountId);
 
   const lowerBody = messageBody.toLowerCase();
   // trigger_keyword can hold several keywords separated by commas (e.g.
@@ -587,16 +617,18 @@ export async function runKeywordAutomations(
 export async function runAnyMessageAutomations(
   supabase: SupabaseClient,
   workspaceId: string,
-  contactId: string
+  contactId: string,
+  whatsappAccountId?: string | null
 ): Promise<boolean> {
   if (await isContactExcludedFromAutomations(supabase, contactId)) return false;
 
-  const { data: automations } = await supabase
+  const { data: todas } = await supabase
     .from("automations")
-    .select("id, workspace_id")
+    .select("id, workspace_id, whatsapp_account_id")
     .eq("workspace_id", workspaceId)
     .eq("trigger_type", "any_message")
     .eq("is_active", true);
+  const automations = deLaLinea(todas, whatsappAccountId);
   if (!automations || automations.length === 0) return false;
 
   const { data: claimed } = await supabase
@@ -623,16 +655,18 @@ export async function runAnyMessageAutomations(
 export async function runFirstMessageOfDayAutomations(
   supabase: SupabaseClient,
   workspaceId: string,
-  contactId: string
+  contactId: string,
+  whatsappAccountId?: string | null
 ): Promise<boolean> {
   if (await isContactExcludedFromAutomations(supabase, contactId)) return false;
 
-  const { data: automations } = await supabase
+  const { data: todas } = await supabase
     .from("automations")
-    .select("id, workspace_id")
+    .select("id, workspace_id, whatsapp_account_id")
     .eq("workspace_id", workspaceId)
     .eq("trigger_type", "first_message_of_day")
     .eq("is_active", true);
+  const automations = deLaLinea(todas, whatsappAccountId);
   if (!automations || automations.length === 0) return false;
 
   const today = new Date().toISOString().slice(0, 10);
@@ -663,16 +697,18 @@ export async function runButtonTapAutomations(
   supabase: SupabaseClient,
   workspaceId: string,
   contactId: string,
-  buttonPayload: string
+  buttonPayload: string,
+  whatsappAccountId?: string | null
 ): Promise<boolean> {
   if (await isContactExcludedFromAutomations(supabase, contactId)) return false;
 
-  const { data: automations } = await supabase
+  const { data: todas } = await supabase
     .from("automations")
-    .select("id, workspace_id, trigger_keyword")
+    .select("id, workspace_id, trigger_keyword, whatsapp_account_id")
     .eq("workspace_id", workspaceId)
     .eq("trigger_type", "button_tap")
     .eq("is_active", true);
+  const automations = deLaLinea(todas, whatsappAccountId);
 
   const candidates = (automations ?? []).filter((a) => a.trigger_keyword === buttonPayload);
   if (candidates.length === 0) return false;

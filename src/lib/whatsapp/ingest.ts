@@ -456,7 +456,7 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
         );
 
         if (isButtonTap && tappedButtonPayload) {
-          await runButtonTapAutomations(supabase, workspaceId, contact.id, tappedButtonPayload);
+          await runButtonTapAutomations(supabase, workspaceId, contact.id, tappedButtonPayload, whatsappAccountId);
         }
 
         // A reaction isn't something to auto-reply to — running keyword
@@ -478,8 +478,8 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           // Content-agnostic triggers — fire regardless of message type
           // (text, image, audio...), unlike keyword matching which needs
           // actual text to search.
-          const matchedAny = await runAnyMessageAutomations(supabase, workspaceId, contact.id);
-          const matchedFirstOfDay = await runFirstMessageOfDayAutomations(supabase, workspaceId, contact.id);
+          const matchedAny = await runAnyMessageAutomations(supabase, workspaceId, contact.id, whatsappAccountId);
+          const matchedFirstOfDay = await runFirstMessageOfDayAutomations(supabase, workspaceId, contact.id, whatsappAccountId);
           matchedAutomation = matchedAny || matchedFirstOfDay;
         }
 
@@ -490,7 +490,8 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
             supabase,
             workspaceId,
             contact.id,
-            textForAutomations
+            textForAutomations,
+            whatsappAccountId
           );
           matchedAutomation = matchedAutomation || matchedKeyword;
         }

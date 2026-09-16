@@ -17,7 +17,10 @@ function fakeSupabase(estado: {
 }) {
   return {
     from(tabla: string) {
-      const resultadoLista = { data: estado.etiquetas ?? [] };
+      // conversations se lee como lista (un hilo por linea, migracion 0108).
+      const resultadoLista = {
+        data: tabla === "conversations" ? (estado.conversacion ? [estado.conversacion] : []) : estado.etiquetas ?? [],
+      };
       const resultadoUnico = {
         data:
           tabla === "conversations"

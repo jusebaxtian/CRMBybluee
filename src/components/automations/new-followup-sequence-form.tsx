@@ -5,9 +5,10 @@ import { Info } from "lucide-react";
 import { createFollowupSequence, updateFollowupSequence } from "@/app/actions/followups";
 import { AutomationActionsBuilder, type InitialAction } from "@/components/automations/automation-actions-builder";
 import { Button } from "@/components/ui/button";
+import { SelectorLinea, plantillasParaLinea, type LineaOption } from "@/components/automations/selector-linea";
 
 type Tag = { id: string; name: string };
-type Template = { id: string; meta_template_name: string; language: string; status: string };
+type Template = { id: string; meta_template_name: string; language: string; status: string; waba_id?: string };
 type Agent = { id: string; name: string | null; email: string };
 type QuickReply = { id: string; name: string };
 
@@ -16,6 +17,7 @@ type ExistingSequence = {
   name: string;
   actions: InitialAction[];
   requiredTagId?: string | null;
+  whatsappAccountId?: string | null;
 };
 
 export function NewFollowupSequenceForm({
@@ -23,12 +25,14 @@ export function NewFollowupSequenceForm({
   templates = [],
   agents = [],
   quickReplies = [],
+  lineas = [],
   sequence,
 }: {
   tags: Tag[];
   templates?: Template[];
   agents?: Agent[];
   quickReplies?: QuickReply[];
+  lineas?: LineaOption[];
   sequence?: ExistingSequence;
 }) {
   const [state, action, pending] = useActionState(
@@ -36,10 +40,19 @@ export function NewFollowupSequenceForm({
     undefined
   );
   const [uploading, setUploading] = useState(false);
+  const [lineaId, setLineaId] = useState(sequence?.whatsappAccountId ?? "");
+  const plantillas = plantillasParaLinea(templates, lineas, lineaId);
 
   return (
     <form action={action} className="flex flex-col gap-5">
       {sequence && <input type="hidden" name="sequenceId" value={sequence.id} />}
+
+      <SelectorLinea
+        lineas={lineas}
+        value={lineaId}
+        onChange={setLineaId}
+        ayuda="Con una línea elegida, el seguimiento solo arranca para chats que van por esa línea."
+      />
 
       <div>
         <label htmlFor="name" className="mb-1 block text-sm font-medium text-muted">
@@ -89,7 +102,7 @@ export function NewFollowupSequenceForm({
         <label className="mb-1 block text-sm font-medium text-muted">Pasos del seguimiento</label>
         <AutomationActionsBuilder
           tags={tags}
-          templates={templates}
+          templates={plantillas}
           agents={agents}
           quickReplies={quickReplies}
           initialActions={sequence?.actions}

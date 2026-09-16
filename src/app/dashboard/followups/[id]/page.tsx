@@ -17,7 +17,7 @@ export default async function EditFollowupSequencePage({
 
   const { data: sequence } = await supabase
     .from("automations")
-    .select("id, name, required_tag_id")
+    .select("id, name, required_tag_id, whatsapp_account_id")
     .eq("id", id)
     .eq("workspace_id", workspaceId ?? "")
     .eq("trigger_type", "no_reply")
@@ -41,7 +41,7 @@ export default async function EditFollowupSequencePage({
 
   const { data: templates } = await supabase
     .from("templates")
-    .select("id, meta_template_name, language, status")
+    .select("id, meta_template_name, language, status, waba_id")
     .eq("workspace_id", workspaceId ?? "")
     .eq("created_via", "crm")
     .neq("status", "DELETED")
@@ -56,6 +56,16 @@ export default async function EditFollowupSequencePage({
 
   const agents = await listWorkspaceAgents(supabase, workspaceId);
 
+  // Lineas del espacio: con mas de una, la regla puede limitarse a una
+  // (migracion 0109) y las plantillas se filtran por su WABA.
+  const { data: lineas } = await supabase
+    .from("whatsapp_accounts")
+    .select("id, label, display_phone_number, waba_id")
+    .eq("workspace_id", workspaceId ?? "")
+    .neq("status", "frozen")
+    .order("connected_at");
+
+
   return (
     <div className="mx-auto max-w-lg">
       <div className="rounded-[13px] border border-border bg-surface p-6">
@@ -63,11 +73,13 @@ export default async function EditFollowupSequencePage({
         <NewFollowupSequenceForm
           tags={tags ?? []}
           templates={templates ?? []}
+          lineas={lineas ?? []}
           agents={agents}
           quickReplies={quickReplies ?? []}
           sequence={{
             id: sequence.id,
             name: sequence.name,
+            whatsappAccountId: sequence.whatsapp_account_id,
             actions: actions ?? [],
             requiredTagId: sequence.required_tag_id,
           }}
