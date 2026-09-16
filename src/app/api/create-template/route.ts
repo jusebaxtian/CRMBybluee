@@ -13,6 +13,7 @@ import { transcodeVideoToH264 } from "@/lib/whatsapp/video-transcode";
 import { toPublicUrl } from "@/lib/supabase/config";
 import { NO_WORKSPACE_ERROR } from "@/lib/auth/with-workspace";
 import { CATEGORIA_PLANTILLA_POR_DEFECTO } from "@/lib/templates/defaults";
+import { wabasDelEspacio } from "@/lib/whatsapp/wabas";
 
 // Plain REST endpoint (not a Server Action) so the client can submit via
 // XMLHttpRequest and get real upload progress for the header file — fetch/
@@ -43,6 +44,7 @@ export async function POST(request: NextRequest) {
   const bodyText = String(formData.get("bodyText") ?? "").trim();
   const footerText = String(formData.get("footerText") ?? "").trim();
   const buttonsJson = String(formData.get("buttonsJson") ?? "[]");
+  const wabaElegida = String(formData.get("wabaId") ?? "");
 
   if (!/^[a-z0-9_]+$/.test(name)) {
     return NextResponse.json(
@@ -95,16 +97,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: NO_WORKSPACE_ERROR }, { status: 401 });
   }
 
-  const { data: account } = await supabase
-    .from("whatsapp_accounts")
-    .select("waba_id, access_token")
-    .eq("workspace_id", workspaceId)
-    .neq("status", "frozen")
-    .limit(1)
-    .maybeSingle();
-  if (!account) {
+  // La plantilla se crea en una WABA concreta (migracion 0106). Con una
+  // sola WABA no hay nada que elegir; con varias, el formulario pide la linea.
+  const wabas = await wabasDelEspacio(supabase, workspaceId);
+  if (wabas.length === 0) {
     return NextResponse.json({ error: "Este workspace no tiene WhatsApp conectado." }, { status: 400 });
   }
+  const waba = wabas.length === 1 ? wabas[0] : wabas.find((w) => w.wabaId === wabaElegida);
+  if (!waba) {
+    return NextResponse.json({ error: "Elige la línea para la que es la plantilla." }, { status: 400 });
+  }
+  const account = { waba_id: waba.wabaId, access_token: waba.accessToken };
 
   let headerMedia: { format: "IMAGE" | "VIDEO" | "DOCUMENT"; handle: string } | undefined;
   let headerMediaUrl: string | null = null;
@@ -206,6 +209,7 @@ export async function POST(request: NextRequest) {
     const { error: upsertError } = await supabase.from("templates").upsert(
       {
         workspace_id: workspaceId,
+        waba_id: account.waba_id,
         meta_template_name: name,
         language,
         category,
@@ -220,7 +224,7 @@ export async function POST(request: NextRequest) {
         synced_at: new Date().toISOString(),
         created_via: "crm",
       },
-      { onConflict: "workspace_id,meta_template_name,language" }
+      { onConflict: "workspace_id,waba_id,meta_template_name,language" }
     );
     if (upsertError) {
       return NextResponse.json(

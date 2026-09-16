@@ -1,4 +1,4 @@
-import { FileText, MousePointerClick } from "lucide-react";
+import { FileText, MousePointerClick, Smartphone } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { SyncTemplatesButton } from "@/components/templates/sync-templates-button";
 import { CreateTemplateForm } from "@/components/templates/create-template-form";
@@ -7,6 +7,7 @@ import { requireModule } from "@/lib/entitlements";
 import { DeleteTemplateButton } from "@/components/templates/delete-template-button";
 import { TemplatePreview } from "@/components/templates/template-preview";
 import { TemplateHeaderMediaUpload } from "@/components/templates/template-header-media-upload";
+import { opcionesDeWaba, wabasDelEspacio } from "@/lib/whatsapp/wabas";
 
 const statusLabel: Record<string, string> = {
   APPROVED: "Aprobada",
@@ -35,7 +36,7 @@ export default async function TemplatesPage() {
   const { data: templates } = await supabase
     .from("templates")
     .select(
-      "id, meta_template_name, language, category, status, body_text, variable_count, header_format, header_text, header_media_url, buttons"
+      "id, meta_template_name, language, category, status, body_text, variable_count, header_format, header_text, header_media_url, buttons, waba_id"
     )
     .eq("workspace_id", workspaceId ?? "")
     // Solo se muestran/usan plantillas creadas desde el formulario del CRM —
@@ -49,12 +50,18 @@ export default async function TemplatesPage() {
     // Más reciente creada primero.
     .order("created_at", { ascending: false });
 
+  // Con lineas en varias WABAs, cada plantilla muestra a cual pertenece y el
+  // formulario pide para cual se crea (migracion 0106).
+  const wabas = opcionesDeWaba(await wabasDelEspacio(supabase, workspaceId));
+  const lineasDeWaba = new Map(wabas.map((w) => [w.wabaId, w.lineas]));
+  const variasWabas = wabas.length > 1;
+
   return (
     <div className="flex flex-col gap-6">
 
       <div className="rounded-[13px] border border-border bg-surface p-6">
         <h2 className="mb-4 text-sm font-semibold text-foreground">Crear nueva plantilla</h2>
-        <CreateTemplateForm />
+        <CreateTemplateForm wabas={wabas} />
       </div>
 
       <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
@@ -96,6 +103,12 @@ export default async function TemplatesPage() {
                     <p className="text-xs text-muted">
                       {t.language} · {t.category ?? "—"}
                     </p>
+                    {variasWabas && (
+                      <p className="mt-0.5 flex items-center gap-1 text-[11px] text-primary">
+                        <Smartphone size={11} />
+                        {lineasDeWaba.get(t.waba_id) ?? "Línea ya no conectada"}
+                      </p>
+                    )}
                   </div>
                   <span
                     className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${

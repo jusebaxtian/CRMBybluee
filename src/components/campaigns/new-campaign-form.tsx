@@ -4,9 +4,9 @@ import { useActionState, useEffect, useState } from "react";
 import { Info, Users } from "lucide-react";
 import { createCampaign, updateCampaign, uploadCampaignMedia, previewAudienceCount } from "@/app/actions/campaigns";
 
-type Template = { id: string; meta_template_name: string; status: string };
+type Template = { id: string; meta_template_name: string; status: string; waba_id?: string };
 type Tag = { id: string; name: string; excludes_followups: boolean };
-type WhatsAppAccountOption = { id: string; label: string | null; display_phone_number: string };
+type WhatsAppAccountOption = { id: string; label: string | null; display_phone_number: string; waba_id?: string };
 type SendType = "template" | "free_text";
 type MediaKind = "" | "image" | "video" | "audio" | "document";
 
@@ -63,6 +63,15 @@ export function NewCampaignForm({
     initialValues?.whatsappAccountId ?? whatsappAccounts[0]?.id ?? ""
   );
   const [sendType, setSendType] = useState<SendType>(initialValues?.sendType ?? "template");
+
+  // Las plantillas pertenecen a la cuenta de WhatsApp Business (WABA) de la
+  // linea, no al espacio: solo se ofrecen las de la linea elegida. Con una
+  // sola WABA la lista es la misma de siempre.
+  const wabaElegida = whatsappAccounts.find((a) => a.id === whatsappAccountId)?.waba_id;
+  const plantillasDeLinea = wabaElegida
+    ? templates.filter((t) => !t.waba_id || t.waba_id === wabaElegida)
+    : templates;
+  const lineaElegida = whatsappAccounts.find((a) => a.id === whatsappAccountId);
   const [mediaKind, setMediaKind] = useState<MediaKind>("");
   const [mediaUrl, setMediaUrl] = useState(initialValues?.mediaUrl ?? "");
   const [mediaFilename, setMediaFilename] = useState(initialValues?.mediaFilename ?? "");
@@ -175,19 +184,22 @@ export function NewCampaignForm({
           <label htmlFor="templateId" className="mb-1 block text-sm font-medium text-muted">
             Plantilla
           </label>
-          {templates.length === 0 ? (
+          {plantillasDeLinea.length === 0 ? (
             <p className="text-sm text-red-400">
-              No tienes plantillas aprobadas. Sincronízalas desde el módulo de Plantillas.
+              {templates.length > 0 && lineaElegida
+                ? `La línea ${lineaElegida.display_phone_number} no tiene plantillas aprobadas. Créalas para esa línea en el módulo de Plantillas o elige otra línea.`
+                : "No tienes plantillas aprobadas. Sincronízalas desde el módulo de Plantillas."}
             </p>
           ) : (
             <select
               id="templateId"
               name="templateId"
               required
+              key={wabaElegida ?? "todas"}
               defaultValue={initialValues?.templateId ?? undefined}
               className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
             >
-              {templates.map((t) => (
+              {plantillasDeLinea.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.meta_template_name}
                 </option>
@@ -474,7 +486,7 @@ export function NewCampaignForm({
 
       <button
         type="submit"
-        disabled={pending || uploading || (sendType === "template" && templates.length === 0)}
+        disabled={pending || uploading || (sendType === "template" && plantillasDeLinea.length === 0)}
         className="mt-2 rounded-[10px] bg-primary px-4 py-[10px] text-[12.5px] font-bold text-white hover:bg-primary-hover disabled:opacity-50"
       >
         {pending ? "Guardando..." : mode === "edit" ? "Guardar cambios" : "Crear campaña"}

@@ -14,94 +14,96 @@ import { validateMediaFile } from "@/lib/whatsapp/media-limits";
 import { toPublicUrl } from "@/lib/supabase/config";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
 import { CATEGORIA_PLANTILLA_POR_DEFECTO } from "@/lib/templates/defaults";
+import { wabasDelEspacio } from "@/lib/whatsapp/wabas";
 
 export async function syncTemplates() {
   const ctx = await requireWorkspace();
   if ("error" in ctx) return { error: ctx.error };
   const { supabase, workspaceId } = ctx;
 
-  const { data: account } = await supabase
-    .from("whatsapp_accounts")
-    .select("waba_id, access_token")
-    .eq("workspace_id", workspaceId)
-    .neq("status", "frozen")
-    // Templates belong to the shared WABA, not to any one phone number, so
-    // any connected account's token can manage them.
-    .limit(1)
-    .maybeSingle();
-  if (!account) return { error: "Este workspace no tiene WhatsApp conectado." };
+  // Una pasada por cada WABA del espacio: las plantillas viven en la WABA
+  // (migracion 0106), asi que un espacio con lineas de WABAs distintas
+  // tiene conjuntos distintos.
+  const wabas = await wabasDelEspacio(supabase, workspaceId);
+  if (wabas.length === 0) return { error: "Este workspace no tiene WhatsApp conectado." };
 
   try {
-    const metaTemplates = await listTemplates(account.waba_id, account.access_token);
+    let total = 0;
+    for (const waba of wabas) {
+      const metaTemplates = await listTemplates(waba.wabaId, waba.accessToken);
+      total += metaTemplates.length;
 
-    for (const t of metaTemplates) {
-      const bodyComponent = t.components.find((c) => c.type === "BODY");
-      const bodyText = bodyComponent?.text ?? "";
-      const variableCount = (bodyText.match(/\{\{\d+\}\}/g) ?? []).length;
+      for (const t of metaTemplates) {
+        const bodyComponent = t.components.find((c) => c.type === "BODY");
+        const bodyText = bodyComponent?.text ?? "";
+        const variableCount = (bodyText.match(/\{\{\d+\}\}/g) ?? []).length;
 
-      // A template created directly in Meta Business Manager (not through
-      // "Crear plantilla" here) used to sync in with NO header info at all —
-      // only the body got copied. For a template with an IMAGE/VIDEO/
-      // DOCUMENT header, that meant every send silently omitted the header
-      // component entirely, and Meta rejected it ("header component
-      // parameter should not be empty"). header_media_url stays null here
-      // regardless — Meta's sync response only gives back an ephemeral
-      // upload handle for the header example, not a URL we can reuse for
-      // future sends, so a media header still needs its file uploaded once
-      // through the template list (see fillTemplateHeaderMedia below).
-      const headerComponent = t.components.find((c) => c.type === "HEADER");
-      const headerFormat = headerComponent?.format ?? null;
-      const headerText = headerFormat === "TEXT" ? headerComponent?.text ?? null : null;
+        // A template created directly in Meta Business Manager (not through
+        // "Crear plantilla" here) used to sync in with NO header info at all —
+        // only the body got copied. For a template with an IMAGE/VIDEO/
+        // DOCUMENT header, that meant every send silently omitted the header
+        // component entirely, and Meta rejected it ("header component
+        // parameter should not be empty"). header_media_url stays null here
+        // regardless — Meta's sync response only gives back an ephemeral
+        // upload handle for the header example, not a URL we can reuse for
+        // future sends, so a media header still needs its file uploaded once
+        // through the template list (see fillTemplateHeaderMedia below).
+        const headerComponent = t.components.find((c) => c.type === "HEADER");
+        const headerFormat = headerComponent?.format ?? null;
+        const headerText = headerFormat === "TEXT" ? headerComponent?.text ?? null : null;
 
-      const buttonsComponent = t.components.find((c) => c.type === "BUTTONS");
-      const buttons = buttonsComponent?.buttons?.map((b) => ({
-        type: b.type === "URL" ? ("URL" as const) : ("QUICK_REPLY" as const),
-        text: b.text,
-        ...(b.type === "URL" && b.url ? { url: b.url } : {}),
-      }));
+        const buttonsComponent = t.components.find((c) => c.type === "BUTTONS");
+        const buttons = buttonsComponent?.buttons?.map((b) => ({
+          type: b.type === "URL" ? ("URL" as const) : ("QUICK_REPLY" as const),
+          text: b.text,
+          ...(b.type === "URL" && b.url ? { url: b.url } : {}),
+        }));
 
-      await supabase.from("templates").upsert(
-        {
-          workspace_id: workspaceId,
-          meta_template_name: t.name,
-          language: t.language,
-          category: t.category,
-          status: t.status,
-          body_text: bodyText,
-          variable_count: variableCount,
-          header_format: headerFormat,
-          header_text: headerText,
-          buttons: buttons && buttons.length > 0 ? buttons : null,
-          synced_at: new Date().toISOString(),
-        },
-        { onConflict: "workspace_id,meta_template_name,language" }
-      );
-    }
+        await supabase.from("templates").upsert(
+          {
+            workspace_id: workspaceId,
+            waba_id: waba.wabaId,
+            meta_template_name: t.name,
+            language: t.language,
+            category: t.category,
+            status: t.status,
+            body_text: bodyText,
+            variable_count: variableCount,
+            header_format: headerFormat,
+            header_text: headerText,
+            buttons: buttons && buttons.length > 0 ? buttons : null,
+            synced_at: new Date().toISOString(),
+          },
+          { onConflict: "workspace_id,waba_id,meta_template_name,language" }
+        );
+      }
 
-    // Templates removed directly in Meta (or deleted here but orphaned by a
-    // failed follow-up) never disappear on their own — prune anything local
-    // that Meta no longer reports for this WABA.
-    const metaNames = new Set(metaTemplates.map((t) => `${t.name}::${t.language}`));
-    const { data: localTemplates } = await supabase
-      .from("templates")
-      .select("id, meta_template_name, language")
-      .eq("workspace_id", workspaceId);
+      // Templates removed directly in Meta (or deleted here but orphaned by a
+      // failed follow-up) never disappear on their own — prune anything local
+      // that Meta no longer reports for this WABA.
+      const metaNames = new Set(metaTemplates.map((t) => `${t.name}::${t.language}`));
+      const { data: localTemplates } = await supabase
+        .from("templates")
+        .select("id, meta_template_name, language")
+        .eq("workspace_id", workspaceId)
+        .eq("waba_id", waba.wabaId);
 
-    const staleIds = (localTemplates ?? [])
-      .filter((t) => !metaNames.has(`${t.meta_template_name}::${t.language}`))
-      .map((t) => t.id);
-    if (staleIds.length > 0) {
-      const { error: deleteError } = await supabase.from("templates").delete().in("id", staleIds);
-      if (deleteError) {
-        // Some of the stale rows are referenced by past campaigns and can't
-        // be hard-deleted — mark those as removed instead so they stop
-        // showing a stale APPROVED status.
-        await supabase.from("templates").update({ status: "DELETED" }).in("id", staleIds);
+      const staleIds = (localTemplates ?? [])
+        .filter((t) => !metaNames.has(`${t.meta_template_name}::${t.language}`))
+        .map((t) => t.id);
+      if (staleIds.length > 0) {
+        const { error: deleteError } = await supabase.from("templates").delete().in("id", staleIds);
+        if (deleteError) {
+          // Some of the stale rows are referenced by past campaigns and can't
+          // be hard-deleted — mark those as removed instead so they stop
+          // showing a stale APPROVED status.
+          await supabase.from("templates").update({ status: "DELETED" }).in("id", staleIds);
+        }
       }
     }
 
     revalidatePath("/dashboard/templates");
-    return { success: true, count: metaTemplates.length };
+    return { success: true, count: total };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Error desconocido." };
   }
@@ -178,6 +180,7 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
   const bodyText = String(formData.get("bodyText") ?? "").trim();
   const footerText = String(formData.get("footerText") ?? "").trim();
   const buttonsJson = String(formData.get("buttonsJson") ?? "[]");
+  const wabaElegida = String(formData.get("wabaId") ?? "");
 
   if (!/^[a-z0-9_]+$/.test(name)) {
     return { error: "El nombre solo puede tener minúsculas, números y guiones bajos (_)." };
@@ -220,16 +223,13 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
   if ("error" in ctx) return { error: ctx.error };
   const { supabase, workspaceId } = ctx;
 
-  const { data: account } = await supabase
-    .from("whatsapp_accounts")
-    .select("waba_id, access_token")
-    .eq("workspace_id", workspaceId)
-    .neq("status", "frozen")
-    // Templates belong to the shared WABA, not to any one phone number, so
-    // any connected account's token can manage them.
-    .limit(1)
-    .maybeSingle();
-  if (!account) return { error: "Este workspace no tiene WhatsApp conectado." };
+  // La plantilla se crea en una WABA concreta (migracion 0106). Con una
+  // sola WABA no hay nada que elegir; con varias, el formulario pide la linea.
+  const wabas = await wabasDelEspacio(supabase, workspaceId);
+  if (wabas.length === 0) return { error: "Este workspace no tiene WhatsApp conectado." };
+  const waba = wabas.length === 1 ? wabas[0] : wabas.find((w) => w.wabaId === wabaElegida);
+  if (!waba) return { error: "Elige la línea para la que es la plantilla." };
+  const account = { waba_id: waba.wabaId, access_token: waba.accessToken };
 
   let headerMedia: { format: "IMAGE" | "VIDEO" | "DOCUMENT"; handle: string } | undefined;
   let headerMediaUrl: string | null = null;
@@ -296,6 +296,7 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
     const { error: upsertError } = await supabase.from("templates").upsert(
       {
         workspace_id: workspaceId,
+        waba_id: account.waba_id,
         meta_template_name: name,
         language,
         category,
@@ -310,7 +311,7 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
         synced_at: new Date().toISOString(),
         created_via: "crm",
       },
-      { onConflict: "workspace_id,meta_template_name,language" }
+      { onConflict: "workspace_id,waba_id,meta_template_name,language" }
     );
     if (upsertError) {
       return {
@@ -332,22 +333,17 @@ export async function deleteTemplate(templateId: string) {
 
   const { data: template } = await supabase
     .from("templates")
-    .select("meta_template_name")
+    .select("meta_template_name, waba_id")
     .eq("id", templateId)
     .eq("workspace_id", workspaceId)
     .single();
   if (!template) return { error: "Plantilla no encontrada." };
 
-  const { data: account } = await supabase
-    .from("whatsapp_accounts")
-    .select("waba_id, access_token")
-    .eq("workspace_id", workspaceId)
-    .neq("status", "frozen")
-    // Templates belong to the shared WABA, not to any one phone number, so
-    // any connected account's token can manage them.
-    .limit(1)
-    .maybeSingle();
-  if (!account) return { error: "Este workspace no tiene WhatsApp conectado." };
+  // Se borra en la WABA a la que pertenece (migracion 0106).
+  const wabas = await wabasDelEspacio(supabase, workspaceId);
+  const waba = wabas.find((w) => w.wabaId === template.waba_id) ?? (wabas.length === 1 ? wabas[0] : undefined);
+  if (!waba) return { error: "La línea de esta plantilla ya no está conectada." };
+  const account = { waba_id: waba.wabaId, access_token: waba.accessToken };
 
   try {
     await deleteMetaTemplate(account.waba_id, account.access_token, template.meta_template_name);

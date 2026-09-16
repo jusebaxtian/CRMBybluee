@@ -1,5 +1,6 @@
 "use server";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -80,6 +81,30 @@ export async function previewAudienceCount(formData: FormData) {
   return { count: contactIds.length };
 }
 
+/**
+ * La plantilla debe existir en la WABA de la linea desde la que se envia
+ * (migracion 0106); si no, Meta rechaza cada envio con #132001.
+ */
+async function plantillaSirveParaLinea(
+  supabase: SupabaseClient,
+  workspaceId: string,
+  templateId: string | null,
+  whatsappAccountId: string | null
+): Promise<string | null> {
+  if (!templateId) return null;
+  const [{ data: plantilla }, { data: linea }] = await Promise.all([
+    supabase.from("templates").select("waba_id, meta_template_name").eq("id", templateId).eq("workspace_id", workspaceId).maybeSingle(),
+    whatsappAccountId
+      ? supabase.from("whatsapp_accounts").select("waba_id, display_phone_number").eq("id", whatsappAccountId).eq("workspace_id", workspaceId).maybeSingle()
+      : supabase.from("whatsapp_accounts").select("waba_id, display_phone_number").eq("workspace_id", workspaceId).neq("status", "frozen").order("connected_at").limit(1).maybeSingle(),
+  ]);
+  if (!plantilla) return "Selecciona una plantilla.";
+  if (linea && plantilla.waba_id && plantilla.waba_id !== linea.waba_id) {
+    return `La plantilla "${plantilla.meta_template_name}" no existe en la línea ${linea.display_phone_number}. Elige otra línea o crea la plantilla para esa línea.`;
+  }
+  return null;
+}
+
 export async function createCampaign(_prevState: unknown, formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const sendType = String(formData.get("sendType") ?? "template") as "template" | "free_text";
@@ -104,6 +129,11 @@ export async function createCampaign(_prevState: unknown, formData: FormData) {
   const ctx = await requireWorkspace();
   if ("error" in ctx) return { error: ctx.error };
   const { supabase, workspaceId } = ctx;
+
+  if (sendType === "template") {
+    const errorPlantilla = await plantillaSirveParaLinea(supabase, workspaceId, templateId, whatsappAccountId);
+    if (errorPlantilla) return { error: errorPlantilla };
+  }
 
   const { data: campaign, error } = await supabase
     .from("campaigns")
@@ -199,6 +229,10 @@ export async function updateCampaign(campaignId: string, _prevState: unknown, fo
 
   const { scheduledAt, error: scheduleError } = readScheduledAt(formData);
   if (scheduleError) return { error: scheduleError };
+  if (sendType === "template") {
+    const errorPlantilla = await plantillaSirveParaLinea(supabase, workspaceId, templateId, whatsappAccountId);
+    if (errorPlantilla) return { error: errorPlantilla };
+  }
 
   const { contactIds, matchedBeforeWindow } = await resolveCampaignAudience(supabase, workspaceId, audienceParams);
   if (contactIds.length === 0) {

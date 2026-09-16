@@ -68,9 +68,9 @@ export default async function ConversationPage({
     workspaceId
       ? supabase
           .from("whatsapp_accounts")
-          .select("id, label, display_phone_number")
+          .select("id, label, display_phone_number, waba_id")
           .eq("workspace_id", workspaceId)
-      : Promise.resolve({ data: [] as { id: string; label: string | null; display_phone_number: string }[] }),
+      : Promise.resolve({ data: [] as { id: string; label: string | null; display_phone_number: string; waba_id: string }[] }),
     listWorkspaceAgents(supabase, workspaceId),
     workspaceId
       ? supabase.from("ai_agents").select("is_active").eq("workspace_id", workspaceId).maybeSingle()
@@ -92,7 +92,7 @@ export default async function ConversationPage({
       .order("name"),
     supabase
       .from("templates")
-      .select("id, meta_template_name, language, body_text")
+      .select("id, meta_template_name, language, body_text, waba_id")
       .eq("workspace_id", workspaceId ?? "")
       .eq("status", "APPROVED")
       .eq("created_via", "crm")
@@ -131,6 +131,11 @@ export default async function ConversationPage({
       : null;
 
   const hasActiveAiAgent = !!aiAgent?.is_active;
+
+  // Solo las plantillas de la WABA de la linea por la que va esta
+  // conversacion (migracion 0106); con una sola WABA son todas.
+  const wabaDeLaLinea = workspaceChannels?.find((c) => c.id === conversation.whatsapp_account_id)?.waba_id;
+  const plantillasDeLaLinea = (approvedTemplates ?? []).filter((t) => !wabaDeLaLinea || !t.waba_id || t.waba_id === wabaDeLaLinea);
 
   // Only write when there's something new to mark read — an unconditional
   // update on every render would re-trigger the conversations-table realtime
@@ -244,7 +249,7 @@ export default async function ConversationPage({
           messages={messages ?? []}
           quickReplies={quickReplies ?? []}
           automations={allAutomations ?? []}
-          approvedTemplates={approvedTemplates ?? []}
+          approvedTemplates={plantillasDeLaLinea}
           esAdmin={esAdmin}
         />
       </div>

@@ -28,7 +28,7 @@ export default async function EditCampaignPage({
 
   const { data: templates } = await supabase
     .from("templates")
-    .select("id, meta_template_name, status")
+    .select("id, meta_template_name, status, waba_id")
     .eq("workspace_id", workspaceId ?? "")
     .eq("status", "APPROVED")
     .eq("created_via", "crm")
@@ -42,7 +42,7 @@ export default async function EditCampaignPage({
 
   const { data: whatsappAccounts } = await supabase
     .from("whatsapp_accounts")
-    .select("id, label, display_phone_number")
+    .select("id, label, display_phone_number, waba_id")
     .eq("workspace_id", workspaceId ?? "")
     .neq("status", "frozen")
     .order("connected_at");

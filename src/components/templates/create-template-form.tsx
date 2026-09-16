@@ -6,6 +6,7 @@ import { CheckCircle2, Plus, X } from "lucide-react";
 import { normalizarNombrePlantilla } from "@/lib/templates/nombre";
 import { Button } from "@/components/ui/button";
 import { CATEGORIA_PLANTILLA_POR_DEFECTO } from "@/lib/templates/defaults";
+import type { WabaOption } from "@/lib/whatsapp/wabas";
 
 const headerAccept: Record<string, string> = {
   image: "image/jpeg,image/png",
@@ -43,7 +44,7 @@ function submitWithProgress(
   });
 }
 
-export function CreateTemplateForm() {
+export function CreateTemplateForm({ wabas = [] }: { wabas?: WabaOption[] }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [category, setCategory] = useState<string>(CATEGORIA_PLANTILLA_POR_DEFECTO);
@@ -98,6 +99,30 @@ export function CreateTemplateForm() {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      {wabas.length > 1 && (
+        <div>
+          <label htmlFor="wabaId" className="mb-1 block text-sm font-medium text-muted">
+            ¿Para qué línea es la plantilla?
+          </label>
+          <select
+            id="wabaId"
+            name="wabaId"
+            required
+            defaultValue={wabas[0].wabaId}
+            className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
+          >
+            {wabas.map((w) => (
+              <option key={w.wabaId} value={w.wabaId}>
+                {w.lineas}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-muted">
+            Tus líneas están en cuentas de WhatsApp Business distintas, y en Meta cada cuenta tiene sus propias
+            plantillas. Esta solo servirá para enviar desde la línea elegida.
+          </p>
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div>
           <label htmlFor="name" className="mb-1 block text-sm font-medium text-muted">
