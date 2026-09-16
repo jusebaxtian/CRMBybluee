@@ -134,10 +134,10 @@ export function MessageBubble({
       type="button"
       onClick={() => onRegistrarPago?.({ messageId: m.id, preview: summarize(m) })}
       title="Registrar este comprobante como pago"
-      aria-label="Registrar pago"
-      className={botonAccion}
+      className="flex shrink-0 items-center gap-1 self-end rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/20"
     >
-      <BadgeDollarSign size={14} />
+      <BadgeDollarSign size={13} />
+      Registrar pago
     </button>
   );
 
