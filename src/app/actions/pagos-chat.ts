@@ -69,6 +69,8 @@ export async function registrarPagoDesdeChat(input: {
   planId: string;
   amount: string;
   nota?: string;
+  /** Fecha de vencimiento (AAAA-MM-DD) elegida por soporte; vacio = ciclo del plan. */
+  venceEl?: string;
 }): Promise<{ error: string } | { tipo: "activado"; espacio: string } | { tipo: "invitacion"; enlace: string }> {
   const a = await soloAdmin();
   if ("error" in a) return { error: a.error };
@@ -77,6 +79,14 @@ export async function registrarPagoDesdeChat(input: {
 
   const amountCents = Math.round(Number(String(input.amount).replace(/[^\d.,]/g, "").replace(",", ".")) * 100);
   if (!amountCents || amountCents <= 0) return { error: "Escribe el monto pagado." };
+
+  let venceEl: Date | null = null;
+  if (input.venceEl) {
+    // Fin del dia en Colombia, para que "vence el 15" cubra todo el 15.
+    venceEl = new Date(`${input.venceEl}T23:59:59-05:00`);
+    if (Number.isNaN(venceEl.getTime())) return { error: "La fecha de vencimiento no es válida." };
+    if (venceEl.getTime() < Date.now()) return { error: "La fecha de vencimiento ya pasó." };
+  }
 
   const { data: plan } = await supabase
     .from("plans")
@@ -103,6 +113,7 @@ export async function registrarPagoDesdeChat(input: {
       proofPath,
       revisadoPor: userId,
       contactId: conv.contacts.id,
+      venceEl,
     });
     if ("error" in r) return { error: r.error };
     const { data: ws } = await admin.from("workspaces").select("name").eq("id", input.workspaceId).maybeSingle();
@@ -121,6 +132,7 @@ export async function registrarPagoDesdeChat(input: {
     currency: plan.currency || "COP",
     proof_path: proofPath,
     nota: input.nota?.trim() || null,
+    vence_el: venceEl?.toISOString() ?? null,
     created_by: userId,
   });
   if (error) return { error: error.message };

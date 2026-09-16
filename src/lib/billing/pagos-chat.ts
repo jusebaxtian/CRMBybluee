@@ -42,6 +42,8 @@ export async function activarEspacioConPago(
     proofPath: string | null;
     revisadoPor: string | null;
     contactId?: string | null;
+    /** Vencimiento fijado a mano por soporte; si falta, se calcula con el ciclo del plan. */
+    venceEl?: Date | null;
   }
 ): Promise<{ paymentId: string } | { error: string }> {
   const { data: ws } = await admin.from("workspaces").select("name, phone, cliente_contact_id").eq("id", input.workspaceId).maybeSingle();
@@ -78,11 +80,12 @@ export async function activarEspacioConPago(
     .limit(1)
     .maybeSingle();
   const desde = vigente ? new Date(vigente.current_period_end) : new Date();
+  const vence = input.venceEl ?? addBillingCycle(desde, input.plan.billing_cycle);
   await admin.from("subscriptions").insert({
     workspace_id: input.workspaceId,
     provider: "manual",
     status: "active",
-    current_period_end: addBillingCycle(desde, input.plan.billing_cycle).toISOString(),
+    current_period_end: vence.toISOString(),
   });
 
   await admin
@@ -113,7 +116,7 @@ export async function aplicarInvitacionRegistro(
 ): Promise<void> {
   const { data: inv } = await admin
     .from("invitaciones_registro")
-    .select("id, contact_id, plan_id, amount_cents, proof_path, status, plans(id, name, price_cents, currency, billing_cycle)")
+    .select("id, contact_id, plan_id, amount_cents, proof_path, status, vence_el, plans(id, name, price_cents, currency, billing_cycle)")
     .eq("token", token)
     .maybeSingle();
   if (!inv || inv.status !== "pending") return;
@@ -127,6 +130,7 @@ export async function aplicarInvitacionRegistro(
     proofPath: inv.proof_path,
     revisadoPor: null,
     contactId: inv.contact_id,
+    venceEl: inv.vence_el ? new Date(inv.vence_el) : null,
   });
   if ("error" in r) {
     console.error("invitacion de registro: no se pudo activar el espacio:", r.error);

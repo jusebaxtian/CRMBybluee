@@ -32,6 +32,7 @@ export function RegistrarPagoDialog({
   const [planId, setPlanId] = useState("");
   const [monto, setMonto] = useState("");
   const [nota, setNota] = useState("");
+  const [venceEl, setVenceEl] = useState("");
   const [destino, setDestino] = useState<"espacio" | "invitacion">("espacio");
   const [resultado, setResultado] = useState<{ tipo: "activado"; espacio: string } | { tipo: "invitacion"; enlace: string } | null>(null);
   const [copiado, setCopiado] = useState(false);
@@ -81,6 +82,7 @@ export function RegistrarPagoDialog({
         planId,
         amount: monto,
         nota,
+        venceEl,
       });
       if ("error" in r) {
         setError(r.error);
@@ -217,6 +219,21 @@ export function RegistrarPagoDialog({
             <label className="text-xs font-medium text-muted">
               Monto pagado (COP)
               <input type="number" inputMode="numeric" value={monto} onChange={(e) => setMonto(e.target.value)} className={`${INPUT} mt-1`} />
+            </label>
+            <label className="text-xs font-medium text-muted">
+              Vence el (opcional)
+              <input
+                type="date"
+                value={venceEl}
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setVenceEl(e.target.value)}
+                className={`${INPUT} mt-1`}
+              />
+              <span className="mt-1 block text-[11px] font-normal text-muted">
+                {venceEl
+                  ? "El espacio queda activo hasta esa fecha."
+                  : `Vacío = un ciclo del plan${ctx.espacio?.vence ? " desde su vencimiento actual" : " desde hoy"}.`}
+              </span>
             </label>
             <label className="text-xs font-medium text-muted">
               Nota (opcional)
