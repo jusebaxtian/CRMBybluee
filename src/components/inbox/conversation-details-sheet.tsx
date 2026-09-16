@@ -9,7 +9,7 @@ import { ConversationFollowupsToggle } from "@/components/inbox/conversation-fol
 import { ContactBlockedNotice } from "@/components/inbox/contact-blocked-notice";
 import { AiHandoffNotice } from "@/components/inbox/ai-handoff-notice";
 import { ConversationAiToggle } from "@/components/inbox/conversation-ai-toggle";
-import { EspacioDelClienteCard, type EspacioDelCliente } from "@/components/inbox/espacio-del-cliente";
+import { EspacioDelClienteCard, type EspacioDelCliente, type InvitacionPendiente } from "@/components/inbox/espacio-del-cliente";
 
 type Agent = { id: string; name: string | null; email: string };
 type Tag = { id: string; name: string; color: string };
@@ -36,6 +36,7 @@ export function ConversationDetailsSheet({
   adHeadline,
   adBody,
   espaciosDelCliente = [],
+  invitacionesPendientes = [],
 }: {
   contactName: string | null;
   contactWaId: string;
@@ -58,6 +59,7 @@ export function ConversationDetailsSheet({
   adBody: string | null;
   /** Solo llega con datos para el administrador de la plataforma. */
   espaciosDelCliente?: EspacioDelCliente[];
+  invitacionesPendientes?: InvitacionPendiente[];
 }) {
   const [open, setOpen] = useState(false);
 
@@ -103,7 +105,7 @@ export function ConversationDetailsSheet({
               </div>
             </div>
 
-            <EspacioDelClienteCard espacios={espaciosDelCliente} />
+            <EspacioDelClienteCard espacios={espaciosDelCliente} invitaciones={invitacionesPendientes} />
 
             {likelyBlocked && <ContactBlockedNotice contactId={contactId} />}
             {(aiHandoffRequested || aiManuallyPaused) && (

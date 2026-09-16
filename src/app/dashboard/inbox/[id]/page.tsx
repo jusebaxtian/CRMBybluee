@@ -17,7 +17,8 @@ import { getWorkspaceId } from "@/lib/workspace";
 import { listWorkspaceAgents } from "@/lib/agents";
 import { isPhoneNumber } from "@/lib/whatsapp/identity";
 import { isPlatformAdmin } from "@/lib/admin";
-import { EspacioDelClienteCard, type EspacioDelCliente } from "@/components/inbox/espacio-del-cliente";
+import { EspacioDelClienteCard, type EspacioDelCliente, type InvitacionPendiente } from "@/components/inbox/espacio-del-cliente";
+import { invitacionesPendientesDeContacto } from "@/lib/billing/invitaciones-pendientes";
 
 export default async function ConversationPage({
   params,
@@ -110,10 +111,15 @@ export default async function ConversationPage({
   // Solo el administrador de la plataforma: qué espacio compró este contacto
   // (migración 0096). Para cualquier otro usuario la función devuelve vacío.
   let espaciosDelCliente: EspacioDelCliente[] = [];
+  let invitacionesPendientes: InvitacionPendiente[] = [];
   const esAdmin = await isPlatformAdmin(supabase);
   if (esAdmin) {
-    const { data } = await supabase.rpc("admin_espacio_de_contacto", { p_contact_id: conversation.contact_id });
+    const [{ data }, invitaciones] = await Promise.all([
+      supabase.rpc("admin_espacio_de_contacto", { p_contact_id: conversation.contact_id }),
+      invitacionesPendientesDeContacto(supabase, conversation.contact_id),
+    ]);
     espaciosDelCliente = (data ?? []) as EspacioDelCliente[];
+    invitacionesPendientes = invitaciones;
   }
 
   const assignedTagIds = contact.contact_tags.map((ct) => ct.tag_id);
@@ -228,6 +234,7 @@ export default async function ConversationPage({
             adHeadline={conversation.ad_headline}
             adBody={conversation.ad_body}
             espaciosDelCliente={espaciosDelCliente}
+            invitacionesPendientes={invitacionesPendientes}
           />
         </div>
 
@@ -258,7 +265,7 @@ export default async function ConversationPage({
           </div>
         </div>
 
-        <EspacioDelClienteCard espacios={espaciosDelCliente} />
+        <EspacioDelClienteCard espacios={espaciosDelCliente} invitaciones={invitacionesPendientes} />
 
         {contact.likely_blocked && <ContactBlockedNotice contactId={conversation.contact_id} />}
         {(conversation.ai_handoff_requested || conversation.ai_manually_paused) && (

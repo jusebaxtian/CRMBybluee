@@ -134,4 +134,35 @@ export async function aplicarInvitacionRegistro(
     .from("invitaciones_registro")
     .update({ status: "used", used_at: new Date().toISOString(), workspace_id: workspaceId, payment_id: r.paymentId })
     .eq("id", inv.id);
+
+  await avisarCuentaCreada(admin, inv.contact_id, plan.name, workspaceId);
+}
+
+/**
+ * Campana del administrador: "Cliente X creó su cuenta", con botón que
+ * lleva al chat del contacto en el espacio de soporte (donde nació el enlace).
+ */
+async function avisarCuentaCreada(
+  admin: SupabaseClient,
+  contactId: string | null,
+  planName: string,
+  nuevoWorkspaceId: string
+): Promise<void> {
+  if (!contactId) return;
+  const [{ data: contacto }, { data: conversacion }, { data: nuevo }] = await Promise.all([
+    admin.from("contacts").select("workspace_id, name, wa_id").eq("id", contactId).maybeSingle(),
+    admin.from("conversations").select("id").eq("contact_id", contactId).order("last_message_at", { ascending: false }).limit(1).maybeSingle(),
+    admin.from("workspaces").select("name").eq("id", nuevoWorkspaceId).maybeSingle(),
+  ]);
+  if (!contacto) return;
+  const quien = contacto.name?.trim() || contacto.wa_id;
+  const { error } = await admin.from("notifications").insert({
+    title: `${quien} creó su cuenta`,
+    body: `Se registró con tu enlace: espacio "${nuevo?.name ?? "nuevo"}" activo con plan ${planName}.`,
+    scope: "workspace",
+    target_workspace_id: contacto.workspace_id,
+    cta_label: "Ir a su chat",
+    cta_url: conversacion ? `/dashboard/inbox/${conversacion.id}` : "/dashboard/inbox",
+  });
+  if (error) console.error("invitacion de registro: no se pudo crear la notificacion:", error.message);
 }

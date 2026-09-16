@@ -72,9 +72,13 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
                 {n.cta_label && n.cta_url && (
                   <a
                     href={n.cta_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
+                    // Enlaces internos (ej. "Ir a su chat") abren en la misma pestaña.
+                    {...(n.cta_url.startsWith("/") ? {} : { target: "_blank", rel: "noopener noreferrer" })}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!n.read) void markNotificationRead(n.id);
+                      if (n.cta_url?.startsWith("/")) setOpen(false);
+                    }}
                     className="mt-2 inline-block rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-white hover:bg-primary-hover"
                   >
                     {n.cta_label}
