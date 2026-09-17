@@ -15,6 +15,7 @@ import {
   CreditCard,
   Lock,
   LifeBuoy,
+  CalendarDays,
 } from "lucide-react";
 
 // `built: false` items don't exist yet regardless of plan.
@@ -27,6 +28,7 @@ const navItems = [
   { href: "/dashboard/campaigns", label: "Campañas", icon: Megaphone, built: true, moduleKey: "campaigns" },
   { href: "/dashboard/billing", label: "Facturación", icon: CreditCard, built: true, moduleKey: null },
   { href: "/dashboard/quick-replies", label: "Respuestas rápidas", icon: Reply, built: true, moduleKey: "quick_replies" },
+  { href: "/dashboard/agenda", label: "Agenda", icon: CalendarDays, built: true, moduleKey: null },
   { href: "/dashboard/reports", label: "Reportes", icon: BarChart3, built: true, moduleKey: "reports" },
   { href: "/dashboard/integrations", label: "Integraciones", icon: Plug, built: false, moduleKey: null },
   { href: "/dashboard/settings", label: "Configuración", icon: Settings, built: true, moduleKey: "settings" },

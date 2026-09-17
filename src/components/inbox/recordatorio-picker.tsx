@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { AlarmClock, Check, Loader2, Trash2, X } from "lucide-react";
-import { crearRecordatorio, eliminarRecordatorio, listarRecordatorios } from "@/app/actions/recordatorios";
+import { actualizarRecordatorio, crearRecordatorio, eliminarRecordatorio, listarRecordatorios } from "@/app/actions/recordatorios";
 
 type Pendiente = { id: string; texto: string; recordar_en: string };
 
@@ -27,6 +27,20 @@ export function RecordatorioPicker({ conversationId, contactName }: { conversati
   const [listo, setListo] = useState(false);
   const [pending, startTransition] = useTransition();
   const [pendientes, setPendientes] = useState<Pendiente[]>([]);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+
+  function editar(r: Pendiente) {
+    setEditandoId(r.id);
+    setTexto(r.texto);
+    setCuando(aLocal(new Date(r.recordar_en)));
+    setError(null);
+  }
+
+  function cancelarEdicion() {
+    setEditandoId(null);
+    setTexto("");
+    setCuando(aLocal(new Date(Date.now() + 60 * 60 * 1000)));
+  }
 
   function abrir() {
     const siguiente = !open;
@@ -44,7 +58,10 @@ export function RecordatorioPicker({ conversationId, contactName }: { conversati
   function guardar() {
     setError(null);
     startTransition(async () => {
-      const r = await crearRecordatorio({ conversationId, texto, recordarEn: new Date(cuando).toISOString() });
+      const recordarEn = new Date(cuando).toISOString();
+      const r = editandoId
+        ? await actualizarRecordatorio({ id: editandoId, texto, recordarEn })
+        : await crearRecordatorio({ conversationId, texto, recordarEn });
       if (r?.error) {
         setError(r.error);
         return;
@@ -54,6 +71,7 @@ export function RecordatorioPicker({ conversationId, contactName }: { conversati
       setTimeout(() => {
         setListo(false);
         setOpen(false);
+        setEditandoId(null);
         setTexto("");
       }, 1200);
     });
@@ -71,7 +89,7 @@ export function RecordatorioPicker({ conversationId, contactName }: { conversati
           </div>
           {listo ? (
             <p className="flex items-center gap-2 py-2 text-sm text-success">
-              <Check size={15} /> Recordatorio programado
+              <Check size={15} /> {editandoId ? "Recordatorio actualizado" : "Recordatorio programado"}
             </p>
           ) : (
             <div className="flex flex-col gap-2">
@@ -107,19 +125,29 @@ export function RecordatorioPicker({ conversationId, contactName }: { conversati
                 className="flex items-center justify-center gap-2 rounded-[9px] bg-primary px-3 py-2 text-sm font-bold text-white hover:bg-primary-hover disabled:opacity-50"
               >
                 {pending && <Loader2 size={14} className="animate-spin" />}
-                Programar
+                {editandoId ? "Guardar cambios" : "Programar"}
               </button>
+              {editandoId && (
+                <button type="button" onClick={cancelarEdicion} className="text-xs text-muted hover:text-foreground">
+                  Cancelar edición
+                </button>
+              )}
               <p className="text-[11px] text-muted">Te avisará en la campana con un botón para abrir este chat.</p>
               {pendientes.length > 0 && (
                 <ul className="mt-1 flex flex-col gap-1 border-t border-border pt-2">
                   {pendientes.map((r) => (
                     <li key={r.id} className="flex items-center gap-2 text-xs">
-                      <span className="min-w-0 flex-1 truncate text-foreground">
+                      <button
+                        type="button"
+                        onClick={() => editar(r)}
+                        title="Editar"
+                        className={`min-w-0 flex-1 truncate text-left hover:underline ${editandoId === r.id ? "text-primary" : "text-foreground"}`}
+                      >
                         <span className="text-muted">
                           {new Date(r.recordar_en).toLocaleString("es-CO", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                         </span>{" "}
                         · {r.texto}
-                      </span>
+                      </button>
                       <button type="button" onClick={() => borrar(r.id)} title="Eliminar" className="text-muted hover:text-error">
                         <Trash2 size={13} />
                       </button>
