@@ -410,7 +410,7 @@ export function AutomationActionsBuilder({
     media_filename: a.action_type === "send_document" ? a.media_filename : undefined,
     template_id: a.action_type === "send_template" ? a.template_id : undefined,
     quick_reply_id: a.action_type === "send_quick_reply" ? a.quick_reply_id : undefined,
-    target_agent_id: a.action_type === "assign_agent" ? a.target_agent_id : undefined,
+    target_agent_id: a.action_type === "assign_agent" ? a.target_agent_id || agents[0]?.id || "" : undefined,
     agent_distribution: a.action_type === "assign_agent_random" ? a.agent_distribution : undefined,
     delay_seconds:
       a.action_type !== "wait_for_reply" && a.delay_value > 0
@@ -444,6 +444,11 @@ export function AutomationActionsBuilder({
                 }
                 if (nextType === "send_template" && !action.template_id) {
                   patch.template_id = approvedTemplates[0]?.id ?? "";
+                }
+                // Mismo caso: "Asignar a un agente" mostraba al primer agente
+                // pero el valor seguia vacio y el guardado fallaba.
+                if (nextType === "assign_agent" && !action.target_agent_id) {
+                  patch.target_agent_id = agents[0]?.id ?? "";
                 }
                 updateAction(index, patch);
               }}
