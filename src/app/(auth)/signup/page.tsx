@@ -13,7 +13,14 @@ import { CampoTelefono } from "@/components/auth/campo-telefono";
 import { GoogleButton } from "@/components/auth/google-button";
 import { useEntrarGuardando } from "@/components/auth/use-entrar-guardando";
 
-type Invitacion = { phone: string; plan_name: string; amount_cents: number; currency: string };
+type Invitacion = {
+  phone: string | null;
+  plan_name: string;
+  amount_cents: number;
+  currency: string;
+  tipo: "pago" | "demo";
+  dias_demo: number | null;
+};
 
 function SignupForm() {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(signup, undefined);
@@ -35,7 +42,7 @@ function SignupForm() {
       vivo = false;
     };
   }, [token]);
-  const telefonoInv = invitacion ? parsePhoneNumberFromString(`+${invitacion.phone}`) : undefined;
+  const telefonoInv = invitacion?.phone ? parsePhoneNumberFromString(`+${invitacion.phone}`) : undefined;
 
   return (
     <AuthShell
@@ -55,14 +62,26 @@ function SignupForm() {
         {token && <input type="hidden" name="invitacion" value={token} />}
         {invitacion && (
           <div className="rounded-[12px] border border-primary/30 bg-primary/10 px-3.5 py-3 text-[13px]">
-            <p className="font-semibold text-foreground">Tu pago ya está registrado ✓</p>
-            <p className="mt-0.5 text-muted">
-              Plan <strong className="text-foreground">{invitacion.plan_name}</strong> ·{" "}
-              {new Intl.NumberFormat("es-CO", { style: "currency", currency: invitacion.currency || "COP", maximumFractionDigits: 0 }).format(
-                invitacion.amount_cents / 100
-              )}
-              . Crea tu cuenta y quedará activa de inmediato.
-            </p>
+            {invitacion.tipo === "demo" ? (
+              <>
+                <p className="font-semibold text-foreground">Cuenta demo por {invitacion.dias_demo ?? 2} días ✓</p>
+                <p className="mt-0.5 text-muted">
+                  Plan <strong className="text-foreground">{invitacion.plan_name}</strong>, sin pago. Crea tu cuenta y quedará
+                  activa de inmediato.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="font-semibold text-foreground">Tu pago ya está registrado ✓</p>
+                <p className="mt-0.5 text-muted">
+                  Plan <strong className="text-foreground">{invitacion.plan_name}</strong> ·{" "}
+                  {new Intl.NumberFormat("es-CO", { style: "currency", currency: invitacion.currency || "COP", maximumFractionDigits: 0 }).format(
+                    invitacion.amount_cents / 100
+                  )}
+                  . Crea tu cuenta y quedará activa de inmediato.
+                </p>
+              </>
+            )}
           </div>
         )}
         <Campo

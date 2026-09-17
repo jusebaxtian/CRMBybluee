@@ -240,6 +240,7 @@ export default async function ConversationPage({
             adBody={conversation.ad_body}
             espaciosDelCliente={espaciosDelCliente}
             invitacionesPendientes={invitacionesPendientes}
+            contactIdAdmin={esAdmin ? conversation.contact_id : undefined}
           />
         </div>
 
@@ -271,7 +272,7 @@ export default async function ConversationPage({
           </div>
         </div>
 
-        <EspacioDelClienteCard espacios={espaciosDelCliente} invitaciones={invitacionesPendientes} />
+        <EspacioDelClienteCard espacios={espaciosDelCliente} invitaciones={invitacionesPendientes} contactId={esAdmin ? conversation.contact_id : undefined} />
 
         {contact.likely_blocked && <ContactBlockedNotice contactId={conversation.contact_id} />}
         {(conversation.ai_handoff_requested || conversation.ai_manually_paused) && (

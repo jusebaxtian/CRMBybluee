@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Building2, ExternalLink, Link2 } from "lucide-react";
 import { EnlaceInvitacion } from "@/components/inbox/enlace-invitacion";
+import { BotonCuentaContacto } from "@/components/inbox/boton-cuenta-contacto";
 
 export type EspacioDelCliente = {
   workspace_id: string;
@@ -20,6 +21,8 @@ export type InvitacionPendiente = {
   amount_cents: number;
   currency: string;
   created_at: string;
+  tipo?: "pago" | "demo";
+  dias_demo?: number | null;
 };
 
 const ESTADOS: Record<string, string> = {
@@ -44,11 +47,14 @@ function formatoMonto(cents: number, currency: string) {
 export function EspacioDelClienteCard({
   espacios,
   invitaciones = [],
+  contactId,
 }: {
   espacios: EspacioDelCliente[];
   invitaciones?: InvitacionPendiente[];
+  /** Con contacto, muestra "Crear demo / Registrar pago" (solo llega para el admin). */
+  contactId?: string;
 }) {
-  if (espacios.length === 0 && invitaciones.length === 0) return null;
+  if (espacios.length === 0 && invitaciones.length === 0 && !contactId) return null;
 
   return (
     <div className="mt-6 flex flex-col gap-3">
@@ -99,7 +105,7 @@ export function EspacioDelClienteCard({
             {invitaciones.map((i) => (
               <li key={i.id} className="text-xs">
                 <p className="text-muted">
-                  {i.plan_name ?? "Plan"} · {formatoMonto(i.amount_cents, i.currency)} ·{" "}
+                  {i.plan_name ?? "Plan"} · {i.tipo === "demo" ? `demo ${i.dias_demo ?? 2} días` : formatoMonto(i.amount_cents, i.currency)} ·{" "}
                   {new Date(i.created_at).toLocaleDateString("es-CO", { day: "2-digit", month: "short", timeZone: "America/Bogota" })}
                 </p>
                 <EnlaceInvitacion enlace={i.enlace} />
@@ -109,6 +115,8 @@ export function EspacioDelClienteCard({
           <p className="mt-1.5 text-[10px] text-muted">Aún no ha creado su cuenta. Toca el enlace para copiarlo y reenviárselo.</p>
         </div>
       )}
+
+      {contactId && <BotonCuentaContacto contactId={contactId} />}
     </div>
   );
 }

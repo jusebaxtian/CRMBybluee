@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PaymentReviewActions } from "@/components/admin/payment-review-actions";
 import { InvitacionesRegistro, type InvitacionFila } from "@/components/admin/invitaciones-registro";
+import { NuevoEnlaceDemo } from "@/components/admin/nuevo-enlace-demo";
 import { headers } from "next/headers";
 import { toPublicUrl } from "@/lib/supabase/config";
 
@@ -70,19 +71,23 @@ export default async function AdminPaymentsPage() {
   const origen = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("x-forwarded-host") ?? h.get("host") ?? "crmbybluee.blue"}`;
   const { data: invitaciones } = await admin
     .from("invitaciones_registro")
-    .select("id, token, phone, amount_cents, currency, created_at, plans(name), contacts(name)")
+    .select("id, token, phone, amount_cents, currency, created_at, tipo, dias_demo, nombre, plans(name), contacts(name)")
     .eq("status", "pending")
     .order("created_at", { ascending: false });
   const invitacionFilas: InvitacionFila[] = (invitaciones ?? []).map((i) => ({
     id: i.id as string,
     enlace: `${origen}/signup?i=${i.token as string}`,
-    phone: i.phone as string,
-    contacto: ((i.contacts as unknown as { name: string | null } | null)?.name ?? null) as string | null,
+    phone: (i.phone as string | null) ?? "",
+    contacto: (((i.contacts as unknown as { name: string | null } | null)?.name ?? (i.nombre as string | null)) ?? null) as string | null,
+    tipo: (i.tipo as "pago" | "demo") ?? "pago",
+    dias_demo: (i.dias_demo as number | null) ?? null,
     plan: ((i.plans as unknown as { name: string } | null)?.name ?? "—") as string,
     amount_cents: Number(i.amount_cents),
     currency: (i.currency as string) ?? "COP",
     created_at: i.created_at as string,
   }));
+
+  const { data: planesDemo } = await admin.from("plans").select("id, name").eq("is_active", true).order("price_cents");
 
   return (
     <div className="flex flex-col gap-6">
@@ -91,6 +96,7 @@ export default async function AdminPaymentsPage() {
         <p className="text-sm text-muted">Revisa y aprueba transferencias manuales</p>
       </div>
 
+      <NuevoEnlaceDemo planes={planesDemo ?? []} />
       <InvitacionesRegistro filas={invitacionFilas} />
 
       <div className="overflow-hidden rounded-xl border border-border bg-surface">

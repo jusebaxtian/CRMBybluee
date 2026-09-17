@@ -44,12 +44,36 @@ export async function activarEspacioConPago(
     contactId?: string | null;
     /** Vencimiento fijado a mano por soporte; si falta, se calcula con el ciclo del plan. */
     venceEl?: Date | null;
+    /** Demo sin pago: activo estos dias; no se crea pago (migracion 0111). */
+    diasDemo?: number | null;
   }
-): Promise<{ paymentId: string } | { error: string }> {
+): Promise<{ paymentId: string | null } | { error: string }> {
   const { data: ws } = await admin.from("workspaces").select("name, phone, cliente_contact_id").eq("id", input.workspaceId).maybeSingle();
   if (!ws) return { error: "Espacio no encontrado." };
 
   const ahora = new Date().toISOString();
+  const esDemo = !!input.diasDemo;
+  if (esDemo) {
+    // Demo: sin pago, activo N dias desde hoy. ever_activated queda como
+    // este para que, al vencer, se vea como prueba vencida y no como pago pendiente.
+    const vence = new Date(Date.now() + (input.diasDemo as number) * 24 * 60 * 60 * 1000);
+    await admin.from("subscriptions").insert({
+      workspace_id: input.workspaceId,
+      provider: "manual",
+      status: "active",
+      current_period_end: vence.toISOString(),
+    });
+    await admin
+      .from("workspaces")
+      .update({
+        plan_id: input.plan.id,
+        status: "active",
+        ...(input.contactId && !ws.cliente_contact_id ? { cliente_contact_id: input.contactId } : {}),
+      })
+      .eq("id", input.workspaceId);
+    return { paymentId: null };
+  }
+
   const { data: pago, error: errPago } = await admin
     .from("payments")
     .insert({
@@ -116,7 +140,7 @@ export async function aplicarInvitacionRegistro(
 ): Promise<void> {
   const { data: inv } = await admin
     .from("invitaciones_registro")
-    .select("id, contact_id, plan_id, amount_cents, proof_path, status, vence_el, plans(id, name, price_cents, currency, billing_cycle)")
+    .select("id, contact_id, created_by, plan_id, amount_cents, proof_path, status, vence_el, tipo, dias_demo, plans(id, name, price_cents, currency, billing_cycle)")
     .eq("token", token)
     .maybeSingle();
   if (!inv || inv.status !== "pending") return;
@@ -131,6 +155,7 @@ export async function aplicarInvitacionRegistro(
     revisadoPor: null,
     contactId: inv.contact_id,
     venceEl: inv.vence_el ? new Date(inv.vence_el) : null,
+    diasDemo: inv.tipo === "demo" ? Number(inv.dias_demo ?? 2) : null,
   });
   if ("error" in r) {
     console.error("invitacion de registro: no se pudo activar el espacio:", r.error);
@@ -141,7 +166,7 @@ export async function aplicarInvitacionRegistro(
     .update({ status: "used", used_at: new Date().toISOString(), workspace_id: workspaceId, payment_id: r.paymentId })
     .eq("id", inv.id);
 
-  await avisarCuentaCreada(admin, inv.contact_id, plan.name, workspaceId);
+  await avisarCuentaCreada(admin, inv.contact_id, inv.created_by, plan.name, workspaceId, inv.tipo === "demo" ? Number(inv.dias_demo ?? 2) : null);
 }
 
 /**
@@ -151,20 +176,49 @@ export async function aplicarInvitacionRegistro(
 async function avisarCuentaCreada(
   admin: SupabaseClient,
   contactId: string | null,
+  creadoPor: string | null,
   planName: string,
-  nuevoWorkspaceId: string
+  nuevoWorkspaceId: string,
+  diasDemo: number | null
 ): Promise<void> {
-  if (!contactId) return;
-  const [{ data: contacto }, { data: conversacion }, { data: nuevo }] = await Promise.all([
+  const { data: nuevo } = await admin.from("workspaces").select("name").eq("id", nuevoWorkspaceId).maybeSingle();
+
+  // Enlace creado desde Admin sin contacto (demo para un prospecto): el
+  // aviso va al espacio de quien lo creo y lleva al espacio nuevo.
+  if (!contactId) {
+    if (!creadoPor) return;
+    const { data: miembro } = await admin
+      .from("workspace_members")
+      .select("workspace_id")
+      .eq("user_id", creadoPor)
+      .order("created_at")
+      .limit(1)
+      .maybeSingle();
+    if (!miembro) return;
+    const { error } = await admin.from("notifications").insert({
+      title: `"${nuevo?.name ?? "Nuevo espacio"}" creó su cuenta`,
+      body: diasDemo ? `Se registró con tu enlace demo: plan ${planName} por ${diasDemo} días.` : `Se registró con tu enlace: plan ${planName}.`,
+      scope: "workspace",
+      target_workspace_id: miembro.workspace_id,
+      cta_label: "Ver espacio",
+      cta_url: `/admin/workspaces/${nuevoWorkspaceId}`,
+      ends_at: new Date(Date.now() + DIAS_AVISO_CUENTA_CREADA * 24 * 60 * 60 * 1000).toISOString(),
+    });
+    if (error) console.error("invitacion de registro: no se pudo crear la notificacion:", error.message);
+    return;
+  }
+
+  const [{ data: contacto }, { data: conversacion }] = await Promise.all([
     admin.from("contacts").select("workspace_id, name, wa_id").eq("id", contactId).maybeSingle(),
     admin.from("conversations").select("id").eq("contact_id", contactId).order("last_message_at", { ascending: false }).limit(1).maybeSingle(),
-    admin.from("workspaces").select("name").eq("id", nuevoWorkspaceId).maybeSingle(),
   ]);
   if (!contacto) return;
   const quien = contacto.name?.trim() || contacto.wa_id;
   const { error } = await admin.from("notifications").insert({
     title: `${quien} creó su cuenta`,
-    body: `Se registró con tu enlace: espacio "${nuevo?.name ?? "nuevo"}" activo con plan ${planName}.`,
+    body: diasDemo
+      ? `Se registró con tu enlace demo: espacio "${nuevo?.name ?? "nuevo"}" con plan ${planName} por ${diasDemo} días.`
+      : `Se registró con tu enlace: espacio "${nuevo?.name ?? "nuevo"}" activo con plan ${planName}.`,
     scope: "workspace",
     target_workspace_id: contacto.workspace_id,
     cta_label: "Ir a su chat",

@@ -9,7 +9,7 @@ export async function invitacionesPendientesDeContacto(
 ): Promise<InvitacionPendiente[]> {
   const { data } = await supabase
     .from("invitaciones_registro")
-    .select("id, token, amount_cents, currency, created_at, plans(name)")
+    .select("id, token, amount_cents, currency, created_at, tipo, dias_demo, plans(name)")
     .eq("contact_id", contactId)
     .eq("status", "pending")
     .order("created_at", { ascending: false });
@@ -22,5 +22,7 @@ export async function invitacionesPendientesDeContacto(
     amount_cents: Number(i.amount_cents),
     currency: i.currency,
     created_at: i.created_at,
+    tipo: (i.tipo as "pago" | "demo") ?? "pago",
+    dias_demo: (i.dias_demo as number | null) ?? null,
   }));
 }

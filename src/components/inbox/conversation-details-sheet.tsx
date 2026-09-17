@@ -37,6 +37,7 @@ export function ConversationDetailsSheet({
   adBody,
   espaciosDelCliente = [],
   invitacionesPendientes = [],
+  contactIdAdmin,
 }: {
   contactName: string | null;
   contactWaId: string;
@@ -60,6 +61,8 @@ export function ConversationDetailsSheet({
   /** Solo llega con datos para el administrador de la plataforma. */
   espaciosDelCliente?: EspacioDelCliente[];
   invitacionesPendientes?: InvitacionPendiente[];
+  /** Solo llega para el administrador de la plataforma. */
+  contactIdAdmin?: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -105,7 +108,7 @@ export function ConversationDetailsSheet({
               </div>
             </div>
 
-            <EspacioDelClienteCard espacios={espaciosDelCliente} invitaciones={invitacionesPendientes} />
+            <EspacioDelClienteCard espacios={espaciosDelCliente} invitaciones={invitacionesPendientes} contactId={contactIdAdmin} />
 
             {likelyBlocked && <ContactBlockedNotice contactId={contactId} />}
             {(aiHandoffRequested || aiManuallyPaused) && (

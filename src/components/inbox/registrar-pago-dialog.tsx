@@ -19,11 +19,17 @@ function formatoCop(cents: number, currency: string) {
  */
 export function RegistrarPagoDialog({
   messageId,
+  contactId,
   preview,
+  modoInicial = "pago",
   onClose,
 }: {
-  messageId: string;
-  preview: string;
+  /** Comprobante recibido en el chat (con adjunto), o... */
+  messageId?: string;
+  /** ...directamente el contacto (sin comprobante), p. ej. para una demo. */
+  contactId?: string;
+  preview?: string;
+  modoInicial?: "pago" | "demo";
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -33,6 +39,8 @@ export function RegistrarPagoDialog({
   const [monto, setMonto] = useState("");
   const [nota, setNota] = useState("");
   const [venceEl, setVenceEl] = useState("");
+  const [modo, setModo] = useState<"pago" | "demo">(modoInicial);
+  const [diasDemo, setDiasDemo] = useState("2");
   const [destino, setDestino] = useState<"espacio" | "invitacion">("espacio");
   const [resultado, setResultado] = useState<{ tipo: "activado"; espacio: string } | { tipo: "invitacion"; enlace: string } | null>(null);
   const [copiado, setCopiado] = useState(false);
@@ -40,7 +48,7 @@ export function RegistrarPagoDialog({
 
   useEffect(() => {
     let vivo = true;
-    contextoPagoDesdeChat(messageId).then((r) => {
+    contextoPagoDesdeChat({ messageId, contactId }).then((r) => {
       if (!vivo) return;
       if ("error" in r) {
         setError(r.error);
@@ -57,7 +65,7 @@ export function RegistrarPagoDialog({
     return () => {
       vivo = false;
     };
-  }, [messageId]);
+  }, [messageId, contactId]);
 
   useEffect(() => {
     function tecla(e: KeyboardEvent) {
@@ -78,9 +86,12 @@ export function RegistrarPagoDialog({
     startGuardar(async () => {
       const r = await registrarPagoDesdeChat({
         messageId,
+        contactId,
         workspaceId: destino === "espacio" && ctx?.espacio ? ctx.espacio.id : null,
         planId,
+        modo,
         amount: monto,
+        diasDemo: Number(diasDemo),
         nota,
         venceEl,
       });
@@ -110,7 +121,7 @@ export function RegistrarPagoDialog({
         <div className="mb-3 flex items-center justify-between">
           <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
             <BadgeDollarSign size={16} className="text-primary" />
-            Registrar pago
+            {modo === "demo" ? "Cuenta demo" : "Registrar pago"}
           </p>
           <button
             type="button"
@@ -122,7 +133,7 @@ export function RegistrarPagoDialog({
           </button>
         </div>
 
-        <p className="mb-3 truncate rounded-lg border border-border bg-background px-3 py-2 text-xs text-muted">{preview}</p>
+        {preview && <p className="mb-3 truncate rounded-lg border border-border bg-background px-3 py-2 text-xs text-muted">{preview}</p>}
 
         {resultado ? (
           <div className="flex flex-col gap-3">
@@ -132,17 +143,22 @@ export function RegistrarPagoDialog({
                   <Check size={16} className="text-success" /> Pago registrado
                 </p>
                 <p className="mt-1 text-xs text-muted">
-                  <strong className="text-foreground">{resultado.espacio}</strong> quedó activo con el plan elegido, con su
-                  renovación calculada y el comprobante guardado en su historial de pagos.
+                  <strong className="text-foreground">{resultado.espacio}</strong>{" "}
+                  {modo === "demo"
+                    ? `quedó activo en demo por ${diasDemo} días con el plan elegido.`
+                    : "quedó activo con el plan elegido, con su renovación calculada y el comprobante guardado en su historial de pagos."}
                 </p>
               </div>
             ) : (
               <div className="rounded-[12px] border border-primary/30 bg-primary/10 p-3">
                 <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <Check size={16} className="text-success" /> Pago guardado. Envíale este enlace:
+                  <Check size={16} className="text-success" />{" "}
+                  {modo === "demo" ? "Enlace demo listo. Envíale este enlace:" : "Pago guardado. Envíale este enlace:"}
                 </p>
                 <p className="mt-1 text-xs text-muted">
-                  Al registrarse con él, su cuenta nace activa con el plan pagado y el comprobante enlazado.
+                  {modo === "demo"
+                    ? `Al registrarse con él, su cuenta nace activa por ${diasDemo} días con el plan elegido, sin pago.`
+                    : "Al registrarse con él, su cuenta nace activa con el plan pagado y el comprobante enlazado."}
                 </p>
                 <button
                   type="button"
@@ -179,6 +195,19 @@ export function RegistrarPagoDialog({
               <p className="text-muted">{ctx.contacto.wa_id}</p>
             </div>
 
+            <div className="grid grid-cols-2 gap-1 rounded-[10px] border border-border p-1 text-xs">
+              {(["pago", "demo"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setModo(m)}
+                  className={`rounded-[8px] px-2 py-1.5 font-semibold ${modo === m ? "bg-primary text-white" : "text-muted hover:text-foreground"}`}
+                >
+                  {m === "pago" ? "Con pago" : "Demo sin pago"}
+                </button>
+              ))}
+            </div>
+
             {ctx.espacio ? (
               <div className="flex flex-col gap-1.5">
                 <label className="flex cursor-pointer items-start gap-2 rounded-[10px] border border-border p-2.5 text-xs has-[:checked]:border-primary">
@@ -202,7 +231,7 @@ export function RegistrarPagoDialog({
             ) : (
               <p className="rounded-[10px] border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground">
                 Este contacto aún no tiene cuenta. Se generará un <strong>enlace de registro</strong> para enviarle; al
-                registrarse quedará activo con el plan pagado.
+                registrarse quedará activo {modo === "demo" ? "en demo por los días elegidos" : "con el plan pagado"}.
               </p>
             )}
 
@@ -216,10 +245,29 @@ export function RegistrarPagoDialog({
                 ))}
               </select>
             </label>
-            <label className="text-xs font-medium text-muted">
-              Monto pagado (COP)
-              <input type="number" inputMode="numeric" value={monto} onChange={(e) => setMonto(e.target.value)} className={`${INPUT} mt-1`} />
-            </label>
+            {modo === "demo" ? (
+              <label className="text-xs font-medium text-muted">
+                Días de demo
+                <input
+                  type="number"
+                  min={1}
+                  max={365}
+                  inputMode="numeric"
+                  value={diasDemo}
+                  onChange={(e) => setDiasDemo(e.target.value)}
+                  className={`${INPUT} mt-1`}
+                />
+                <span className="mt-1 block text-[11px] font-normal text-muted">
+                  Sin pago. Al cumplirse los días el espacio pasa a prueba vencida.
+                </span>
+              </label>
+            ) : (
+              <label className="text-xs font-medium text-muted">
+                Monto pagado (COP)
+                <input type="number" inputMode="numeric" value={monto} onChange={(e) => setMonto(e.target.value)} className={`${INPUT} mt-1`} />
+              </label>
+            )}
+            {modo === "pago" && (
             <label className="text-xs font-medium text-muted">
               Vence el (opcional)
               <input
@@ -235,12 +283,13 @@ export function RegistrarPagoDialog({
                   : `Vacío = un ciclo del plan${ctx.espacio?.vence ? " desde su vencimiento actual" : " desde hoy"}.`}
               </span>
             </label>
+            )}
             <label className="text-xs font-medium text-muted">
               Nota (opcional)
               <input value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Ej: Nequi, pagó con descuento" className={`${INPUT} mt-1`} />
             </label>
-            {!ctx.tieneAdjunto && (
-              <p className="text-[11px] text-muted">Este mensaje no tiene archivo; el pago se registra sin comprobante adjunto.</p>
+            {modo === "pago" && !ctx.tieneAdjunto && (
+              <p className="text-[11px] text-muted">Sin archivo adjunto; el pago se registra sin comprobante.</p>
             )}
 
             {error && <p className="text-xs text-error">{error}</p>}
@@ -254,9 +303,13 @@ export function RegistrarPagoDialog({
               {guardando && <Loader2 size={15} className="animate-spin" />}
               {guardando
                 ? "Guardando…"
-                : destino === "espacio" && ctx.espacio
-                  ? "Registrar pago y activar"
-                  : "Registrar pago y generar enlace"}
+                : modo === "demo"
+                  ? destino === "espacio" && ctx.espacio
+                    ? `Activar demo ${diasDemo} días`
+                    : "Generar enlace demo"
+                  : destino === "espacio" && ctx.espacio
+                    ? "Registrar pago y activar"
+                    : "Registrar pago y generar enlace"}
             </button>
           </div>
         )}
