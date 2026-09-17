@@ -245,7 +245,10 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
-      recorder.start();
+      // Con trozos periodicos (1 s) Safari/iPad no depende de entregar todo
+      // el audio en un unico evento al parar, que es donde a veces llegaba
+      // vacio y la nota se perdia sin aviso.
+      recorder.start(1000);
       mediaRecorderRef.current = recorder;
       recordedBlobRef.current = null;
       setRecStatus("recording");
@@ -273,8 +276,18 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
         // pidio puede no ser el que produjo.
         const tipoReal = recorder.mimeType || recordingMimeTypeRef.current;
         recordingMimeTypeRef.current = tipoReal;
-        resolve(new Blob(audioChunksRef.current, { type: tipoReal }));
+        // Safari puede disparar el ultimo "dataavailable" justo despues de
+        // "stop": se le da un respiro antes de armar el archivo.
+        setTimeout(() => resolve(new Blob(audioChunksRef.current, { type: tipoReal })), 150);
       };
+      // Pide el trozo pendiente antes de parar (en Safari no siempre sale solo).
+      if (recorder.state === "recording") {
+        try {
+          recorder.requestData();
+        } catch {
+          // Algunos navegadores no lo implementan; el stop() lo entrega igual.
+        }
+      }
       recorder.stop();
     });
   }
@@ -283,7 +296,14 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
     if (timerRef.current) clearInterval(timerRef.current);
     const blob = await stopCapture();
     recordedBlobRef.current = blob;
-    setPreviewUrl(blob.size > 0 ? URL.createObjectURL(blob) : null);
+    if (blob.size === 0) {
+      // Antes se quedaba en "revisar" sin audio y al enviar no pasaba nada.
+      setUploadError("La nota de voz quedó vacía. Toca el micrófono y graba de nuevo; espera un segundo antes de parar.");
+      setRecStatus("idle");
+      setRecordSeconds(0);
+      return;
+    }
+    setPreviewUrl(URL.createObjectURL(blob));
     setRecStatus("reviewing");
   }
 
@@ -335,6 +355,8 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
     if (blob && blob.size > 0) {
       const ext = blob.type.includes("mp4") ? "mp4" : blob.type.includes("mpeg") ? "mp3" : "webm";
       enqueueUpload(new File([blob], `nota-de-voz-${Date.now()}.${ext}`, { type: blob.type }));
+    } else {
+      setUploadError("La nota de voz quedó vacía. Graba de nuevo.");
     }
   }
 
