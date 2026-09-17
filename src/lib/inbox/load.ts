@@ -54,6 +54,7 @@ const ETIQUETA_MEDIA: Record<string, string> = {
   audio: "🎤 Nota de voz",
   document: "📄 Documento",
   sticker: "🩹 Sticker",
+  unsupported: "⚠️ Contenido no compatible",
 };
 
 const CAMPOS =

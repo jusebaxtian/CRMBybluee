@@ -42,6 +42,7 @@ function summarize(m: Pick<Message, "message_type" | "body">): string {
   if (m.message_type === "audio") return "🎤 Nota de voz";
   if (m.message_type === "document") return m.body || "📄 Documento";
   if (m.message_type === "sticker") return "🩹 Sticker";
+  if (m.message_type === "unsupported") return "⚠️ Contenido no compatible";
   if (m.message_type === "reaction") return m.body ? `Reaccionó ${m.body}` : "Reacción";
   if (m.message_type === "button") return m.body ? `🔘 ${m.body}` : "Tocó un botón";
   return m.body || "Mensaje";
@@ -97,6 +98,24 @@ export function MessageBubble({
           {out ? "Reaccionaste" : "Reaccionó"} {m.body ? m.body : "(quitó su reacción)"}
           {quotedMessage && <> a &quot;{summarize(quotedMessage).slice(0, 40)}&quot;</>}
         </p>
+      </div>
+    );
+  }
+
+  // Meta no transmite por la API ciertos contenidos (foto/video "ver una
+  // vez", encuestas, eventos, estados reenviados): llegan como "unsupported"
+  // y antes se pintaban como una burbuja vacia.
+  if (m.message_type === "unsupported") {
+    return (
+      <div className={`flex ${out ? "justify-end" : "justify-start"}`}>
+        <div className="max-w-[85%] rounded-[12px] border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground sm:max-w-[70%]">
+          <p className="font-semibold">⚠️ Contenido no compatible con la API de WhatsApp</p>
+          <p className="mt-0.5 text-muted">
+            Suele ser una foto o video de &quot;ver una vez&quot;, una encuesta, un evento o un estado reenviado. Pídele que lo envíe
+            como mensaje normal.
+          </p>
+          <p className="mt-1 text-[10px] opacity-70">{time}</p>
+        </div>
       </div>
     );
   }
