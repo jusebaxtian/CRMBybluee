@@ -7,6 +7,7 @@ import { MessageComposer, type MessageComposerHandle } from "@/components/inbox/
 import { TemplateGatePicker } from "@/components/templates/template-gate-picker";
 import { ForwardDialog } from "@/components/inbox/forward-dialog";
 import { RegistrarPagoDialog } from "@/components/inbox/registrar-pago-dialog";
+import { RecordatorioPicker } from "@/components/inbox/recordatorio-picker";
 import { useMessageWindow } from "@/lib/use-message-window";
 
 export type OptimisticMessage = {
@@ -29,6 +30,7 @@ type ApprovedTemplate = { id: string; meta_template_name: string; language: stri
 export function ChatPane({
   conversationId,
   contactId,
+  contactName = "",
   messages,
   quickReplies = [],
   automations = [],
@@ -37,6 +39,7 @@ export function ChatPane({
 }: {
   conversationId: string;
   contactId: string;
+  contactName?: string;
   messages: OptimisticMessage[];
   quickReplies?: { id: string; name: string }[];
   automations?: { id: string; name: string }[];
@@ -135,6 +138,7 @@ export function ChatPane({
           ref={composerRef}
           conversationId={conversationId}
           contactId={contactId}
+          contactName={contactName}
           quickReplies={quickReplies}
           automations={automations}
           replyingTo={replyingTo}
@@ -142,7 +146,14 @@ export function ChatPane({
           onOptimisticSend={(message) => setPending((p) => [...p, message])}
         />
       ) : (
-        <TemplateGatePicker conversationId={conversationId} templates={approvedTemplates} />
+        <div className="relative">
+          {/* Fuera de la ventana de 24 h el compositor no se muestra, pero el
+              recordatorio ("llamar al cliente") es justo lo que se necesita ahi. */}
+          <div className="absolute left-3 top-3 z-30 rounded-full border border-border bg-surface p-1.5 shadow-lg">
+            <RecordatorioPicker conversationId={conversationId} contactName={contactName} />
+          </div>
+          <TemplateGatePicker conversationId={conversationId} templates={approvedTemplates} />
+        </div>
       )}
     </div>
   );

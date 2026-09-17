@@ -246,6 +246,7 @@ export default async function ConversationPage({
         <ChatPane
           conversationId={id}
           contactId={conversation.contact_id}
+          contactName={contact.name?.trim() || contact.wa_id}
           messages={messages ?? []}
           quickReplies={quickReplies ?? []}
           automations={allAutomations ?? []}

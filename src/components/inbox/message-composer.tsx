@@ -6,6 +6,7 @@ import { sendMessage, sendChatMedia } from "@/app/actions/whatsapp";
 import type { OptimisticMessage } from "@/components/inbox/chat-pane";
 import { QuickReplyPicker } from "@/components/quick-replies/quick-reply-picker";
 import { AutomationPicker } from "@/components/automations/automation-picker";
+import { RecordatorioPicker } from "@/components/inbox/recordatorio-picker";
 import { ResetAutomationsButton } from "@/components/automations/reset-automations-button";
 import { mediaKindFromMime, validateMediaSize } from "@/lib/whatsapp/media-limits";
 
@@ -22,6 +23,7 @@ export type MessageComposerHandle = {
 export const MessageComposer = forwardRef<MessageComposerHandle, {
   conversationId: string;
   contactId: string;
+  contactName?: string;
   quickReplies?: { id: string; name: string }[];
   automations?: { id: string; name: string }[];
   replyingTo?: { waMessageId: string; preview: string } | null;
@@ -30,6 +32,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
 }>(function MessageComposer({
   conversationId,
   contactId,
+  contactName = "",
   quickReplies = [],
   automations = [],
   replyingTo,
@@ -466,6 +469,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
         <QuickReplyPicker contactId={contactId} quickReplies={quickReplies} />
         <AutomationPicker contactId={contactId} automations={automations} />
         <ResetAutomationsButton contactId={contactId} />
+        <RecordatorioPicker conversationId={conversationId} contactName={contactName} />
         <button
           type="button"
           onClick={startRecording}

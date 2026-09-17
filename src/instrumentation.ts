@@ -32,6 +32,7 @@ export async function register() {
   const { cleanupOldNotifications } = await import("@/lib/notifications/scheduler");
   const { processDueCampaigns } = await import("@/lib/campaigns/scheduler");
   const { deleteStaleUnactivatedWorkspaces } = await import("@/lib/billing/cleanup");
+  const { processDueReminders } = await import("@/lib/recordatorios/scheduler");
 
   const MINUTO = 60_000;
 
@@ -42,6 +43,7 @@ export async function register() {
     { nombre: "automatizaciones", cadaMs: 20_000, correr: processDueAutomationRuns },
     { nombre: "campañas", cadaMs: 30_000, correr: processDueCampaigns },
     { nombre: "seguimientos IA", cadaMs: MINUTO, correr: processAiFollowups },
+    { nombre: "recordatorios", cadaMs: MINUTO, correr: processDueReminders },
     { nombre: "fin de prueba", cadaMs: 5 * MINUTO, correr: expireTrials },
     { nombre: "suscripciones vencidas", cadaMs: 5 * MINUTO, correr: expireLapsedActiveSubscriptions },
     { nombre: "limpieza de notificaciones", cadaMs: 60 * MINUTO, correr: cleanupOldNotifications },
