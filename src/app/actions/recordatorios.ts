@@ -71,6 +71,7 @@ export async function listarRecordatorios(conversationId: string) {
     .select("id, texto, recordar_en")
     .eq("conversation_id", conversationId)
     .eq("workspace_id", workspaceId)
+    .is("avisado_en", null)
     .order("recordar_en");
   return (data ?? []) as { id: string; texto: string; recordar_en: string }[];
 }
@@ -93,7 +94,7 @@ export async function actualizarRecordatorio(input: { id: string; texto: string;
   const { supabase, workspaceId } = ctx;
   const { data, error } = await supabase
     .from("recordatorios")
-    .update({ texto: v.texto, recordar_en: v.cuando.toISOString() })
+    .update({ texto: v.texto, recordar_en: v.cuando.toISOString(), avisado_en: null })
     .eq("id", input.id)
     .eq("workspace_id", workspaceId)
     .select("conversation_id")
@@ -112,6 +113,8 @@ export type RecordatorioAgenda = {
   conversation_id: string;
   contacto: string;
   wa_id: string;
+  /** Cuando ya sono el aviso (historial); null = pendiente. */
+  avisado_en: string | null;
 };
 
 /** Recordatorios del espacio entre dos fechas (Agenda). */
@@ -121,7 +124,7 @@ export async function listarRecordatoriosEntre(desdeIso: string, hastaIso: strin
   const { supabase, workspaceId } = ctx;
   const { data } = await supabase
     .from("recordatorios")
-    .select("id, texto, recordar_en, conversation_id, contacts(name, wa_id)")
+    .select("id, texto, recordar_en, conversation_id, avisado_en, contacts(name, wa_id)")
     .eq("workspace_id", workspaceId)
     .gte("recordar_en", desdeIso)
     .lt("recordar_en", hastaIso)
@@ -135,6 +138,7 @@ export async function listarRecordatoriosEntre(desdeIso: string, hastaIso: strin
       conversation_id: r.conversation_id,
       contacto: c?.name?.trim() || c?.wa_id || "Contacto",
       wa_id: c?.wa_id ?? "",
+      avisado_en: (r.avisado_en as string | null) ?? null,
     };
   });
 }

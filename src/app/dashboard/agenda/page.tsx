@@ -22,7 +22,7 @@ export default async function AgendaPage() {
       <div>
         <h1 className="font-dash-display text-[22px] font-bold tracking-[-.4px] text-foreground">Agenda</h1>
         <p className="mt-1 text-sm text-muted">
-          Recordatorios de tus contactos. Al cumplirse te avisan en la campana y desaparecen de aquí.
+          Recordatorios de tus contactos. Al cumplirse te avisan en la campana y quedan aquí como historial durante 60 días.
         </p>
       </div>
       <Agenda inicial={inicial} mesInicial={`${hoy.getFullYear()}-${hoy.getMonth() + 1}`} />

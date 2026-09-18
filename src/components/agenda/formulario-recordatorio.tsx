@@ -178,6 +178,12 @@ export function FormularioRecordatorio({
           />
         </label>
 
+        {existente?.avisado_en && (
+          <p className="rounded-[9px] border border-border bg-background px-3 py-2 text-xs text-muted">
+            ✓ Avisado el {new Date(existente.avisado_en).toLocaleString("es-CO", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}.
+            Queda como historial 60 días. Si guardas una fecha nueva, vuelve a programarse.
+          </p>
+        )}
         {error && <p className="text-xs text-error">{error}</p>}
 
         <div className="flex items-center gap-2">

@@ -1,10 +1,13 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 
-const DIAS_VISIBLE = 3;
+const DIAS_VISIBLE_AVISO = 3;
+/** Los recordatorios cumplidos quedan como historial en la Agenda este tiempo. */
+export const DIAS_HISTORIAL_RECORDATORIOS = 60;
 
 /**
- * Recordatorios vencidos → aviso en la campana del espacio y se borran
- * (migracion 0110). Corre cada minuto en el proceso de fondo.
+ * Recordatorios vencidos → aviso en la campana del espacio y se marcan
+ * como avisados (quedan 60 dias como historial en la Agenda, migracion
+ * 0112). Corre cada minuto en el proceso de fondo.
  */
 export async function processDueReminders() {
   const supabase = createAdminClient();
@@ -13,13 +16,13 @@ export async function processDueReminders() {
   const { data: vencidos } = await supabase
     .from("recordatorios")
     .select("id, workspace_id, conversation_id, texto, contacts(name, wa_id)")
+    .is("avisado_en", null)
     .lte("recordar_en", ahora.toISOString())
     .order("recordar_en")
     .limit(100);
-  if (!vencidos || vencidos.length === 0) return;
 
-  const endsAt = new Date(ahora.getTime() + DIAS_VISIBLE * 24 * 60 * 60 * 1000).toISOString();
-  for (const r of vencidos) {
+  const endsAt = new Date(ahora.getTime() + DIAS_VISIBLE_AVISO * 24 * 60 * 60 * 1000).toISOString();
+  for (const r of vencidos ?? []) {
     const contacto = r.contacts as unknown as { name: string | null; wa_id: string } | null;
     const quien = contacto?.name?.trim() || contacto?.wa_id || "contacto";
     const { error } = await supabase.from("notifications").insert({
@@ -35,6 +38,10 @@ export async function processDueReminders() {
       console.error("recordatorio: no se pudo crear el aviso:", error.message);
       continue;
     }
-    await supabase.from("recordatorios").delete().eq("id", r.id);
+    await supabase.from("recordatorios").update({ avisado_en: ahora.toISOString() }).eq("id", r.id);
   }
+
+  // Historial: pasados 60 dias de la fecha del recordatorio, se borra.
+  const corte = new Date(ahora.getTime() - DIAS_HISTORIAL_RECORDATORIOS * 24 * 60 * 60 * 1000).toISOString();
+  await supabase.from("recordatorios").delete().lt("recordar_en", corte);
 }

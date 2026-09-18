@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { AlarmClock, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { AlarmClock, Check, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { listarRecordatoriosEntre, type RecordatorioAgenda } from "@/app/actions/recordatorios";
 import { FormularioRecordatorio } from "@/components/agenda/formulario-recordatorio";
 
@@ -150,10 +150,12 @@ export function Agenda({ inicial, mesInicial }: { inicial: RecordatorioAgenda[];
                       <button
                         type="button"
                         onClick={() => setEditando(r)}
-                        title={`${r.contacto}: ${r.texto}`}
-                        className="flex w-full items-start gap-1 rounded-md border border-primary/30 bg-primary/10 px-1.5 py-1 text-left text-[11px] leading-tight text-foreground hover:bg-primary/20"
+                        title={`${r.contacto}: ${r.texto}${r.avisado_en ? " · avisado" : ""}`}
+                        className={`flex w-full items-start gap-1 rounded-md border px-1.5 py-1 text-left text-[11px] leading-tight hover:bg-primary/20 ${
+                          r.avisado_en ? "border-border bg-surface-hover/60 text-muted" : "border-primary/30 bg-primary/10 text-foreground"
+                        }`}
                       >
-                        <AlarmClock size={10} className="mt-0.5 shrink-0 text-primary" />
+                        {r.avisado_en ? <Check size={10} className="mt-0.5 shrink-0 text-success" /> : <AlarmClock size={10} className="mt-0.5 shrink-0 text-primary" />}
                         <span className="min-w-0">
                           <span className="font-semibold">
                             {new Date(r.recordar_en).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })}
