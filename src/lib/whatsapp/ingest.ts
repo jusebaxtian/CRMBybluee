@@ -282,13 +282,33 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           .maybeSingle();
         if (existing) continue;
 
-        const contactEntry = value.contacts?.find((c) => c.wa_id === message.from);
+        // Usuarios de WhatsApp con nombre de usuario y numero oculto: Meta
+        // puede mandar "from"/"wa_id" con el BSUID (CO.xxxx) u omitirlos y
+        // dejar solo user_id. Antes, sin "from" el contacto no se creaba y
+        // el mensaje se descartaba sin dejar rastro.
+        const contactEntry =
+          value.contacts?.find((c) => c.wa_id === message.from) ??
+          value.contacts?.find((c) => c.user_id && c.user_id === message.user_id) ??
+          value.contacts?.[0];
         const profileName = contactEntry?.profile?.name;
         const bsuid = message.user_id ?? contactEntry?.user_id ?? null;
+        const waId = message.from || contactEntry?.wa_id || bsuid;
+        if (!waId) {
+          console.error("whatsapp webhook: mensaje sin remitente identificable", {
+            workspaceId,
+            messageId: message.id,
+            type: message.type,
+            contacts: value.contacts,
+          });
+          continue;
+        }
 
-        const contact = await resolveContact(supabase, workspaceId, message.from, bsuid, profileName);
+        const contact = await resolveContact(supabase, workspaceId, waId, bsuid, profileName);
 
-        if (!contact) continue;
+        if (!contact) {
+          console.error("whatsapp webhook: no se pudo crear el contacto", { workspaceId, waId, bsuid, messageId: message.id });
+          continue;
+        }
 
         // Any inbound message proves the number is reachable — clear
         // whatever failure streak/likely_blocked flag it had.
@@ -451,7 +471,7 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           conversation.id,
           conversation.assigned_agent_id,
           profileName ?? null,
-          message.from,
+          waId,
           notificationPreview
         );
 
