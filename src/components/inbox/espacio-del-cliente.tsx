@@ -67,7 +67,7 @@ export function EspacioDelClienteCard({
           <ul className="mt-2 flex flex-col gap-2">
             {espacios.map((e) => {
               const vence = e.vence
-                ? new Date(e.vence).toLocaleDateString("es-CO", { day: "2-digit", month: "short", timeZone: "America/Bogota" })
+                ? new Date(e.vence).toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric", timeZone: "America/Bogota" })
                 : null;
               return (
                 <li key={e.workspace_id} className="text-xs">
