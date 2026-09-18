@@ -10,6 +10,7 @@ import {
   updateWorkspacePhone,
   updateWorkspaceExtraNumbers,
   updateWorkspaceExtraAgents,
+  updateWorkspaceRenewalDate,
 } from "@/app/actions/admin";
 
 const INPUT =
@@ -22,6 +23,8 @@ type Valores = {
   extraAgents: string;
   email: string;
   password: string;
+  /** Vencimiento (AAAA-MM-DD) del plan o de la prueba. */
+  venceEl: string;
 };
 
 /**
@@ -39,6 +42,8 @@ export function EditClientFields({
   planNumbers,
   ownerId,
   ownerEmail,
+  createdAt,
+  venceEl,
 }: {
   workspaceId: string;
   workspaceName: string;
@@ -50,6 +55,10 @@ export function EditClientFields({
   planNumbers: number;
   ownerId: string | null;
   ownerEmail: string | null;
+  /** Fecha de registro del espacio (solo lectura). */
+  createdAt: string;
+  /** Vencimiento actual (AAAA-MM-DD) o vacio si no tiene. */
+  venceEl: string;
 }) {
   const router = useRouter();
   const inicial: Valores = {
@@ -59,6 +68,7 @@ export function EditClientFields({
     extraAgents: String(extraAgents),
     email: ownerEmail ?? "",
     password: "",
+    venceEl,
   };
   const [v, setV] = useState<Valores>(inicial);
   const [guardado, setGuardado] = useState<Valores>(inicial);
@@ -85,6 +95,7 @@ export function EditClientFields({
     if (cambio("extraAgents")) tareas.push(["extraAgents", () => updateWorkspaceExtraAgents(workspaceId, v.extraAgents)]);
     if (ownerId && cambio("email")) tareas.push(["email", () => updateOwnerEmail(ownerId, v.email, workspaceId)]);
     if (ownerId && cambio("password")) tareas.push(["password", () => updateOwnerPassword(ownerId, v.password, workspaceId)]);
+    if (cambio("venceEl")) tareas.push(["venceEl", () => updateWorkspaceRenewalDate(workspaceId, v.venceEl)]);
 
     const nuevosErrores: Partial<Record<keyof Valores, string>> = {};
     const nuevoGuardado = { ...guardado };
@@ -137,6 +148,13 @@ export function EditClientFields({
         ) : (
           <p className="text-xs text-muted">Este workspace no tiene un usuario propietario.</p>
         )}
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted">Fecha de registro</label>
+          <p className={`${INPUT} cursor-default border-dashed text-muted`}>
+            {new Date(createdAt).toLocaleDateString("es-CO", { day: "2-digit", month: "long", year: "numeric", timeZone: "America/Bogota" })}
+          </p>
+        </div>
+        {campo("venceEl", "Vence el (plan o prueba)", "date")}
       </div>
 
       <div className="mt-4 flex items-center gap-3">

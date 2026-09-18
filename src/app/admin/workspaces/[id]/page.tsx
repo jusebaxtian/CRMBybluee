@@ -73,6 +73,19 @@ export default async function AdminWorkspaceDetailPage({
     .limit(5);
 
   const limiteNumeros = await limiteDeNumeros(supabase, id);
+
+  // Vencimiento actual para el formulario: prueba -> trial_ends_at; si no,
+  // la suscripcion activa mas lejana.
+  const { data: suscripcionVigente } = await supabase
+    .from("subscriptions")
+    .select("current_period_end")
+    .eq("workspace_id", id)
+    .eq("status", "active")
+    .order("current_period_end", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const venceIso = workspace.status === "trialing" ? workspace.trial_ends_at : suscripcionVigente?.current_period_end ?? null;
+  const venceEl = venceIso ? new Date(venceIso).toLocaleDateString("en-CA", { timeZone: "America/Bogota" }) : "";
   const planAgents = (await limiteDeAgentes(supabase, id)).plan;
 
   const { data: owner } = await supabase
@@ -130,6 +143,8 @@ export default async function AdminWorkspaceDetailPage({
           planNumbers={limiteNumeros.plan}
           ownerId={owner?.user_id ?? null}
           ownerEmail={ownerEmail}
+          createdAt={workspace.created_at}
+          venceEl={venceEl}
         />
         <div className="mt-4 border-t border-border pt-4">
           <NotifyActivationButton
