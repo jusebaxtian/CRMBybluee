@@ -1,6 +1,18 @@
 const GRAPH_VERSION = "v21.0";
 const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`;
 
+// Destinatario segun el tipo de identificador (BSUID, migracion 0025):
+// un numero va en "to"; un usuario con numero oculto (CO.xxxx) debe ir
+// en "recipient" con recipient_type individual. Mandar el BSUID en "to"
+// hacia que Meta aceptara el envio y luego lo marcara 131026 (no
+// entregable).
+function esBsuid(id: string): boolean {
+  return /^[A-Z]{2}.[A-Za-z0-9]+$/.test(id);
+}
+function destinatario(to: string): Record<string, string> {
+  return esBsuid(to) ? { recipient_type: "individual", recipient: to } : { to };
+}
+
 async function graphFetch(path: string, init?: RequestInit) {
   const res = await fetch(`${GRAPH_BASE}${path}`, init);
   const data = await res.json();
@@ -118,7 +130,7 @@ export async function sendTextMessage(
     },
     body: JSON.stringify({
       messaging_product: "whatsapp",
-      to,
+      ...destinatario(to),
       type: "text",
       text: { body },
       ...(replyToWaMessageId ? { context: { message_id: replyToWaMessageId } } : {}),
@@ -146,7 +158,7 @@ export async function sendInteractiveButtonsMessage(
     },
     body: JSON.stringify({
       messaging_product: "whatsapp",
-      to,
+      ...destinatario(to),
       type: "interactive",
       interactive: {
         type: "button",
@@ -182,7 +194,7 @@ export async function sendInteractiveCtaUrlMessage(
     },
     body: JSON.stringify({
       messaging_product: "whatsapp",
-      to,
+      ...destinatario(to),
       type: "interactive",
       interactive: {
         type: "cta_url",
@@ -403,7 +415,7 @@ export async function sendMediaMessage(
     },
     body: JSON.stringify({
       messaging_product: "whatsapp",
-      to,
+      ...destinatario(to),
       type,
       [type]: mediaObject,
     }),
@@ -471,7 +483,7 @@ export async function sendTemplateMessage(
     },
     body: JSON.stringify({
       messaging_product: "whatsapp",
-      to,
+      ...destinatario(to),
       type: "template",
       template,
     }),
