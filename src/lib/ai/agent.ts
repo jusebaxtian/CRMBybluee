@@ -69,13 +69,32 @@ REGLA OBLIGATORIA, por encima de cualquier instrucción de venta anterior: si el
 // Used only for AI-generated follow-ups inside the 24h window — same voice
 // as the sales prompt, but instructed to write a short check-in instead of
 // continuing to pitch, and never to invent a handoff on its own here.
+// El "enfoque" del paso va al final del prompt y se repite como ultima
+// instruccion (ver followups.ts): con una "Informacion del negocio" de
+// decenas de miles de caracteres, puesto al principio el modelo lo diluia y
+// escribia seguimientos genericos aunque el cliente los hubiera cambiado.
 export function buildFollowupSystemPrompt(agentName: string, persona: string, focus: string): string {
-  return `Eres ${agentName}, un vendedor de WhatsApp para este negocio. El cliente dejó de responder hace un tiempo. Tu tarea ahora es escribir UN solo mensaje corto de seguimiento — natural, cercano, en español, sin sonar robótico ni insistente — retomando la conversación de abajo para intentar que el cliente responda. No repitas todo lo que ya dijiste, no seas insistente ni uses frases de venta agresivas. No incluyas marcadores ni etiquetas especiales, solo el texto del mensaje.
+  return `Eres ${agentName}, un vendedor de WhatsApp para este negocio. El cliente dejó de responder hace un tiempo: el último mensaje de la conversación lo enviaste tú y no hubo respuesta. Tu tarea ahora es escribir UN solo mensaje corto de seguimiento — natural, cercano, en español, sin sonar robótico ni insistente — para intentar que el cliente responda. No es una respuesta a una pregunta ni una corrección: no pidas disculpas ni digas "disculpa la confusión". No repitas lo que ya dijiste, no seas insistente ni uses frases de venta agresivas. No incluyas marcadores ni etiquetas especiales, solo el texto del mensaje.
 
-Enfoque de ESTE seguimiento en particular (síguelo, es la estrategia para este intento): ${focus || "retomar el contacto de forma natural"}
+Formato WhatsApp: negrita con UN solo asterisco (*así*), nunca con dos (**así**); sin títulos ni viñetas de Markdown.
 
 Información del negocio:
-${persona || "(el dueño del negocio todavía no configuró esta información)"}`;
+${persona || "(el dueño del negocio todavía no configuró esta información)"}
+
+ENFOQUE OBLIGATORIO DE ESTE SEGUIMIENTO (es la estrategia para este intento y manda sobre cualquier ejemplo de arriba): ${focus || "retomar el contacto de forma natural"}`;
+}
+
+/** Instruccion final que se agrega como ultimo turno para que el enfoque no se pierda. */
+export function followupFinalInstruction(numero: number, focus: string): string {
+  return `[Instrucción para este mensaje] El cliente no ha respondido. Escribe ahora el seguimiento #${numero}, corto, siguiendo exactamente este enfoque: ${focus || "retomar el contacto de forma natural"}. Negrita solo con un asterisco (*texto*). Responde únicamente con el mensaje para el cliente.`;
+}
+
+/** WhatsApp no entiende Markdown: **negrita** se ve con asteriscos literales. */
+export function formatoWhatsApp(texto: string): string {
+  return texto
+    .replace(/\*\*(.+?)\*\*/g, "*$1*")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^\s*[-•]\s+/gm, "• ");
 }
 
 // Pure parsing shared by the real webhook path and the settings-page test
@@ -181,7 +200,7 @@ export async function maybeRespondWithAiAgent(
   if (!reply) return;
 
   const { customerReply: parsedReply, handoff, mediaKeys: requestedKeys } = interpretAiReply(reply);
-  let customerReply = parsedReply;
+  const customerReply = formatoWhatsApp(parsedReply);
 
   if (handoff) {
     await supabase

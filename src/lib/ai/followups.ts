@@ -1,7 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { callAiProvider, type ChatTurn } from "@/lib/ai/providers";
 import { sendTextMessage, sendTemplateMessage } from "@/lib/whatsapp/graph";
-import { buildFollowupSystemPrompt } from "@/lib/ai/agent";
+import { buildFollowupSystemPrompt, followupFinalInstruction, formatoWhatsApp } from "@/lib/ai/agent";
 import { isContactExcludedFromAutomations } from "@/lib/automations/engine";
 import { buildTemplateSendParams } from "@/lib/whatsapp/variables";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
@@ -119,7 +119,7 @@ async function processWorkspaceFollowups(
     if (!account) continue;
 
     try {
-      await sendFollowup(supabase, agent, conversation.id, conversation.contact_id, account, template, step);
+      await sendFollowup(supabase, agent, conversation.id, conversation.contact_id, account, template, step, conversation.ai_followup_count + 1);
     } catch (err) {
       console.error(
         `AI followup send failed conversation=${conversation.id} workspace=${agent.workspace_id}:`,
@@ -144,7 +144,8 @@ async function sendFollowup(
     variable_count: number;
     buttons: { type: "URL" | "QUICK_REPLY"; text: string; url?: string }[] | null;
   } | null,
-  step: FollowupStep
+  step: FollowupStep,
+  numero: number
 ) {
   const { data: contact } = await supabase.from("contacts").select("wa_id, name").eq("id", contactId).single();
   if (!contact) return;
@@ -182,13 +183,13 @@ async function sendFollowup(
         agent.api_key,
         agent.model,
         buildFollowupSystemPrompt(agent.agent_name, agent.persona, step.focus),
-        history
+        [...history, { role: "user", content: followupFinalInstruction(numero, step.focus) }]
       );
     } catch (err) {
       console.error(`AI followup generation failed for workspace=${agent.workspace_id}:`, err);
       return;
     }
-    const text = reply?.trim();
+    const text = formatoWhatsApp(reply?.trim() ?? "");
     if (!text) return;
 
     const result = await sendTextMessage(account.phone_number_id, account.access_token, contact.wa_id, text);
