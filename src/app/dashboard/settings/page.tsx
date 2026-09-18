@@ -106,7 +106,7 @@ export default async function SettingsPage() {
       ? await supabase
           .from("ai_agents")
           .select(
-            "provider, model, agent_name, persona, is_active, followup_enabled, followup_delay_minutes, followup_max_attempts, followup_template_id"
+            "provider, model, agent_name, persona, is_active, followup_enabled, followup_steps, followup_template_id"
           )
           .eq("workspace_id", workspaceId)
           .maybeSingle()
