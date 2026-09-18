@@ -13,7 +13,8 @@ import { ConversationFollowupsToggle } from "@/components/inbox/conversation-fol
 import { ContactBlockedNotice } from "@/components/inbox/contact-blocked-notice";
 import { AiHandoffNotice } from "@/components/inbox/ai-handoff-notice";
 import { ConversationAiToggle } from "@/components/inbox/conversation-ai-toggle";
-import { getWorkspaceId } from "@/lib/workspace";
+import { getWorkspaceId, IMPERSONATION_COOKIE } from "@/lib/workspace";
+import { cookies } from "next/headers";
 import { listWorkspaceAgents } from "@/lib/agents";
 import { isPhoneNumber } from "@/lib/whatsapp/identity";
 import { isPlatformAdmin } from "@/lib/admin";
@@ -112,7 +113,11 @@ export default async function ConversationPage({
   // (migración 0096). Para cualquier otro usuario la función devuelve vacío.
   let espaciosDelCliente: EspacioDelCliente[] = [];
   let invitacionesPendientes: InvitacionPendiente[] = [];
-  const esAdmin = await isPlatformAdmin(supabase);
+  // Las herramientas de soporte (registrar pago, demo, espacio del cliente)
+  // solo aplican en el espacio propio del administrador: en "modo soporte"
+  // se ocultan para ver exactamente lo mismo que ve el cliente.
+  const enModoSoporte = !!(await cookies()).get(IMPERSONATION_COOKIE)?.value;
+  const esAdmin = !enModoSoporte && (await isPlatformAdmin(supabase));
   if (esAdmin) {
     const [{ data }, invitaciones] = await Promise.all([
       supabase.rpc("admin_espacio_de_contacto", { p_contact_id: conversation.contact_id }),
