@@ -24,6 +24,7 @@ import { transcodeVideoToH264 } from "@/lib/whatsapp/video-transcode";
 import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
 import { buildTemplateSendParams } from "@/lib/whatsapp/variables";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
+import { crearPlantillaSaludoInicial } from "@/lib/templates/saludo-inicial";
 import { abrirConversacion } from "@/lib/whatsapp/conversacion";
 import { toPublicUrl } from "@/lib/supabase/config";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
@@ -185,7 +186,11 @@ export async function connectWhatsApp(input: {
       return { error: error.message };
     }
 
+    // Plantilla de arranque para todo espacio que conecta su API (una por WABA).
+    await crearPlantillaSaludoInicial(supabase, membership.workspace_id, input.wabaId, accessToken);
+
     revalidatePath("/dashboard");
+    revalidatePath("/dashboard/templates");
     return { success: true, displayPhoneNumber: phoneDetails.display_phone_number };
   } catch (err) {
     // Queda en el log del servidor: hasta ahora el mensaje solo lo veia el
