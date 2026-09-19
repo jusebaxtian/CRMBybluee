@@ -347,10 +347,16 @@ export function CreateTemplateForm({ wabas = [] }: { wabas?: WabaOption[] }) {
       )}
       {error && <p className="text-sm text-red-400">{error}</p>}
       {success && (
-        <p className="flex items-center gap-1.5 text-sm text-success">
-          <CheckCircle2 size={14} />
-          Plantilla enviada a Meta para aprobación. Puede tardar minutos u horas en revisarse.
-        </p>
+        <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
+          <p className="flex items-center gap-1.5 font-semibold text-success">
+            <CheckCircle2 size={14} />
+            Plantilla enviada a Meta. Queda en estado <span className="text-warning">Pendiente</span>.
+          </p>
+          <p className="mt-1 text-xs text-warning">
+            ⚠️ La aprobación de la plantilla hace parte de un proceso de Meta, no del CRM: puede tardar entre 24 y 48 horas.
+            Mientras esté pendiente no se puede usar en campañas ni automatizaciones. Usa “Sincronizar” para ver el estado actualizado.
+          </p>
+        </div>
       )}
 
       <Button type="submit" disabled={uploading} className="self-start">

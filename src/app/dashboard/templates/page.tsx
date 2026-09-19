@@ -119,6 +119,11 @@ export default async function TemplatesPage() {
                   </span>
                 </div>
 
+                {t.status === "PENDING" && (
+                  <p className="mb-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-[11px] text-warning">
+                    ⚠️ En revisión por Meta. La aprobación es un proceso de Meta y puede tardar entre 24 y 48 horas.
+                  </p>
+                )}
                 <TemplatePreview
                   headerFormat={headerFormat}
                   headerText={t.header_text}
