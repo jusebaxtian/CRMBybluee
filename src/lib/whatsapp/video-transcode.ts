@@ -14,7 +14,7 @@ const MIN_VIDEO_BITRATE_KBPS = 150;
 const MAX_VIDEO_BITRATE_KBPS = 3000;
 const MAX_DIMENSION = 1280;
 
-async function probeVideo(filePath: string): Promise<{ duration: number; width: number; height: number }> {
+async function probeVideo(filePath: string): Promise<{ duration: number }> {
   const { stdout } = await execFileAsync("ffprobe", [
     "-v",
     "error",
@@ -27,18 +27,8 @@ async function probeVideo(filePath: string): Promise<{ duration: number; width: 
     filePath,
   ]);
   const data = JSON.parse(stdout);
-  const stream = data.streams?.[0] ?? {};
   const duration = parseFloat(data.format?.duration);
-  return {
-    duration: Number.isFinite(duration) && duration > 0 ? duration : 60,
-    width: Number(stream.width) || 1280,
-    height: Number(stream.height) || 720,
-  };
-}
-
-function evenize(n: number): number {
-  const rounded = Math.round(n);
-  return rounded % 2 === 0 ? rounded : rounded - 1;
+  return { duration: Number.isFinite(duration) && duration > 0 ? duration : 60 };
 }
 
 // WhatsApp's Cloud API only accepts H.264 video + AAC audio inside an MP4
@@ -68,7 +58,7 @@ export async function transcodeVideoToH264(buffer: Buffer, sourceExt: string): P
   const outPath = path.join(tmpdir(), `${id}-out.mp4`);
   await writeFile(inPath, buffer);
   try {
-    const { duration, width, height } = await probeVideo(inPath);
+    const { duration } = await probeVideo(inPath);
 
     const targetBits = TARGET_MAX_BYTES * SAFETY_MARGIN * 8;
     let videoBitrateKbps = Math.min(
@@ -79,10 +69,14 @@ export async function transcodeVideoToH264(buffer: Buffer, sourceExt: string): P
     // A low bitrate budget on a full-resolution source looks worse than the
     // same budget on a downscaled one — cap the larger dimension once the
     // bitrate gets tight. libx264 requires even width/height.
-    const largerDim = Math.max(width, height);
-    const scale = largerDim > MAX_DIMENSION ? MAX_DIMENSION / largerDim : 1;
-    const outWidth = evenize(width * scale);
-    const outHeight = evenize(height * scale);
+    //
+    // Los videos de celular en vertical vienen grabados en horizontal con
+    // una etiqueta de rotacion de 90 grados: ffprobe reporta 1920x1080 pero
+    // ffmpeg, al autorrotar, produce cuadros de 1080x1920. Escalar a un
+    // tamano fijo calculado con las medidas sin rotar aplastaba el video
+    // vertical en un marco horizontal. El filtro decide sobre el cuadro ya
+    // rotado (iw/ih), conserva la proporcion y deja medidas pares (-2).
+    const filtroEscala = `scale=w='if(gt(iw,ih),min(${MAX_DIMENSION},iw),-2)':h='if(gt(iw,ih),-2,min(${MAX_DIMENSION},ih))'`;
 
     const MAX_ATTEMPTS = 3;
     let result: Buffer | null = null;
@@ -108,7 +102,7 @@ export async function transcodeVideoToH264(buffer: Buffer, sourceExt: string): P
           "-bufsize",
           `${videoBitrateKbps * 2}k`,
           "-vf",
-          `scale=${outWidth}:${outHeight}`,
+          filtroEscala,
           "-c:a",
           "aac",
           "-b:a",
