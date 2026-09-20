@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0f0c">
+<title>Sin conexión · ByBluee</title>
+<style>
+  :root{color-scheme:dark}
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:radial-gradient(360px 260px at 50% 30%,#1ba84a1f,transparent 70%),#0a0f0c;color:#eef3ef;font-family:Manrope,system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:max(24px,env(safe-area-inset-top)) 24px max(24px,env(safe-area-inset-bottom));gap:12px}
+  .logo{display:flex;align-items:center;gap:8px;font-weight:800;font-size:16px;letter-spacing:-.01em}
+  .logo img{width:24px;height:24px;border-radius:7px}
+  .ico{position:relative;width:96px;height:96px;margin:10px auto 4px;display:grid;place-items:center}
+  .ico::before,.ico::after{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid #1ba84a66;animation:wave 2.4s ease-out infinite}
+  .ico::after{animation-delay:1.2s}
+  .ico svg{width:48px;height:48px;stroke:#7ee3a1;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;position:relative;z-index:1}
+  h1{font-size:26px;margin:0;letter-spacing:-.02em}
+  p{color:#a7b3ab;line-height:1.55;margin:0 auto;max-width:30ch;font-size:15px}
+  .btn{display:inline-flex;justify-content:center;align-items:center;gap:8px;background:#1ba84a;color:#fff;border:0;border-radius:11px;padding:13px 22px;font-weight:800;font-size:14px;box-shadow:0 8px 24px #1ba84a44;cursor:pointer;margin-top:10px;font-family:inherit}
+  .btn:active{transform:translateY(1px)}
+  a.link{font-size:13px;color:#93a39a;text-decoration:underline}
+  .estado{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:#93a39a;margin-top:18px}
+  .dot{width:8px;height:8px;border-radius:50%;background:#e05b5b;display:inline-block;animation:blink 1.4s infinite}
+  .dot.ok{background:#1ba84a;animation:none}
+  @keyframes blink{50%{opacity:.3}}
+  @keyframes wave{0%{transform:scale(.6);opacity:.9}100%{transform:scale(1.6);opacity:0}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+  <div class="logo"><img src="/logo.png" alt="" onerror="this.style.display='none'">ByBluee</div>
+  <div class="ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M1.5 8.5a15 15 0 0 1 21 0"/><path d="M5 12a10 10 0 0 1 14 0"/><path d="M8.5 15.5a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/><path d="M3 3l18 18"/></svg></div>
+  <h1>Sin conexión por ahora</h1>
+  <p>Revisa tus datos o el WiFi. Tus chats siguen guardados; en cuanto vuelva la señal seguimos donde ibas.</p>
+  <button class="btn" type="button" onclick="reintentar()">Reintentar</button>
+  <a class="link" href="/dashboard/inbox">Volver a la bandeja</a>
+  <span class="estado"><i class="dot" id="dot"></i><span id="txt">Buscando conexión…</span></span>
+  <script>
+    var destino = location.pathname && location.pathname !== "/sin-conexion.html" ? location.href : "/dashboard/inbox";
+    function reintentar(){ location.replace(destino); }
+    function volvio(){ document.getElementById("dot").className="dot ok"; document.getElementById("txt").textContent="Conectado ✓ Volviendo…"; setTimeout(reintentar, 600); }
+    window.addEventListener("online", volvio);
+    // Algunos navegadores no disparan "online": se comprueba cada 5 s.
+    setInterval(function(){ if(!navigator.onLine) return; fetch("/manifest.json",{cache:"no-store",mode:"no-cors"}).then(volvio).catch(function(){}); }, 5000);
+  </script>
+</body>
+</html>

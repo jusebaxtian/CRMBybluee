@@ -1,9 +1,42 @@
-self.addEventListener("install", () => {
-  self.skipWaiting();
+// Pagina "Sin conexion": se guarda al instalar y se sirve cuando una
+// navegacion falla por falta de red (reemplaza el "This page couldn't load"
+// del navegador / la PWA). Subir la version limpia la cache vieja.
+const CACHE_OFFLINE = "bybluee-offline-v1";
+const PAGINA_OFFLINE = "/sin-conexion.html";
+const PRECACHE = [PAGINA_OFFLINE, "/logo.png", "/manifest.json"];
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches
+      .open(CACHE_OFFLINE)
+      .then((cache) => cache.addAll(PRECACHE))
+      .catch(() => {})
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_OFFLINE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener("fetch", (event) => {
+  const { request } = event;
+  // Solo navegaciones (abrir/recargar una pagina). Datos, imagenes y
+  // realtime siguen yendo directo a la red sin tocar la cache.
+  if (request.mode !== "navigate" || request.method !== "GET") return;
+
+  event.respondWith(
+    fetch(request).catch(async () => {
+      const cache = await caches.open(CACHE_OFFLINE);
+      const offline = await cache.match(PAGINA_OFFLINE);
+      return offline || new Response("Sin conexión", { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    })
+  );
 });
 
 self.addEventListener("push", (event) => {

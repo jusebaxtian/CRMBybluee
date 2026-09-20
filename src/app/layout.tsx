@@ -58,6 +58,11 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
 })(window,document,'script','dataLayer','${GTM_ID}');`}
         </Script>
+        {/* Service worker en todas las paginas: guarda /sin-conexion.html y la
+            muestra cuando no hay red (antes solo se registraba al activar push). */}
+        <Script id="sw-register" strategy="afterInteractive">
+          {`if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("/sw.js").catch(function(){})})}`}
+        </Script>
       </head>
       <body className="min-h-full flex flex-col">
         <noscript>
