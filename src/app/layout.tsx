@@ -61,7 +61,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         {/* Service worker en todas las paginas: guarda /sin-conexion.html y la
             muestra cuando no hay red (antes solo se registraba al activar push). */}
         <Script id="sw-register" strategy="afterInteractive">
-          {`if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("/sw.js").catch(function(){})})}`}
+          {`if("serviceWorker" in navigator){var r=function(){navigator.serviceWorker.register("/sw.js").catch(function(){})};document.readyState==="complete"?r():window.addEventListener("load",r)}`}
         </Script>
       </head>
       <body className="min-h-full flex flex-col">
