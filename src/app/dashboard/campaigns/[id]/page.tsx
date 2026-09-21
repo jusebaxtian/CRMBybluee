@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Users, Clock, Pencil } from "lucide-react";
+import { ArrowLeft, Users, Clock, Pencil, FileSpreadsheet } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { SendCampaignButton } from "@/components/campaigns/send-campaign-button";
 import { DeleteCampaignButton } from "@/components/campaigns/delete-campaign-button";
@@ -87,6 +87,15 @@ export default async function CampaignDetailPage({
             </p>
           </div>
         </div>
+        {campaign.status !== "draft" && (
+          <a
+            href={`/api/campaigns/${campaign.id}/export`}
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-surface-hover"
+          >
+            <FileSpreadsheet size={13} />
+            Exportar Excel
+          </a>
+        )}
         {campaign.status === "draft" && (
           <div className="flex shrink-0 items-center gap-2">
             <Link
