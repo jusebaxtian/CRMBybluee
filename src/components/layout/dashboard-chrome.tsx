@@ -7,6 +7,7 @@ import { InboundMessageSound } from "@/components/notifications/inbound-message-
 import { NotificationSound } from "@/components/notifications/notification-sound";
 import { PushNotifications } from "@/components/notifications/push-notifications";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
+import { AvisoPantalla } from "@/components/notifications/aviso-pantalla";
 
 type Notification = {
   id: string;
@@ -16,6 +17,8 @@ type Notification = {
   read: boolean;
   cta_label?: string | null;
   cta_url?: string | null;
+  /** pantalla = aviso emergente a pantalla completa hasta cerrarlo (migracion 0115). */
+  modo?: string | null;
 };
 
 export function DashboardChrome({
@@ -56,6 +59,9 @@ export function DashboardChrome({
   children: React.ReactNode;
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // Avisos emergentes pendientes (no se muestran en modo soporte para no
+  // "leerselos" al cliente).
+  const avisos = isImpersonating ? [] : notifications.filter((n) => n.modo === "pantalla" && !n.read);
 
   return (
     <div className="flex bg-background">
@@ -98,6 +104,7 @@ export function DashboardChrome({
       </div>
 
       <div className="flex min-h-screen w-full flex-1 flex-col overflow-x-hidden">
+        {avisos.length > 0 && <AvisoPantalla avisos={avisos} />}
         {banner}
         <Topbar
           workspaceName={workspaceName}

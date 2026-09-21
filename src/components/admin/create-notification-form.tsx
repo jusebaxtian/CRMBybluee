@@ -107,6 +107,24 @@ export function CreateNotificationForm({
         )}
       </div>
 
+      <div>
+        <label htmlFor="modo" className="mb-1 block text-sm font-medium text-muted">
+          ¿Cómo se muestra?
+        </label>
+        <select
+          id="modo"
+          name="modo"
+          defaultValue="campana"
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+        >
+          <option value="campana">Solo en la campana</option>
+          <option value="pantalla">Aviso emergente en toda la pantalla (con X para cerrar) + campana</option>
+        </select>
+        <p className="mt-1 text-[11px] text-muted">
+          El aviso emergente sale al abrir el panel y deja de salir cuando lo cierran o pulsan el botón.
+        </p>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="startsAt" className="mb-1 block text-sm font-medium text-muted">

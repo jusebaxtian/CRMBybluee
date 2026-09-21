@@ -16,6 +16,7 @@ export async function createNotification(_prevState: unknown, formData: FormData
   const endsAt = String(formData.get("endsAt") ?? "");
   const ctaLabel = String(formData.get("ctaLabel") ?? "").trim();
   const ctaUrl = String(formData.get("ctaUrl") ?? "").trim();
+  const modo = String(formData.get("modo") ?? "campana") === "pantalla" ? "pantalla" : "campana";
 
   if (!title || !body) return { error: "Título y contenido son obligatorios." };
   if (scope === "status" && !targetStatus) {
@@ -42,6 +43,7 @@ export async function createNotification(_prevState: unknown, formData: FormData
     ends_at: endsAt ? new Date(`${endsAt}T23:59:59`).toISOString() : null,
     cta_label: ctaLabel || null,
     cta_url: ctaUrl || null,
+    modo,
     created_by: user?.id,
   });
 

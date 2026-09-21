@@ -104,7 +104,7 @@ export default async function DashboardLayout({
   const nowIso = new Date().toISOString();
   const { data: notifications } = await supabase
     .from("notifications")
-    .select("id, title, body, created_at, cta_label, cta_url")
+    .select("id, title, body, created_at, cta_label, cta_url, modo")
     .or(scopeFilter)
     .lte("starts_at", nowIso)
     .or(`ends_at.is.null,ends_at.gte.${nowIso}`)
