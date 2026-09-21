@@ -519,6 +519,69 @@ export async function sendMessageToContact(input: { contactId: string; body: str
   return sendToConversation(supabase, conversation.id, workspaceId, contact.wa_id, input.body);
 }
 
+/**
+ * "Enviar plantilla" desde la tabla de contactos: abre (o reutiliza) la
+ * conversacion del contacto en la linea elegida y manda la plantilla. Un
+ * contacto sin chat previo solo puede recibir plantillas (regla de las 24 h),
+ * por eso aqui no hay texto libre.
+ */
+export async function sendTemplateToContact(input: {
+  contactId: string;
+  templateId: string;
+  whatsappAccountId?: string | null;
+}) {
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
+
+  const [{ data: contact }, { data: template }] = await Promise.all([
+    supabase.from("contacts").select("id").eq("id", input.contactId).eq("workspace_id", workspaceId).maybeSingle(),
+    supabase
+      .from("templates")
+      .select("id, waba_id, status")
+      .eq("id", input.templateId)
+      .eq("workspace_id", workspaceId)
+      .maybeSingle(),
+  ]);
+  if (!contact) return { error: "Contacto no encontrado." };
+  if (!template) return { error: "Plantilla no encontrada." };
+  if (template.status !== "APPROVED") return { error: "Esa plantilla aún no está aprobada por Meta." };
+
+  // La plantilla vive en la WABA de la linea: si eligieron linea, tiene que ser una de esa WABA.
+  let whatsappAccountId = input.whatsappAccountId ?? null;
+  if (whatsappAccountId) {
+    const { data: linea } = await supabase
+      .from("whatsapp_accounts")
+      .select("id, waba_id")
+      .eq("id", whatsappAccountId)
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+    if (!linea) return { error: "Línea no encontrada." };
+    if (template.waba_id && template.waba_id !== linea.waba_id) {
+      return { error: "Esa plantilla no pertenece a la línea elegida." };
+    }
+  } else if (template.waba_id) {
+    // Sin linea elegida: la primera linea de la WABA de la plantilla.
+    const { data: linea } = await supabase
+      .from("whatsapp_accounts")
+      .select("id")
+      .eq("workspace_id", workspaceId)
+      .eq("waba_id", template.waba_id)
+      .neq("status", "frozen")
+      .order("connected_at")
+      .limit(1)
+      .maybeSingle();
+    whatsappAccountId = linea?.id ?? null;
+  }
+
+  const conversation = await abrirConversacion(supabase, workspaceId, contact.id, whatsappAccountId);
+  if (!conversation) return { error: "No se pudo abrir la conversación." };
+
+  const r = await sendTemplateToConversation({ conversationId: conversation.id, templateId: template.id });
+  if ("error" in r) return { error: r.error };
+  return { conversationId: conversation.id };
+}
+
 // Templates are the only message type WhatsApp allows outside the 24h
 // customer-service window, so this is what the composer falls back to once
 // that window closes.

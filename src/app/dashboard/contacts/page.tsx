@@ -38,6 +38,23 @@ export default async function ContactsPage() {
     }
   }
 
+  // Para "Plantilla" en cada fila: lineas del espacio y plantillas aprobadas
+  // (se filtran por la WABA de la linea elegida en el propio selector).
+  const [{ data: lineas }, { data: plantillas }] = await Promise.all([
+    supabase
+      .from("whatsapp_accounts")
+      .select("id, label, display_phone_number, waba_id")
+      .eq("workspace_id", workspaceId ?? "")
+      .neq("status", "frozen")
+      .order("connected_at"),
+    supabase
+      .from("templates")
+      .select("id, meta_template_name, waba_id, body_text")
+      .eq("workspace_id", workspaceId ?? "")
+      .eq("status", "APPROVED")
+      .order("meta_template_name"),
+  ]);
+
   const { data: allTags } = await supabase
     .from("tags")
     .select("id, name, color")
@@ -88,7 +105,7 @@ export default async function ContactsPage() {
         <AddContactForm />
         <ImportContactsButton />
       </div>
-      <ContactsTable contacts={rows} allTags={allTags ?? []} />
+      <ContactsTable contacts={rows} allTags={allTags ?? []} lineas={lineas ?? []} plantillas={plantillas ?? []} />
     </div>
   );
 }

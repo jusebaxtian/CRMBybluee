@@ -14,7 +14,8 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { ContactTagPicker } from "@/components/tags/contact-tag-picker";
-import { SendMessagePopover } from "@/components/contacts/send-message-popover";
+import { EnviarPlantillaPopover, type PlantillaOption } from "@/components/contacts/enviar-plantilla-popover";
+import type { LineaOption } from "@/components/automations/selector-linea";
 import { updateContact, bulkDeleteContacts, bulkAddTagToContacts } from "@/app/actions/contacts";
 
 type Tag = { id: string; name: string; color: string };
@@ -31,9 +32,13 @@ type Contact = {
 export function ContactsTable({
   contacts,
   allTags,
+  lineas,
+  plantillas,
 }: {
   contacts: Contact[];
   allTags: Tag[];
+  lineas: LineaOption[];
+  plantillas: PlantillaOption[];
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -474,7 +479,7 @@ export function ContactsTable({
                         >
                           <Pencil size={13} />
                         </button>
-                        <SendMessagePopover contactId={c.id} />
+                        <EnviarPlantillaPopover contactId={c.id} lineas={lineas} plantillas={plantillas} />
                       </div>
                     </td>
                   </>
