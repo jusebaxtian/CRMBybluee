@@ -110,6 +110,7 @@ function SignupForm() {
           paisInicial={v.phoneCountry || telefonoInv?.country || undefined}
           numeroInicial={v.phone ?? telefonoInv?.nationalNumber ?? ""}
           disabled={pending}
+          fijo={!!telefonoInv}
         />
         <Campo
           etiqueta="Correo electrónico"

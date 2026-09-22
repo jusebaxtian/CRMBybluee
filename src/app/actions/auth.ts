@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { aplicarInvitacionRegistro } from "@/lib/billing/pagos-chat";
 import { componerTelefono } from "@/lib/auth/telefono";
+import { leerInvitacionRegistro } from "@/app/actions/pagos-chat";
 
 // nginx forwards the real client IP via X-Forwarded-For (may be a chain of
 // "client, proxy1, proxy2" — the first entry is the actual visitor).
@@ -86,6 +87,16 @@ export async function signup(
   if (!passwordConfirm) errores.passwordConfirm = "Repite la contraseña.";
   else if (password && passwordConfirm !== password) errores.passwordConfirm = "Las contraseñas no coinciden.";
 
+  // El numero del enlace de registro manda: si la invitacion trae telefono,
+  // ese es el que queda, aunque alguien edite el campo en el navegador.
+  const tokenInvitacion = textoDe(formData, "invitacion");
+  if (tokenInvitacion) {
+    const inv = await leerInvitacionRegistro(tokenInvitacion);
+    if (inv?.phone && telefono && telefono.digitos !== inv.phone) {
+      errores.phone = "Este enlace es para otro número. Pídele a soporte un enlace nuevo.";
+    }
+  }
+
   if (Object.keys(errores).length > 0 || !telefono) return { errores, valores };
 
   const supabase = await createClient();
@@ -120,9 +131,8 @@ export async function signup(
 
   // Registro por enlace de pago (soporte ya registro el pago desde el chat):
   // el espacio nace activo con el plan pagado. Ver migracion 0105.
-  const invitacion = textoDe(formData, "invitacion");
-  if (invitacion && nuevoWorkspaceId) {
-    await aplicarInvitacionRegistro(createAdminClient(), invitacion, String(nuevoWorkspaceId));
+  if (tokenInvitacion && nuevoWorkspaceId) {
+    await aplicarInvitacionRegistro(createAdminClient(), tokenInvitacion, String(nuevoWorkspaceId));
   }
 
   // El cliente guarda usuario/contraseña en el navegador y navega al panel.

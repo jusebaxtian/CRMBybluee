@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { ChevronDown, Search } from "lucide-react";
+import { ChevronDown, Lock, Search } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { INPUT_AUTH, INPUT_AUTH_BASE } from "@/components/auth/campos";
 import { listaDePaises, PAIS_POR_DEFECTO, type Pais } from "@/lib/auth/telefono";
@@ -20,12 +20,15 @@ export function CampoTelefono({
   paisInicial = PAIS_POR_DEFECTO,
   numeroInicial = "",
   disabled,
+  fijo = false,
 }: {
   etiqueta?: string;
   error?: string | null;
   paisInicial?: string;
   numeroInicial?: string;
   disabled?: boolean;
+  /** El numero viene del enlace de registro: se muestra pero no se edita. */
+  fijo?: boolean;
 }) {
   const id = useId();
   const paises = useMemo(() => listaDePaises(), []);
@@ -93,21 +96,22 @@ export function CampoTelefono({
 
         <button
           type="button"
-          disabled={disabled}
-          onClick={() => setAbierto((a) => !a)}
+          disabled={disabled || fijo}
+          onClick={() => !fijo && setAbierto((a) => !a)}
           aria-haspopup="listbox"
           aria-expanded={abierto}
           aria-label={`País: ${pais.nombre} ${pais.indicativo}`}
           className={cn(
             INPUT_AUTH_BASE,
             "flex w-[118px] shrink-0 items-center gap-2 px-3 text-left sm:w-[172px]",
-            error && "border-error"
+            error && "border-error",
+            fijo && "cursor-default opacity-90"
           )}
         >
           <Bandera pais={pais} />
           <span className="hidden min-w-0 flex-1 truncate text-[13px] sm:block">{pais.nombre}</span>
           <span className="text-[13px] font-semibold text-muted">{pais.indicativo}</span>
-          <ChevronDown size={14} className="ml-auto shrink-0 text-muted" />
+          {!fijo && <ChevronDown size={14} className="ml-auto shrink-0 text-muted" />}
         </button>
 
         <input
@@ -119,14 +123,21 @@ export function CampoTelefono({
           autoComplete="tel-national"
           required
           disabled={disabled}
+          readOnly={fijo}
           value={numero}
-          onChange={(e) => setNumero(e.target.value.replace(/[^\d\s-]/g, ""))}
+          onChange={(e) => !fijo && setNumero(e.target.value.replace(/[^\d\s-]/g, ""))}
           placeholder="Número de WhatsApp"
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? `${id}-error` : undefined}
         />
 
-        {abierto && (
+        {fijo && (
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted" title="Número del enlace: no se puede cambiar">
+            <Lock size={14} />
+          </span>
+        )}
+
+        {abierto && !fijo && (
           <div
             className="absolute left-0 top-[calc(100%+6px)] z-20 w-full max-w-[340px] overflow-hidden rounded-[12px] border border-border bg-surface shadow-[0_20px_50px_rgba(0,0,0,0.45)]"
             onKeyDown={teclado}
