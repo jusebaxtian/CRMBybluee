@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceId } from "@/lib/workspace";
 import { rangoDe, cargarAviso, type Periodo } from "@/lib/dashboard/datos";
 import { Bloque } from "@/components/dashboard/bloque";
 import { Aviso } from "@/components/dashboard/aviso";
@@ -66,8 +67,13 @@ export default async function DashboardPage({
   // Decide la primera fila: sin aviso, Estado de cuenta ocupa todo el ancho.
   const hayAviso = (await cargarAviso(supabase)) !== null;
 
-  const nombre =
-    (user.user_metadata?.full_name as string | undefined)?.split(" ")[0] ?? user.email?.split("@")[0] ?? "";
+  // El saludo es al negocio, no a la persona (decision del 22 sep 2026):
+  // antes usaba el nombre del usuario y, si no tenia, el correo.
+  const workspaceId = await getWorkspaceId(supabase);
+  const { data: espacio } = workspaceId
+    ? await supabase.from("workspaces").select("name").eq("id", workspaceId).maybeSingle()
+    : { data: null };
+  const nombre = espacio?.name?.trim() ?? "";
   const fecha = new Date().toLocaleDateString("es-CO", {
     weekday: "long",
     day: "numeric",
