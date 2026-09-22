@@ -134,6 +134,15 @@ export default async function DashboardLayout({
     : { data: 0 };
   const unreadMessagesCount = Number(noLeidos ?? 0);
 
+  // Tutoriales destacados para la ventana de bienvenida (primer ingreso).
+  const { data: tutorialesDestacados } = await supabase
+    .from("tutoriales")
+    .select("id, titulo, descripcion, url, modulo, duracion")
+    .eq("activo", true)
+    .order("orden")
+    .order("created_at")
+    .limit(3);
+
   const { data: supportSettings } = await supabase
     .from("platform_settings")
     .select("key, value")
@@ -155,6 +164,7 @@ export default async function DashboardLayout({
       supportWhatsappMessage={supportWhatsappMessage}
       userEmail={user.email ?? ""}
       notifications={notificationsWithRead}
+      tutorialesDestacados={tutorialesDestacados ?? []}
       workspaceId={workspaceId}
       planId={workspace?.plan_id ?? null}
       workspaceStatus={workspace?.status ?? null}

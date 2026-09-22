@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   MessageSquare,
@@ -16,6 +17,7 @@ import {
   Lock,
   LifeBuoy,
   CalendarDays,
+  PlaySquare,
 } from "lucide-react";
 
 // `built: false` items don't exist yet regardless of plan.
@@ -32,6 +34,7 @@ const navItems = [
   { href: "/dashboard/reports", label: "Reportes", icon: BarChart3, built: true, moduleKey: "reports" },
   { href: "/dashboard/integrations", label: "Integraciones", icon: Plug, built: false, moduleKey: null },
   { href: "/dashboard/settings", label: "Configuración", icon: Settings, built: true, moduleKey: "settings" },
+  { href: "/dashboard/tutoriales", label: "Tutoriales", icon: PlaySquare, built: true, moduleKey: null },
 ];
 
 export function Sidebar({
@@ -59,6 +62,7 @@ export function Sidebar({
     ? `https://wa.me/${supportWhatsappNumber}?text=${encodeURIComponent(supportWhatsappMessage ?? "")}`
     : null;
   const pathname = usePathname();
+  const tutorialesVisitados = useTutorialesVisitados(pathname);
 
   return (
     <aside className="flex h-screen w-[232px] shrink-0 flex-col gap-[26px] overflow-y-auto border-r border-border bg-surface px-[14px] py-5 font-dash-ui">
@@ -81,14 +85,18 @@ export function Sidebar({
             const locked = built && moduleKey !== null && !enabledModules.includes(moduleKey);
             const ready = built && !locked;
             const active = ready && (href === "/dashboard" ? pathname === href : pathname.startsWith(href));
+            // Tutoriales va resaltado en verde hasta que lo abren por primera vez.
+            const tutoriales = href === "/dashboard/tutoriales";
             const content = (
               <span
                 className={`flex items-center gap-[11px] rounded-[9px] px-3 py-[10px] text-[13.5px] transition-colors duration-150 ${
                   active
                     ? "bg-dash-green-13 font-semibold text-success"
-                    : ready
-                      ? "font-medium text-muted hover:bg-[rgba(255,255,255,0.04)] hover:text-foreground"
-                      : "cursor-default font-medium text-muted/40"
+                    : tutoriales && !tutorialesVisitados
+                      ? "mt-1 border border-primary/50 bg-primary/10 font-semibold text-success hover:bg-primary/15"
+                      : ready
+                        ? "font-medium text-muted hover:bg-[rgba(255,255,255,0.04)] hover:text-foreground"
+                        : "cursor-default font-medium text-muted/40"
                 }`}
               >
                 <span aria-hidden className={`flex w-[18px] justify-center ${ready ? "" : "opacity-60"}`}>
@@ -102,6 +110,9 @@ export function Sidebar({
                   >
                     {unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}
                   </span>
+                )}
+                {tutoriales && !tutorialesVisitados && (
+                  <span className="ml-auto rounded-[20px] bg-primary px-[7px] py-px text-[10px] font-bold text-white">NUEVO</span>
                 )}
                 {!built && (
                   <span className="ml-auto rounded-[20px] border border-border px-[7px] py-px text-[10px] font-semibold text-muted">
@@ -167,4 +178,24 @@ export function Sidebar({
       </div>
     </aside>
   );
+}
+
+const CLAVE_TUTORIALES = "bybluee:tutoriales-visitados";
+
+/** true una vez que el navegador abrio /dashboard/tutoriales alguna vez (se recuerda en localStorage). */
+function useTutorialesVisitados(pathname: string): boolean {
+  const [visitados, setVisitados] = useState(true);
+  useEffect(() => {
+    try {
+      if (pathname.startsWith("/dashboard/tutoriales")) {
+        localStorage.setItem(CLAVE_TUTORIALES, "1");
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setVisitados(true);
+      } else {
+         
+        setVisitados(localStorage.getItem(CLAVE_TUTORIALES) === "1");
+      }
+    } catch {}
+  }, [pathname]);
+  return visitados;
 }

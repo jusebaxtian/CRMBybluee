@@ -8,6 +8,8 @@ import { NotificationSound } from "@/components/notifications/notification-sound
 import { PushNotifications } from "@/components/notifications/push-notifications";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 import { AvisoPantalla } from "@/components/notifications/aviso-pantalla";
+import { BienvenidaTutoriales } from "@/components/tutoriales/bienvenida-tutoriales";
+import type { Tutorial } from "@/components/tutoriales/biblioteca-tutoriales";
 
 type Notification = {
   id: string;
@@ -32,6 +34,7 @@ export function DashboardChrome({
   supportWhatsappMessage,
   userEmail,
   notifications,
+  tutorialesDestacados = [],
   workspaceId = null,
   planId = null,
   workspaceStatus = null,
@@ -50,6 +53,7 @@ export function DashboardChrome({
   supportWhatsappMessage?: string | null;
   userEmail: string;
   notifications: Notification[];
+  tutorialesDestacados?: Tutorial[];
   workspaceId?: string | null;
   planId?: string | null;
   workspaceStatus?: string | null;
@@ -105,6 +109,7 @@ export function DashboardChrome({
 
       <div className="flex min-h-screen w-full flex-1 flex-col overflow-x-hidden">
         {avisos.length > 0 && <AvisoPantalla avisos={avisos} />}
+        {!isImpersonating && avisos.length === 0 && <BienvenidaTutoriales destacados={tutorialesDestacados} />}
         {banner}
         <Topbar
           workspaceName={workspaceName}
