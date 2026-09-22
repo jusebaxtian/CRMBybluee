@@ -187,7 +187,11 @@ export function CampoTelefono({
           {error}
         </p>
       ) : (
-        <p className="mt-1.5 text-[12px] text-muted">Solo el número local, sin el indicativo. Ej: 3001234567</p>
+        <p className="mt-1.5 text-[12px] text-muted">
+          {fijo
+            ? "Este es el número de tu enlace: no se puede cambiar."
+            : "Solo el número local, sin el indicativo. Ej: 3001234567"}
+        </p>
       )}
     </div>
   );
