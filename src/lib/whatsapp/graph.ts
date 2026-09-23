@@ -1,3 +1,5 @@
+import { traducirErrorMeta } from "@/lib/whatsapp/errores";
+
 const GRAPH_VERSION = "v21.0";
 const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`;
 
@@ -17,13 +19,11 @@ async function graphFetch(path: string, init?: RequestInit) {
   const res = await fetch(`${GRAPH_BASE}${path}`, init);
   const data = await res.json();
   if (!res.ok) {
-    // Meta's top-level error.message is often a generic label ("Invalid
-    // parameter") — error_user_msg / error_data.details carry the actual
-    // reason and are worth surfacing when present.
+    // Meta responde en ingles y con enlaces kilometricos; traducirErrorMeta
+    // deja una frase accionable en español. El error crudo queda en el log.
     const err = data?.error;
-    const detail = err?.error_user_msg || err?.error_data?.details;
-    const message = detail ? `${err.message}: ${detail}` : err?.message ?? "Meta Graph API request failed";
-    throw new Error(message);
+    console.error("Meta Graph API error:", JSON.stringify(err ?? data));
+    throw new Error(traducirErrorMeta(err));
   }
   return data;
 }

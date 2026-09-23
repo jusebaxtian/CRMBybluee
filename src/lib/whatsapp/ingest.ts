@@ -13,31 +13,7 @@ import { maybeRespondWithAiAgent } from "@/lib/ai/agent";
 import { transcribeAudio } from "@/lib/ai/providers";
 import { toPublicUrl } from "@/lib/supabase/config";
 import { recordInboundMessage } from "@/lib/messaging/record";
-
-// Translates the most common Cloud API delivery-failure codes into a short,
-// actionable message an agent can actually understand — the raw error is
-// still logged in full via console.error for debugging.
-function friendlyWhatsAppError(error: {
-  code: number;
-  title: string;
-  message?: string;
-  error_data?: { details?: string };
-}): string {
-  switch (error.code) {
-    case 131047:
-      return "No se pudo enviar: han pasado más de 24 horas desde el último mensaje del cliente. Solo se puede reabrir la conversación con una plantilla aprobada.";
-    case 131053:
-      return `No se pudo enviar: formato de archivo no compatible. ${error.error_data?.details ?? ""}`.trim();
-    case 131026:
-      return "No se pudo enviar: el número no tiene WhatsApp o no puede recibir mensajes.";
-    case 131031:
-      return "No se pudo enviar: tu cuenta de WhatsApp Business fue restringida por Meta.";
-    case 131049:
-      return "No se pudo enviar: Meta bloqueó este mensaje de marketing para proteger al usuario de spam (no es un problema de tu cuenta ni del CRM). Este contacto no recibe bien mensajes de marketing.";
-    default:
-      return error.error_data?.details || error.message || error.title || "No se pudo enviar el mensaje.";
-  }
-}
+import { traducirErrorEnvio } from "@/lib/whatsapp/errores";
 
 // WhatsApp never tells a business when a customer has blocked them (privacy
 // by design) — the closest signal available is this error code, meaning
@@ -529,7 +505,7 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
             `whatsapp delivery failed for wa_message_id=${status.id}:`,
             JSON.stringify(status.errors)
           );
-          errorDetail = friendlyWhatsAppError(status.errors[0]);
+          errorDetail = traducirErrorEnvio(status.errors[0]);
           errorCode = status.errors[0].code;
         }
 
