@@ -92,7 +92,11 @@ export async function signup(
   const tokenInvitacion = textoDe(formData, "invitacion");
   if (tokenInvitacion) {
     const inv = await leerInvitacionRegistro(tokenInvitacion);
-    if (inv?.phone && telefono && telefono.digitos !== inv.phone) {
+    // Solo cuando la invitacion trae un numero real. Un contacto que oculta su
+    // numero guarda un identificador de Meta ("CO.1137..."), que no es telefono:
+    // ahi la persona escribe el suyo y no hay nada que comparar.
+    const numeroDeLaInvitacion = inv?.phone && /^\d{8,15}$/.test(inv.phone) ? inv.phone : null;
+    if (numeroDeLaInvitacion && telefono && telefono.digitos !== numeroDeLaInvitacion) {
       errores.phone = "Este enlace es para otro número. Pídele a soporte un enlace nuevo.";
     }
   }
