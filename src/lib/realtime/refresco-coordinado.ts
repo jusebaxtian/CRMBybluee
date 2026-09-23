@@ -14,16 +14,25 @@
 
 type Runner = () => void;
 
+/** Si un refresco no avisa que termino en este tiempo, se da por terminado. */
+const LIMITE_REFRESCO_MS = 8000;
+
 const runners = new Set<Runner>();
 let timer: ReturnType<typeof setTimeout> | null = null;
 let vence = 0;
 let enCurso = false;
 let otraVez = false;
+let vigilante: ReturnType<typeof setTimeout> | null = null;
 
 export function registrarRunner(r: Runner): () => void {
   runners.add(r);
   return () => {
     runners.delete(r);
+    // El componente que lanzo el refresco pudo desmontarse antes de avisar
+    // que termino (cambiar de chat, cerrar la bandeja). Sin esto, "en curso"
+    // se quedaba encendido para siempre y la pagina no volvia a refrescarse
+    // sola hasta recargar a mano.
+    if (runners.size === 0) liberar();
   };
 }
 
@@ -45,13 +54,26 @@ function ejecutar() {
   const runner = runners.values().next().value;
   if (!runner) return;
   enCurso = true;
+  // Red de seguridad: si nadie avisa que el refresco termino (el componente
+  // se desmonto, la transicion se quedo colgada), se libera igual.
+  if (vigilante) clearTimeout(vigilante);
+  vigilante = setTimeout(liberar, LIMITE_REFRESCO_MS);
   runner();
 }
 
 /** Lo llama el runner cuando su transicion termina. */
 export function refrescoTermino() {
+  liberar();
+}
+
+function liberar() {
+  if (vigilante) {
+    clearTimeout(vigilante);
+    vigilante = null;
+  }
+  const estaba = enCurso;
   enCurso = false;
-  if (otraVez) {
+  if (otraVez && estaba) {
     otraVez = false;
     solicitarRefresco(0);
   }
