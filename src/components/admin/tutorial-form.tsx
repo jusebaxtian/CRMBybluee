@@ -6,8 +6,11 @@ import { actualizarTutorial, crearTutorial, eliminarTutorial } from "@/app/actio
 import { Button } from "@/components/ui/button";
 import { MODULOS_TUTORIAL, etiquetaModulo, idYoutube } from "@/lib/tutoriales/video";
 
+export type CursoOpcion = { id: string; titulo: string };
+
 export type TutorialAdmin = {
   id: string;
+  curso_id: string | null;
   titulo: string;
   descripcion: string | null;
   url: string;
@@ -20,7 +23,7 @@ export type TutorialAdmin = {
 const INPUT =
   "w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary";
 
-function Campos({ t }: { t?: TutorialAdmin }) {
+function Campos({ t, cursos }: { t?: TutorialAdmin; cursos: CursoOpcion[] }) {
   return (
     <>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -57,6 +60,19 @@ function Campos({ t }: { t?: TutorialAdmin }) {
           <input name="orden" type="number" defaultValue={t?.orden ?? 0} className={`${INPUT} mt-1`} />
         </label>
       </div>
+      {cursos.length > 0 && (
+        <label className="text-sm font-medium text-muted">
+          ¿Pertenece a un curso?
+          <select name="cursoId" defaultValue={t?.curso_id ?? ""} className={`${INPUT} mt-1`}>
+            <option value="">No — video gratuito para todos</option>
+            {cursos.map((c) => (
+              <option key={c.id} value={c.id}>
+                Lección del curso: {c.titulo}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <p className="text-[11px] text-muted">
         YouTube (incluidos videos &quot;no listados&quot;) se reproduce dentro de la plataforma; cualquier otra URL abre en una pestaña nueva.
       </p>
@@ -64,11 +80,11 @@ function Campos({ t }: { t?: TutorialAdmin }) {
   );
 }
 
-export function NuevoTutorialForm() {
+export function NuevoTutorialForm({ cursos = [] }: { cursos?: CursoOpcion[] }) {
   const [state, action, pending] = useActionState(crearTutorial, undefined);
   return (
     <form action={action} className="flex flex-col gap-3">
-      <Campos />
+      <Campos cursos={cursos} />
       {state && "error" in state && <p className="text-sm text-red-400">{state.error}</p>}
       {state && "success" in state && <p className="text-sm text-success">Tutorial agregado.</p>}
       <Button type="submit" disabled={pending} className="self-start">
@@ -78,7 +94,7 @@ export function NuevoTutorialForm() {
   );
 }
 
-export function FilaTutorial({ t }: { t: TutorialAdmin }) {
+export function FilaTutorial({ t, cursos = [] }: { t: TutorialAdmin; cursos?: CursoOpcion[] }) {
   const [editando, setEditando] = useState(false);
   const [state, action, pending] = useActionState(actualizarTutorial.bind(null, t.id), undefined);
   const yt = idYoutube(t.url);
@@ -92,7 +108,7 @@ export function FilaTutorial({ t }: { t: TutorialAdmin }) {
             <X size={15} />
           </button>
         </div>
-        <Campos t={t} />
+        <Campos t={t} cursos={cursos} />
         <label className="flex items-center gap-2 text-sm text-muted">
           <input type="checkbox" name="activo" defaultChecked={t.activo} /> Visible para los clientes
         </label>

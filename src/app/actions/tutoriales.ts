@@ -12,10 +12,11 @@ function leer(formData: FormData) {
   const modulo = String(formData.get("modulo") ?? "empezar");
   const duracion = String(formData.get("duracion") ?? "").trim() || null;
   const orden = Number(formData.get("orden") ?? 0) || 0;
+  const cursoId = String(formData.get("cursoId") ?? "") || null;
   if (!titulo) return { error: "Escribe el título." };
   if (!/^https?:\/\//.test(url)) return { error: "La URL debe empezar por http:// o https://" };
   if (!MODULOS_TUTORIAL.some((m) => m.value === modulo)) return { error: "Módulo no válido." };
-  return { datos: { titulo, descripcion, url, modulo, duracion, orden } };
+  return { datos: { titulo, descripcion, url, modulo, duracion, orden, curso_id: cursoId } };
 }
 
 export async function crearTutorial(_prev: unknown, formData: FormData) {
