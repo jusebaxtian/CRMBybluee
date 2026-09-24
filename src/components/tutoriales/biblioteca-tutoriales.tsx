@@ -76,7 +76,7 @@ export function BibliotecaTutoriales({ tutoriales, abrirInicial }: { tutoriales:
 
       {lista.length === 0 && (
         <div className="rounded-[13px] border border-border bg-surface p-10 text-center text-sm text-muted">
-          Pronto habrá videos aquí.
+          Pronto habrá capacitaciones aquí.
         </div>
       )}
 

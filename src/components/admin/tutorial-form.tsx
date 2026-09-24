@@ -64,7 +64,7 @@ function Campos({ t, cursos }: { t?: TutorialAdmin; cursos: CursoOpcion[] }) {
         <label className="text-sm font-medium text-muted">
           ¿Pertenece a un curso?
           <select name="cursoId" defaultValue={t?.curso_id ?? ""} className={`${INPUT} mt-1`}>
-            <option value="">No — video gratuito para todos</option>
+            <option value="">No — capacitación incluida para todos</option>
             {cursos.map((c) => (
               <option key={c.id} value={c.id}>
                 Lección del curso: {c.titulo}
@@ -86,9 +86,9 @@ export function NuevoTutorialForm({ cursos = [] }: { cursos?: CursoOpcion[] }) {
     <form action={action} className="flex flex-col gap-3">
       <Campos cursos={cursos} />
       {state && "error" in state && <p className="text-sm text-red-400">{state.error}</p>}
-      {state && "success" in state && <p className="text-sm text-success">Tutorial agregado.</p>}
+      {state && "success" in state && <p className="text-sm text-success">Capacitación agregada.</p>}
       <Button type="submit" disabled={pending} className="self-start">
-        {pending ? "Guardando..." : "Agregar tutorial"}
+        {pending ? "Guardando..." : "Agregar capacitación"}
       </Button>
     </form>
   );
@@ -103,7 +103,7 @@ export function FilaTutorial({ t, cursos = [] }: { t: TutorialAdmin; cursos?: Cu
     return (
       <form action={action} className="flex flex-col gap-3 border-b border-border px-5 py-4 last:border-b-0">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold text-foreground">Editar tutorial</p>
+          <p className="text-sm font-semibold text-foreground">Editar capacitación</p>
           <button type="button" onClick={() => setEditando(false)} className="text-muted hover:text-foreground" aria-label="Cerrar">
             <X size={15} />
           </button>

@@ -58,7 +58,7 @@ export default async function CursoPage({
   return (
     <div className="flex flex-col gap-6">
       <Link href="/dashboard/tutoriales" className="flex w-fit items-center gap-2 text-sm text-muted hover:text-foreground">
-        <ArrowLeft size={15} /> Volver a Tutoriales
+        <ArrowLeft size={15} /> Volver a Capacitaciones
       </Link>
 
       <div className="overflow-hidden rounded-[15px] border border-border bg-surface">

@@ -49,7 +49,7 @@ export default async function AdminTutorialesPage() {
       <div className="rounded-xl border border-border bg-surface p-6">
         <h2 className="mb-1 text-lg font-semibold text-foreground">Nuevo curso de pago</h2>
         <p className="mb-4 text-xs text-muted">
-          El cliente lo ve en <strong>Tutoriales</strong> con su portada y precio, y paga por la pasarela o por transferencia.
+          El cliente lo ve en <strong>Capacitaciones</strong> con su portada y precio, y paga por la pasarela o por transferencia.
         </p>
         <NuevoCursoForm />
       </div>
@@ -74,15 +74,15 @@ export default async function AdminTutorialesPage() {
       </div>
 
       <div className="rounded-xl border border-border bg-surface p-6">
-        <h2 className="mb-1 text-lg font-semibold text-foreground">Nuevo tutorial</h2>
+        <h2 className="mb-1 text-lg font-semibold text-foreground">Nueva capacitación</h2>
         <p className="mb-4 text-xs text-muted">
-          Sin curso queda como video gratuito. Si eliges un curso, será una lección de pago.
+          Sin curso queda como capacitación incluida para todos. Si eliges un curso, será una lección de pago.
         </p>
         <NuevoTutorialForm cursos={opcionesCurso} />
       </div>
 
       <div className="overflow-hidden rounded-xl border border-border bg-surface">
-        {(tutoriales ?? []).length === 0 && <p className="px-5 py-6 text-sm text-muted">Aún no hay tutoriales.</p>}
+        {(tutoriales ?? []).length === 0 && <p className="px-5 py-6 text-sm text-muted">Aún no hay capacitaciones.</p>}
         {((tutoriales ?? []) as TutorialAdmin[]).map((t) => (
           <FilaTutorial key={t.id} t={t} cursos={opcionesCurso} />
         ))}

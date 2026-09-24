@@ -80,7 +80,7 @@ export default async function AdminLayout({
             className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted hover:bg-surface-hover hover:text-foreground"
           >
             <PlaySquare size={18} />
-            Tutoriales
+            Capacitaciones
           </Link>
           <Link
             href="/admin/support"

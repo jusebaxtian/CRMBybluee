@@ -41,8 +41,8 @@ export default async function TutorialesPage({ searchParams }: { searchParams: P
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="font-dash-display text-[22px] font-bold tracking-[-.4px] text-foreground">Tutoriales</h1>
-        <p className="mt-1 text-sm text-muted">Aprende a usar ByBluee paso a paso con videos cortos de cada módulo.</p>
+        <h1 className="font-dash-display text-[22px] font-bold tracking-[-.4px] text-foreground">Capacitaciones</h1>
+        <p className="mt-1 text-sm text-muted">Fórmate en ByBluee: capacitaciones cortas de cada módulo y cursos completos.</p>
       </div>
 
       {(cursos ?? []).length > 0 && (
@@ -84,7 +84,7 @@ export default async function TutorialesPage({ searchParams }: { searchParams: P
 
       <section className="flex flex-col gap-3">
         {(cursos ?? []).length > 0 && (
-          <h2 className="font-dash-display text-[17px] font-bold tracking-[-.3px] text-foreground">Videos gratuitos</h2>
+          <h2 className="font-dash-display text-[17px] font-bold tracking-[-.3px] text-foreground">Capacitaciones incluidas</h2>
         )}
         <BibliotecaTutoriales tutoriales={(gratuitos ?? []) as Tutorial[]} abrirInicial={ver ?? null} />
       </section>

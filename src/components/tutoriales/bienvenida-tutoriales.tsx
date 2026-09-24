@@ -42,7 +42,7 @@ export function BienvenidaTutoriales({ destacados }: { destacados: Tutorial[] })
         <p className="text-[11px] font-bold uppercase tracking-wider text-primary">Primer ingreso</p>
         <h2 className="font-dash-display text-[22px] font-bold leading-tight tracking-[-.3px] text-foreground">¡Bienvenido a ByBluee! 👋</h2>
         <p className="text-sm leading-relaxed text-muted">
-          Antes de empezar, mira estos videos cortos. En pocos minutos tendrás tu WhatsApp conectado y tu equipo respondiendo.
+          Antes de empezar, mira estas capacitaciones cortas. En pocos minutos tendrás tu WhatsApp conectado y tu equipo respondiendo.
         </p>
         <div className="grid grid-cols-3 gap-3">
           {destacados.slice(0, 3).map((t) => {
@@ -79,12 +79,12 @@ export function BienvenidaTutoriales({ destacados }: { destacados: Tutorial[] })
             onClick={cerrar}
             className="rounded-[10px] bg-primary px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(27,168,74,0.35)] hover:bg-primary-hover"
           >
-            Ver tutoriales
+            Ver capacitaciones
           </Link>
           <button type="button" onClick={cerrar} className="text-sm text-muted underline hover:text-foreground">
             Después, ir a mi bandeja
           </button>
-          <span className="ml-auto text-[11px] text-muted">Siempre en el menú → Tutoriales</span>
+          <span className="ml-auto text-[11px] text-muted">Siempre en el menú → Capacitaciones</span>
         </div>
       </div>
     </div>

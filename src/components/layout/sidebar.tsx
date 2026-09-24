@@ -34,7 +34,7 @@ const navItems = [
   { href: "/dashboard/reports", label: "Reportes", icon: BarChart3, built: true, moduleKey: "reports" },
   { href: "/dashboard/integrations", label: "Integraciones", icon: Plug, built: false, moduleKey: null },
   { href: "/dashboard/settings", label: "Configuración", icon: Settings, built: true, moduleKey: "settings" },
-  { href: "/dashboard/tutoriales", label: "Tutoriales", icon: PlaySquare, built: true, moduleKey: null },
+  { href: "/dashboard/tutoriales", label: "Capacitaciones", icon: PlaySquare, built: true, moduleKey: null },
 ];
 
 export function Sidebar({
