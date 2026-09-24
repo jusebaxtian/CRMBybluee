@@ -11,7 +11,7 @@ type Turn = {
   media?: { key: string; label: string }[];
 };
 
-export function AiAgentTestChat() {
+export function AiAgentTestChat({ whatsappAccountId = null }: { whatsappAccountId?: string | null }) {
   const [open, setOpen] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
@@ -29,7 +29,7 @@ export function AiAgentTestChat() {
     setPending(true);
 
     const history = turns.map((t) => ({ role: t.role, content: t.content }));
-    const result = await testAiAgentMessage(history, message);
+    const result = await testAiAgentMessage(history, message, whatsappAccountId);
 
     if ("error" in result) {
       setError(result.error ?? "Error desconocido.");

@@ -39,6 +39,10 @@ export async function saveAiAgent(_prevState: unknown, formData: FormData) {
     followupSteps = [];
   }
 
+  // Linea a la que atiende este agente (migracion 0118). Vacio = atiende
+  // las lineas que no tengan agente propio.
+  const whatsappAccountId = String(formData.get("whatsappAccountId") ?? "") || null;
+
   if (provider !== "openai" && provider !== "anthropic") {
     return { error: "Selecciona un proveedor válido." };
   }
@@ -63,11 +67,14 @@ export async function saveAiAgent(_prevState: unknown, formData: FormData) {
   let apiKey = submittedApiKey;
   let keyChanged = true;
   if (!submittedApiKey) {
-    const { data: existing } = await supabase
+    const consulta = supabase
       .from("ai_agents")
       .select("api_key, provider")
-      .eq("workspace_id", workspaceId)
-      .maybeSingle();
+      .eq("workspace_id", workspaceId);
+    const { data: existing } = await (whatsappAccountId
+      ? consulta.eq("whatsapp_account_id", whatsappAccountId)
+      : consulta.is("whatsapp_account_id", null)
+    ).maybeSingle();
     if (!existing) return { error: "Pega tu API key." };
     apiKey = existing.api_key;
     keyChanged = existing.provider !== provider;
@@ -87,8 +94,16 @@ export async function saveAiAgent(_prevState: unknown, formData: FormData) {
     }
   }
 
-  const { error } = await supabase.from("ai_agents").upsert({
+  // Un agente por linea: se actualiza el de esa linea o se crea si no existe.
+  const consultaId = supabase.from("ai_agents").select("id").eq("workspace_id", workspaceId);
+  const { data: filaExistente } = await (whatsappAccountId
+    ? consultaId.eq("whatsapp_account_id", whatsappAccountId)
+    : consultaId.is("whatsapp_account_id", null)
+  ).maybeSingle();
+
+  const datos = {
     workspace_id: workspaceId,
+    whatsapp_account_id: whatsappAccountId,
     provider,
     api_key: apiKey,
     model,
@@ -98,7 +113,10 @@ export async function saveAiAgent(_prevState: unknown, formData: FormData) {
     followup_steps: followupSteps,
     followup_template_id: followupTemplateId,
     updated_at: new Date().toISOString(),
-  });
+  };
+  const { error } = filaExistente
+    ? await supabase.from("ai_agents").update(datos).eq("id", filaExistente.id)
+    : await supabase.from("ai_agents").insert(datos);
   if (error) return { error: error.message };
 
   revalidatePath("/dashboard/settings");
@@ -113,17 +131,21 @@ export async function saveAiAgent(_prevState: unknown, formData: FormData) {
 // and media triggers in the response so you can see what WOULD happen.
 export async function testAiAgentMessage(
   history: { role: "user" | "assistant"; content: string }[],
-  message: string
+  message: string,
+  whatsappAccountId?: string | null
 ) {
   const ctx = await requireWorkspace();
   if ("error" in ctx) return { error: ctx.error };
   const { supabase, workspaceId } = ctx;
 
-  const { data: agent } = await supabase
+  const consultaAgente = supabase
     .from("ai_agents")
     .select("provider, api_key, model, agent_name, persona")
-    .eq("workspace_id", workspaceId)
-    .maybeSingle();
+    .eq("workspace_id", workspaceId);
+  const { data: agent } = await (whatsappAccountId
+    ? consultaAgente.eq("whatsapp_account_id", whatsappAccountId)
+    : consultaAgente.is("whatsapp_account_id", null)
+  ).maybeSingle();
   if (!agent) return { error: "Primero conecta y guarda tu agente." };
 
   const { data: mediaLibrary } = await supabase
@@ -182,7 +204,7 @@ export async function testAiAgentMessage(
 // owner, only one system answers at a time: turning the AI on pauses every
 // currently-active automation (tagged disabled_by_ai so we know which ones
 // to restore), and turning it off brings back exactly those.
-export async function toggleAiAgentActive(isActive: boolean) {
+export async function toggleAiAgentActive(isActive: boolean, whatsappAccountId?: string | null) {
   const ctx = await requireWorkspace();
   if ("error" in ctx) return { error: ctx.error };
   const { supabase, workspaceId } = ctx;
@@ -197,10 +219,10 @@ export async function toggleAiAgentActive(isActive: boolean) {
     if (pauseError) return { error: pauseError.message };
   }
 
-  const { error } = await supabase
-    .from("ai_agents")
-    .update({ is_active: isActive })
-    .eq("workspace_id", workspaceId);
+  const consulta = supabase.from("ai_agents").update({ is_active: isActive }).eq("workspace_id", workspaceId);
+  const { error } = await (whatsappAccountId
+    ? consulta.eq("whatsapp_account_id", whatsappAccountId)
+    : consulta.is("whatsapp_account_id", null));
   if (error) return { error: error.message };
 
   if (!isActive) {

@@ -68,10 +68,13 @@ export function AiAgentPanel({
   agent,
   mediaItems = [],
   templates = [],
+  whatsappAccountId = null,
 }: {
   agent: AiAgent;
   mediaItems?: MediaItem[];
   templates?: TemplateOption[];
+  /** Linea que atiende este agente; null = las que no tengan agente propio. */
+  whatsappAccountId?: string | null;
 }) {
   const [state, action, pending] = useActionState(saveAiAgent, undefined);
   const [provider, setProvider] = useState<"openai" | "anthropic">(agent?.provider ?? "openai");
@@ -104,7 +107,7 @@ export function AiAgentPanel({
   async function handleToggle() {
     setTogglePending(true);
     const next = !active;
-    const result = await toggleAiAgentActive(next);
+    const result = await toggleAiAgentActive(next, whatsappAccountId);
     if (!result?.error) setActive(next);
     setTogglePending(false);
   }
@@ -147,10 +150,12 @@ export function AiAgentPanel({
         </div>
       )}
 
-      {agent && <AiAgentTestChat />}
+      {agent && <AiAgentTestChat whatsappAccountId={whatsappAccountId} />}
 
       <div className="rounded-xl border border-border p-5">
       <form id="ai-agent-config-form" action={action} className="flex flex-col gap-4">
+        {/* Linea que atiende este agente (migracion 0118). */}
+        <input type="hidden" name="whatsappAccountId" value={whatsappAccountId ?? ""} />
         <div className="flex items-center gap-2">
           <Sparkles size={16} className="text-primary" />
           <h3 className="text-sm font-semibold text-foreground">

@@ -109,25 +109,42 @@ export function interpretAiReply(
   return { customerReply, handoff, mediaKeys };
 }
 
+/** Agente de esa linea, o el general del espacio si la linea no tiene uno. */
+export async function agenteDeLaLinea(
+  supabase: ReturnType<typeof createAdminClient>,
+  workspaceId: string,
+  whatsappAccountId: string | null
+) {
+  const { data: agentes } = await supabase
+    .from("ai_agents")
+    .select("id, provider, api_key, model, agent_name, persona, is_active, whatsapp_account_id")
+    .eq("workspace_id", workspaceId);
+  if (!agentes || agentes.length === 0) return null;
+  return (
+    agentes.find((a) => whatsappAccountId && a.whatsapp_account_id === whatsappAccountId) ??
+    agentes.find((a) => !a.whatsapp_account_id) ??
+    null
+  );
+}
+
 export async function maybeRespondWithAiAgent(
   supabase: ReturnType<typeof createAdminClient>,
   workspaceId: string,
   conversationId: string,
   contactId: string
 ) {
-  const { data: agent } = await supabase
-    .from("ai_agents")
-    .select("provider, api_key, model, agent_name, persona, is_active")
-    .eq("workspace_id", workspaceId)
-    .maybeSingle();
-  if (!agent || !agent.is_active) return;
-
   const { data: conversation } = await supabase
     .from("conversations")
     .select("ai_handoff_requested, ai_manually_paused, whatsapp_account_id")
     .eq("id", conversationId)
     .maybeSingle();
   if (!conversation || conversation.ai_handoff_requested || conversation.ai_manually_paused) return;
+
+  // Un agente por linea (migracion 0118): responde el de la linea por la que
+  // entro el mensaje; si esa linea no tiene agente propio, el general del
+  // espacio (whatsapp_account_id null). Si no hay ninguno, la IA no responde.
+  const agent = await agenteDeLaLinea(supabase, workspaceId, conversation.whatsapp_account_id);
+  if (!agent || !agent.is_active) return;
 
   // A contact tagged "excluir de automatizaciones" (ej: "Ya compró") skips
   // the AI too — same rule as keyword/tag automations and follow-ups.

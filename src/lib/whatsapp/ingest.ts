@@ -204,12 +204,16 @@ async function transcribeIncomingAudio(
   workspaceId: string,
   mediaUrl: string
 ): Promise<string | null> {
-  const { data: agent } = await supabase
+  // Basta con que el espacio tenga un agente de OpenAI activo (cualquier linea).
+  const { data: agentes } = await supabase
     .from("ai_agents")
     .select("provider, api_key, is_active")
     .eq("workspace_id", workspaceId)
-    .maybeSingle();
-  if (!agent || !agent.is_active || agent.provider !== "openai") return null;
+    .eq("is_active", true)
+    .eq("provider", "openai")
+    .limit(1);
+  const agent = agentes?.[0];
+  if (!agent) return null;
 
   try {
     const res = await fetch(mediaUrl);

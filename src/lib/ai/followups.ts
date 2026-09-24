@@ -27,7 +27,7 @@ export async function processAiFollowups() {
   const { data: agents } = await supabase
     .from("ai_agents")
     .select(
-      "workspace_id, provider, api_key, model, agent_name, persona, is_active, followup_enabled, followup_steps, followup_template_id"
+      "workspace_id, whatsapp_account_id, provider, api_key, model, agent_name, persona, is_active, followup_enabled, followup_steps, followup_template_id"
     )
     .eq("is_active", true)
     .eq("followup_enabled", true);
@@ -43,6 +43,8 @@ export async function processAiFollowups() {
 
 type AgentRow = {
   workspace_id: string;
+  /** null = atiende las lineas sin agente propio (migracion 0118). */
+  whatsapp_account_id: string | null;
   provider: "openai" | "anthropic";
   api_key: string;
   model: string;
@@ -59,7 +61,18 @@ async function processWorkspaceFollowups(
   const steps = agent.followup_steps ?? [];
   if (steps.length === 0) return;
 
-  const { data: conversations } = await supabase
+  // Lineas que ya tienen agente propio: el agente general no las toca.
+  let lineasConAgente: string[] = [];
+  if (!agent.whatsapp_account_id) {
+    const { data: otros } = await supabase
+      .from("ai_agents")
+      .select("whatsapp_account_id")
+      .eq("workspace_id", agent.workspace_id)
+      .not("whatsapp_account_id", "is", null);
+    lineasConAgente = (otros ?? []).map((o) => o.whatsapp_account_id as string);
+  }
+
+  const consulta = supabase
     .from("conversations")
     .select("id, contact_id, whatsapp_account_id, ai_followup_count, ai_followup_started_at")
     .eq("workspace_id", agent.workspace_id)
@@ -70,6 +83,14 @@ async function processWorkspaceFollowups(
     .lt("ai_followup_count", steps.length)
     .not("ai_followup_started_at", "is", null)
     .limit(BATCH_LIMIT);
+
+  const { data: conversations } = await (agent.whatsapp_account_id
+    ? consulta.eq("whatsapp_account_id", agent.whatsapp_account_id)
+    : lineasConAgente.length > 0
+        ? consulta.or(
+            `whatsapp_account_id.is.null,whatsapp_account_id.not.in.(${lineasConAgente.join(",")})`
+          )
+      : consulta);
 
   if (!conversations || conversations.length === 0) return;
 

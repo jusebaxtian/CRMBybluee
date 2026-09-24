@@ -147,6 +147,8 @@ export async function createAutomation(_prevState: unknown, formData: FormData) 
     .from("ai_agents")
     .select("is_active")
     .eq("workspace_id", workspaceId)
+    .eq("is_active", true)
+    .limit(1)
     .maybeSingle();
 
   const { data: automation, error } = await supabase
@@ -275,6 +277,8 @@ export async function toggleAutomationActive(automationId: string, isActive: boo
       .from("ai_agents")
       .select("is_active")
       .eq("workspace_id", workspaceId)
+      .eq("is_active", true)
+      .limit(1)
       .maybeSingle();
     if (agent?.is_active) {
       return {

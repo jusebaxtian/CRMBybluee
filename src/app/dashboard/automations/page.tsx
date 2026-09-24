@@ -23,6 +23,8 @@ export default async function AutomationsPage() {
         .from("ai_agents")
         .select("is_active")
         .eq("workspace_id", workspaceId)
+        .eq("is_active", true)
+        .limit(1)
         .maybeSingle()
     : { data: null };
   const aiAgentActive = !!aiAgent?.is_active;

@@ -9,7 +9,7 @@ import { AgentProfileForm } from "@/components/account/agent-profile-form";
 import { AgentsList } from "@/components/account/agents-list";
 import { SettingsTabs } from "@/components/layout/settings-tabs";
 import { WhatsAppApiPanel } from "@/components/whatsapp/whatsapp-api-panel";
-import { AiAgentPanel } from "@/components/ai-agent/ai-agent-panel";
+import { AgentesPorLinea, type AgenteFila } from "@/components/ai-agent/agentes-por-linea";
 import { CtwaDatasetForm } from "@/components/whatsapp/ctwa-dataset-form";
 import { limiteDeNumeros } from "@/lib/whatsapp/limite-numeros";
 import { limiteDeAgentes } from "@/lib/agentes/limite-agentes";
@@ -102,15 +102,15 @@ export default async function SettingsPage() {
 
   let aiAgentSection: React.ReactNode = undefined;
   if (hasAiAgentModule) {
-    const { data: aiAgent } = workspaceId
+    // Un agente por linea (migracion 0118).
+    const { data: aiAgents } = workspaceId
       ? await supabase
           .from("ai_agents")
           .select(
-            "provider, model, agent_name, persona, is_active, followup_enabled, followup_steps, followup_template_id"
+            "whatsapp_account_id, provider, model, agent_name, persona, is_active, followup_enabled, followup_steps, followup_template_id"
           )
           .eq("workspace_id", workspaceId)
-          .maybeSingle()
-      : { data: null };
+      : { data: [] };
 
     const { data: aiAgentMedia } = workspaceId
       ? await supabase
@@ -131,7 +131,12 @@ export default async function SettingsPage() {
       : { data: [] };
 
     aiAgentSection = (
-      <AiAgentPanel agent={aiAgent} mediaItems={aiAgentMedia ?? []} templates={followupTemplates ?? []} />
+      <AgentesPorLinea
+        agentes={(aiAgents ?? []) as AgenteFila[]}
+        lineas={(accounts ?? []).filter((a) => a.status !== "frozen")}
+        mediaItems={aiAgentMedia ?? []}
+        templates={followupTemplates ?? []}
+      />
     );
   }
 

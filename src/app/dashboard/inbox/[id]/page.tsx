@@ -39,7 +39,7 @@ export default async function ConversationPage({
     { data: allTags },
     { data: workspaceChannels },
     agents,
-    { data: aiAgent },
+    { data: aiAgents },
     { data: allAutomations },
     { data: quickReplies },
     { data: approvedTemplates },
@@ -74,8 +74,8 @@ export default async function ConversationPage({
       : Promise.resolve({ data: [] as { id: string; label: string | null; display_phone_number: string; waba_id: string }[] }),
     listWorkspaceAgents(supabase, workspaceId),
     workspaceId
-      ? supabase.from("ai_agents").select("is_active").eq("workspace_id", workspaceId).maybeSingle()
-      : Promise.resolve({ data: null as { is_active: boolean } | null }),
+      ? supabase.from("ai_agents").select("is_active, whatsapp_account_id").eq("workspace_id", workspaceId)
+      : Promise.resolve({ data: [] as { is_active: boolean; whatsapp_account_id: string | null }[] }),
     // All active automations, not just the ones triggered by this contact's
     // tags — the chat's floating menu lets an agent fire any flow manually,
     // same idea as quick replies but reusing automation flows.
@@ -135,7 +135,12 @@ export default async function ConversationPage({
       ? workspaceChannels?.find((c) => c.id === conversation.whatsapp_account_id) ?? null
       : null;
 
-  const hasActiveAiAgent = !!aiAgent?.is_active;
+  // Un agente por linea (0118): manda el de esta linea; si no tiene, el general.
+  const agenteDeEsteChat =
+    (aiAgents ?? []).find((a) => a.whatsapp_account_id === conversation.whatsapp_account_id) ??
+    (aiAgents ?? []).find((a) => !a.whatsapp_account_id) ??
+    null;
+  const hasActiveAiAgent = !!agenteDeEsteChat?.is_active;
 
   // Solo las plantillas de la WABA de la linea por la que va esta
   // conversacion (migracion 0106); con una sola WABA son todas.
