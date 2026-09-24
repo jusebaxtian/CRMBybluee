@@ -43,7 +43,7 @@ export function InsigniaPartner({ compacta = false }: { compacta?: boolean }) {
           Meta Business Partners
         </span>
       </span>
-      <span aria-hidden className={`h-5 w-px bg-border ${compacta ? "mx-1" : "mx-2 hidden sm:block"}`} />
+      {compacta && <span aria-hidden className="mx-1 h-5 w-px bg-border" />}
       <span className="flex items-center gap-2">
         <LogoWhatsApp size={compacta ? 15 : 20} />
         <span className={`font-dash-display tracking-[-.02em] ${compacta ? "text-[14px]" : "text-[clamp(16px,2.2vw,22px)]"}`}>
