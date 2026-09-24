@@ -3,6 +3,7 @@ import { Check, ArrowRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Reveal } from "@/components/marketing/reveal";
 import { SocialLinks } from "@/components/marketing/social-links";
+import { InsigniaPartner } from "@/components/marketing/insignia-partner";
 import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
 import { AgenteEscribiendo, BandejaViva, Cinta, Contador, Flujo, Testimonios } from "@/components/marketing/viva";
 import { getActivePlansWithFeatures, planCycleLabel, formatCents } from "@/lib/billing/plans";
@@ -108,6 +109,9 @@ export default async function Home() {
                 {["Conectas tu número en 5 minutos", "App móvil incluida", "Activo 24/7", "Soporte por WhatsApp"].map((t) => (
                   <span key={t}><b className="font-extrabold text-primary">✓</b> {t}</span>
                 ))}
+              </div>
+              <div className="mt-5 w-fit">
+                <InsigniaPartner />
               </div>
               <div className="mt-4 flex items-center gap-3">
                 <SocialLinks />
@@ -362,6 +366,9 @@ export default async function Home() {
               <a href={waHref} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Soporte por WhatsApp</a>
             </span>
             <span>Recibimos todas las tarjetas · PSE · Nequi · Transferencia</span>
+          </div>
+          <div className="my-2 w-full border-t border-border pt-4">
+            <InsigniaPartner compacta />
           </div>
           <SocialLinks />
         </div>
