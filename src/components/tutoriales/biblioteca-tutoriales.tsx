@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Check, ExternalLink, Play, X } from "lucide-react";
-import { MODULOS_TUTORIAL, etiquetaModulo, idYoutube, miniaturaYoutube } from "@/lib/tutoriales/video";
+import { MODULOS_TUTORIAL, etiquetaModulo, idYoutube, miniaturaYoutube, urlReproductor } from "@/lib/tutoriales/video";
 
 export type Tutorial = {
   id: string;
@@ -50,7 +50,7 @@ export function BibliotecaTutoriales({ tutoriales, abrirInicial }: { tutoriales:
         localStorage.setItem(CLAVE_VISTOS, JSON.stringify(nuevos));
       } catch {}
     }
-    if (idYoutube(t.url)) setAbierto(t);
+    if (urlReproductor(t.url)) setAbierto(t);
     else window.open(t.url, "_blank", "noopener,noreferrer");
   }
 
@@ -83,6 +83,7 @@ export function BibliotecaTutoriales({ tutoriales, abrirInicial }: { tutoriales:
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {lista.map((t) => {
           const yt = idYoutube(t.url);
+          const reproducible = !!urlReproductor(t.url);
           const visto = vistos.includes(t.id);
           return (
             <button
@@ -98,7 +99,7 @@ export function BibliotecaTutoriales({ tutoriales, abrirInicial }: { tutoriales:
                 )}
                 <span className="absolute inset-0 flex items-center justify-center">
                   <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary text-white shadow-lg transition-transform group-hover:scale-110">
-                    {yt ? <Play size={16} fill="currentColor" /> : <ExternalLink size={16} />}
+                    {reproducible ? <Play size={16} fill="currentColor" /> : <ExternalLink size={16} />}
                   </span>
                 </span>
                 {t.duracion && (
@@ -131,7 +132,7 @@ export function BibliotecaTutoriales({ tutoriales, abrirInicial }: { tutoriales:
             </div>
             <div className="aspect-video w-full overflow-hidden rounded-xl bg-black">
               <iframe
-                src={`https://www.youtube-nocookie.com/embed/${idYoutube(abierto.url)}?autoplay=1&rel=0`}
+                src={urlReproductor(abierto.url) ?? ""}
                 title={abierto.titulo}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
                 allowFullScreen

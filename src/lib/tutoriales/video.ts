@@ -32,6 +32,47 @@ export function idYoutube(url: string): string | null {
   return null;
 }
 
+/** Id de un archivo de Google Drive compartido por enlace. */
+export function idDrive(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (!u.hostname.endsWith("drive.google.com")) return null;
+    // https://drive.google.com/file/d/<id>/view?usp=sharing
+    const m = u.pathname.match(/\/file\/d\/([^/]+)/);
+    if (m) return m[1];
+    // https://drive.google.com/open?id=<id>
+    return u.searchParams.get("id");
+  } catch {
+    return null;
+  }
+}
+
+/** Id de un video de Vimeo. */
+export function idVimeo(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (!u.hostname.endsWith("vimeo.com")) return null;
+    const m = u.pathname.match(/^\/(\d+)/);
+    return m ? m[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Direccion para reproducir dentro de la plataforma, o null si ese enlace
+ * no se puede incrustar (entonces se abre en otra pestaña).
+ */
+export function urlReproductor(url: string): string | null {
+  const yt = idYoutube(url);
+  if (yt) return `https://www.youtube-nocookie.com/embed/${yt}?autoplay=1&rel=0`;
+  const drive = idDrive(url);
+  if (drive) return `https://drive.google.com/file/d/${drive}/preview`;
+  const vimeo = idVimeo(url);
+  if (vimeo) return `https://player.vimeo.com/video/${vimeo}`;
+  return null;
+}
+
 export function miniaturaYoutube(id: string): string {
   return `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 }

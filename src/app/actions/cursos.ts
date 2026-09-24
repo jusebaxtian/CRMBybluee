@@ -7,6 +7,7 @@ import { isPlatformAdmin } from "@/lib/admin";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
 import { generateBoldIntegritySignature, getBoldTransactionStatus } from "@/lib/bold";
 import { origenPublico } from "@/lib/http/origen-publico";
+import { toPublicUrl } from "@/lib/supabase/config";
 
 const MAX_PORTADA_BYTES = 5 * 1024 * 1024;
 const MAX_COMPROBANTE_BYTES = 5 * 1024 * 1024;
@@ -24,7 +25,9 @@ async function subirPortada(file: File | null): Promise<string | null> {
     .upload(path, file, { contentType: file.type || "image/jpeg", upsert: false });
   if (error) throw new Error(`No se pudo subir la portada: ${error.message}`);
   const { data } = admin.storage.from("cursos").getPublicUrl(path);
-  return data.publicUrl;
+  // getPublicUrl devuelve la URL interna del servidor (localhost:8000 detras
+  // de docker); el navegador necesita el dominio publico.
+  return toPublicUrl(data.publicUrl);
 }
 
 function leerCurso(formData: FormData) {
