@@ -140,16 +140,19 @@ export async function createAutomation(_prevState: unknown, formData: FormData) 
   if ("error" in ctx) return { error: ctx.error };
   const { supabase, workspaceId } = ctx;
 
-  // The AI agent and keyword/tag automations are mutually exclusive (see
-  // toggleAiAgentActive) — a new one created while the AI is on starts
-  // paused instead of silently going live alongside it.
-  const { data: aiAgent } = await supabase
+  // La IA y las automatizaciones de palabra clave/etiqueta no responden a la
+  // vez EN LA MISMA LINEA: si la IA de esa linea esta encendida, la nueva
+  // automatizacion nace pausada. La IA de otra linea no la afecta.
+  const { data: agentesActivos } = await supabase
     .from("ai_agents")
-    .select("is_active")
+    .select("whatsapp_account_id")
     .eq("workspace_id", workspaceId)
-    .eq("is_active", true)
-    .limit(1)
-    .maybeSingle();
+    .eq("is_active", true);
+  const aiAgent = (agentesActivos ?? []).some(
+    (a) => (a.whatsapp_account_id ?? null) === (whatsappAccountId ?? null)
+  )
+    ? { is_active: true }
+    : null;
 
   const { data: automation, error } = await supabase
     .from("automations")
@@ -269,20 +272,26 @@ export async function toggleAutomationActive(automationId: string, isActive: boo
   if ("error" in ctx) return { error: ctx.error };
   const { supabase, workspaceId } = ctx;
 
-  // The AI agent and keyword/tag automations are mutually exclusive (see
-  // toggleAiAgentActive) — while the AI is on, automations stay paused and
-  // can't be turned back on manually until the AI is turned off.
+  // Solo bloquea la IA de la MISMA linea que la automatizacion.
   if (isActive) {
-    const { data: agent } = await supabase
-      .from("ai_agents")
-      .select("is_active")
+    const { data: automacion } = await supabase
+      .from("automations")
+      .select("whatsapp_account_id")
+      .eq("id", automationId)
       .eq("workspace_id", workspaceId)
-      .eq("is_active", true)
-      .limit(1)
       .maybeSingle();
-    if (agent?.is_active) {
+    const { data: agentesActivos } = await supabase
+      .from("ai_agents")
+      .select("whatsapp_account_id")
+      .eq("workspace_id", workspaceId)
+      .eq("is_active", true);
+    const chocan = (agentesActivos ?? []).some(
+      (a) => (a.whatsapp_account_id ?? null) === (automacion?.whatsapp_account_id ?? null)
+    );
+    if (chocan) {
       return {
-        error: "El agente de IA está activo — apágalo primero para poder activar automatizaciones.",
+        error:
+          "El agente de IA de esa línea está activo — apágalo primero para poder activar automatizaciones en esa línea.",
       };
     }
   }

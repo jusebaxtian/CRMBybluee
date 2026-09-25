@@ -209,25 +209,32 @@ export async function testAiAgentMessage(
   };
 }
 
-// The AI and keyword/tag automations both react to inbound messages, and
-// keyword automations already win over the AI when both are on — which
-// meant an active automation could silently make the AI look "broken"
-// (never replying) for that keyword. To keep it simple for the business
-// owner, only one system answers at a time: turning the AI on pauses every
-// currently-active automation (tagged disabled_by_ai so we know which ones
-// to restore), and turning it off brings back exactly those.
+// La IA y las automatizaciones de palabra clave/etiqueta reaccionan al mismo
+// mensaje entrante, asi que solo una responde a la vez: al encender la IA se
+// pausan las automatizaciones (marcadas disabled_by_ai) y al apagarla vuelven.
+//
+// IMPORTANTE: esto va POR LINEA (migracion 0118). Encender el agente de
+// Soporte no puede tocar las automatizaciones de Ventas — paso el 25 sep 2026
+// y dejo un espacio sin respuestas automaticas toda la noche.
 export async function toggleAiAgentActive(isActive: boolean, whatsappAccountId?: string | null) {
   const ctx = await requireWorkspace();
   if ("error" in ctx) return { error: ctx.error };
   const { supabase, workspaceId } = ctx;
 
+  // Solo las automatizaciones del mismo alcance que el agente: las de esa
+  // linea, o las "de todas las lineas" cuando el agente es el general.
+  const delMismoAlcance = <T extends { eq: (c: string, v: unknown) => T; is: (c: string, v: null) => T }>(q: T) =>
+    whatsappAccountId ? q.eq("whatsapp_account_id", whatsappAccountId) : q.is("whatsapp_account_id", null);
+
   if (isActive) {
-    const { error: pauseError } = await supabase
-      .from("automations")
-      .update({ is_active: false, disabled_by_ai: true })
-      .eq("workspace_id", workspaceId)
-      .eq("is_active", true)
-      .in("trigger_type", ["keyword", "tag_added"]);
+    const { error: pauseError } = await delMismoAlcance(
+      supabase
+        .from("automations")
+        .update({ is_active: false, disabled_by_ai: true })
+        .eq("workspace_id", workspaceId)
+        .eq("is_active", true)
+        .in("trigger_type", ["keyword", "tag_added"])
+    );
     if (pauseError) return { error: pauseError.message };
   }
 
@@ -238,11 +245,13 @@ export async function toggleAiAgentActive(isActive: boolean, whatsappAccountId?:
   if (error) return { error: error.message };
 
   if (!isActive) {
-    const { error: restoreError } = await supabase
-      .from("automations")
-      .update({ is_active: true, disabled_by_ai: false })
-      .eq("workspace_id", workspaceId)
-      .eq("disabled_by_ai", true);
+    const { error: restoreError } = await delMismoAlcance(
+      supabase
+        .from("automations")
+        .update({ is_active: true, disabled_by_ai: false })
+        .eq("workspace_id", workspaceId)
+        .eq("disabled_by_ai", true)
+    );
     if (restoreError) return { error: restoreError.message };
   }
 
