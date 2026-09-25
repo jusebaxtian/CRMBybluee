@@ -80,3 +80,19 @@ export async function markNotificationRead(notificationId: string) {
 
   revalidatePath("/dashboard");
 }
+
+/** "Marcar todas como leídas" de la campana. */
+export async function markAllNotificationsRead(notificationIds: string[]) {
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
+  if (notificationIds.length === 0) return { success: true as const };
+
+  const { error } = await supabase
+    .from("notification_reads")
+    .upsert(notificationIds.map((id) => ({ notification_id: id, workspace_id: workspaceId })));
+  if (error) return { error: error.message };
+
+  revalidatePath("/dashboard");
+  return { success: true as const };
+}
