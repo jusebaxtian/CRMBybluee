@@ -611,9 +611,27 @@ export function ConversationListPanel({
                     </span>
                   </span>
                 </div>
-                {conv.contact.name && (
-                  <p className="truncate text-xs text-muted">{conv.contact.wa_id}</p>
-                )}
+                <div className="flex min-w-0 items-center gap-1.5">
+                  {conv.contact.name && (
+                    <p className="truncate text-xs text-muted">{conv.contact.wa_id}</p>
+                  )}
+                  {/* Por cual linea entra este chat (con varias APIs conectadas). */}
+                  {channels.length > 1 && conv.whatsappAccountId && channelColor.has(conv.whatsappAccountId) && (
+                    <span
+                      className="flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none"
+                      style={{
+                        color: channelColor.get(conv.whatsappAccountId),
+                        backgroundColor: `${channelColor.get(conv.whatsappAccountId)}1f`,
+                      }}
+                    >
+                      <span
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ backgroundColor: channelColor.get(conv.whatsappAccountId) }}
+                      />
+                      {channelName(channels.find((c) => c.id === conv.whatsappAccountId)!)}
+                    </span>
+                  )}
+                </div>
                 {conv.tags.length > 0 && (
                   <div className="mt-0.5 flex flex-wrap gap-1">
                     {conv.tags.map((tag) => (
