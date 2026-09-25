@@ -67,17 +67,19 @@ export async function saveAiAgent(_prevState: unknown, formData: FormData) {
   let apiKey = submittedApiKey;
   let keyChanged = true;
   if (!submittedApiKey) {
-    const consulta = supabase
+    // La llave es del espacio: se comparte entre todos los agentes. Si este
+    // agente aun no existe, se hereda la del espacio en vez de pedirla otra vez.
+    const { data: agentesDelEspacio } = await supabase
       .from("ai_agents")
-      .select("api_key, provider")
+      .select("api_key, provider, whatsapp_account_id")
       .eq("workspace_id", workspaceId);
-    const { data: existing } = await (whatsappAccountId
-      ? consulta.eq("whatsapp_account_id", whatsappAccountId)
-      : consulta.is("whatsapp_account_id", null)
-    ).maybeSingle();
-    if (!existing) return { error: "Pega tu API key." };
-    apiKey = existing.api_key;
-    keyChanged = existing.provider !== provider;
+    const propio = (agentesDelEspacio ?? []).find(
+      (a) => (a.whatsapp_account_id ?? null) === whatsappAccountId
+    );
+    const cualquiera = propio ?? (agentesDelEspacio ?? []).find((a) => a.provider === provider) ?? (agentesDelEspacio ?? [])[0];
+    if (!cualquiera) return { error: "Pega tu API key." };
+    apiKey = cualquiera.api_key;
+    keyChanged = cualquiera.provider !== provider;
   }
 
   if (keyChanged) {
@@ -118,6 +120,16 @@ export async function saveAiAgent(_prevState: unknown, formData: FormData) {
     ? await supabase.from("ai_agents").update(datos).eq("id", filaExistente.id)
     : await supabase.from("ai_agents").insert(datos);
   if (error) return { error: error.message };
+
+  // Una sola llave por espacio: si la cambiaron aqui, se actualiza en todos
+  // los agentes del espacio para que no queden claves distintas por linea.
+  if (submittedApiKey) {
+    await supabase
+      .from("ai_agents")
+      .update({ api_key: apiKey, provider })
+      .eq("workspace_id", workspaceId)
+      .neq("api_key", apiKey);
+  }
 
   revalidatePath("/dashboard/settings");
   return { success: true as const };

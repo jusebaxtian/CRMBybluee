@@ -62,8 +62,18 @@ export function AgentesPorLinea({
   const agenteDe = (lineaId: string | null) =>
     agentes.find((a) => (a.whatsapp_account_id ?? null) === lineaId) ?? null;
 
+  const hayLlave = agentes.length > 0;
+
   if (lineas.length < 2) {
-    return <AiAgentPanel agent={agenteDe(null)} mediaItems={mediaItems} templates={templates} whatsappAccountId={null} />;
+    return (
+      <AiAgentPanel
+        agent={agenteDe(null)}
+        mediaItems={mediaItems}
+        templates={templates}
+        whatsappAccountId={null}
+        hayLlaveEnElEspacio={hayLlave}
+      />
+    );
   }
 
   const pestanas: { id: string | null; nombre: string }[] = [
@@ -79,8 +89,9 @@ export function AgentesPorLinea({
           Un agente por línea
         </div>
         <p className="mb-3 text-xs text-muted">
-          Cada línea puede tener su propio agente, con su personalidad y sus seguimientos. Si una línea no tiene agente
-          propio, responde el de <strong>Otras líneas</strong>; si tampoco existe, la IA no responde en esa línea.
+          Cada línea puede tener su propio agente, con su personalidad y sus seguimientos, y todos comparten la misma
+          API key. Si una línea no tiene agente propio, responde el de <strong>Otras líneas</strong>; si tampoco existe,
+          la IA no responde en esa línea.
         </p>
         <div className="flex flex-wrap gap-2">
           {pestanas.map((p) => {
@@ -122,6 +133,7 @@ export function AgentesPorLinea({
         mediaItems={mediaItems}
         templates={templates}
         whatsappAccountId={seleccion ?? null}
+        hayLlaveEnElEspacio={hayLlave}
       />
     </div>
   );

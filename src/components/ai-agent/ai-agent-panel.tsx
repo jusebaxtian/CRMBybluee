@@ -69,12 +69,15 @@ export function AiAgentPanel({
   mediaItems = [],
   templates = [],
   whatsappAccountId = null,
+  hayLlaveEnElEspacio = false,
 }: {
   agent: AiAgent;
   mediaItems?: MediaItem[];
   templates?: TemplateOption[];
   /** Linea que atiende este agente; null = las que no tengan agente propio. */
   whatsappAccountId?: string | null;
+  /** El espacio ya tiene una llave guardada: este agente la reutiliza. */
+  hayLlaveEnElEspacio?: boolean;
 }) {
   const [state, action, pending] = useActionState(saveAiAgent, undefined);
   const [provider, setProvider] = useState<"openai" | "anthropic">(agent?.provider ?? "openai");
@@ -177,14 +180,14 @@ export function AiAgentPanel({
         </div>
 
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted">Tu API key</label>
+          <label className="mb-1 block text-xs font-medium text-muted">API key (la misma para todos tus agentes)</label>
           <input
             name="apiKey"
             type="password"
-            required={!agent}
+            required={!agent && !hayLlaveEnElEspacio}
             placeholder={
-              agent
-                ? "Déjalo vacío para mantener la llave guardada"
+              agent || hayLlaveEnElEspacio
+                ? "Déjalo vacío para usar la llave que ya guardaste"
                 : provider === "openai"
                   ? "sk-..."
                   : "sk-ant-..."
@@ -192,8 +195,8 @@ export function AiAgentPanel({
             className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
           />
           <p className="mt-1 text-[11px] text-muted">
-            {agent
-              ? "Solo llénalo si quieres reemplazar la llave actual."
+            {agent || hayLlaveEnElEspacio
+              ? "La llave se comparte con todos los agentes del espacio: si la cambias aquí, se cambia en todos."
               : provider === "openai"
                 ? "La consigues en platform.openai.com → API keys."
                 : "La consigues en console.anthropic.com → API keys."}
