@@ -6,6 +6,7 @@ import { ContactsTable } from "@/components/contacts/contacts-table";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
 import { listWorkspaceAgents } from "@/lib/agents";
+import { noSePuedeUsar } from "@/lib/whatsapp/limite-plantilla";
 
 export default async function ContactsPage() {
   const supabase = await createClient();
@@ -118,7 +119,7 @@ export default async function ContactsPage() {
         contacts={rows}
         allTags={allTags ?? []}
         lineas={lineas ?? []}
-        plantillas={plantillas ?? []}
+        plantillas={(plantillas ?? []).filter((t) => !noSePuedeUsar(t.body_text))}
         agentes={agentes}
       />
     </div>

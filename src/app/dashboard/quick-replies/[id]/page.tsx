@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NewQuickReplyForm } from "@/components/quick-replies/new-quick-reply-form";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
+import { noSePuedeUsar } from "@/lib/whatsapp/limite-plantilla";
 
 export default async function EditQuickReplyPage({
   params,
@@ -37,7 +38,7 @@ export default async function EditQuickReplyPage({
 
   const { data: templates } = await supabase
     .from("templates")
-    .select("id, meta_template_name, language, status")
+    .select("id, meta_template_name, language, status, body_text")
     .eq("workspace_id", workspaceId ?? "")
     .eq("created_via", "crm")
     .neq("status", "DELETED")
@@ -49,7 +50,7 @@ export default async function EditQuickReplyPage({
         <h1 className="mb-4 font-dash-display text-[22px] font-bold tracking-[-.4px] text-foreground">Editar respuesta rápida</h1>
         <NewQuickReplyForm
           tags={tags ?? []}
-          templates={templates ?? []}
+          templates={(templates ?? []).filter((t) => !noSePuedeUsar(t.body_text))}
           quickReply={{
             id: quickReply.id,
             name: quickReply.name,

@@ -6,6 +6,7 @@ import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { abrirConversacion } from "@/lib/whatsapp/conversacion";
 import { isWindowOpen } from "@/lib/whatsapp/message-window";
 import { recordOutboundMessage } from "@/lib/messaging/record";
+import { noSePuedeUsar, motivoDelExceso } from "@/lib/whatsapp/limite-plantilla";
 
 // media_filename doesn't carry a mime type — infer a close-enough one from
 // its extension just to pick the right WhatsApp media kind (image/video/
@@ -95,6 +96,16 @@ async function prepareCampaignSend(
           link: template.header_media_url,
         }
       : undefined;
+
+  // Una plantilla aprobada cuyo cuerpo se pasa del limite de WhatsApp falla en
+  // cada destinatario (132005). Se corta antes de marcar la campaña como
+  // "sending": es la diferencia entre un aviso y 181 de 181 fallidos, que es
+  // exactamente lo que le paso a un cliente.
+  if (campaign.send_type !== "free_text" && noSePuedeUsar(template?.body_text)) {
+    return {
+      error: `La plantilla de esta campaña no se puede enviar. ${motivoDelExceso(template!.body_text!)} Créala de nuevo con el cuerpo más corto y vuelve a elegirla en la campaña.`,
+    };
+  }
 
   const account = await resolveSendAccount(supabase, workspaceId, campaign.whatsapp_account_id);
   if (!account) return { error: "Este workspace no tiene WhatsApp conectado." };

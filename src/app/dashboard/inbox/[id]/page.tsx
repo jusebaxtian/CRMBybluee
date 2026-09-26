@@ -20,6 +20,7 @@ import { isPhoneNumber } from "@/lib/whatsapp/identity";
 import { isPlatformAdmin } from "@/lib/admin";
 import { EspacioDelClienteCard, type EspacioDelCliente, type InvitacionPendiente } from "@/components/inbox/espacio-del-cliente";
 import { invitacionesPendientesDeContacto } from "@/lib/billing/invitaciones-pendientes";
+import { noSePuedeUsar } from "@/lib/whatsapp/limite-plantilla";
 
 export default async function ConversationPage({
   params,
@@ -145,7 +146,11 @@ export default async function ConversationPage({
   // Solo las plantillas de la WABA de la linea por la que va esta
   // conversacion (migracion 0106); con una sola WABA son todas.
   const wabaDeLaLinea = workspaceChannels?.find((c) => c.id === conversation.whatsapp_account_id)?.waba_id;
-  const plantillasDeLaLinea = (approvedTemplates ?? []).filter((t) => !wabaDeLaLinea || !t.waba_id || t.waba_id === wabaDeLaLinea);
+  const plantillasDeLaLinea = (approvedTemplates ?? [])
+    .filter((t) => !wabaDeLaLinea || !t.waba_id || t.waba_id === wabaDeLaLinea)
+    // Ver la nota en la lista de campañas: las que se pasan del limite no se
+    // ofrecen porque el envio falla siempre.
+    .filter((t) => !noSePuedeUsar(t.body_text));
 
   // Only write when there's something new to mark read — an unconditional
   // update on every render would re-trigger the conversations-table realtime

@@ -7,6 +7,17 @@ import { normalizarNombrePlantilla } from "@/lib/templates/nombre";
 import { Button } from "@/components/ui/button";
 import { CATEGORIA_PLANTILLA_POR_DEFECTO } from "@/lib/templates/defaults";
 import type { WabaOption } from "@/lib/whatsapp/wabas";
+import {
+  LIMITE_CUERPO,
+  RESERVA_POR_VARIABLE,
+  espacioPorVariable,
+  largoEnElPeorCaso,
+  largoFijo,
+  margenRestante,
+  noSePuedeUsar,
+  quedaJusto,
+  variablesDe,
+} from "@/lib/whatsapp/limite-plantilla";
 
 const headerAccept: Record<string, string> = {
   image: "image/jpeg,image/png",
@@ -57,6 +68,16 @@ export function CreateTemplateForm({ wabas = [] }: { wabas?: WabaOption[] }) {
   const [footerText, setFooterText] = useState("");
   const [buttons, setButtons] = useState<TemplateButton[]>([]);
   const urlButtonCount = buttons.filter((b) => b.type === "URL").length;
+
+  // WhatsApp mide el mensaje ya armado, con las variables reemplazadas: por
+  // eso el contador suma la reserva de cada variable en vez del texto tal cual.
+  const variablesDelCuerpo = variablesDe(bodyText).length;
+  const ocupado = largoEnElPeorCaso(bodyText);
+  const margen = margenRestante(bodyText);
+  // Dos umbrales: no se deja enviar a aprobacion lo que no podria enviarse
+  // nunca, y se avisa de lo que queda al borde.
+  const seExcede = noSePuedeUsar(bodyText);
+  const justa = quedaJusto(bodyText);
 
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -245,6 +266,40 @@ export function CreateTemplateForm({ wabas = [] }: { wabas?: WabaOption[] }) {
         <p className="mt-1 text-xs text-muted">
           Usa {"{{1}}"}, {"{{2}}"}, etc. para variables (ej. nombre del contacto).
         </p>
+        <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2">
+          <p
+            className={`text-xs ${
+              seExcede ? "font-medium text-red-400" : justa ? "font-medium text-amber-400" : "text-muted"
+            }`}
+          >
+            {ocupado} de {LIMITE_CUERPO} caracteres
+            {variablesDelCuerpo > 0 && (
+              <>
+                {" "}
+                ({largoFijo(bodyText)} de texto + {variablesDelCuerpo} variable
+                {variablesDelCuerpo === 1 ? "" : "s"} × {RESERVA_POR_VARIABLE})
+              </>
+            )}
+          </p>
+          {(seExcede || justa) && (
+            <p className={`text-xs font-medium ${seExcede ? "text-red-400" : "text-amber-400"}`}>
+              A cada variable le caben {espacioPorVariable(bodyText)} caracteres
+              {seExcede ? "" : ` · recorta ${-margen} para quedar tranquilo`}
+            </p>
+          )}
+        </div>
+        {seExcede && (
+          <p className="mt-1 rounded-[9px] border border-red-400/40 bg-red-400/10 px-3 py-2 text-xs text-foreground">
+            No se puede enviar a aprobación: WhatsApp mide el mensaje con la variable ya reemplazada, y aquí no cabe
+            ni un nombre corriente. Meta igual te la aprobaría, pero después fallaría cada envío. Recorta el cuerpo.
+          </p>
+        )}
+        {justa && (
+          <p className="mt-1 rounded-[9px] border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs text-foreground">
+            Queda justa: los nombres normales pasan, pero uno más largo que {espacioPorVariable(bodyText)} caracteres
+            haría fallar ese envío. Lo cómodo es dejar {RESERVA_POR_VARIABLE} caracteres libres por variable.
+          </p>
+        )}
       </div>
 
       <div>
@@ -359,7 +414,7 @@ export function CreateTemplateForm({ wabas = [] }: { wabas?: WabaOption[] }) {
         </div>
       )}
 
-      <Button type="submit" disabled={uploading} className="self-start">
+      <Button type="submit" disabled={uploading || seExcede} className="self-start">
         {uploading ? "Enviando a Meta..." : "Enviar plantilla a aprobación"}
       </Button>
     </form>

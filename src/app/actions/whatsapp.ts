@@ -30,6 +30,7 @@ import { toPublicUrl } from "@/lib/supabase/config";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
 import { recordOutboundMessage } from "@/lib/messaging/record";
 import { limiteDeNumeros } from "@/lib/whatsapp/limite-numeros";
+import { noSePuedeUsar, motivoDelExceso } from "@/lib/whatsapp/limite-plantilla";
 
 const execFileAsync = promisify(execFile);
 
@@ -538,7 +539,7 @@ export async function sendTemplateToContact(input: {
     supabase.from("contacts").select("id").eq("id", input.contactId).eq("workspace_id", workspaceId).maybeSingle(),
     supabase
       .from("templates")
-      .select("id, waba_id, status")
+      .select("id, waba_id, status, body_text")
       .eq("id", input.templateId)
       .eq("workspace_id", workspaceId)
       .maybeSingle(),
@@ -546,6 +547,11 @@ export async function sendTemplateToContact(input: {
   if (!contact) return { error: "Contacto no encontrado." };
   if (!template) return { error: "Plantilla no encontrada." };
   if (template.status !== "APPROVED") return { error: "Esa plantilla aún no está aprobada por Meta." };
+  // Aprobada no quiere decir enviable: si el cuerpo se pasa del limite de
+  // WhatsApp al reemplazar las variables, Meta rechaza cada envio (132005).
+  if (noSePuedeUsar(template.body_text)) {
+    return { error: `Esta plantilla no se puede enviar. ${motivoDelExceso(template.body_text)}` };
+  }
 
   // La plantilla vive en la WABA de la linea: si eligieron linea, tiene que ser una de esa WABA.
   let whatsappAccountId = input.whatsappAccountId ?? null;

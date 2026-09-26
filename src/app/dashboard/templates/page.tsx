@@ -8,6 +8,7 @@ import { DeleteTemplateButton } from "@/components/templates/delete-template-but
 import { TemplatePreview } from "@/components/templates/template-preview";
 import { TemplateHeaderMediaUpload } from "@/components/templates/template-header-media-upload";
 import { opcionesDeWaba, wabasDelEspacio } from "@/lib/whatsapp/wabas";
+import { noSePuedeUsar, quedaJusto, motivoDelExceso, avisoDeMargenJusto } from "@/lib/whatsapp/limite-plantilla";
 
 const statusLabel: Record<string, string> = {
   APPROVED: "Aprobada",
@@ -95,6 +96,10 @@ export default async function TemplatesPage() {
           {templates.map((t) => {
             const headerFormat = t.header_format as "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | null;
             const buttons = t.buttons as { type: "URL" | "QUICK_REPLY"; text: string; url?: string }[] | null;
+            // Aprobada por Meta pero inservible: el cuerpo se pasa del limite
+            // al reemplazar las variables, asi que el envio siempre falla.
+            const pasadaDeLargo = noSePuedeUsar(t.body_text);
+            const justa = quedaJusto(t.body_text);
             return (
               <div key={t.id} className="flex flex-col rounded-[13px] border border-border bg-surface p-5">
                 <div className="mb-3 flex items-start justify-between gap-2">
@@ -110,15 +115,39 @@ export default async function TemplatesPage() {
                       </p>
                     )}
                   </div>
-                  <span
-                    className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
-                      statusColor[t.status] ?? "text-muted border-border"
-                    }`}
-                  >
-                    {statusLabel[t.status] ?? t.status}
-                  </span>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <span
+                      className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                        statusColor[t.status] ?? "text-muted border-border"
+                      }`}
+                    >
+                      {statusLabel[t.status] ?? t.status}
+                    </span>
+                    {pasadaDeLargo && (
+                      <span className="shrink-0 rounded-full border border-red-400 bg-red-400/10 px-2 py-0.5 text-[11px] font-medium text-red-400">
+                        No se puede usar
+                      </span>
+                    )}
+                    {justa && (
+                      <span className="shrink-0 rounded-full border border-amber-400 bg-amber-400/10 px-2 py-0.5 text-[11px] font-medium text-amber-400">
+                        Queda justa
+                      </span>
+                    )}
+                  </div>
                 </div>
 
+                {pasadaDeLargo && (
+                  <p className="mb-3 rounded-lg border border-red-400/40 bg-red-400/10 px-3 py-2 text-[11px] text-foreground">
+                    🚫 Aprobada por Meta, pero no se puede usar: {motivoDelExceso(t.body_text)} Mientras siga así, no
+                    aparece para elegir en campañas, automatizaciones ni seguimientos, porque todos los envíos
+                    fallarían. Créala de nuevo con el cuerpo más corto.
+                  </p>
+                )}
+                {justa && (
+                  <p className="mb-3 rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-[11px] text-foreground">
+                    ⚠️ {avisoDeMargenJusto(t.body_text)}
+                  </p>
+                )}
                 {t.status === "PENDING" && (
                   <p className="mb-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-[11px] text-warning">
                     ⚠️ En revisión por Meta. La aprobación es un proceso de Meta y puede tardar entre 24 y 48 horas.

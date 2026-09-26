@@ -13,6 +13,7 @@ import { AgentesPorLinea, type AgenteFila } from "@/components/ai-agent/agentes-
 import { CtwaDatasetForm } from "@/components/whatsapp/ctwa-dataset-form";
 import { limiteDeNumeros } from "@/lib/whatsapp/limite-numeros";
 import { limiteDeAgentes } from "@/lib/agentes/limite-agentes";
+import { noSePuedeUsar } from "@/lib/whatsapp/limite-plantilla";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -123,7 +124,7 @@ export default async function SettingsPage() {
     const { data: followupTemplates } = workspaceId
       ? await supabase
           .from("templates")
-          .select("id, meta_template_name, language")
+          .select("id, meta_template_name, language, body_text")
           .eq("workspace_id", workspaceId)
           .eq("status", "APPROVED")
           .eq("created_via", "crm")
@@ -135,7 +136,7 @@ export default async function SettingsPage() {
         agentes={(aiAgents ?? []) as AgenteFila[]}
         lineas={(accounts ?? []).filter((a) => a.status !== "frozen")}
         mediaItems={aiAgentMedia ?? []}
-        templates={followupTemplates ?? []}
+        templates={(followupTemplates ?? []).filter((t) => !noSePuedeUsar(t.body_text))}
       />
     );
   }

@@ -15,6 +15,7 @@ import { toPublicUrl } from "@/lib/supabase/config";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
 import { CATEGORIA_PLANTILLA_POR_DEFECTO } from "@/lib/templates/defaults";
 import { wabasDelEspacio } from "@/lib/whatsapp/wabas";
+import { noSePuedeUsar, motivoDelExceso } from "@/lib/whatsapp/limite-plantilla";
 
 export async function syncTemplates() {
   const ctx = await requireWorkspace();
@@ -186,6 +187,11 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
     return { error: "El nombre solo puede tener minúsculas, números y guiones bajos (_)." };
   }
   if (!bodyText) return { error: "El cuerpo del mensaje es obligatorio." };
+  // Meta aprueba plantillas que despues fallan en cada envio porque el
+  // mensaje ya armado se pasa de 1.024 caracteres. Se corta aqui, antes de
+  // mandarla a aprobacion, en vez de descubrirlo destinatario por
+  // destinatario.
+  if (noSePuedeUsar(bodyText)) return { error: motivoDelExceso(bodyText) };
   if (headerKind === "text" && !headerText) {
     return { error: "Escribe el texto del encabezado." };
   }

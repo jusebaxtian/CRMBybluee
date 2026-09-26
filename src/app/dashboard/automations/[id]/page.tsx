@@ -4,6 +4,7 @@ import { NewAutomationForm } from "@/components/automations/new-automation-form"
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
 import { listWorkspaceAgents } from "@/lib/agents";
+import { noSePuedeUsar } from "@/lib/whatsapp/limite-plantilla";
 
 export default async function EditAutomationPage({
   params,
@@ -40,7 +41,7 @@ export default async function EditAutomationPage({
 
   const { data: templates } = await supabase
     .from("templates")
-    .select("id, meta_template_name, language, status, waba_id")
+    .select("id, meta_template_name, language, status, waba_id, body_text")
     .eq("workspace_id", workspaceId ?? "")
     .eq("created_via", "crm")
     .neq("status", "DELETED")
@@ -71,7 +72,7 @@ export default async function EditAutomationPage({
         <h1 className="mb-4 font-dash-display text-[22px] font-bold tracking-[-.4px] text-foreground">Editar automatización</h1>
         <NewAutomationForm
           tags={tags ?? []}
-          templates={templates ?? []}
+          templates={(templates ?? []).filter((t) => !noSePuedeUsar(t.body_text))}
           lineas={lineas ?? []}
           agents={agents}
           quickReplies={quickReplies ?? []}
