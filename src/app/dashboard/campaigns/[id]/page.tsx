@@ -52,9 +52,12 @@ export default async function CampaignDetailPage({
       .eq("id", cuenta.id)
       .maybeSingle();
     if (linea) {
-      lineaSaliente = linea.label
+      const nombre = linea.label
         ? `${linea.display_phone_number} · ${linea.label}`
         : linea.display_phone_number;
+      // Ver la nota en la lista de campañas: sin linea guardada, la principal
+      // es una deduccion y se muestra como tal.
+      lineaSaliente = campaign.whatsapp_account_id ? nombre : `${nombre} (línea principal)`;
     }
   }
 

@@ -74,9 +74,13 @@ export default async function CampaignsPage() {
   const lineasPorId = new Map((lineas ?? []).map((l) => [l.id as string, l]));
   const lineaPorDefecto = (lineas ?? []).find((l) => l.status !== "frozen") ?? null;
   const lineaDeCampaña = (whatsappAccountId: string | null) => {
-    const l = (whatsappAccountId ? lineasPorId.get(whatsappAccountId) : null) ?? lineaPorDefecto;
+    const elegida = whatsappAccountId ? lineasPorId.get(whatsappAccountId) : null;
+    const l = elegida ?? lineaPorDefecto;
     if (!l) return null;
-    return l.label ? `${l.display_phone_number} · ${l.label}` : l.display_phone_number;
+    const nombre = l.label ? `${l.display_phone_number} · ${l.label}` : l.display_phone_number;
+    // Sin linea guardada el envio uso la principal, pero eso es una deduccion,
+    // no un dato de la campaña: se dice tal cual para no afirmar de mas.
+    return elegida ? nombre : `${nombre} (línea principal)`;
   };
 
   // Aggregated in SQL (see campaign_recipient_counts) rather than fetching
