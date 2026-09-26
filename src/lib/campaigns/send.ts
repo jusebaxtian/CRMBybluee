@@ -157,14 +157,19 @@ async function runCampaignSendLoop(
   type RecipientRow = {
     id: string;
     contact_id: string;
-    contacts: { wa_id: string; name: string | null; likely_blocked: boolean };
+    contacts: {
+      wa_id: string;
+      name: string | null;
+      likely_blocked: boolean;
+      marketing_opt_out_at: string | null;
+    };
   };
   const PAGE_SIZE = 1000;
   const recipients: RecipientRow[] = [];
   for (let offset = 0; ; offset += PAGE_SIZE) {
     const { data: batch } = await supabase
       .from("campaign_recipients")
-      .select("id, contact_id, contacts(wa_id, name, likely_blocked)")
+      .select("id, contact_id, contacts(wa_id, name, likely_blocked, marketing_opt_out_at)")
       .eq("campaign_id", campaignId)
       .eq("status", "pending")
       .range(offset, offset + PAGE_SIZE - 1);
@@ -261,8 +266,22 @@ async function runCampaignSendLoop(
       wa_id: string;
       name: string | null;
       likely_blocked: boolean;
+      marketing_opt_out_at: string | null;
     };
     const { wa_id: waId, likely_blocked: likelyBlocked } = contact;
+
+    // Pidio no recibir marketing: Meta rechaza el envio de todas formas, y
+    // cada intento pesa contra la calidad del numero. Mejor no gastarlo.
+    if (contact.marketing_opt_out_at) {
+      await supabase
+        .from("campaign_recipients")
+        .update({
+          status: "failed",
+          error_message: "Pidió no recibir marketing de tu negocio — excluido del envío.",
+        })
+        .eq("id", recipient.id);
+      continue;
+    }
 
     if (noFollowupContactIds.has(recipient.contact_id)) {
       await supabase

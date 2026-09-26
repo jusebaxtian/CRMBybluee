@@ -15,6 +15,25 @@ function destinatario(to: string): Record<string, string> {
   return esBsuid(to) ? { recipient_type: "individual", recipient: to } : { to };
 }
 
+/**
+ * Error de Meta ya traducido, pero sin perder el codigo.
+ *
+ * El mensaje traducido sirve para mostrarlo; el codigo sirve para actuar
+ * (marcar al contacto que pidio no recibir marketing, por ejemplo). Antes se
+ * lanzaba un Error pelado y quien lo atrapaba solo tenia el texto.
+ */
+export class ErrorDeMeta extends Error {
+  readonly codigo: number | null;
+  readonly subcodigo: number | null;
+
+  constructor(mensaje: string, codigo: number | null, subcodigo: number | null) {
+    super(mensaje);
+    this.name = "ErrorDeMeta";
+    this.codigo = codigo;
+    this.subcodigo = subcodigo;
+  }
+}
+
 async function graphFetch(path: string, init?: RequestInit) {
   const res = await fetch(`${GRAPH_BASE}${path}`, init);
   const data = await res.json();
@@ -23,7 +42,11 @@ async function graphFetch(path: string, init?: RequestInit) {
     // deja una frase accionable en español. El error crudo queda en el log.
     const err = data?.error;
     console.error("Meta Graph API error:", JSON.stringify(err ?? data));
-    throw new Error(traducirErrorMeta(err));
+    throw new ErrorDeMeta(
+      traducirErrorMeta(err),
+      typeof err?.code === "number" ? err.code : null,
+      typeof err?.error_subcode === "number" ? err.error_subcode : null
+    );
   }
   return data;
 }

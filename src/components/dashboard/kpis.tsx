@@ -84,11 +84,21 @@ export async function Kpis({ rango, etiquetaPeriodo }: { rango: RangoFechas; eti
           )
         }
       />
+      {/* Antes era "Contactos nuevos". Cambiada el 26 sep 2026: saber a cuánta
+          gente ya no se le puede escribir pesa más que el conteo de altas,
+          porque insistirles es lo que baja la calidad del número. */}
       <Tarjeta
-        etiqueta="Contactos nuevos"
-        cifra={n(k.contactosNuevos)}
-        delta={<Delta pct={k.deltaContactosPct} sufijo="" />}
-        pie={`${n(k.contactosMetaAds)} ${k.contactosMetaAds === 1 ? "vino" : "vinieron"} de Meta Ads`}
+        etiqueta="Pidieron no recibir marketing"
+        cifra={n(k.sinMarketing)}
+        pie={
+          k.sinMarketing > 0 ? (
+            <Link href="/dashboard/contacts" className="text-dash-green-text hover:underline">
+              Ver contactos →
+            </Link>
+          ) : (
+            "Nadie se ha dado de baja 👌"
+          )
+        }
       />
       <Tarjeta
         etiqueta="Mensajes enviados"

@@ -28,6 +28,8 @@ type Contact = {
   assignedTagIds: string[];
   fromAds: boolean;
   adHeadline: string | null;
+  /** Fecha en que Meta informó que ya no quiere mensajes de marketing. */
+  marketingOptOutAt: string | null;
 };
 
 type Agente = { id: string; name: string | null; email: string };
@@ -67,6 +69,9 @@ export function ContactsTable({
   const [search, setSearch] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [tagFilter, setTagFilter] = useState("");
+  // "" = todos, "si" = solo los que pidieron no recibir marketing, "no" = los
+  // que si se pueden incluir en envios.
+  const [marketingFilter, setMarketingFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
@@ -85,16 +90,20 @@ export function ContactsTable({
         if (!matchesName && !matchesNumber) return false;
       }
       if (tagFilter && !c.assignedTagIds.includes(tagFilter)) return false;
+      if (marketingFilter === "si" && !c.marketingOptOutAt) return false;
+      if (marketingFilter === "no" && c.marketingOptOutAt) return false;
       if (dateFrom && c.created_at < dateFrom) return false;
       if (dateTo && c.created_at.slice(0, 10) > dateTo) return false;
       return true;
     });
-  }, [contacts, search, tagFilter, dateFrom, dateTo]);
+  }, [contacts, search, tagFilter, marketingFilter, dateFrom, dateTo]);
 
-  const activeFilterCount = (tagFilter ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0);
+  const activeFilterCount =
+    (tagFilter ? 1 : 0) + (marketingFilter ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0);
 
   function clearFilters() {
     setTagFilter("");
+    setMarketingFilter("");
     setDateFrom("");
     setDateTo("");
   }
@@ -257,6 +266,18 @@ export function ContactsTable({
                       {t.name}
                     </option>
                   ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted">Marketing</label>
+                <select
+                  value={marketingFilter}
+                  onChange={(e) => setMarketingFilter(e.target.value)}
+                  className="w-full rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary"
+                >
+                  <option value="">Todos</option>
+                  <option value="si">Pidieron no recibir marketing</option>
+                  <option value="no">Sí se les puede enviar</option>
                 </select>
               </div>
               <div>
@@ -468,6 +489,16 @@ export function ContactsTable({
                             }
                           >
                             <Megaphone size={12} className="shrink-0 text-primary" />
+                          </span>
+                        )}
+                        {c.marketingOptOutAt && (
+                          <span
+                            title={`Pidió no recibir marketing de tu negocio (${new Date(
+                              c.marketingOptOutAt
+                            ).toLocaleDateString("es-CO")}). Queda fuera de campañas y seguimientos; solo le puedes escribir si te escribe primero.`}
+                            className="flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full bg-red-400/15"
+                          >
+                            <X size={10} className="shrink-0 text-red-400" />
                           </span>
                         )}
                       </span>

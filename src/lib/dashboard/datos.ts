@@ -229,6 +229,13 @@ export type Kpis = {
   contactosNuevos: number;
   deltaContactosPct: number | null;
   contactosMetaAds: number;
+  /**
+   * Contactos que le pidieron a WhatsApp no recibir mas marketing de este
+   * negocio (error 131050). No es del periodo: es el total acumulado, porque
+   * la decision no caduca y lo que interesa es a cuanta gente ya no se le
+   * puede escribir.
+   */
+  sinMarketing: number;
   mensajesEnviados: number;
   deltaEnviadosPct: number | null;
 };
@@ -255,6 +262,7 @@ export async function cargarKpis(supabase: SupabaseClient, workspaceId: string, 
     { count: contactosNuevos },
     { count: contactosAntes },
     { count: metaAds },
+    { count: sinMarketing },
     { data: tiempos },
     { data: enviados },
   ] = await Promise.all([
@@ -272,6 +280,11 @@ export async function cargarKpis(supabase: SupabaseClient, workspaceId: string, 
       .not("ad_source_id", "is", null)
       .gte("last_message_at", iso(rango.desde))
       .lte("last_message_at", iso(rango.hasta)),
+    supabase
+      .from("contacts")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", workspaceId)
+      .not("marketing_opt_out_at", "is", null),
     supabase.rpc("dashboard_tiempo_respuesta", {
       p_workspace_id: workspaceId,
       p_desde: iso(previo.desde),
@@ -298,6 +311,7 @@ export async function cargarKpis(supabase: SupabaseClient, workspaceId: string, 
     contactosNuevos: contactosNuevos ?? 0,
     deltaContactosPct: pct(contactosNuevos ?? 0, contactosAntes ?? 0),
     contactosMetaAds: metaAds ?? 0,
+    sinMarketing: sinMarketing ?? 0,
     mensajesEnviados: m?.enviados_actual ?? 0,
     deltaEnviadosPct: pct(m?.enviados_actual ?? 0, m?.enviados_anterior ?? 0),
   };

@@ -54,6 +54,24 @@ async function resetContactReachability(
 // Tagging it automatically lets the workspace spot and eventually prune
 // these contacts from future remarketing sends (they'd likely need a
 // UTILITY-category template instead, which isn't subject to this limit).
+// Error 131050: la persona le dijo a WhatsApp que no quiere mas mensajes de
+// marketing de este negocio. No es un fallo que se arregle reintentando — es
+// una decision suya, y cada insistencia pesa contra la calidad del numero.
+// Queda anotada en el contacto para verla, filtrarla y dejarla fuera de los
+// envios.
+const MARKETING_OPT_OUT_ERROR_CODE = 131050;
+
+async function anotarQueNoQuiereMarketing(
+  supabase: ReturnType<typeof createAdminClient>,
+  contactId: string
+) {
+  await supabase
+    .from("contacts")
+    .update({ marketing_opt_out_at: new Date().toISOString() })
+    .eq("id", contactId)
+    .is("marketing_opt_out_at", null);
+}
+
 const MARKETING_BLOCKED_ERROR_CODE = 131049;
 const MARKETING_BLOCKED_TAG_NAME = "No apta para Marketing (Meta)";
 
@@ -558,6 +576,10 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           await recordUnreachableFailure(supabase, conversation.contact_id);
         } else if (status.status === "delivered" || status.status === "read") {
           await resetContactReachability(supabase, conversation.contact_id);
+        }
+
+        if (status.status === "failed" && errorCode === MARKETING_OPT_OUT_ERROR_CODE) {
+          await anotarQueNoQuiereMarketing(supabase, conversation.contact_id);
         }
 
         if (status.status === "failed" && errorCode === MARKETING_BLOCKED_ERROR_CODE) {
