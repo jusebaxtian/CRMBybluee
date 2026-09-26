@@ -5,6 +5,7 @@ import { InvitacionesRegistro, type InvitacionFila } from "@/components/admin/in
 import { NuevoEnlaceDemo } from "@/components/admin/nuevo-enlace-demo";
 import { headers } from "next/headers";
 import { toPublicUrl } from "@/lib/supabase/config";
+import { ResumenVentas, type VentaFila } from "@/components/admin/resumen-ventas";
 
 const statusColor: Record<string, string> = {
   pending: "text-warning border-warning",
@@ -12,13 +13,33 @@ const statusColor: Record<string, string> = {
   rejected: "text-red-400 border-red-400",
 };
 
-export default async function AdminPaymentsPage() {
+export default async function AdminPaymentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ desde?: string; hasta?: string }>;
+}) {
+  const { desde, hasta } = await searchParams;
   const supabase = await createClient();
   const admin = createAdminClient();
 
+  // Ventas activadas (pagos aprobados) para las tarjetas del resumen. La
+  // fecha de venta es la de activacion: cuando se aprobo el pago, y si no
+  // quedo registrada (pagos por pasarela, que se aprueban solos), la de
+  // creacion.
+  const { data: aprobados } = await supabase
+    .from("payments")
+    .select("amount_cents, created_at, reviewed_at")
+    .eq("status", "approved");
+  const ventas: VentaFila[] = (aprobados ?? []).map((v) => ({
+    amount_cents: v.amount_cents,
+    fecha: (v.reviewed_at as string | null) ?? (v.created_at as string),
+  }));
+
   const { data: payments } = await supabase
     .from("payments")
-    .select("id, provider, amount_cents, status, proof_path, created_at, workspace_id, workspaces(name)")
+    .select(
+      "id, provider, amount_cents, status, proof_path, created_at, reviewed_at, workspace_id, workspaces(name)"
+    )
     // Una orden de Bold sin confirmar no es un pago: la pagina de Facturacion
     // tiene que crearla al renderizar para que el boton de Bold funcione, asi
     // que abrir esa pagina y no pagar deja una fila "pending". Mostrarlas aqui
@@ -96,6 +117,8 @@ export default async function AdminPaymentsPage() {
         <p className="text-sm text-muted">Revisa y aprueba transferencias manuales</p>
       </div>
 
+      <ResumenVentas ventas={ventas} desde={desde ?? null} hasta={hasta ?? null} />
+
       <NuevoEnlaceDemo planes={planesDemo ?? []} />
       <InvitacionesRegistro filas={invitacionFilas} />
 
@@ -107,6 +130,7 @@ export default async function AdminPaymentsPage() {
               <th className="px-5 py-3 font-medium">Método</th>
               <th className="px-5 py-3 font-medium">Monto</th>
               <th className="px-5 py-3 font-medium">Comprobante</th>
+              <th className="px-5 py-3 font-medium">Activación</th>
               <th className="px-5 py-3 font-medium">Estado</th>
               <th className="px-5 py-3 font-medium"></th>
             </tr>
@@ -141,6 +165,29 @@ export default async function AdminPaymentsPage() {
                     )}
                   </td>
                   <td className="px-5 py-3">
+                    {p.status === "approved" ? (
+                      <>
+                        <p className="text-foreground">
+                          {new Date((p.reviewed_at as string | null) ?? p.created_at).toLocaleDateString("es-CO", {
+                            timeZone: "America/Bogota",
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </p>
+                        <p className="text-xs text-muted">
+                          {new Date((p.reviewed_at as string | null) ?? p.created_at).toLocaleTimeString("es-CO", {
+                            timeZone: "America/Bogota",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </>
+                    ) : (
+                      <span className="text-muted">—</span>
+                    )}
+                  </td>
+                  <td className="px-5 py-3">
                     <span className={`rounded-full border px-2 py-0.5 text-xs ${statusColor[p.status]}`}>
                       {p.status}
                     </span>
@@ -155,7 +202,7 @@ export default async function AdminPaymentsPage() {
             })}
             {paymentsWithUrls.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-5 py-6 text-center text-muted">
+                <td colSpan={7} className="px-5 py-6 text-center text-muted">
                   Sin pagos registrados.
                 </td>
               </tr>
