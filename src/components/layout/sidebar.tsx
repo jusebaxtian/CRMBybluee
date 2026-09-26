@@ -10,7 +10,6 @@ import {
   Megaphone,
   Reply,
   BarChart3,
-  Plug,
   Settings,
   ShieldCheck,
   CreditCard,
@@ -32,7 +31,6 @@ const navItems = [
   { href: "/dashboard/quick-replies", label: "Respuestas rápidas", icon: Reply, built: true, moduleKey: "quick_replies" },
   { href: "/dashboard/agenda", label: "Agenda", icon: CalendarDays, built: true, moduleKey: null },
   { href: "/dashboard/reports", label: "Reportes", icon: BarChart3, built: true, moduleKey: "reports" },
-  { href: "/dashboard/integrations", label: "Integraciones", icon: Plug, built: false, moduleKey: null },
   { href: "/dashboard/settings", label: "Configuración", icon: Settings, built: true, moduleKey: "settings" },
   { href: "/dashboard/tutoriales", label: "Capacitaciones", icon: PlaySquare, built: true, moduleKey: null },
 ];

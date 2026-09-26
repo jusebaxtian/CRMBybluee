@@ -5,6 +5,7 @@ import { AddContactForm } from "@/components/contacts/add-contact-form";
 import { ContactsTable } from "@/components/contacts/contacts-table";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
+import { listWorkspaceAgents } from "@/lib/agents";
 
 export default async function ContactsPage() {
   const supabase = await createClient();
@@ -21,14 +22,16 @@ export default async function ContactsPage() {
     wa_id: string;
     created_at: string;
     contact_tags: { tag_id: string }[];
-    conversations: { ad_source_id: string | null; ad_headline: string | null }[];
+    conversations: { ad_source_id: string | null; ad_headline: string | null; assigned_agent_id: string | null }[];
   }[] = [];
   if (workspaceId) {
     const PAGE_SIZE = 1000;
     for (let offset = 0; ; offset += PAGE_SIZE) {
       const { data: batch } = await supabase
         .from("contacts")
-        .select("id, name, wa_id, created_at, contact_tags(tag_id), conversations(ad_source_id, ad_headline)")
+        .select(
+          "id, name, wa_id, created_at, contact_tags(tag_id), conversations(ad_source_id, ad_headline, assigned_agent_id)"
+        )
         .eq("workspace_id", workspaceId)
         .order("created_at", { ascending: false })
         .range(offset, offset + PAGE_SIZE - 1);
@@ -54,6 +57,9 @@ export default async function ContactsPage() {
       .eq("status", "APPROVED")
       .order("meta_template_name"),
   ]);
+
+  // Para mostrar "asignado a" en la tabla: los agentes del espacio.
+  const agentes = await listWorkspaceAgents(supabase, workspaceId);
 
   const { data: allTags } = await supabase
     .from("tags")
@@ -94,6 +100,9 @@ export default async function ContactsPage() {
       wa_id: c.wa_id,
       created_at: c.created_at,
       assignedTagIds: (c.contact_tags as unknown as { tag_id: string }[]).map((ct) => ct.tag_id),
+      assignedAgentId:
+        (c.conversations as unknown as { assigned_agent_id: string | null }[]).find((cv) => cv.assigned_agent_id)
+          ?.assigned_agent_id ?? null,
       fromAds: !!conversation?.ad_source_id,
       adHeadline: conversation?.ad_headline ?? null,
     };
@@ -105,7 +114,13 @@ export default async function ContactsPage() {
         <AddContactForm />
         <ImportContactsButton />
       </div>
-      <ContactsTable contacts={rows} allTags={allTags ?? []} lineas={lineas ?? []} plantillas={plantillas ?? []} />
+      <ContactsTable
+        contacts={rows}
+        allTags={allTags ?? []}
+        lineas={lineas ?? []}
+        plantillas={plantillas ?? []}
+        agentes={agentes}
+      />
     </div>
   );
 }

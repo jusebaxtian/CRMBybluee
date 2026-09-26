@@ -32,6 +32,18 @@ type Conversation = {
   tags: Tag[];
 };
 
+
+/** Nombre corto del agente, para la marca de "asignado a" en la lista. */
+function nombreCorto(a: Agent): string {
+  const base = (a.name || a.email.split("@")[0] || "").trim();
+  return base.split(" ")[0] || base;
+}
+function iniciales(a: Agent): string {
+  const base = (a.name || a.email).trim();
+  const partes = base.split(/[\s.@_-]+/).filter(Boolean);
+  return ((partes[0]?.[0] ?? "") + (partes[1]?.[0] ?? "")).toUpperCase() || base[0].toUpperCase();
+}
+
 // Cycled by channel index — same order every render since `channels` comes
 // from a stable, ordered query (connected_at).
 const CHANNEL_COLORS = ["#1ba84a", "#4a9eff", "#f59e0b", "#a855f7"];
@@ -219,6 +231,7 @@ export function ConversationListPanel({
   }
 
   const channelColor = new Map(channels.map((c, i) => [c.id, CHANNEL_COLORS[i % CHANNEL_COLORS.length]]));
+  const agentesPorId = new Map(agents.map((a) => [a.id, a]));
   const channelName = (c: Channel) => c.label || c.display_phone_number;
 
   // Only needed to keep the "por vencer" filter and its badges live —
@@ -614,6 +627,18 @@ export function ConversationListPanel({
                 <div className="flex min-w-0 items-center gap-1.5">
                   {conv.contact.name && (
                     <p className="truncate text-xs text-muted">{conv.contact.wa_id}</p>
+                  )}
+                  {/* Quien del equipo tiene asignado este chat. */}
+                  {conv.assignedAgentId && agentesPorId.has(conv.assignedAgentId) && (
+                    <span
+                      title={`Asignado a ${agentesPorId.get(conv.assignedAgentId)!.name || agentesPorId.get(conv.assignedAgentId)!.email}`}
+                      className="flex shrink-0 items-center gap-1 rounded-full bg-surface-hover px-1.5 py-0.5 text-[10px] font-semibold leading-none text-muted"
+                    >
+                      <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary/20 text-[8px] font-bold text-success">
+                        {iniciales(agentesPorId.get(conv.assignedAgentId)!)}
+                      </span>
+                      {nombreCorto(agentesPorId.get(conv.assignedAgentId)!)}
+                    </span>
                   )}
                   {/* Por cual linea entra este chat (con varias APIs conectadas). */}
                   {channels.length > 1 && conv.whatsappAccountId && channelColor.has(conv.whatsappAccountId) && (

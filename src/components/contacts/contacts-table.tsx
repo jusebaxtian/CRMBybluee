@@ -24,22 +24,35 @@ type Contact = {
   name: string | null;
   wa_id: string;
   created_at: string;
+  assignedAgentId: string | null;
   assignedTagIds: string[];
   fromAds: boolean;
   adHeadline: string | null;
 };
+
+type Agente = { id: string; name: string | null; email: string };
+
+/** Iniciales para el circulito de "asignado a". */
+function iniciales(a: Agente): string {
+  const bruto = (a.name || a.email).trim();
+  const partes = bruto.split(/[\s.@_-]+/).filter(Boolean);
+  return ((partes[0]?.[0] ?? "") + (partes[1]?.[0] ?? "")).toUpperCase() || bruto[0].toUpperCase();
+}
 
 export function ContactsTable({
   contacts,
   allTags,
   lineas,
   plantillas,
+  agentes = [],
 }: {
   contacts: Contact[];
   allTags: Tag[];
   lineas: LineaOption[];
   plantillas: PlantillaOption[];
+  agentes?: Agente[];
 }) {
+  const agentesPorId = new Map(agentes.map((a) => [a.id, a]));
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -378,6 +391,7 @@ export function ContactsTable({
               <th className="px-5 py-3 font-medium">Nombre</th>
               <th className="px-5 py-3 font-medium">Número</th>
               <th className="px-5 py-3 font-medium">Etiquetas</th>
+              {agentes.length > 0 && <th className="px-5 py-3 font-medium">Atiende</th>}
               <th className="px-5 py-3 font-medium">Contacto desde</th>
               <th className="px-5 py-3 font-medium"></th>
             </tr>
@@ -385,7 +399,7 @@ export function ContactsTable({
           <tbody>
             {filteredContacts.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-5 py-6 text-center text-muted">
+                <td colSpan={agentes.length > 0 ? 7 : 6} className="px-5 py-6 text-center text-muted">
                   Sin resultados para estos filtros.
                 </td>
               </tr>
@@ -466,6 +480,23 @@ export function ContactsTable({
                         assignedTagIds={c.assignedTagIds}
                       />
                     </td>
+                    {agentes.length > 0 && (
+                      <td className="px-5 py-3">
+                        {c.assignedAgentId && agentesPorId.has(c.assignedAgentId) ? (
+                          <span
+                            title={`Asignado a ${agentesPorId.get(c.assignedAgentId)!.name || agentesPorId.get(c.assignedAgentId)!.email}`}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-surface-hover px-2 py-1 text-xs text-foreground"
+                          >
+                            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary/20 text-[9px] font-bold text-success">
+                              {iniciales(agentesPorId.get(c.assignedAgentId)!)}
+                            </span>
+                            {agentesPorId.get(c.assignedAgentId)!.name || agentesPorId.get(c.assignedAgentId)!.email.split("@")[0]}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted">—</span>
+                        )}
+                      </td>
+                    )}
                     <td className="px-5 py-3 text-muted">
                       {new Date(c.created_at).toLocaleDateString("es-CO")}
                     </td>
