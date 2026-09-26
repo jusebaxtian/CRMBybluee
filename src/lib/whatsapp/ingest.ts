@@ -416,6 +416,21 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
               (message.document?.filename ?? null) ??
               (audioTranscript ? `🎙️ ${audioTranscript}` : null);
 
+        // Cuando Meta no entrega el contenido (tipo "unsupported", media que
+        // no pudo descargar) manda el motivo en `errors`. Guardarlo es lo que
+        // convierte el "contenido no compatible" del chat en algo accionable,
+        // y el log deja el mensaje crudo para poder identificar tipos nuevos.
+        const errorEntrante = message.errors?.[0] ?? null;
+        if (errorEntrante || message.type === "unsupported") {
+          console.error("whatsapp webhook: contenido entrante no entregado", {
+            workspaceId,
+            waMessageId: message.id,
+            type: message.type,
+            errors: message.errors,
+            mensaje: JSON.stringify(message).slice(0, 800),
+          });
+        }
+
         const { error: insertError } = await recordInboundMessage(supabase, {
           conversationId: conversation.id,
           messageType: isButtonTap ? "button" : message.type,
@@ -424,6 +439,7 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           mediaMimeType,
           waMessageId: message.id,
           contextWaMessageId,
+          errorDetail: errorEntrante ? traducirErrorEnvio(errorEntrante) : null,
           createdAt: new Date(Number(message.timestamp) * 1000).toISOString(),
         });
         // This insert's error used to go unchecked — a failure here looked

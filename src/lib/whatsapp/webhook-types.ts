@@ -40,6 +40,10 @@ export type WhatsAppWebhookPayload = {
           context?: { from: string; id: string };
           // Present only on the first inbound message of a "Click to
           // WhatsApp" ad conversation — identifies which Meta ad it came from.
+          // Meta explica aqui por que no pudo entregar el contenido (tipo
+          // "unsupported", o media que no logro descargar). Sin guardarlo, en
+          // el chat solo quedaba "contenido no compatible" sin el motivo.
+          errors?: { code: number; title?: string; message?: string; error_data?: { details?: string } }[];
           referral?: {
             source_type?: string;
             source_id?: string;

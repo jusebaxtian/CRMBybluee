@@ -117,6 +117,8 @@ export type InboundMessage = {
   mediaUrl?: string | null;
   mediaMimeType?: string | null;
   contextWaMessageId?: string | null;
+  /** Motivo que reporta Meta cuando no entrego el contenido. */
+  errorDetail?: string | null;
 };
 
 /**
@@ -142,6 +144,7 @@ export async function recordInboundMessage(
     media_mime_type: message.mediaMimeType ?? null,
     wa_message_id: message.waMessageId,
     context_wa_message_id: message.contextWaMessageId ?? null,
+    error_detail: message.errorDetail ?? null,
     status: "delivered",
     created_at: message.createdAt,
   });

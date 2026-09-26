@@ -111,8 +111,8 @@ export function MessageBubble({
         <div className="max-w-[85%] rounded-[12px] border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground sm:max-w-[70%]">
           <p className="font-semibold">⚠️ Contenido no compatible con la API de WhatsApp</p>
           <p className="mt-0.5 text-muted">
-            Suele ser una foto o video de &quot;ver una vez&quot;, una encuesta, un evento o un estado reenviado. Pídele que lo envíe
-            como mensaje normal.
+            {m.error_detail ??
+              'Suele ser una foto o video de "ver una vez", una encuesta, un evento o un estado reenviado. Pídele que lo envíe como mensaje normal.'}
           </p>
           <p className="mt-1 text-[10px] opacity-70">{time}</p>
         </div>
