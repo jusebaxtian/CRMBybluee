@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Megaphone, Plus } from "lucide-react";
+import { Megaphone, Phone, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
@@ -58,10 +58,26 @@ export default async function CampaignsPage() {
   const { data: campaigns } = await supabase
     .from("campaigns")
     .select(
-      "id, name, status, send_type, created_at, scheduled_at, started_at, templates(meta_template_name)"
+      "id, name, status, send_type, created_at, scheduled_at, started_at, whatsapp_account_id, templates(meta_template_name)"
     )
     .eq("workspace_id", workspaceId ?? "")
     .order("created_at", { ascending: false });
+
+  // Por que linea salio cada envio. Las campañas sin linea elegida (las de
+  // antes de tener varios numeros) salieron por la misma que usa el envio en
+  // ese caso: la primera conectada que no este congelada.
+  const { data: lineas } = await supabase
+    .from("whatsapp_accounts")
+    .select("id, label, display_phone_number, status, connected_at")
+    .eq("workspace_id", workspaceId ?? "")
+    .order("connected_at", { ascending: true });
+  const lineasPorId = new Map((lineas ?? []).map((l) => [l.id as string, l]));
+  const lineaPorDefecto = (lineas ?? []).find((l) => l.status !== "frozen") ?? null;
+  const lineaDeCampaña = (whatsappAccountId: string | null) => {
+    const l = (whatsappAccountId ? lineasPorId.get(whatsappAccountId) : null) ?? lineaPorDefecto;
+    if (!l) return null;
+    return l.label ? `${l.display_phone_number} · ${l.label}` : l.display_phone_number;
+  };
 
   // Aggregated in SQL (see campaign_recipient_counts) rather than fetching
   // campaign_recipients directly — a campaign can have thousands of rows,
@@ -128,6 +144,12 @@ export default async function CampaignsPage() {
                       : `Plantilla: ${template?.meta_template_name ?? "—"}`}
                   </p>
                   <p className="mt-0.5 text-[11px] text-muted">{campaignDateLine(c)}</p>
+                  {lineaDeCampaña(c.whatsapp_account_id) && (
+                    <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted">
+                      <Phone size={10} className="shrink-0" />
+                      {lineaDeCampaña(c.whatsapp_account_id)}
+                    </p>
+                  )}
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
                   {hasRecipients && (

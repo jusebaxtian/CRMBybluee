@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Users, Clock, Pencil, FileSpreadsheet } from "lucide-react";
+import { ArrowLeft, Users, Clock, Pencil, FileSpreadsheet, Phone } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { SendCampaignButton } from "@/components/campaigns/send-campaign-button";
 import { DeleteCampaignButton } from "@/components/campaigns/delete-campaign-button";
@@ -8,6 +8,7 @@ import { RealtimeRefresh } from "@/components/ui/realtime-refresh";
 import { CampaignRecipientsTable } from "@/components/campaigns/campaign-recipients-table";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
+import { resolveSendAccount } from "@/lib/whatsapp/account";
 
 const statusLabel: Record<string, string> = {
   draft: "Borrador",
@@ -29,7 +30,7 @@ export default async function CampaignDetailPage({
   const { data: campaign } = await supabase
     .from("campaigns")
     .select(
-      "id, name, status, send_type, message_body, media_url, scheduled_at, started_at, templates(meta_template_name)"
+      "id, name, status, send_type, message_body, media_url, scheduled_at, started_at, whatsapp_account_id, templates(meta_template_name)"
     )
     .eq("id", id)
     .eq("workspace_id", workspaceId ?? "")
@@ -38,6 +39,24 @@ export default async function CampaignDetailPage({
   if (!campaign) notFound();
 
   const template = campaign.templates as unknown as { meta_template_name: string } | null;
+
+  // La linea por la que salio (o saldra) el envio: la elegida en la campaña
+  // o, cuando no tiene ninguna, la misma que resuelve el envio — la primera
+  // conectada que no este congelada. Es el numero que ve el destinatario.
+  const cuenta = await resolveSendAccount(supabase, workspaceId ?? "", campaign.whatsapp_account_id);
+  let lineaSaliente: string | null = null;
+  if (cuenta) {
+    const { data: linea } = await supabase
+      .from("whatsapp_accounts")
+      .select("label, display_phone_number")
+      .eq("id", cuenta.id)
+      .maybeSingle();
+    if (linea) {
+      lineaSaliente = linea.label
+        ? `${linea.display_phone_number} · ${linea.label}`
+        : linea.display_phone_number;
+    }
+  }
 
   // PostgREST hard-caps any single response at 1000 rows — a plain
   // .select() undercounted "X contactos en total" (and the table below)
@@ -139,6 +158,12 @@ export default async function CampaignDetailPage({
               hour: "2-digit",
               minute: "2-digit",
             })}
+          </div>
+        )}
+        {lineaSaliente && (
+          <div className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm text-muted">
+            <Phone size={15} className="shrink-0" />
+            {campaign.status === "draft" ? "Saldrá por" : "Salió por"} {lineaSaliente}
           </div>
         )}
       </div>
