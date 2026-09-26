@@ -103,6 +103,37 @@ export default async function CampaignsPage() {
     ])
   );
 
+  // Motivo de fallo predominante, para el tooltip de "Falló"/"fallidos".
+  // Tambien se agrega en SQL (ver campaign_failure_reasons) por el limite de
+  // 1000 filas de PostgREST.
+  const { data: motivos } = await supabase.rpc("campaign_failure_reasons", {
+    p_workspace_id: workspaceId ?? "",
+  });
+  const motivosPorCampaña = new Map(
+    (
+      (motivos ?? []) as {
+        campaign_id: string;
+        reason: string;
+        reason_count: number;
+        failed_count: number;
+        distinct_reasons: number;
+      }[]
+    ).map((m) => [m.campaign_id, m])
+  );
+  const motivoDeFallo = (campaignId: string): string | undefined => {
+    const m = motivosPorCampaña.get(campaignId);
+    if (!m) return undefined;
+    const cabeza = `${m.reason_count} de ${m.failed_count} fallidos: ${m.reason}`;
+    // Cuando hay mas de un motivo se dice, para que no parezca que ese unico
+    // texto explica todos los fallos de la campaña.
+    const otros = m.distinct_reasons - 1;
+    return otros > 0
+      ? `${cabeza}
+
+Y ${otros} motivo${otros === 1 ? "" : "s"} más. Abre la campaña para verlos uno por uno.`
+      : cabeza;
+  };
+
   return (
     <div className="flex flex-col gap-6">
 
@@ -160,7 +191,12 @@ export default async function CampaignsPage() {
                     <div className="flex items-center gap-2">
                       <StatBadge value={count.sent} label="enviados" color="success" />
                       {count.failed > 0 && (
-                        <StatBadge value={count.failed} label="fallidos" color="danger" />
+                        <StatBadge
+                          value={count.failed}
+                          label="fallidos"
+                          color="danger"
+                          title={motivoDeFallo(c.id)}
+                        />
                       )}
                       {count.pending > 0 && (
                         <StatBadge value={count.pending} label="pendientes" color="muted" />
@@ -174,6 +210,7 @@ export default async function CampaignsPage() {
                     color={
                       c.status === "draft" && c.scheduled_at ? "warning" : statusColor[c.status] ?? "muted"
                     }
+                    title={motivoDeFallo(c.id)}
                   />
                 </div>
               </Link>

@@ -10,10 +10,15 @@ type BadgeColor = keyof typeof colorClasses;
 
 // Pill-shaped, outline-only badge — no fill — matching the client's
 // reference style for tag/status chips.
-function Pill({ text, color }: { text: string; color: BadgeColor }) {
+// `title` pinta el motivo del fallo al pasar el cursor. Con el cursor de
+// ayuda para que se note que hay algo que leer.
+function Pill({ text, color, title }: { text: string; color: BadgeColor; title?: string }) {
   return (
     <span
-      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium ${colorClasses[color]}`}
+      title={title}
+      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium ${
+        title ? "cursor-help" : ""
+      } ${colorClasses[color]}`}
     >
       {text}
     </span>
@@ -25,16 +30,26 @@ export function StatBadge({
   value,
   label,
   color,
+  title,
 }: {
   value: number;
   label: string;
   color: BadgeColor;
+  title?: string;
 }) {
-  return <Pill text={`${value} ${label}`} color={color} />;
+  return <Pill text={`${value} ${label}`} color={color} title={title} />;
 }
 
 // Status variant: just a label, for campaign/automation/etc. status chips
 // ("Completada", "Enviando...", "Falló") in the same pill style.
-export function StatusBadge({ label, color }: { label: string; color: BadgeColor }) {
-  return <Pill text={label} color={color} />;
+export function StatusBadge({
+  label,
+  color,
+  title,
+}: {
+  label: string;
+  color: BadgeColor;
+  title?: string;
+}) {
+  return <Pill text={label} color={color} title={title} />;
 }
