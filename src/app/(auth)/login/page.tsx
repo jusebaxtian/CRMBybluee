@@ -9,7 +9,7 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { Campo, CampoContrasena, BotonEnviar, ErrorFormulario } from "@/components/auth/campos";
 import { GoogleButton } from "@/components/auth/google-button";
 import { useEntrarGuardando } from "@/components/auth/use-entrar-guardando";
-import { RECUPERACION_POR_CORREO } from "@/lib/auth/telefono";
+import { RECUPERACION_POR_CORREO, RECUPERACION_POR_WHATSAPP } from "@/lib/auth/telefono";
 
 function LoginForm() {
   const [state, action, pending] = useActionState<AuthFormState, FormData>(login, undefined);
@@ -51,7 +51,7 @@ function LoginForm() {
             error={state?.errores?.password}
             disabled={pending}
           />
-          {RECUPERACION_POR_CORREO && (
+          {(RECUPERACION_POR_CORREO || RECUPERACION_POR_WHATSAPP) && (
             <div className="mt-2 text-right">
               <Link href="/recuperar" className="text-[13px] font-medium text-primary hover:underline">
                 ¿Olvidaste tu contraseña?

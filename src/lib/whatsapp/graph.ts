@@ -570,3 +570,89 @@ export async function updateBusinessProfile(
     body: JSON.stringify({ messaging_product: "whatsapp", ...profile }),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Plantillas de autenticacion (codigos de un solo uso)
+// ---------------------------------------------------------------------------
+
+/**
+ * Crea la plantilla de autenticacion con boton "Copiar codigo".
+ *
+ * El texto lo fija Meta y no se puede personalizar: solo se elige si lleva el
+ * descargo de seguridad y el aviso de caducidad. Por eso esta funcion no
+ * recibe cuerpo — recibe las dos opciones y el nombre.
+ */
+export async function createAuthenticationTemplate(
+  wabaId: string,
+  accessToken: string,
+  input: {
+    name: string;
+    language: string;
+    /** "Por tu propia seguridad, no compartas este codigo." */
+    conAvisoDeSeguridad?: boolean;
+    /** "Este codigo caduca en N minutos." */
+    minutosDeCaducidad?: number;
+  }
+) {
+  const body: Record<string, unknown> = { type: "BODY" };
+  if (input.conAvisoDeSeguridad) body.add_security_recommendation = true;
+
+  const components: Record<string, unknown>[] = [body];
+  if (input.minutosDeCaducidad) {
+    components.push({ type: "FOOTER", code_expiration_minutes: input.minutosDeCaducidad });
+  }
+  components.push({
+    type: "BUTTONS",
+    buttons: [{ type: "OTP", otp_type: "COPY_CODE" }],
+  });
+
+  return graphFetch(`/${wabaId}/message_templates`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: input.name,
+      language: input.language,
+      category: "AUTHENTICATION",
+      components,
+    }),
+  });
+}
+
+/**
+ * Envia un codigo con una plantilla de autenticacion.
+ *
+ * El codigo va dos veces y no es un descuido: una en el cuerpo (el texto que
+ * lee la persona) y otra en el boton (lo que copia al portapapeles). Meta
+ * rechaza el envio si falta cualquiera de las dos.
+ */
+export async function sendAuthenticationCode(
+  phoneNumberId: string,
+  accessToken: string,
+  to: string,
+  templateName: string,
+  language: string,
+  codigo: string
+): Promise<{ messages: { id: string }[] }> {
+  return graphFetch(`/${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      ...destinatario(to),
+      type: "template",
+      template: {
+        name: templateName,
+        language: { code: language },
+        components: [
+          { type: "body", parameters: [{ type: "text", text: codigo }] },
+          {
+            type: "button",
+            sub_type: "url",
+            index: "0",
+            parameters: [{ type: "text", text: codigo }],
+          },
+        ],
+      },
+    }),
+  });
+}

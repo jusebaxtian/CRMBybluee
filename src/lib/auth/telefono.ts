@@ -82,3 +82,14 @@ export function componerTelefono(iso: string, local: string): TelefonoCompuesto 
  * /restablecer responden 404.
  */
 export const RECUPERACION_POR_CORREO = false;
+
+/**
+ * Recuperacion por WhatsApp: el codigo de 6 digitos llega al telefono del
+ * espacio, por la linea de soporte de la plataforma. Solo para el dueño — los
+ * agentes no tienen telefono propio guardado (auth.users lo tiene vacio en los
+ * 106 usuarios), asi que a ellos les cambia la clave su dueño o un
+ * administrador.
+ *
+ * Con false, /recuperar responde 404 y el login no muestra el enlace.
+ */
+export const RECUPERACION_POR_WHATSAPP = true;
