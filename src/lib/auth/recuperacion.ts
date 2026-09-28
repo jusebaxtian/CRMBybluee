@@ -73,3 +73,39 @@ export function telefonoTapado(e164: string): string {
   if (d.length < 4) return "••••";
   return `•••• ••${d.slice(-2)}`;
 }
+
+/** Lo que hay guardado de un codigo, para decidir si sirve. */
+export type CodigoGuardado = {
+  expires_at: string;
+  attempts: number;
+  consumed_at: string | null;
+};
+
+export type VeredictoCodigo =
+  | { sirve: true }
+  | { sirve: false; motivo: "vencido" | "usado" | "sin_intentos" | "no_existe" };
+
+/**
+ * Si un codigo todavia sirve, antes de compararlo.
+ *
+ * Vive aqui y no dentro de la accion porque es la parte que decide si alguien
+ * entra o no: tiene que poder probarse sin base de datos ni WhatsApp.
+ */
+export function veredictoDelCodigo(
+  fila: CodigoGuardado | null | undefined,
+  ahora: Date = new Date()
+): VeredictoCodigo {
+  if (!fila) return { sirve: false, motivo: "no_existe" };
+  if (fila.consumed_at) return { sirve: false, motivo: "usado" };
+  if (new Date(fila.expires_at).getTime() < ahora.getTime()) return { sirve: false, motivo: "vencido" };
+  if (fila.attempts >= INTENTOS_MAXIMOS) return { sirve: false, motivo: "sin_intentos" };
+  return { sirve: true };
+}
+
+/** Segundos que faltan para poder pedir otro codigo. 0 si ya se puede. */
+export function esperaEntreEnvios(ultimoEnvio: string | null | undefined, ahora: Date = new Date()): number {
+  if (!ultimoEnvio) return 0;
+  const transcurrido = ahora.getTime() - new Date(ultimoEnvio).getTime();
+  const falta = SEGUNDOS_ENTRE_ENVIOS * 1000 - transcurrido;
+  return falta > 0 ? Math.ceil(falta / 1000) : 0;
+}

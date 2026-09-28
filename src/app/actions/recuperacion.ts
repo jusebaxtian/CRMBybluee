@@ -12,13 +12,14 @@ import {
   LARGO_MINIMO_CLAVE,
   MINUTOS_DEL_PERMISO,
   MINUTOS_DE_VIDA,
-  SEGUNDOS_ENTRE_ENVIOS,
   coincide,
+  esperaEntreEnvios,
   generarCodigo,
   generarPermiso,
   hashDe,
   soloDigitos,
   telefonoTapado,
+  veredictoDelCodigo,
 } from "@/lib/auth/recuperacion";
 
 /**
@@ -133,9 +134,8 @@ export async function solicitarCodigo(
     .gte("created_at", new Date(ahora - 3_600_000).toISOString())
     .order("created_at", { ascending: false });
 
-  const ultimo = recientes?.[0]?.created_at;
-  if (ultimo && ahora - new Date(ultimo).getTime() < SEGUNDOS_ENTRE_ENVIOS * 1000) {
-    const faltan = Math.ceil((SEGUNDOS_ENTRE_ENVIOS * 1000 - (ahora - new Date(ultimo).getTime())) / 1000);
+  const faltan = esperaEntreEnvios(recientes?.[0]?.created_at);
+  if (faltan > 0) {
     return {
       error: `Acabamos de enviarte un código. Espera ${faltan} segundo${faltan === 1 ? "" : "s"} para pedir otro.`,
       valores: { email },
@@ -227,9 +227,9 @@ export async function verificarCodigo(
     .limit(1)
     .maybeSingle();
 
-  const vencido = !fila || new Date(fila.expires_at).getTime() < Date.now();
-  const quemado = !!fila && fila.attempts >= INTENTOS_MAXIMOS;
-  if (vencido || quemado) {
+  const veredicto = veredictoDelCodigo(fila);
+  // El `!fila` es para TypeScript: el veredicto ya lo cubre con "no_existe".
+  if (!fila || !veredicto.sirve) {
     return {
       paso: "codigo",
       errores: { codigo: "Ese código ya no sirve. Pide uno nuevo." },
