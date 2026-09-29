@@ -47,13 +47,27 @@ export default async function CursoPage({
   const acceso = (compras ?? []).some((c) => c.status === "approved");
   const pendiente = (compras ?? []).some((c) => c.status === "pending");
 
-  const { data: lecciones } = await supabase
-    .from("tutoriales")
-    .select("id, titulo, descripcion, url, modulo, duracion")
-    .eq("curso_id", id)
-    .eq("activo", true)
-    .order("orden")
-    .order("created_at");
+  // Con acceso se piden las lecciones completas; sin acceso la base ya no las
+  // entrega (migracion 0123), asi que el temario --titulos y duracion, nunca
+  // los enlaces-- viene de una funcion aparte. Antes esta consulta devolvia
+  // los enlaces de YouTube a cualquiera que preguntara por la API.
+  const { data: lecciones } = acceso
+    ? await supabase
+        .from("tutoriales")
+        .select("id, titulo, descripcion, url, modulo, duracion")
+        .eq("curso_id", id)
+        .eq("activo", true)
+        .order("orden")
+        .order("created_at")
+    : { data: null };
+
+  const { data: temario } = acceso
+    ? { data: null }
+    : await supabase.rpc("curso_temario", { p_curso_id: id });
+
+  const listado = (acceso ? lecciones : temario) as
+    | { id: string; titulo: string; duracion: string | null }[]
+    | null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -74,7 +88,7 @@ export default async function CursoPage({
               {curso.precio_cents > 0 ? precioCop(curso.precio_cents, curso.currency) : "Gratis"}
             </span>
             <span className="text-xs text-muted">
-              {(lecciones ?? []).length} {(lecciones ?? []).length === 1 ? "lección" : "lecciones"}
+              {(listado ?? []).length} {(listado ?? []).length === 1 ? "lección" : "lecciones"}
             </span>
             {acceso && <span className="rounded-full bg-success/15 px-3 py-1 text-xs font-bold text-success">Comprado ✓</span>}
           </div>
@@ -88,7 +102,7 @@ export default async function CursoPage({
           <div className="rounded-[13px] border border-border bg-surface p-5">
             <p className="mb-3 text-sm font-semibold text-foreground">Contenido del curso</p>
             <ul className="flex flex-col gap-2">
-              {(lecciones ?? []).map((l, i) => (
+              {(listado ?? []).map((l, i) => (
                 <li key={l.id} className="flex items-center gap-3 border-b border-border pb-2 text-sm last:border-b-0">
                   <span className="text-xs text-muted">{String(i + 1).padStart(2, "0")}</span>
                   <PlayCircle size={15} className="shrink-0 text-muted" />
@@ -97,7 +111,7 @@ export default async function CursoPage({
                   <Lock size={13} className="shrink-0 text-muted" />
                 </li>
               ))}
-              {(lecciones ?? []).length === 0 && <li className="text-sm text-muted">Pronto se publicarán las lecciones.</li>}
+              {(listado ?? []).length === 0 && <li className="text-sm text-muted">Pronto se publicarán las lecciones.</li>}
             </ul>
           </div>
           <ComprarCurso
