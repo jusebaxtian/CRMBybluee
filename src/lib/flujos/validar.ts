@@ -11,6 +11,9 @@ import { BLOQUES, MAX_BOTONES, salidasDe, type DatosBloque, type TipoBloque } fr
 export type NodoParaValidar = { id: string; tipo: TipoBloque; datos: DatosBloque };
 export type ConexionParaValidar = { origen_id: string; destino_id: string; salida: string | null };
 
+/** 24 horas en minutos: la ventana de servicio de WhatsApp. */
+export const MINUTOS_VENTANA = 24 * 60;
+
 export type Aviso = {
   /** "error" impide activar el flujo; "aviso" solo advierte. */ 
   nivel: "error" | "aviso";
@@ -119,6 +122,51 @@ export function revisarFlujo(
       if (m <= 0) {
         avisos.push({ nivel: "error", nodoId: nodo.id, texto: "La espera tiene que ser de al menos 1 minuto." });
       }
+
+      // La regla que mas flujos rotos evita: pasadas 24 horas desde el ultimo
+      // mensaje del contacto, WhatsApp solo entrega plantillas aprobadas. Una
+      // espera larga seguida de un mensaje normal es un envio que Meta va a
+      // rechazar, y en el lienzo no se ve.
+      if (m >= MINUTOS_VENTANA) {
+        const siguientes = conexiones
+          .filter((c) => c.origen_id === nodo.id && c.salida === "no_respondio")
+          .map((c) => nodos.find((n) => n.id === c.destino_id))
+          .filter(Boolean) as NodoParaValidar[];
+        for (const sig of siguientes) {
+          if (sig.tipo === "mensaje" || sig.tipo === "botones") {
+            avisos.push({
+              nivel: "error",
+              nodoId: sig.id,
+              texto:
+                "Después de esperar 24 horas o más solo se puede enviar una plantilla aprobada: cambia este bloque por uno de plantilla.",
+            });
+          }
+        }
+      }
+    }
+
+    if (nodo.tipo === "plantilla" && !nodo.datos.plantillaId) {
+      avisos.push({ nivel: "error", nodoId: nodo.id, texto: "Elige la plantilla que se va a enviar." });
+    }
+
+    if (nodo.tipo === "condicion" && !nodo.datos.condicionTagId) {
+      avisos.push({ nivel: "error", nodoId: nodo.id, texto: "La condición no tiene etiqueta elegida." });
+    }
+
+    if (nodo.tipo === "etiqueta" && !nodo.datos.etiquetaId) {
+      avisos.push({ nivel: "error", nodoId: nodo.id, texto: "Elige qué etiqueta poner o quitar." });
+    }
+
+    if (nodo.tipo === "respuesta_rapida" && !nodo.datos.respuestaRapidaId) {
+      avisos.push({ nivel: "error", nodoId: nodo.id, texto: "Elige la respuesta rápida." });
+    }
+
+    if (nodo.tipo === "automatizacion" && !nodo.datos.automatizacionId) {
+      avisos.push({ nivel: "error", nodoId: nodo.id, texto: "Elige la automatización que se va a disparar." });
+    }
+
+    if (nodo.tipo === "saltar" && !nodo.datos.flujoDestinoId) {
+      avisos.push({ nivel: "error", nodoId: nodo.id, texto: "Elige a qué flujo salta el contacto." });
     }
   }
 

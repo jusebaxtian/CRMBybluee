@@ -1,17 +1,38 @@
 "use client";
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { Bot, Flag, MessageSquare, MousePointerClick, Play, Timer } from "lucide-react";
+import {
+  Bot,
+  FileText,
+  Flag,
+  GitBranch,
+  MessageSquare,
+  MousePointerClick,
+  Play,
+  Reply,
+  Tag,
+  Timer,
+  UserCheck,
+  Workflow,
+  Zap,
+} from "lucide-react";
 import { BLOQUES, resumenDe, salidasDe, type DatosBloque, type TipoBloque } from "@/lib/flujos/bloques";
 
-const ICONOS = {
+const ICONOS: Record<TipoBloque, typeof Play> = {
   inicio: Play,
   mensaje: MessageSquare,
+  plantilla: FileText,
   botones: MousePointerClick,
   esperar: Timer,
+  condicion: GitBranch,
+  etiqueta: Tag,
+  agente: UserCheck,
+  respuesta_rapida: Reply,
+  automatizacion: Zap,
+  saltar: Workflow,
   ia: Bot,
   fin: Flag,
-} as const;
+};
 
 export type DatosNodo = { tipo: TipoBloque; datos: DatosBloque; conAviso?: boolean };
 

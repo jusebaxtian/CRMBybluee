@@ -19,7 +19,7 @@ import { AlertTriangle, Check, Loader2, Save } from "lucide-react";
 import { BLOQUES, BLOQUES_ARRASTRABLES, type DatosBloque, type TipoBloque } from "@/lib/flujos/bloques";
 import { revisarFlujo, type Aviso } from "@/lib/flujos/validar";
 import { BloqueNodo, type DatosNodo } from "@/components/flujos/bloque-nodo";
-import { PanelBloque } from "@/components/flujos/panel-bloque";
+import { PanelBloque, type Catalogos } from "@/components/flujos/panel-bloque";
 import { guardarLienzo } from "@/app/actions/flujos";
 
 export type NodoInicial = { id: string; tipo: TipoBloque; datos: DatosBloque; x: number; y: number };
@@ -35,11 +35,13 @@ function Lienzo({
   nodosIniciales,
   conexionesIniciales,
   etiquetas,
+  catalogos,
 }: {
   flujoId: string;
   nodosIniciales: NodoInicial[];
   conexionesIniciales: ConexionInicial[];
   etiquetas: { id: string; name: string }[];
+  catalogos: Catalogos;
 }) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>(
     nodosIniciales.map((n) => ({
@@ -243,6 +245,7 @@ function Lienzo({
           tipo={datosDelSeleccionado.tipo}
           datos={datosDelSeleccionado.datos}
           etiquetas={etiquetas}
+          catalogos={catalogos}
           onCambiar={(datos) =>
             setNodes((prev) =>
               prev.map((n) =>
@@ -267,6 +270,7 @@ export function LienzoFlujo(props: {
   nodosIniciales: NodoInicial[];
   conexionesIniciales: ConexionInicial[];
   etiquetas: { id: string; name: string }[];
+  catalogos: Catalogos;
 }) {
   return (
     <ReactFlowProvider>

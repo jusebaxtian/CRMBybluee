@@ -118,3 +118,71 @@ describe("disparadores del inicio", () => {
     expect(avisos.some((a) => a.nivel === "error" && a.texto.includes("sin etiqueta"))).toBe(true);
   });
 });
+
+describe("la regla de las 24 horas", () => {
+  const inicioListo2: NodoParaValidar = {
+    id: "i",
+    tipo: "inicio",
+    datos: { disparadores: [{ tipo: "keyword", valor: "precio" }] },
+  };
+
+  it("no deja mandar un mensaje normal después de esperar un día", () => {
+    const nodos: NodoParaValidar[] = [
+      inicioListo2,
+      { id: "e", tipo: "esperar", datos: { minutos: 1440 } },
+      { id: "m", tipo: "mensaje", datos: { texto: "¿Sigues interesado?" } },
+    ];
+    const conexiones: ConexionParaValidar[] = [
+      { origen_id: "i", destino_id: "e", salida: "sig" },
+      { origen_id: "e", destino_id: "m", salida: "no_respondio" },
+    ];
+    const avisos = revisarFlujo(nodos, conexiones);
+    expect(avisos.some((a) => a.nivel === "error" && a.texto.includes("plantilla aprobada"))).toBe(true);
+  });
+
+  it("con plantilla sí lo deja", () => {
+    const nodos: NodoParaValidar[] = [
+      inicioListo2,
+      { id: "e", tipo: "esperar", datos: { minutos: 1440 } },
+      { id: "p", tipo: "plantilla", datos: { plantillaId: "t1", plantillaNombre: "recordatorio" } },
+    ];
+    const conexiones: ConexionParaValidar[] = [
+      { origen_id: "i", destino_id: "e", salida: "sig" },
+      { origen_id: "e", destino_id: "p", salida: "no_respondio" },
+    ];
+    expect(revisarFlujo(nodos, conexiones).some((a) => a.nivel === "error")).toBe(false);
+  });
+
+  it("una espera corta no exige plantilla", () => {
+    const nodos: NodoParaValidar[] = [
+      inicioListo2,
+      { id: "e", tipo: "esperar", datos: { minutos: 5 } },
+      { id: "m", tipo: "mensaje", datos: { texto: "¿Sigues ahí?" } },
+    ];
+    const conexiones: ConexionParaValidar[] = [
+      { origen_id: "i", destino_id: "e", salida: "sig" },
+      { origen_id: "e", destino_id: "m", salida: "no_respondio" },
+    ];
+    expect(revisarFlujo(nodos, conexiones).some((a) => a.nivel === "error")).toBe(false);
+  });
+});
+
+describe("bloques nuevos sin configurar", () => {
+  const i: NodoParaValidar = { id: "i", tipo: "inicio", datos: { disparadores: [{ tipo: "any_message" }] } };
+  const conectar = (destino: string): ConexionParaValidar[] => [
+    { origen_id: "i", destino_id: destino, salida: "sig" },
+  ];
+
+  it.each([
+    ["plantilla", "plantilla que se va a enviar"],
+    ["condicion", "etiqueta elegida"],
+    ["etiqueta", "qué etiqueta poner"],
+    ["respuesta_rapida", "respuesta rápida"],
+    ["automatizacion", "automatización que se va a disparar"],
+    ["saltar", "a qué flujo salta"],
+  ])("marca el bloque %s vacío", (tipo, textoEsperado) => {
+    const nodos: NodoParaValidar[] = [i, { id: "x", tipo: tipo as NodoParaValidar["tipo"], datos: {} }];
+    const avisos = revisarFlujo(nodos, conectar("x"));
+    expect(avisos.some((a) => a.nivel === "error" && a.texto.includes(textoEsperado))).toBe(true);
+  });
+});

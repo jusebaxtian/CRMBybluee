@@ -3,6 +3,7 @@ import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { sendInteractiveButtonsMessage, sendTextMessage } from "@/lib/whatsapp/graph";
 import { recordOutboundMessage } from "@/lib/messaging/record";
 import { salidasDe, type DatosBloque, type TipoBloque } from "@/lib/flujos/bloques";
+import { executeAction, type AutomationAction } from "@/lib/automations/engine";
 
 type Supabase = ReturnType<typeof createAdminClient>;
 
@@ -60,6 +61,39 @@ export function destinoDe(
 ): string | null {
   const c = conexiones.find((x) => x.origen_id === nodoId && (x.salida ?? "sig") === (salida ?? "sig"));
   return c?.destino_id ?? null;
+}
+
+/**
+ * Ejecuta una accion reutilizando el motor de automatizaciones.
+ *
+ * Mandar una plantilla, poner una etiqueta, asignar un agente o correr una
+ * respuesta rapida ya estan resueltos ahi, con sus detalles feos incluidos
+ * (variables de la plantilla, media del encabezado, reparto entre agentes).
+ * Reimplementarlo aqui seria tener dos versiones de lo mismo que se separan
+ * con el tiempo.
+ */
+async function ejecutarComoAccion(
+  supabase: Supabase,
+  workspaceId: string,
+  contactId: string,
+  accion: Partial<AutomationAction> & { action_type: string }
+) {
+  const completa: AutomationAction = {
+    position: 0,
+    action_type: accion.action_type,
+    message_body: accion.message_body ?? null,
+    tag_id: accion.tag_id ?? null,
+    media_url: accion.media_url ?? null,
+    media_filename: accion.media_filename ?? null,
+    template_id: accion.template_id ?? null,
+    quick_reply_id: accion.quick_reply_id ?? null,
+    delay_seconds: 0,
+    target_agent_id: accion.target_agent_id ?? null,
+    agent_distribution: accion.agent_distribution ?? null,
+    buttons: accion.buttons ?? null,
+    templates: accion.templates ?? null,
+  };
+  await executeAction(supabase, { id: "flujo", workspace_id: workspaceId }, contactId, completa);
 }
 
 async function cerrar(
@@ -234,6 +268,114 @@ export async function avanzar(supabase: Supabase, ejecucionId: string): Promise<
         nodo_id: nodoActual.id,
         vence_el: new Date(Date.now() + minutos * 60_000).toISOString(),
       });
+      return;
+    }
+
+    if (tipo === "plantilla") {
+      if (!datos.plantillaId) {
+        await cerrar(supabase, ejecucionId, "cancelado");
+        return;
+      }
+      const { data: plantilla } = await supabase
+        .from("templates")
+        .select("meta_template_name, language, body_text, header_format, header_media_url, variable_count, buttons")
+        .eq("id", datos.plantillaId)
+        .maybeSingle();
+      await ejecutarComoAccion(supabase, ejecucion.workspace_id as string, ejecucion.contact_id as string, {
+        action_type: "send_template",
+        template_id: datos.plantillaId,
+        templates: (plantilla ?? null) as AutomationAction["templates"],
+      });
+      const siguiente = destinoDe(conexiones, nodoActual.id, "sig");
+      if (!siguiente) {
+        await cerrar(supabase, ejecucionId, "terminado");
+        return;
+      }
+      nodoActual = nodos.find((n) => n.id === siguiente);
+      continue;
+    }
+
+    if (tipo === "etiqueta" || tipo === "agente" || tipo === "respuesta_rapida") {
+      const accion =
+        tipo === "etiqueta"
+          ? {
+              action_type: datos.etiquetaAccion === "quitar" ? "remove_tag" : "add_tag",
+              tag_id: datos.etiquetaId ?? null,
+            }
+          : tipo === "agente"
+            ? { action_type: "assign_agent", target_agent_id: datos.agenteId ?? null }
+            : { action_type: "send_quick_reply", quick_reply_id: datos.respuestaRapidaId ?? null };
+
+      await ejecutarComoAccion(
+        supabase,
+        ejecucion.workspace_id as string,
+        ejecucion.contact_id as string,
+        accion
+      );
+
+      const siguiente = destinoDe(conexiones, nodoActual.id, "sig");
+      if (!siguiente) {
+        await cerrar(supabase, ejecucionId, "terminado");
+        return;
+      }
+      nodoActual = nodos.find((n) => n.id === siguiente);
+      continue;
+    }
+
+    if (tipo === "automatizacion") {
+      if (datos.automatizacionId) {
+        const { runActionsForAutomation } = await import("@/lib/automations/engine");
+        await runActionsForAutomation(
+          supabase,
+          { id: datos.automatizacionId, workspace_id: ejecucion.workspace_id as string },
+          ejecucion.contact_id as string
+        );
+      }
+      const siguiente = destinoDe(conexiones, nodoActual.id, "sig");
+      if (!siguiente) {
+        await cerrar(supabase, ejecucionId, "terminado");
+        return;
+      }
+      nodoActual = nodos.find((n) => n.id === siguiente);
+      continue;
+    }
+
+    if (tipo === "condicion") {
+      // Hoy la condicion es "¿tiene esta etiqueta?", que es lo que el cliente
+      // ya usa para segmentar. Cuando haga falta mas, la salida sigue siendo
+      // la misma: si / no.
+      let cumple = false;
+      if (datos.condicionTagId) {
+        const { data } = await supabase
+          .from("contact_tags")
+          .select("tag_id")
+          .eq("contact_id", ejecucion.contact_id as string)
+          .eq("tag_id", datos.condicionTagId)
+          .maybeSingle();
+        cumple = Boolean(data);
+      }
+      const siguiente = destinoDe(conexiones, nodoActual.id, cumple ? "si" : "no");
+      if (!siguiente) {
+        await cerrar(supabase, ejecucionId, "terminado");
+        return;
+      }
+      nodoActual = nodos.find((n) => n.id === siguiente);
+      continue;
+    }
+
+    if (tipo === "saltar") {
+      // Este flujo termina y arranca el otro. Se cierra ANTES de iniciar
+      // porque un contacto no puede estar en dos flujos a la vez: si se
+      // hiciera al reves, el nuevo no arrancaria nunca.
+      await cerrar(supabase, ejecucionId, "terminado");
+      if (datos.flujoDestinoId) {
+        await iniciarFlujo(
+          supabase,
+          datos.flujoDestinoId,
+          ejecucion.contact_id as string,
+          (ejecucion.conversation_id as string | null) ?? null
+        );
+      }
       return;
     }
 

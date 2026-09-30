@@ -17,10 +17,20 @@ import {
  * Va al lado del lienzo y no en una ventana emergente a proposito: al cambiar
  * un texto se quiere ver como queda el bloque y a donde van sus lineas.
  */
+export type Catalogos = {
+  etiquetas: { id: string; name: string }[];
+  plantillas: { id: string; meta_template_name: string; language: string }[];
+  agentes: { id: string; name: string | null; email: string }[];
+  respuestasRapidas: { id: string; name: string }[];
+  automatizaciones: { id: string; name: string }[];
+  flujos: { id: string; nombre: string }[];
+};
+
 export function PanelBloque({
   tipo,
   datos,
   etiquetas = [],
+  catalogos,
   onCambiar,
   onBorrar,
   onCerrar,
@@ -28,6 +38,7 @@ export function PanelBloque({
   tipo: TipoBloque;
   datos: DatosBloque;
   etiquetas?: { id: string; name: string }[];
+  catalogos: Catalogos;
   onCambiar: (datos: DatosBloque) => void;
   onBorrar: () => void;
   onCerrar: () => void;
@@ -246,6 +257,188 @@ export function PanelBloque({
             </p>
           </div>
         </>
+      )}
+
+      {tipo === "plantilla" && (
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted">Plantilla aprobada</label>
+          <select
+            value={datos.plantillaId ?? ""}
+            onChange={(e) => {
+              const elegido = catalogos.plantillas.find((x) => x.id === e.target.value);
+              onCambiar({ ...datos, plantillaId: e.target.value || undefined, plantillaNombre: elegido?.meta_template_name });
+            }}
+            className="w-full rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary"
+          >
+            <option value="">Elige la plantilla…</option>
+            {catalogos.plantillas.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.meta_template_name}
+              </option>
+            ))}
+          </select>
+          <p className="mt-2 text-[11px] leading-relaxed text-muted">
+            Es lo único que WhatsApp entrega pasadas 24 horas desde el último mensaje del contacto. Úsalo
+            después de una espera larga.
+          </p>
+        </div>
+      )}
+
+      {tipo === "condicion" && (
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted">¿Tiene esta etiqueta?</label>
+          <select
+            value={datos.condicionTagId ?? ""}
+            onChange={(e) => {
+              const elegido = catalogos.etiquetas.find((x) => x.id === e.target.value);
+              onCambiar({ ...datos, condicionTagId: e.target.value || undefined, condicionTagNombre: elegido?.name });
+            }}
+            className="w-full rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary"
+          >
+            <option value="">Elige la etiqueta…</option>
+            {catalogos.etiquetas.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.name}
+              </option>
+            ))}
+          </select>
+          <p className="mt-2 text-[11px] leading-relaxed text-muted">
+            El flujo se parte en dos: por &ldquo;Sí cumple&rdquo; van los que tienen la etiqueta y por &ldquo;No cumple&rdquo; el resto.
+          </p>
+        </div>
+      )}
+
+      {tipo === "etiqueta" && (
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted">Qué hacer</label>
+          <div className="mb-2 flex gap-1.5">
+            {(["poner", "quitar"] as const).map((accion) => (
+              <button
+                key={accion}
+                type="button"
+                onClick={() => onCambiar({ ...datos, etiquetaAccion: accion })}
+                className={`flex-1 rounded-[9px] border px-2 py-1.5 text-[12.5px] font-medium ${
+                  (datos.etiquetaAccion ?? "poner") === accion
+                    ? "border-primary text-primary"
+                    : "border-border text-muted hover:text-foreground"
+                }`}
+              >
+                {accion === "poner" ? "Poner" : "Quitar"}
+              </button>
+            ))}
+          </div>
+          <select
+            value={datos.etiquetaId ?? ""}
+            onChange={(e) => {
+              const elegido = catalogos.etiquetas.find((x) => x.id === e.target.value);
+              onCambiar({ ...datos, etiquetaId: e.target.value || undefined, etiquetaNombre: elegido?.name });
+            }}
+            className="w-full rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary"
+          >
+            <option value="">Elige la etiqueta…</option>
+            {catalogos.etiquetas.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {tipo === "agente" && (
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted">Asignar a</label>
+          <select
+            value={datos.agenteId ?? ""}
+            onChange={(e) => {
+              const elegido = catalogos.agentes.find((x) => x.id === e.target.value);
+              onCambiar({ ...datos, agenteId: e.target.value || undefined, agenteNombre: elegido ? elegido.name || elegido.email : undefined });
+            }}
+            className="w-full rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary"
+          >
+            <option value="">Reparto automático entre el equipo</option>
+            {catalogos.agentes.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.name || x.email}
+              </option>
+            ))}
+          </select>
+          <p className="mt-2 text-[11px] leading-relaxed text-muted">
+            El chat le queda asignado y aparece en su bandeja. El flujo sigue de largo.
+          </p>
+        </div>
+      )}
+
+      {tipo === "respuesta_rapida" && (
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted">Respuesta rápida</label>
+          <select
+            value={datos.respuestaRapidaId ?? ""}
+            onChange={(e) => {
+              const elegido = catalogos.respuestasRapidas.find((x) => x.id === e.target.value);
+              onCambiar({ ...datos, respuestaRapidaId: e.target.value || undefined, respuestaRapidaNombre: elegido?.name });
+            }}
+            className="w-full rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary"
+          >
+            <option value="">Elige la respuesta…</option>
+            {catalogos.respuestasRapidas.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.name}
+              </option>
+            ))}
+          </select>
+          <p className="mt-2 text-[11px] leading-relaxed text-muted">
+            Manda todos los mensajes de esa respuesta rápida, tal como los tienes armados.
+          </p>
+        </div>
+      )}
+
+      {tipo === "automatizacion" && (
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted">Automatización</label>
+          <select
+            value={datos.automatizacionId ?? ""}
+            onChange={(e) => {
+              const elegido = catalogos.automatizaciones.find((x) => x.id === e.target.value);
+              onCambiar({ ...datos, automatizacionId: e.target.value || undefined, automatizacionNombre: elegido?.name });
+            }}
+            className="w-full rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary"
+          >
+            <option value="">Elige la automatización…</option>
+            {catalogos.automatizaciones.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.name}
+              </option>
+            ))}
+          </select>
+          <p className="mt-2 text-[11px] leading-relaxed text-muted">
+            Corre sus acciones y el flujo continúa. Sirve para reaprovechar lo que ya tienes hecho.
+          </p>
+        </div>
+      )}
+
+      {tipo === "saltar" && (
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted">Saltar al flujo</label>
+          <select
+            value={datos.flujoDestinoId ?? ""}
+            onChange={(e) => {
+              const elegido = catalogos.flujos.find((x) => x.id === e.target.value);
+              onCambiar({ ...datos, flujoDestinoId: e.target.value || undefined, flujoDestinoNombre: elegido?.nombre });
+            }}
+            className="w-full rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary"
+          >
+            <option value="">Elige el flujo…</option>
+            {catalogos.flujos.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.nombre}
+              </option>
+            ))}
+          </select>
+          <p className="mt-2 text-[11px] leading-relaxed text-muted">
+            Este flujo termina y el contacto entra al otro. El otro tiene que estar activo.
+          </p>
+        </div>
       )}
 
       {tipo === "fin" && (

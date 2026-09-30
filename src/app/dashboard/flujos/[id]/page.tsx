@@ -4,6 +4,8 @@ import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
+import { listWorkspaceAgents } from "@/lib/agents";
+import { noSePuedeUsar } from "@/lib/whatsapp/limite-plantilla";
 import { LienzoFlujo, type ConexionInicial, type NodoInicial } from "@/components/flujos/lienzo";
 import { ActivarFlujo } from "@/components/flujos/activar-flujo";
 import type { DatosBloque, TipoBloque } from "@/lib/flujos/bloques";
@@ -22,12 +24,49 @@ export default async function FlujoPage({ params }: { params: Promise<{ id: stri
     .maybeSingle();
   if (!flujo) notFound();
 
-  const [{ data: nodos }, { data: conexiones }, { data: disparadores }, { data: etiquetas }] = await Promise.all([
+  // Los catalogos que necesitan los bloques para elegir: plantillas, agentes,
+  // etiquetas, respuestas rapidas, automatizaciones y los otros flujos.
+  const [
+    { data: nodos },
+    { data: conexiones },
+    { data: disparadores },
+    { data: etiquetas },
+    { data: plantillas },
+    { data: respuestasRapidas },
+    { data: automatizaciones },
+    { data: otrosFlujos },
+  ] = await Promise.all([
     supabase.from("flujo_nodos").select("id, tipo, datos, pos_x, pos_y").eq("flujo_id", id),
     supabase.from("flujo_conexiones").select("origen_id, destino_id, salida").eq("flujo_id", id),
     supabase.from("flujo_disparadores").select("tipo, valor, tag_id").eq("flujo_id", id),
     supabase.from("tags").select("id, name").eq("workspace_id", workspaceId ?? "").order("name"),
+    supabase
+      .from("templates")
+      .select("id, meta_template_name, language, body_text")
+      .eq("workspace_id", workspaceId ?? "")
+      .eq("status", "APPROVED")
+      .eq("created_via", "crm")
+      .order("meta_template_name"),
+    supabase
+      .from("quick_replies")
+      .select("id, name")
+      .eq("workspace_id", workspaceId ?? "")
+      .eq("is_active", true)
+      .order("name"),
+    supabase
+      .from("automations")
+      .select("id, name")
+      .eq("workspace_id", workspaceId ?? "")
+      .order("name"),
+    supabase
+      .from("flujos")
+      .select("id, nombre")
+      .eq("workspace_id", workspaceId ?? "")
+      .neq("id", id)
+      .order("nombre"),
   ]);
+
+  const agentes = await listWorkspaceAgents(supabase, workspaceId);
 
   // Los disparadores viven en su propia tabla pero se editan dentro del
   // bloque de inicio: aqui se devuelven a ese bloque para pintarlos.
@@ -85,6 +124,16 @@ export default async function FlujoPage({ params }: { params: Promise<{ id: stri
         nodosIniciales={nodosIniciales}
         conexionesIniciales={conexionesIniciales}
         etiquetas={etiquetas ?? []}
+        catalogos={{
+          etiquetas: etiquetas ?? [],
+          // Las plantillas que se pasan del limite de WhatsApp no se ofrecen:
+          // elegirlas seria armar un flujo que falla en cada envio.
+          plantillas: (plantillas ?? []).filter((p) => !noSePuedeUsar(p.body_text)),
+          agentes,
+          respuestasRapidas: respuestasRapidas ?? [],
+          automatizaciones: automatizaciones ?? [],
+          flujos: otrosFlujos ?? [],
+        }}
       />
 
       <p className="text-[11.5px] leading-relaxed text-muted">

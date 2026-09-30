@@ -6,7 +6,20 @@
  * aqui: si un bloque gana una salida, se agrega una vez y los tres se enteran.
  */
 
-export type TipoBloque = "inicio" | "mensaje" | "botones" | "esperar" | "ia" | "fin";
+export type TipoBloque =
+  | "inicio"
+  | "mensaje"
+  | "plantilla"
+  | "botones"
+  | "esperar"
+  | "condicion"
+  | "etiqueta"
+  | "agente"
+  | "respuesta_rapida"
+  | "automatizacion"
+  | "saltar"
+  | "ia"
+  | "fin";
 
 /** Una salida es un punto del que sale una linea hacia el siguiente bloque. */
 export type Salida = { id: string; etiqueta: string };
@@ -68,6 +81,72 @@ export const BLOQUES: Record<TipoBloque, DefinicionBloque> = {
       { id: "no_respondio", etiqueta: "No respondió" },
     ],
   },
+  plantilla: {
+    tipo: "plantilla",
+    nombre: "Enviar plantilla",
+    descripcion: "La única forma de escribir pasadas las 24 horas",
+    color: "var(--info)",
+    maximo: null,
+    aceptaEntrada: true,
+    salidasFijas: [{ id: "sig", etiqueta: "" }],
+  },
+  condicion: {
+    tipo: "condicion",
+    nombre: "Condición",
+    descripcion: "Se parte en dos según la etiqueta del contacto",
+    color: "var(--accent-purple)",
+    maximo: null,
+    aceptaEntrada: true,
+    salidasFijas: [
+      { id: "si", etiqueta: "Sí cumple" },
+      { id: "no", etiqueta: "No cumple" },
+    ],
+  },
+  etiqueta: {
+    tipo: "etiqueta",
+    nombre: "Poner o quitar etiqueta",
+    descripcion: "Marca al contacto y sigue de largo",
+    color: "var(--warning)",
+    maximo: null,
+    aceptaEntrada: true,
+    salidasFijas: [{ id: "sig", etiqueta: "" }],
+  },
+  agente: {
+    tipo: "agente",
+    nombre: "Asignar a un agente",
+    descripcion: "Le entrega el chat a alguien del equipo",
+    color: "var(--success)",
+    maximo: null,
+    aceptaEntrada: true,
+    salidasFijas: [{ id: "sig", etiqueta: "" }],
+  },
+  respuesta_rapida: {
+    tipo: "respuesta_rapida",
+    nombre: "Respuesta rápida",
+    descripcion: "Manda una de las que ya tienes armadas",
+    color: "var(--info)",
+    maximo: null,
+    aceptaEntrada: true,
+    salidasFijas: [{ id: "sig", etiqueta: "" }],
+  },
+  automatizacion: {
+    tipo: "automatizacion",
+    nombre: "Disparar automatización",
+    descripcion: "Corre una automatización ya creada y sigue",
+    color: "var(--accent-purple)",
+    maximo: null,
+    aceptaEntrada: true,
+    salidasFijas: [{ id: "sig", etiqueta: "" }],
+  },
+  saltar: {
+    tipo: "saltar",
+    nombre: "Saltar a otro flujo",
+    descripcion: "Termina este y mete al contacto en otro",
+    color: "var(--muted)",
+    maximo: null,
+    aceptaEntrada: true,
+    salidasFijas: null,
+  },
   ia: {
     tipo: "ia",
     nombre: "Entregar a la IA",
@@ -89,7 +168,20 @@ export const BLOQUES: Record<TipoBloque, DefinicionBloque> = {
 };
 
 /** Lo que el usuario puede arrastrar al lienzo (el inicio ya viene puesto). */
-export const BLOQUES_ARRASTRABLES: TipoBloque[] = ["mensaje", "botones", "esperar", "ia", "fin"];
+export const BLOQUES_ARRASTRABLES: TipoBloque[] = [
+  "mensaje",
+  "plantilla",
+  "botones",
+  "esperar",
+  "condicion",
+  "etiqueta",
+  "agente",
+  "respuesta_rapida",
+  "automatizacion",
+  "saltar",
+  "ia",
+  "fin",
+];
 
 /** Como entra un contacto al flujo. Son los mismos de las automatizaciones. */
 export type TipoDisparador = "keyword" | "any_message" | "first_message_of_day" | "tag" | "manual";
@@ -147,6 +239,28 @@ export type DatosBloque = {
   /** ia: objetivo propio de este flujo; vacio = usa el agente de la linea */
   objetivo?: string;
   nombreAgente?: string;
+  /** plantilla */
+  plantillaId?: string;
+  plantillaNombre?: string;
+  /** condicion: hoy solo por etiqueta, que es lo que el cliente ya entiende */
+  condicionTagId?: string;
+  condicionTagNombre?: string;
+  /** etiqueta */
+  etiquetaId?: string;
+  etiquetaNombre?: string;
+  etiquetaAccion?: "poner" | "quitar";
+  /** agente */
+  agenteId?: string;
+  agenteNombre?: string;
+  /** respuesta_rapida */
+  respuestaRapidaId?: string;
+  respuestaRapidaNombre?: string;
+  /** automatizacion */
+  automatizacionId?: string;
+  automatizacionNombre?: string;
+  /** saltar */
+  flujoDestinoId?: string;
+  flujoDestinoNombre?: string;
 };
 
 /** Las salidas reales de un bloque, ya contando sus datos. */
@@ -186,6 +300,18 @@ export function resumenDe(tipo: TipoBloque, datos: DatosBloque): string {
     const m = datos.minutos ?? 5;
     return `Espera ${m} ${m === 1 ? "minuto" : "minutos"}`;
   }
+  if (tipo === "plantilla") return datos.plantillaNombre || "Sin plantilla elegida";
+  if (tipo === "condicion") {
+    return datos.condicionTagNombre ? `¿Tiene la etiqueta "${datos.condicionTagNombre}"?` : "Sin condición elegida";
+  }
+  if (tipo === "etiqueta") {
+    if (!datos.etiquetaNombre) return "Sin etiqueta elegida";
+    return `${datos.etiquetaAccion === "quitar" ? "Quitar" : "Poner"} "${datos.etiquetaNombre}"`;
+  }
+  if (tipo === "agente") return datos.agenteNombre ? `Para ${datos.agenteNombre}` : "Reparto automático";
+  if (tipo === "respuesta_rapida") return datos.respuestaRapidaNombre || "Sin respuesta rápida elegida";
+  if (tipo === "automatizacion") return datos.automatizacionNombre || "Sin automatización elegida";
+  if (tipo === "saltar") return datos.flujoDestinoNombre ? `Va a "${datos.flujoDestinoNombre}"` : "Sin flujo elegido";
   if (tipo === "ia") return datos.nombreAgente?.trim() || "El agente de IA toma la conversación";
   return "El contacto sale del flujo";
 }
