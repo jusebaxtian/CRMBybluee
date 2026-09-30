@@ -1,0 +1,74 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceId } from "@/lib/workspace";
+import { requireModule } from "@/lib/entitlements";
+import { LienzoFlujo, type ConexionInicial, type NodoInicial } from "@/components/flujos/lienzo";
+import type { DatosBloque, TipoBloque } from "@/lib/flujos/bloques";
+
+export default async function FlujoPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  await requireModule(supabase, workspaceId, "flujos");
+
+  const { data: flujo } = await supabase
+    .from("flujos")
+    .select("id, nombre, activo")
+    .eq("id", id)
+    .eq("workspace_id", workspaceId ?? "")
+    .maybeSingle();
+  if (!flujo) notFound();
+
+  const [{ data: nodos }, { data: conexiones }] = await Promise.all([
+    supabase.from("flujo_nodos").select("id, tipo, datos, pos_x, pos_y").eq("flujo_id", id),
+    supabase.from("flujo_conexiones").select("origen_id, destino_id, salida").eq("flujo_id", id),
+  ]);
+
+  const nodosIniciales: NodoInicial[] = (nodos ?? []).map((n) => ({
+    id: n.id as string,
+    tipo: n.tipo as TipoBloque,
+    datos: (n.datos ?? {}) as DatosBloque,
+    x: Number(n.pos_x),
+    y: Number(n.pos_y),
+  }));
+
+  const conexionesIniciales: ConexionInicial[] = (conexiones ?? []).map((c) => ({
+    origen: c.origen_id as string,
+    destino: c.destino_id as string,
+    salida: (c.salida as string | null) ?? null,
+  }));
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <Link
+            href="/dashboard/flujos"
+            className="flex w-fit items-center gap-2 text-sm text-muted hover:text-foreground"
+          >
+            <ArrowLeft size={15} /> Volver a Flujos
+          </Link>
+          <h1 className="mt-1 truncate font-dash-display text-[22px] font-bold tracking-[-.4px] text-foreground">
+            {flujo.nombre}
+          </h1>
+        </div>
+        <span
+          className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium ${
+            flujo.activo ? "border-success text-success" : "border-border text-muted"
+          }`}
+        >
+          {flujo.activo ? "Activo" : "Borrador"}
+        </span>
+      </div>
+
+      <LienzoFlujo flujoId={id} nodosIniciales={nodosIniciales} conexionesIniciales={conexionesIniciales} />
+
+      <p className="text-[11.5px] leading-relaxed text-muted">
+        Esta es la primera parte del módulo: el lienzo y el guardado. El motor que mueve a los contactos por los
+        bloques llega en el siguiente paso, por eso el flujo todavía no se puede activar.
+      </p>
+    </div>
+  );
+}

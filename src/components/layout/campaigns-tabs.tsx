@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Megaphone, FileText, Zap, Tag, History, Lock } from "lucide-react";
+import { Megaphone, FileText, Zap, Tag, History, Lock, Workflow } from "lucide-react";
 
 const tabs = [
   { href: "/dashboard/campaigns", label: "Campañas", icon: Megaphone, moduleKey: "campaigns" },
   { href: "/dashboard/templates", label: "Plantillas", icon: FileText, moduleKey: "templates" },
   { href: "/dashboard/automations", label: "Automatizaciones", icon: Zap, moduleKey: "automations" },
+  { href: "/dashboard/flujos", label: "Flujos", icon: Workflow, moduleKey: "flujos" },
   { href: "/dashboard/followups", label: "Seguimientos", icon: History, moduleKey: "followups" },
   { href: "/dashboard/tags", label: "Etiquetas", icon: Tag, moduleKey: "tags" },
 ];
