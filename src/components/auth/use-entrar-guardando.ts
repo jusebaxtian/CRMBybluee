@@ -7,8 +7,12 @@ import type { AuthFormState } from "@/app/actions/auth";
 
 /**
  * Login y registro: captura correo y contraseña al enviar el formulario y,
- * cuando la accion responde ok = "entrar", pide al navegador guardarlos y
- * navega al panel.
+ * cuando la accion responde, guarda la credencial y navega.
+ *
+ * Dos destinos: "entrar" va al panel, y "completar" a terminar el registro
+ * --el caso en que la cuenta se creo pero su espacio no--. En los dos la
+ * sesion ya esta activa, por eso se guarda igual la contraseña: la persona
+ * va a necesitarla la proxima vez, falle lo que falle despues.
  */
 export function useEntrarGuardando(state: AuthFormState) {
   const router = useRouter();
@@ -20,11 +24,12 @@ export function useEntrarGuardando(state: AuthFormState) {
   }
 
   useEffect(() => {
-    if (state?.ok !== "entrar") return;
+    if (state?.ok !== "entrar" && state?.ok !== "completar") return;
+    const destino = state.ok === "completar" ? "/completar-registro" : "/dashboard";
     const c = credencial.current;
     (async () => {
       if (c?.id && c.password) await guardarCredencial(c.id, c.password);
-      router.push("/dashboard");
+      router.push(destino);
       router.refresh();
     })();
   }, [state, router]);

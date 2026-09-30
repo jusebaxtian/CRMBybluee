@@ -129,8 +129,13 @@ export async function signup(
   });
 
   if (rpcError) {
-    console.error("signup: create_workspace_with_owner:", rpcError.message);
-    return { error: "Tu cuenta quedó creada, pero no pudimos crear tu espacio. Escríbenos a soporte.", valores };
+    // La cuenta quedo creada y con sesion activa: lo que falta es el espacio.
+    // Antes esto terminaba en "escribenos a soporte", y quien no escribia se
+    // quedaba con una cuenta que no servia para nada -- 25 personas asi en
+    // produccion a 30 sep 2026, siete de ellas de este mismo mes. Ahora se
+    // manda a terminar el registro, que es una pantalla que ya existe.
+    console.error("signup: create_workspace_with_owner:", rpcError.message, { email, companyName });
+    return { ok: "completar", valores };
   }
 
   // Registro por enlace de pago (soporte ya registro el pago desde el chat):
