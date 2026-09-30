@@ -21,15 +21,28 @@ export default async function FlujoPage({ params }: { params: Promise<{ id: stri
     .maybeSingle();
   if (!flujo) notFound();
 
-  const [{ data: nodos }, { data: conexiones }] = await Promise.all([
+  const [{ data: nodos }, { data: conexiones }, { data: disparadores }, { data: etiquetas }] = await Promise.all([
     supabase.from("flujo_nodos").select("id, tipo, datos, pos_x, pos_y").eq("flujo_id", id),
     supabase.from("flujo_conexiones").select("origen_id, destino_id, salida").eq("flujo_id", id),
+    supabase.from("flujo_disparadores").select("tipo, valor, tag_id").eq("flujo_id", id),
+    supabase.from("tags").select("id, name").eq("workspace_id", workspaceId ?? "").order("name"),
   ]);
+
+  // Los disparadores viven en su propia tabla pero se editan dentro del
+  // bloque de inicio: aqui se devuelven a ese bloque para pintarlos.
+  const disparadoresDelInicio = (disparadores ?? []).map((d) => ({
+    tipo: d.tipo as "keyword" | "any_message" | "first_message_of_day" | "tag" | "manual",
+    valor: (d.valor as string | null) ?? undefined,
+    tagId: (d.tag_id as string | null) ?? undefined,
+  }));
 
   const nodosIniciales: NodoInicial[] = (nodos ?? []).map((n) => ({
     id: n.id as string,
     tipo: n.tipo as TipoBloque,
-    datos: (n.datos ?? {}) as DatosBloque,
+    datos:
+      n.tipo === "inicio"
+        ? { ...((n.datos ?? {}) as DatosBloque), disparadores: disparadoresDelInicio }
+        : ((n.datos ?? {}) as DatosBloque),
     x: Number(n.pos_x),
     y: Number(n.pos_y),
   }));
@@ -63,7 +76,12 @@ export default async function FlujoPage({ params }: { params: Promise<{ id: stri
         </span>
       </div>
 
-      <LienzoFlujo flujoId={id} nodosIniciales={nodosIniciales} conexionesIniciales={conexionesIniciales} />
+      <LienzoFlujo
+        flujoId={id}
+        nodosIniciales={nodosIniciales}
+        conexionesIniciales={conexionesIniciales}
+        etiquetas={etiquetas ?? []}
+      />
 
       <p className="text-[11.5px] leading-relaxed text-muted">
         Esta es la primera parte del módulo: el lienzo y el guardado. El motor que mueve a los contactos por los

@@ -29,6 +29,28 @@ export function revisarFlujo(
     avisos.push({ nivel: "error", nodoId: null, texto: "El flujo no tiene bloque de inicio." });
   }
 
+  // Sin disparador el flujo nunca arranca. Es aviso y no error porque se puede
+  // guardar a medias mientras se dibuja; el motor si lo exigira para activar.
+  for (const inicio of inicios) {
+    const disparadores = inicio.datos.disparadores ?? [];
+    if (disparadores.length === 0) {
+      avisos.push({
+        nivel: "aviso",
+        nodoId: inicio.id,
+        texto: "El inicio no tiene disparador: nadie va a entrar al flujo.",
+      });
+      continue;
+    }
+    for (const d of disparadores) {
+      if (d.tipo === "keyword" && !d.valor?.trim()) {
+        avisos.push({ nivel: "error", nodoId: inicio.id, texto: "Hay un disparador por palabra clave sin palabra." });
+      }
+      if (d.tipo === "tag" && !d.tagId) {
+        avisos.push({ nivel: "error", nodoId: inicio.id, texto: "Hay un disparador por etiqueta sin etiqueta elegida." });
+      }
+    }
+  }
+
   // Bloques sueltos: nadie llega a ellos. Es el error mas comun al armar un
   // flujo arrastrando cosas, y en pantalla no se nota.
   const conDestino = new Set(conexiones.map((c) => c.destino_id));

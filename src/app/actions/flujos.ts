@@ -142,6 +142,29 @@ export async function guardarLienzo(
     if (errorConexiones) return { error: errorConexiones.message };
   }
 
+  // Los disparadores se editan en el bloque de inicio pero viven en su propia
+  // tabla: es lo que el motor consultara para saber que flujo arrancar con un
+  // mensaje entrante, sin tener que leer el grafo completo de cada flujo.
+  const inicio = nodos.find((n) => n.tipo === "inicio");
+  const disparadores = (inicio?.datos.disparadores ?? []).filter((d) => {
+    if (d.tipo === "keyword") return Boolean(d.valor?.trim());
+    if (d.tipo === "tag") return Boolean(d.tagId);
+    return true;
+  });
+
+  await supabase.from("flujo_disparadores").delete().eq("flujo_id", flujoId);
+  if (disparadores.length > 0) {
+    const { error: errorDisparadores } = await supabase.from("flujo_disparadores").insert(
+      disparadores.map((d) => ({
+        flujo_id: flujoId,
+        tipo: d.tipo,
+        valor: d.tipo === "keyword" ? d.valor?.trim() ?? null : null,
+        tag_id: d.tipo === "tag" ? d.tagId ?? null : null,
+      }))
+    );
+    if (errorDisparadores) return { error: errorDisparadores.message };
+  }
+
   await supabase.from("flujos").update({ updated_at: new Date().toISOString() }).eq("id", flujoId);
   revalidatePath(`/dashboard/flujos/${flujoId}`);
 

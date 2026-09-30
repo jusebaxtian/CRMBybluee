@@ -2,7 +2,14 @@ import { describe, it, expect } from "vitest";
 import { revisarFlujo, type ConexionParaValidar, type NodoParaValidar } from "@/lib/flujos/validar";
 import { salidasDe } from "@/lib/flujos/bloques";
 
+/** Inicio sin disparador: sirve para probar justamente ese aviso. */
 const inicio: NodoParaValidar = { id: "i", tipo: "inicio", datos: {} };
+/** Inicio completo, como queda un flujo de verdad. */
+const inicioListo: NodoParaValidar = {
+  id: "i",
+  tipo: "inicio",
+  datos: { disparadores: [{ tipo: "keyword", valor: "precio" }] },
+};
 
 describe("salidas de un bloque", () => {
   it("un bloque de botones tiene una salida por botón más la de 'otra cosa'", () => {
@@ -24,7 +31,7 @@ describe("salidas de un bloque", () => {
 describe("revisión del flujo", () => {
   it("un flujo bien armado no da errores", () => {
     const nodos: NodoParaValidar[] = [
-      inicio,
+      inicioListo,
       { id: "m", tipo: "mensaje", datos: { texto: "Hola" } },
       { id: "f", tipo: "fin", datos: {} },
     ];
@@ -69,5 +76,45 @@ describe("revisión del flujo", () => {
     const nodos: NodoParaValidar[] = [inicio, { id: "e", tipo: "esperar", datos: { minutos: 0 } }];
     const avisos = revisarFlujo(nodos, [{ origen_id: "i", destino_id: "e", salida: "sig" }]);
     expect(avisos.some((a) => a.nivel === "error" && a.texto.includes("1 minuto"))).toBe(true);
+  });
+});
+
+describe("disparadores del inicio", () => {
+  const conDisparador: NodoParaValidar = {
+    id: "i",
+    tipo: "inicio",
+    datos: { disparadores: [{ tipo: "keyword", valor: "precio" }] },
+  };
+
+  it("avisa cuando el inicio no tiene disparador", () => {
+    const avisos = revisarFlujo([inicio, { id: "f", tipo: "fin", datos: {} }], [
+      { origen_id: "i", destino_id: "f", salida: "sig" },
+    ]);
+    expect(avisos.some((a) => a.texto.includes("nadie va a entrar"))).toBe(true);
+  });
+
+  it("no avisa cuando sí lo tiene", () => {
+    const avisos = revisarFlujo([conDisparador, { id: "f", tipo: "fin", datos: {} }], [
+      { origen_id: "i", destino_id: "f", salida: "sig" },
+    ]);
+    expect(avisos).toHaveLength(0);
+  });
+
+  it("marca la palabra clave vacía", () => {
+    const nodos: NodoParaValidar[] = [
+      { id: "i", tipo: "inicio", datos: { disparadores: [{ tipo: "keyword", valor: "  " }] } },
+      { id: "f", tipo: "fin", datos: {} },
+    ];
+    const avisos = revisarFlujo(nodos, [{ origen_id: "i", destino_id: "f", salida: "sig" }]);
+    expect(avisos.some((a) => a.nivel === "error" && a.texto.includes("sin palabra"))).toBe(true);
+  });
+
+  it("marca la etiqueta sin elegir", () => {
+    const nodos: NodoParaValidar[] = [
+      { id: "i", tipo: "inicio", datos: { disparadores: [{ tipo: "tag" }] } },
+      { id: "f", tipo: "fin", datos: {} },
+    ];
+    const avisos = revisarFlujo(nodos, [{ origen_id: "i", destino_id: "f", salida: "sig" }]);
+    expect(avisos.some((a) => a.nivel === "error" && a.texto.includes("sin etiqueta"))).toBe(true);
   });
 });

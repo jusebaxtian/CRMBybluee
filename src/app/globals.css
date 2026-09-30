@@ -328,3 +328,32 @@ select option {
 @media (min-width: 640px) { .viva-inbox { transform: perspective(1400px) rotateY(-6deg) rotateX(2deg); animation: viva-float 7s ease-in-out infinite; } }
 @media (prefers-reduced-motion: reduce) { .viva-cinta, .viva-blink, .viva-dot, .viva-msg, .viva-aura, .viva-arrow, .viva-inbox, .viva-sub::after { animation: none !important; } }
 @keyframes viva-onda { from { transform: scale(0.6); opacity: 0.9; } to { transform: scale(1.6); opacity: 0; } }
+
+/* Lienzo de Flujos (React Flow).
+   La libreria trae sus botones pensados para fondo blanco: sobre el fondo
+   oscuro de la app quedaban en blanco sobre blanco, invisibles. Se visten con
+   los mismos tokens que el resto del panel. */
+.react-flow__controls {
+  box-shadow: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.react-flow__controls-button {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  color: var(--foreground);
+  width: 28px;
+  height: 28px;
+}
+.react-flow__controls-button:hover { background: var(--surface-hover); }
+.react-flow__controls-button svg { fill: currentColor; }
+.react-flow__attribution {
+  background: transparent;
+  font-size: 10px;
+}
+.react-flow__attribution a { color: var(--muted); opacity: 0.55; }
+.react-flow__edge-path { stroke: var(--primary); stroke-width: 2; }
+.react-flow__handle { border-color: var(--border); background: var(--background); }
+.react-flow__handle-connecting { background: var(--warning); }
+.react-flow__handle-valid { background: var(--success); }

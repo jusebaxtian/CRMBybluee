@@ -91,7 +91,53 @@ export const BLOQUES: Record<TipoBloque, DefinicionBloque> = {
 /** Lo que el usuario puede arrastrar al lienzo (el inicio ya viene puesto). */
 export const BLOQUES_ARRASTRABLES: TipoBloque[] = ["mensaje", "botones", "esperar", "ia", "fin"];
 
+/** Como entra un contacto al flujo. Son los mismos de las automatizaciones. */
+export type TipoDisparador = "keyword" | "any_message" | "first_message_of_day" | "tag" | "manual";
+
+export type Disparador = {
+  tipo: TipoDisparador;
+  /** Palabra clave, cuando el tipo es "keyword". */
+  valor?: string;
+  /** Etiqueta, cuando el tipo es "tag". */
+  tagId?: string;
+};
+
+export const DISPARADORES: { tipo: TipoDisparador; nombre: string; ayuda: string; pideValor: boolean }[] = [
+  {
+    tipo: "keyword",
+    nombre: "Escribe una palabra clave",
+    ayuda: 'Entra cuando el contacto escribe algo que contiene esa palabra (ej. "precio").',
+    pideValor: true,
+  },
+  {
+    tipo: "any_message",
+    nombre: "Escribe cualquier mensaje",
+    ayuda: "Entra con cualquier mensaje que mande, escriba lo que escriba.",
+    pideValor: false,
+  },
+  {
+    tipo: "first_message_of_day",
+    nombre: "Su primer mensaje del día",
+    ayuda: "Entra solo con el primer mensaje que manda cada día, no con los siguientes.",
+    pideValor: false,
+  },
+  {
+    tipo: "tag",
+    nombre: "Le ponen una etiqueta",
+    ayuda: "Entra en el momento en que el contacto recibe esa etiqueta.",
+    pideValor: false,
+  },
+  {
+    tipo: "manual",
+    nombre: "Un agente lo mete a mano",
+    ayuda: "No entra solo: alguien del equipo lo mete al flujo desde el chat.",
+    pideValor: false,
+  },
+];
+
 export type DatosBloque = {
+  /** inicio: uno o varios disparadores */
+  disparadores?: Disparador[];
   /** mensaje / botones */
   texto?: string;
   /** botones: los titulos que ve el cliente */
@@ -121,7 +167,16 @@ export function salidasDe(tipo: TipoBloque, datos: DatosBloque): Salida[] {
 
 /** Resumen corto que se ve dentro del bloque en el lienzo. */
 export function resumenDe(tipo: TipoBloque, datos: DatosBloque): string {
-  if (tipo === "inicio") return "Entrada del flujo";
+  if (tipo === "inicio") {
+    const d = datos.disparadores ?? [];
+    if (d.length === 0) return "Sin disparador: nadie entra todavía";
+    return d
+      .map((x) => {
+        if (x.tipo === "keyword") return `Escribe "${x.valor?.trim() || "…"}"`;
+        return DISPARADORES.find((o) => o.tipo === x.tipo)?.nombre ?? x.tipo;
+      })
+      .join(" · ");
+  }
   if (tipo === "mensaje") return datos.texto?.trim() || "Sin mensaje todavía";
   if (tipo === "botones") {
     const texto = datos.texto?.trim() || "Sin pregunta todavía";

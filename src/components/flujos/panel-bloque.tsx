@@ -1,7 +1,15 @@
 "use client";
 
 import { Trash2, X } from "lucide-react";
-import { BLOQUES, MAX_BOTONES, type DatosBloque, type TipoBloque } from "@/lib/flujos/bloques";
+import {
+  BLOQUES,
+  DISPARADORES,
+  MAX_BOTONES,
+  type DatosBloque,
+  type Disparador,
+  type TipoBloque,
+  type TipoDisparador,
+} from "@/lib/flujos/bloques";
 
 /**
  * Panel lateral para editar el bloque seleccionado.
@@ -12,18 +20,27 @@ import { BLOQUES, MAX_BOTONES, type DatosBloque, type TipoBloque } from "@/lib/f
 export function PanelBloque({
   tipo,
   datos,
+  etiquetas = [],
   onCambiar,
   onBorrar,
   onCerrar,
 }: {
   tipo: TipoBloque;
   datos: DatosBloque;
+  etiquetas?: { id: string; name: string }[];
   onCambiar: (datos: DatosBloque) => void;
   onBorrar: () => void;
   onCerrar: () => void;
 }) {
   const def = BLOQUES[tipo];
   const botones = datos.botones ?? [];
+  const disparadores = datos.disparadores ?? [];
+
+  const cambiarDisparador = (i: number, cambios: Partial<Disparador>) => {
+    const copia = [...disparadores];
+    copia[i] = { ...copia[i], ...cambios };
+    onCambiar({ ...datos, disparadores: copia });
+  };
 
   return (
     <aside className="flex w-[300px] shrink-0 flex-col gap-4 border-l border-border bg-surface p-4">
@@ -36,6 +53,90 @@ export function PanelBloque({
           <X size={15} />
         </button>
       </div>
+
+      {tipo === "inicio" && (
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted">¿Cuándo entra un contacto?</label>
+
+          {disparadores.length === 0 && (
+            <p className="mb-2 rounded-[9px] border border-warning/40 bg-warning/10 px-3 py-2 text-[11.5px] leading-relaxed text-foreground">
+              Sin disparador el flujo no arranca nunca. Agrega al menos uno.
+            </p>
+          )}
+
+          <div className="flex flex-col gap-3">
+            {disparadores.map((d, i) => {
+              const def = DISPARADORES.find((o) => o.tipo === d.tipo);
+              return (
+                <div key={i} className="rounded-[9px] border border-border bg-background p-2.5">
+                  <div className="flex items-start gap-1.5">
+                    <select
+                      value={d.tipo}
+                      onChange={(e) => cambiarDisparador(i, { tipo: e.target.value as TipoDisparador })}
+                      className="min-w-0 flex-1 rounded-[8px] border border-border bg-surface px-2 py-1.5 text-[12.5px] text-foreground outline-none focus:border-primary"
+                    >
+                      {DISPARADORES.map((o) => (
+                        <option key={o.tipo} value={o.tipo}>
+                          {o.nombre}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => onCambiar({ ...datos, disparadores: disparadores.filter((_, j) => j !== i) })}
+                      className="shrink-0 pt-1.5 text-muted hover:text-red-400"
+                      title="Quitar"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+
+                  {def?.pideValor && (
+                    <input
+                      value={d.valor ?? ""}
+                      onChange={(e) => cambiarDisparador(i, { valor: e.target.value })}
+                      placeholder="precio, cotización, info…"
+                      className="mt-2 w-full rounded-[8px] border border-border bg-surface px-2 py-1.5 text-[12.5px] text-foreground outline-none focus:border-primary"
+                    />
+                  )}
+
+                  {d.tipo === "tag" && (
+                    <select
+                      value={d.tagId ?? ""}
+                      onChange={(e) => cambiarDisparador(i, { tagId: e.target.value })}
+                      className="mt-2 w-full rounded-[8px] border border-border bg-surface px-2 py-1.5 text-[12.5px] text-foreground outline-none focus:border-primary"
+                    >
+                      <option value="">Elige la etiqueta…</option>
+                      {etiquetas.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  <p className="mt-1.5 text-[10.5px] leading-relaxed text-muted">{def?.ayuda}</p>
+                </div>
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              onCambiar({ ...datos, disparadores: [...disparadores, { tipo: "keyword", valor: "" }] })
+            }
+            className="mt-2 text-xs font-medium text-primary hover:underline"
+          >
+            + Agregar disparador
+          </button>
+
+          <p className="mt-2 text-[11px] leading-relaxed text-muted">
+            Si pones varios, entra cuando se cumpla cualquiera de ellos. Un contacto que ya está dentro no vuelve
+            a entrar hasta que termine.
+          </p>
+        </div>
+      )}
 
       {(tipo === "mensaje" || tipo === "botones") && (
         <div>

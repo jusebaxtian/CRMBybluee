@@ -34,10 +34,12 @@ function Lienzo({
   flujoId,
   nodosIniciales,
   conexionesIniciales,
+  etiquetas,
 }: {
   flujoId: string;
   nodosIniciales: NodoInicial[];
   conexionesIniciales: ConexionInicial[];
+  etiquetas: { id: string; name: string }[];
 }) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>(
     nodosIniciales.map((n) => ({
@@ -239,6 +241,7 @@ function Lienzo({
         <PanelBloque
           tipo={datosDelSeleccionado.tipo}
           datos={datosDelSeleccionado.datos}
+          etiquetas={etiquetas}
           onCambiar={(datos) =>
             setNodes((prev) =>
               prev.map((n) =>
@@ -262,6 +265,7 @@ export function LienzoFlujo(props: {
   flujoId: string;
   nodosIniciales: NodoInicial[];
   conexionesIniciales: ConexionInicial[];
+  etiquetas: { id: string; name: string }[];
 }) {
   return (
     <ReactFlowProvider>
