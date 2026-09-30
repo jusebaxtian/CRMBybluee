@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
 import { LienzoFlujo, type ConexionInicial, type NodoInicial } from "@/components/flujos/lienzo";
+import { ActivarFlujo } from "@/components/flujos/activar-flujo";
 import type { DatosBloque, TipoBloque } from "@/lib/flujos/bloques";
 
 export default async function FlujoPage({ params }: { params: Promise<{ id: string }> }) {
@@ -67,13 +68,16 @@ export default async function FlujoPage({ params }: { params: Promise<{ id: stri
             {flujo.nombre}
           </h1>
         </div>
-        <span
-          className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium ${
-            flujo.activo ? "border-success text-success" : "border-border text-muted"
-          }`}
-        >
-          {flujo.activo ? "Activo" : "Borrador"}
-        </span>
+        <div className="flex shrink-0 items-center gap-3">
+          <span
+            className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+              flujo.activo ? "border-success text-success" : "border-border text-muted"
+            }`}
+          >
+            {flujo.activo ? "Activo" : "Borrador"}
+          </span>
+          <ActivarFlujo flujoId={id} activo={Boolean(flujo.activo)} />
+        </div>
       </div>
 
       <LienzoFlujo
@@ -84,8 +88,9 @@ export default async function FlujoPage({ params }: { params: Promise<{ id: stri
       />
 
       <p className="text-[11.5px] leading-relaxed text-muted">
-        Esta es la primera parte del módulo: el lienzo y el guardado. El motor que mueve a los contactos por los
-        bloques llega en el siguiente paso, por eso el flujo todavía no se puede activar.
+        Mientras está en borrador no le llega a nadie. Al activarlo, los contactos que cumplan el disparador
+        entran al flujo: mientras están dentro, las automatizaciones, los seguimientos y el agente de IA no
+        responden, para que no se crucen los mensajes.
       </p>
     </div>
   );

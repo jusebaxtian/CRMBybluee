@@ -12,6 +12,7 @@ import { substituteContactVariables, buildTemplateSendParams } from "@/lib/whats
 import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { abrirConversacion } from "@/lib/whatsapp/conversacion";
 import { recordOutboundMessage } from "@/lib/messaging/record";
+import { contactoEnFlujo } from "@/lib/flujos/motor";
 
 export type Automation = {
   id: string;
@@ -542,6 +543,9 @@ export async function isContactExcludedFromAutomations(
   // Pidio no recibir marketing (131050): Meta no entrega nada que no sea
   // respuesta a un mensaje suyo, y cada intento pesa contra la calidad.
   if (contact?.marketing_opt_out_at) return true;
+  // Dentro de un flujo manda el flujo: dos sistemas contestando a la vez le
+  // dejan al cliente una conversacion cruzada.
+  if (await contactoEnFlujo(supabase as never, contactId)) return true;
 
   const { data: tags } = await supabase
     .from("contact_tags")

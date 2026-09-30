@@ -13,6 +13,7 @@ import { maybeRespondWithAiAgent } from "@/lib/ai/agent";
 import { transcribeAudio } from "@/lib/ai/providers";
 import { toPublicUrl } from "@/lib/supabase/config";
 import { recordInboundMessage } from "@/lib/messaging/record";
+import { iniciarPorMensaje, procesarEntrada } from "@/lib/flujos/motor";
 import { traducirErrorEnvio } from "@/lib/whatsapp/errores";
 
 // WhatsApp never tells a business when a customer has blocked them (privacy
@@ -99,6 +100,32 @@ async function tagContactAsMarketingBlocked(
   if (!tagId) return;
 
   await supabase.from("contact_tags").upsert({ contact_id: contactId, tag_id: tagId });
+}
+
+/**
+ * Si este es el primer mensaje que manda el contacto hoy.
+ *
+ * Se mira sobre los mensajes ya guardados, excluyendo el que acaba de entrar:
+ * cuando esto corre, el mensaje actual ya esta en la tabla.
+ */
+async function esElPrimerMensajeDelDia(
+  supabase: ReturnType<typeof createAdminClient>,
+  contactId: string,
+  waMessageId: string
+): Promise<boolean> {
+  const inicioDelDia = new Date();
+  inicioDelDia.setHours(0, 0, 0, 0);
+
+  const { data } = await supabase
+    .from("messages")
+    .select("id, conversations!inner(contact_id)")
+    .eq("conversations.contact_id", contactId)
+    .eq("direction", "in")
+    .neq("wa_message_id", waMessageId)
+    .gte("created_at", inicioDelDia.toISOString())
+    .limit(1);
+
+  return (data ?? []).length === 0;
 }
 
 const extensionFromMime: Record<string, string> = {
@@ -489,6 +516,17 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           notificationPreview
         );
 
+        // Flujos manda sobre todo lo demas. Si el contacto ya esta dentro de
+        // uno, el flujo decide que pasa con este mensaje y nada mas se mete:
+        // las automatizaciones, los seguimientos y la IA responderian encima
+        // y el cliente veria una conversacion cruzada.
+        const loTomoUnFlujo = await procesarEntrada(supabase, contact.id, {
+          botonId: isButtonTap ? tappedButtonPayload : null,
+          texto: message.text?.body ?? null,
+        });
+
+        if (loTomoUnFlujo) continue;
+
         if (isButtonTap && tappedButtonPayload) {
           await runButtonTapAutomations(supabase, workspaceId, contact.id, tappedButtonPayload, whatsappAccountId);
         }
@@ -506,6 +544,17 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
         // independently if the reply text happens to match one.
         if (!isReaction) {
           matchedAutomation = await resumePendingReplyWaits(supabase, workspaceId, contact.id);
+        }
+
+        // No estaba dentro de ningun flujo: ¿alguno deberia arrancar con este
+        // mensaje? Va antes que las automatizaciones por la misma razon de
+        // arriba, y solo entra un flujo por contacto.
+        if (!matchedAutomation && !isReaction) {
+          const arranco = await iniciarPorMensaje(supabase, workspaceId, contact.id, conversation.id, {
+            texto: message.text?.body ?? null,
+            esPrimeroDelDia: await esElPrimerMensajeDelDia(supabase, contact.id, message.id),
+          });
+          if (arranco) continue;
         }
 
         if (!matchedAutomation && !isReaction && !isButtonTap) {

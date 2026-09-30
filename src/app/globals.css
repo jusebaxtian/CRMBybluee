@@ -331,8 +331,22 @@ select option {
 
 /* Lienzo de Flujos (React Flow).
    La libreria trae sus botones pensados para fondo blanco: sobre el fondo
-   oscuro de la app quedaban en blanco sobre blanco, invisibles. Se visten con
-   los mismos tokens que el resto del panel. */
+   oscuro de la app quedaban blanco sobre blanco, invisibles. Su hoja de
+   estilos se carga despues de esta, asi que no basta con escribir reglas
+   propias --ganaba la suya--: hay que fijar las variables que ella misma
+   usa, y reforzar el icono, que viene con un relleno fijo oscuro. */
+.react-flow {
+  --xy-controls-button-background-color: var(--surface);
+  --xy-controls-button-background-color-hover: var(--surface-hover);
+  --xy-controls-button-color: var(--foreground);
+  --xy-controls-button-color-hover: var(--foreground);
+  --xy-controls-button-border-color: var(--border);
+  --xy-edge-stroke: var(--primary);
+  --xy-edge-stroke-selected: var(--success);
+  --xy-handle-background-color: var(--background);
+  --xy-handle-border-color: var(--border);
+  --xy-background-color: transparent;
+}
 .react-flow__controls {
   box-shadow: none;
   border: 1px solid var(--border);
@@ -340,19 +354,17 @@ select option {
   overflow: hidden;
 }
 .react-flow__controls-button {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  color: var(--foreground);
-  width: 28px;
-  height: 28px;
+  background: var(--surface) !important;
+  border-bottom: 1px solid var(--border) !important;
+  width: 30px;
+  height: 30px;
 }
-.react-flow__controls-button:hover { background: var(--surface-hover); }
-.react-flow__controls-button svg { fill: currentColor; }
-.react-flow__attribution {
-  background: transparent;
-  font-size: 10px;
-}
-.react-flow__attribution a { color: var(--muted); opacity: 0.55; }
+.react-flow__controls-button:hover { background: var(--surface-hover) !important; }
+/* El icono viene con fill fijo oscuro; sin esto se pierde sobre el panel. */
+.react-flow__controls-button svg,
+.react-flow__controls-button svg path { fill: var(--foreground) !important; }
+.react-flow__controls-button:disabled svg,
+.react-flow__controls-button:disabled svg path { fill: var(--muted) !important; }
 .react-flow__edge-path { stroke: var(--primary); stroke-width: 2; }
 .react-flow__handle { border-color: var(--border); background: var(--background); }
 .react-flow__handle-connecting { background: var(--warning); }

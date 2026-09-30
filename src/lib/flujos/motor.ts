@@ -1,0 +1,469 @@
+import type { createAdminClient } from "@/lib/supabase/admin";
+import { resolveSendAccount } from "@/lib/whatsapp/account";
+import { sendInteractiveButtonsMessage, sendTextMessage } from "@/lib/whatsapp/graph";
+import { recordOutboundMessage } from "@/lib/messaging/record";
+import { salidasDe, type DatosBloque, type TipoBloque } from "@/lib/flujos/bloques";
+
+type Supabase = ReturnType<typeof createAdminClient>;
+
+/**
+ * El motor de Flujos: mueve a un contacto de bloque en bloque.
+ *
+ * Tres cosas lo despiertan y solo tres: un mensaje entrante, la pulsacion de
+ * un boton, o un tiempo que vence. Todo lo demas --que mensaje mandar, a
+ * donde seguir-- sale del dibujo que el usuario armo en el lienzo.
+ *
+ * Reglas que no se negocian, porque cada una nacio de un riesgo real:
+ *
+ *  - Un contacto esta en un flujo o en ninguno, nunca en dos.
+ *  - Mientras esta dentro, las automatizaciones, los seguimientos y la IA no
+ *    se meten: si no, el cliente recibe respuestas cruzadas.
+ *  - Hay tope de pasos y fecha de vencimiento. Un flujo dibujado en circulo
+ *    no puede mandar mensajes para siempre, y un contacto que nunca responde
+ *    no puede quedarse "dentro" de por vida.
+ */
+
+/** Tope de bloques que puede recorrer una ejecucion. Corta-circuitos de lazos. */
+export const MAX_PASOS = 50;
+
+export type NodoFila = { id: string; tipo: TipoBloque; datos: DatosBloque };
+export type ConexionFila = { origen_id: string; destino_id: string; salida: string | null };
+
+/** ¿Este contacto esta ahora mismo dentro de algun flujo? */
+export async function contactoEnFlujo(supabase: Supabase, contactId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from("flujo_ejecuciones")
+    .select("id")
+    .eq("contact_id", contactId)
+    .in("estado", ["corriendo", "esperando"])
+    .limit(1)
+    .maybeSingle();
+  return Boolean(data);
+}
+
+async function grafoDelFlujo(supabase: Supabase, flujoId: string) {
+  const [{ data: nodos }, { data: conexiones }] = await Promise.all([
+    supabase.from("flujo_nodos").select("id, tipo, datos").eq("flujo_id", flujoId),
+    supabase.from("flujo_conexiones").select("origen_id, destino_id, salida").eq("flujo_id", flujoId),
+  ]);
+  return {
+    nodos: ((nodos ?? []) as NodoFila[]),
+    conexiones: ((conexiones ?? []) as ConexionFila[]),
+  };
+}
+
+/** A donde lleva una salida concreta de un bloque. null si no esta conectada. */
+export function destinoDe(
+  conexiones: ConexionFila[],
+  nodoId: string,
+  salida: string | null
+): string | null {
+  const c = conexiones.find((x) => x.origen_id === nodoId && (x.salida ?? "sig") === (salida ?? "sig"));
+  return c?.destino_id ?? null;
+}
+
+async function cerrar(
+  supabase: Supabase,
+  ejecucionId: string,
+  estado: "terminado" | "entregado" | "vencido" | "cancelado"
+) {
+  await supabase
+    .from("flujo_ejecuciones")
+    .update({ estado, terminado_el: new Date().toISOString(), actualizado_el: new Date().toISOString() })
+    .eq("id", ejecucionId);
+}
+
+/**
+ * Corre la ejecucion desde su bloque actual hasta que tenga que parar.
+ *
+ * Para cuando: llega a un bloque que espera algo (botones o espera), termina,
+ * entrega a la IA, se queda sin salida conectada, o se pasa del tope de pasos.
+ */
+export async function avanzar(supabase: Supabase, ejecucionId: string): Promise<void> {
+  const { data: ejecucion } = await supabase
+    .from("flujo_ejecuciones")
+    .select("id, flujo_id, workspace_id, contact_id, conversation_id, nodo_id, estado, pasos, vence_el")
+    .eq("id", ejecucionId)
+    .maybeSingle();
+  if (!ejecucion || !["corriendo", "esperando"].includes(ejecucion.estado as string)) return;
+
+  if (new Date(ejecucion.vence_el as string).getTime() < Date.now()) {
+    await cerrar(supabase, ejecucionId, "vencido");
+    return;
+  }
+
+  const { nodos, conexiones } = await grafoDelFlujo(supabase, ejecucion.flujo_id as string);
+  const { data: contacto } = await supabase
+    .from("contacts")
+    .select("wa_id, marketing_opt_out_at")
+    .eq("id", ejecucion.contact_id as string)
+    .maybeSingle();
+  if (!contacto) {
+    await cerrar(supabase, ejecucionId, "cancelado");
+    return;
+  }
+  // Quien pidio no recibir marketing no recibe un flujo: Meta lo rechaza y
+  // cada intento pesa contra la calidad del numero.
+  if (contacto.marketing_opt_out_at) {
+    await cerrar(supabase, ejecucionId, "cancelado");
+    return;
+  }
+
+  const { data: conversacion } = ejecucion.conversation_id
+    ? await supabase
+        .from("conversations")
+        .select("whatsapp_account_id")
+        .eq("id", ejecucion.conversation_id as string)
+        .maybeSingle()
+    : { data: null };
+
+  const cuenta = await resolveSendAccount(
+    supabase,
+    ejecucion.workspace_id as string,
+    conversacion?.whatsapp_account_id ?? null
+  );
+  if (!cuenta) {
+    await cerrar(supabase, ejecucionId, "cancelado");
+    return;
+  }
+
+  let nodoActual = nodos.find((n) => n.id === ejecucion.nodo_id);
+  let pasos = ejecucion.pasos as number;
+
+  while (nodoActual) {
+    pasos += 1;
+    if (pasos > MAX_PASOS) {
+      console.error(
+        `flujo ${ejecucion.flujo_id}: la ejecucion ${ejecucionId} paso de ${MAX_PASOS} bloques — probablemente hay un lazo`
+      );
+      await cerrar(supabase, ejecucionId, "cancelado");
+      return;
+    }
+
+    const tipo = nodoActual.tipo;
+    const datos = (nodoActual.datos ?? {}) as DatosBloque;
+
+    if (tipo === "fin") {
+      await cerrar(supabase, ejecucionId, "terminado");
+      return;
+    }
+
+    if (tipo === "ia") {
+      // Entregar a la IA es terminar el flujo y quitarle el freno al agente:
+      // el historial del chat ya lo lee el solo.
+      if (ejecucion.conversation_id) {
+        await supabase
+          .from("conversations")
+          .update({ ai_manually_paused: false, ai_handoff_requested: false })
+          .eq("id", ejecucion.conversation_id as string);
+      }
+      await cerrar(supabase, ejecucionId, "entregado");
+      return;
+    }
+
+    if (tipo === "mensaje" || tipo === "inicio") {
+      if (tipo === "mensaje" && datos.texto?.trim()) {
+        const enviado = await sendTextMessage(
+          cuenta.phone_number_id,
+          cuenta.access_token,
+          contacto.wa_id as string,
+          datos.texto.trim()
+        );
+        if (ejecucion.conversation_id) {
+          await recordOutboundMessage(supabase, {
+            conversationId: ejecucion.conversation_id as string,
+            messageType: "text",
+            body: datos.texto.trim(),
+            waMessageId: enviado.messages[0]?.id,
+          });
+        }
+      }
+
+      const siguiente = destinoDe(conexiones, nodoActual.id, "sig");
+      if (!siguiente) {
+        await cerrar(supabase, ejecucionId, "terminado");
+        return;
+      }
+      nodoActual = nodos.find((n) => n.id === siguiente);
+      continue;
+    }
+
+    if (tipo === "botones") {
+      const botones = (datos.botones ?? [])
+        .map((titulo, i) => ({ id: String(i), title: titulo.trim() }))
+        .filter((b) => b.title);
+      if (botones.length === 0 || !datos.texto?.trim()) {
+        await cerrar(supabase, ejecucionId, "cancelado");
+        return;
+      }
+
+      const enviado = await sendInteractiveButtonsMessage(
+        cuenta.phone_number_id,
+        cuenta.access_token,
+        contacto.wa_id as string,
+        datos.texto.trim(),
+        botones
+      );
+      if (ejecucion.conversation_id) {
+        await recordOutboundMessage(supabase, {
+          conversationId: ejecucion.conversation_id as string,
+          messageType: "text",
+          body: datos.texto.trim(),
+          waMessageId: enviado.messages[0]?.id,
+          buttons: botones.map((b) => ({ type: "QUICK_REPLY", text: b.title })),
+        });
+      }
+
+      // Queda esperando la pulsacion. Sin tiempo limite: el vencimiento de la
+      // ejecucion es el que evita que se quede ahi para siempre.
+      await supabase
+        .from("flujo_ejecuciones")
+        .update({ estado: "esperando", nodo_id: nodoActual.id, pasos, actualizado_el: new Date().toISOString() })
+        .eq("id", ejecucionId);
+      return;
+    }
+
+    if (tipo === "esperar") {
+      const minutos = Math.max(1, datos.minutos ?? 5);
+      await supabase
+        .from("flujo_ejecuciones")
+        .update({ estado: "esperando", nodo_id: nodoActual.id, pasos, actualizado_el: new Date().toISOString() })
+        .eq("id", ejecucionId);
+      await supabase.from("flujo_esperas").insert({
+        ejecucion_id: ejecucionId,
+        nodo_id: nodoActual.id,
+        vence_el: new Date(Date.now() + minutos * 60_000).toISOString(),
+      });
+      return;
+    }
+
+    // Tipo desconocido (version vieja del dibujo): se cierra en vez de
+    // adivinar.
+    await cerrar(supabase, ejecucionId, "cancelado");
+    return;
+  }
+
+  // Se quedo sin bloque: el dibujo tenia una salida colgando.
+  await cerrar(supabase, ejecucionId, "terminado");
+}
+
+/** Mueve la ejecucion a un bloque y la corre. */
+async function irANodo(supabase: Supabase, ejecucionId: string, nodoId: string) {
+  await supabase
+    .from("flujo_ejecuciones")
+    .update({ estado: "corriendo", nodo_id: nodoId, actualizado_el: new Date().toISOString() })
+    .eq("id", ejecucionId);
+  await avanzar(supabase, ejecucionId);
+}
+
+/**
+ * Llego algo del contacto mientras estaba dentro de un flujo.
+ *
+ * Devuelve true si el flujo se hizo cargo: quien llama usa eso para no correr
+ * ademas las automatizaciones ni la IA.
+ */
+export async function procesarEntrada(
+  supabase: Supabase,
+  contactId: string,
+  entrada: { botonId: string | null; texto: string | null }
+): Promise<boolean> {
+  const { data: ejecucion } = await supabase
+    .from("flujo_ejecuciones")
+    .select("id, flujo_id, nodo_id, estado, vence_el")
+    .eq("contact_id", contactId)
+    .in("estado", ["corriendo", "esperando"])
+    .limit(1)
+    .maybeSingle();
+  if (!ejecucion) return false;
+
+  if (new Date(ejecucion.vence_el as string).getTime() < Date.now()) {
+    await cerrar(supabase, ejecucion.id as string, "vencido");
+    return false;
+  }
+
+  const { nodos, conexiones } = await grafoDelFlujo(supabase, ejecucion.flujo_id as string);
+  const nodo = nodos.find((n) => n.id === ejecucion.nodo_id);
+  if (!nodo) return false;
+
+  if (nodo.tipo === "botones") {
+    const datos = (nodo.datos ?? {}) as DatosBloque;
+    const salidas = salidasDe("botones", datos);
+    // El id del boton es su posicion; si escribio texto en vez de tocar, se
+    // sigue por "otro", que siempre existe.
+    const salida = entrada.botonId !== null && salidas.some((s) => s.id === entrada.botonId)
+      ? entrada.botonId
+      : "otro";
+    const destino = destinoDe(conexiones, nodo.id, salida);
+    if (!destino) {
+      await cerrar(supabase, ejecucion.id as string, "terminado");
+      return true;
+    }
+    await irANodo(supabase, ejecucion.id as string, destino);
+    return true;
+  }
+
+  if (nodo.tipo === "esperar") {
+    // Respondio antes de tiempo: la espera pendiente ya no aplica.
+    await supabase
+      .from("flujo_esperas")
+      .update({ procesada_el: new Date().toISOString() })
+      .eq("ejecucion_id", ejecucion.id as string)
+      .is("procesada_el", null);
+
+    const destino = destinoDe(conexiones, nodo.id, "respondio");
+    if (!destino) {
+      await cerrar(supabase, ejecucion.id as string, "terminado");
+      return true;
+    }
+    await irANodo(supabase, ejecucion.id as string, destino);
+    return true;
+  }
+
+  // En cualquier otro bloque el mensaje no hace avanzar nada, pero el flujo
+  // sigue mandando: no se deja pasar a las automatizaciones.
+  return true;
+}
+
+/** Arranca un flujo para un contacto. Devuelve el id de la ejecucion, o null. */
+export async function iniciarFlujo(
+  supabase: Supabase,
+  flujoId: string,
+  contactId: string,
+  conversationId: string | null
+): Promise<string | null> {
+  const { data: flujo } = await supabase
+    .from("flujos")
+    .select("id, workspace_id, activo, dias_de_vida")
+    .eq("id", flujoId)
+    .maybeSingle();
+  if (!flujo || !flujo.activo) return null;
+
+  // Un contacto, un flujo. Si ya esta en otro, este no arranca.
+  if (await contactoEnFlujo(supabase, contactId)) return null;
+
+  const { nodos, conexiones } = await grafoDelFlujo(supabase, flujoId);
+  const inicio = nodos.find((n) => n.tipo === "inicio");
+  if (!inicio) return null;
+  const primero = destinoDe(conexiones, inicio.id, "sig");
+  if (!primero) return null;
+
+  const dias = (flujo.dias_de_vida as number) || 7;
+  const { data: ejecucion, error } = await supabase
+    .from("flujo_ejecuciones")
+    .insert({
+      flujo_id: flujoId,
+      workspace_id: flujo.workspace_id,
+      contact_id: contactId,
+      conversation_id: conversationId,
+      nodo_id: primero,
+      estado: "corriendo",
+      vence_el: new Date(Date.now() + dias * 86_400_000).toISOString(),
+    })
+    .select("id")
+    .single();
+  // El indice unico puede rechazar la insercion si dos mensajes entran a la
+  // vez: es la proteccion funcionando, no un error que reportar.
+  if (error || !ejecucion) return null;
+
+  await avanzar(supabase, ejecucion.id as string);
+  return ejecucion.id as string;
+}
+
+/** Trabajo de fondo: las esperas que ya vencieron siguen por "no respondió". */
+export async function procesarEsperasVencidas(supabase: Supabase): Promise<number> {
+  const { data: esperas } = await supabase
+    .from("flujo_esperas")
+    .select("id, ejecucion_id, nodo_id")
+    .is("procesada_el", null)
+    .lte("vence_el", new Date().toISOString())
+    .limit(100);
+
+  let procesadas = 0;
+  for (const espera of esperas ?? []) {
+    // Se reclama de forma atomica: si dos procesos corren el trabajo a la vez,
+    // solo uno se queda con la espera.
+    const { data: reclamada } = await supabase
+      .from("flujo_esperas")
+      .update({ procesada_el: new Date().toISOString() })
+      .eq("id", espera.id as string)
+      .is("procesada_el", null)
+      .select("id")
+      .maybeSingle();
+    if (!reclamada) continue;
+
+    const { data: ejecucion } = await supabase
+      .from("flujo_ejecuciones")
+      .select("id, flujo_id, estado")
+      .eq("id", espera.ejecucion_id as string)
+      .maybeSingle();
+    if (!ejecucion || !["corriendo", "esperando"].includes(ejecucion.estado as string)) continue;
+
+    const { conexiones } = await grafoDelFlujo(supabase, ejecucion.flujo_id as string);
+    const destino = destinoDe(conexiones, espera.nodo_id as string, "no_respondio");
+    if (!destino) {
+      await cerrar(supabase, ejecucion.id as string, "terminado");
+      procesadas += 1;
+      continue;
+    }
+
+    await irANodo(supabase, ejecucion.id as string, destino);
+    procesadas += 1;
+  }
+
+  return procesadas;
+}
+
+/** Trabajo de fondo: cierra las ejecuciones a las que se les acabo el plazo. */
+export async function cerrarEjecucionesVencidas(supabase: Supabase): Promise<number> {
+  const { data } = await supabase
+    .from("flujo_ejecuciones")
+    .update({ estado: "vencido", terminado_el: new Date().toISOString(), actualizado_el: new Date().toISOString() })
+    .in("estado", ["corriendo", "esperando"])
+    .lte("vence_el", new Date().toISOString())
+    .select("id");
+  return (data ?? []).length;
+}
+
+/**
+ * Busca que flujo arrancar con lo que acaba de llegar.
+ *
+ * Se llama solo cuando el contacto NO esta ya dentro de un flujo. Si varios
+ * flujos coinciden gana el mas reciente: es el que el cliente acaba de armar,
+ * y casi siempre el que quiere probar.
+ */
+export async function iniciarPorMensaje(
+  supabase: Supabase,
+  workspaceId: string,
+  contactId: string,
+  conversationId: string | null,
+  entrada: { texto: string | null; esPrimeroDelDia: boolean }
+): Promise<boolean> {
+  const { data: flujos } = await supabase
+    .from("flujos")
+    .select("id, updated_at, flujo_disparadores(tipo, valor)")
+    .eq("workspace_id", workspaceId)
+    .eq("activo", true)
+    .order("updated_at", { ascending: false });
+
+  const texto = (entrada.texto ?? "").toLowerCase();
+
+  for (const flujo of flujos ?? []) {
+    const disparadores = (flujo.flujo_disparadores ?? []) as { tipo: string; valor: string | null }[];
+    const coincide = disparadores.some((d) => {
+      if (d.tipo === "any_message") return true;
+      if (d.tipo === "first_message_of_day") return entrada.esPrimeroDelDia;
+      if (d.tipo === "keyword") {
+        const palabra = (d.valor ?? "").trim().toLowerCase();
+        return Boolean(palabra) && texto.includes(palabra);
+      }
+      // "tag" y "manual" no entran por mensaje.
+      return false;
+    });
+    if (!coincide) continue;
+
+    const ejecucion = await iniciarFlujo(supabase, flujo.id as string, contactId, conversationId);
+    if (ejecucion) return true;
+  }
+
+  return false;
+}

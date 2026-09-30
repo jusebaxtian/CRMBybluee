@@ -175,3 +175,79 @@ export async function guardarLienzo(
   );
   return { ok: true as const, avisos };
 }
+
+/**
+ * Activar o pausar un flujo.
+ *
+ * Activar es lo que lo pone a correr de verdad, asi que aqui se repite la
+ * revision completa: en el lienzo se avisa mientras se dibuja, pero el aviso
+ * en pantalla no sirve de nada si despues se puede activar igual.
+ */
+export async function activarFlujo(flujoId: string, activo: boolean) {
+  const ctx = await flujoDelEspacio(flujoId);
+  if ("error" in ctx) return ctx;
+  const { supabase } = ctx;
+
+  if (activo) {
+    const [{ data: nodos }, { data: conexiones }, { data: disparadores }] = await Promise.all([
+      supabase.from("flujo_nodos").select("id, tipo, datos").eq("flujo_id", flujoId),
+      supabase.from("flujo_conexiones").select("origen_id, destino_id, salida").eq("flujo_id", flujoId),
+      supabase.from("flujo_disparadores").select("tipo, valor, tag_id").eq("flujo_id", flujoId),
+    ]);
+
+    if ((disparadores ?? []).length === 0) {
+      return { error: "Ponle un disparador al bloque de inicio: sin eso nadie entra al flujo." };
+    }
+
+    const avisos = revisarFlujo(
+      (nodos ?? []).map((n) => ({
+        id: n.id as string,
+        tipo: n.tipo as TipoBloque,
+        datos: {
+          ...((n.datos ?? {}) as DatosBloque),
+          // Los disparadores viven aparte: se le devuelven al inicio para que
+          // la revision los vea.
+          ...(n.tipo === "inicio"
+            ? {
+                disparadores: (disparadores ?? []).map((d) => ({
+                  tipo: d.tipo as "keyword" | "any_message" | "first_message_of_day" | "tag" | "manual",
+                  valor: (d.valor as string | null) ?? undefined,
+                  tagId: (d.tag_id as string | null) ?? undefined,
+                })),
+              }
+            : {}),
+        },
+      })),
+      (conexiones ?? []).map((c) => ({
+        origen_id: c.origen_id as string,
+        destino_id: c.destino_id as string,
+        salida: (c.salida as string | null) ?? null,
+      }))
+    );
+
+    const errores = avisos.filter((a) => a.nivel === "error");
+    if (errores.length > 0) {
+      return { error: `No se puede activar: ${errores[0].texto}` };
+    }
+  }
+
+  const { error } = await supabase
+    .from("flujos")
+    .update({ activo, updated_at: new Date().toISOString() })
+    .eq("id", flujoId);
+  if (error) return { error: error.message };
+
+  // Al pausar, los contactos que iban a medias se quedan dentro sin que nadie
+  // los mueva: se cierran para que recuperen sus seguimientos y su IA.
+  if (!activo) {
+    await supabase
+      .from("flujo_ejecuciones")
+      .update({ estado: "cancelado", terminado_el: new Date().toISOString() })
+      .eq("flujo_id", flujoId)
+      .in("estado", ["corriendo", "esperando"]);
+  }
+
+  revalidatePath(`/dashboard/flujos/${flujoId}`);
+  revalidatePath("/dashboard/flujos");
+  return { ok: true as const };
+}

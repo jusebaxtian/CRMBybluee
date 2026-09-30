@@ -2,18 +2,20 @@ import { describe, it, expect } from "vitest";
 import { isContactExcludedFromAutomations } from "@/lib/automations/engine";
 
 /**
- * Doble de Supabase para las tres consultas que hace la exclusion:
+ * Doble de Supabase para las cuatro consultas que hace la exclusion:
  *  - conversations.followups_enabled  (maybeSingle)
  *  - contacts.likely_blocked          (maybeSingle)
  *  - contact_tags -> tags(excludes_followups)  (lista, se resuelve al await)
+ *  - flujo_ejecuciones activas del contacto   (maybeSingle, con .in e .limit)
  *
  * La cadena es "thenable" para que `await supabase.from(...).select(...).eq(...)`
  * resuelva sin llamar a maybeSingle, que es como consulta las etiquetas.
  */
 function fakeSupabase(estado: {
   conversacion?: { followups_enabled: boolean } | null;
-  contacto?: { likely_blocked: boolean } | null;
+  contacto?: { likely_blocked: boolean; marketing_opt_out_at?: string | null } | null;
   etiquetas?: { tags: { excludes_followups: boolean } | null }[];
+  enFlujo?: boolean;
 }) {
   return {
     from(tabla: string) {
@@ -27,11 +29,18 @@ function fakeSupabase(estado: {
             ? estado.conversacion ?? null
             : tabla === "contacts"
               ? estado.contacto ?? null
-              : null,
+              : tabla === "flujo_ejecuciones"
+                ? estado.enFlujo
+                  ? { id: "ejecucion-1" }
+                  : null
+                : null,
       };
       const constructor: Record<string, unknown> = {
         select: () => constructor,
         eq: () => constructor,
+        in: () => constructor,
+        limit: () => constructor,
+        is: () => constructor,
         maybeSingle: async () => resultadoUnico,
         then: (resolver: (v: unknown) => unknown) => Promise.resolve(resultadoLista).then(resolver),
       };
@@ -120,6 +129,30 @@ describe("isContactExcludedFromAutomations — el corte que apaga todo", () => {
       conversacion: null,
       contacto: { likely_blocked: false },
       etiquetas: [],
+    });
+    await expect(isContactExcludedFromAutomations(supabase, "c1")).resolves.toBe(false);
+  });
+});
+
+// Flujos manda sobre todo lo demas: mientras el contacto esta dentro de uno,
+// ni automatizaciones ni seguimientos ni IA le escriben encima.
+describe("exclusión mientras el contacto está dentro de un flujo", () => {
+  it("excluye al contacto que va a mitad de un flujo", async () => {
+    const supabase = fakeSupabase({
+      conversacion: { followups_enabled: true },
+      contacto: { likely_blocked: false },
+      etiquetas: [],
+      enFlujo: true,
+    });
+    await expect(isContactExcludedFromAutomations(supabase, "c1")).resolves.toBe(true);
+  });
+
+  it("no lo excluye cuando ya salió del flujo", async () => {
+    const supabase = fakeSupabase({
+      conversacion: { followups_enabled: true },
+      contacto: { likely_blocked: false },
+      etiquetas: [],
+      enFlujo: false,
     });
     await expect(isContactExcludedFromAutomations(supabase, "c1")).resolves.toBe(false);
   });

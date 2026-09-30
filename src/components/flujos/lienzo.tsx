@@ -193,6 +193,7 @@ function Lienzo({
             if (tipo) agregarBloque(tipo, { x: e.clientX, y: e.clientY });
           }}
           fitView
+          proOptions={{ hideAttribution: true }}
         >
           <Background gap={18} size={1} color="var(--border)" />
           <Controls showInteractive={false} />
