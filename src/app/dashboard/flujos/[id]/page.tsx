@@ -103,9 +103,14 @@ export default async function FlujoPage({ params }: { params: Promise<{ id: stri
           >
             <ArrowLeft size={15} /> Volver a Flujos
           </Link>
-          <h1 className="mt-1 truncate font-dash-display text-[22px] font-bold tracking-[-.4px] text-foreground">
-            {flujo.nombre}
-          </h1>
+          <div className="mt-1 flex items-center gap-2">
+            <h1 className="truncate font-dash-display text-[22px] font-bold tracking-[-.4px] text-foreground">
+              {flujo.nombre}
+            </h1>
+            <span className="shrink-0 rounded-[20px] border border-warning/50 bg-warning/10 px-[7px] py-px text-[9.5px] font-bold uppercase tracking-wide text-warning">
+              Beta
+            </span>
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-3">
           <span

@@ -5,20 +5,32 @@ import { usePathname } from "next/navigation";
 import { Megaphone, FileText, Zap, Tag, History, Lock, Workflow } from "lucide-react";
 
 const tabs = [
-  { href: "/dashboard/campaigns", label: "Campañas", icon: Megaphone, moduleKey: "campaigns" },
-  { href: "/dashboard/templates", label: "Plantillas", icon: FileText, moduleKey: "templates" },
-  { href: "/dashboard/automations", label: "Automatizaciones", icon: Zap, moduleKey: "automations" },
-  { href: "/dashboard/flujos", label: "Flujos", icon: Workflow, moduleKey: "flujos" },
-  { href: "/dashboard/followups", label: "Seguimientos", icon: History, moduleKey: "followups" },
-  { href: "/dashboard/tags", label: "Etiquetas", icon: Tag, moduleKey: "tags" },
+  { href: "/dashboard/campaigns", label: "Campañas", icon: Megaphone, moduleKey: "campaigns", beta: false },
+  { href: "/dashboard/templates", label: "Plantillas", icon: FileText, moduleKey: "templates", beta: false },
+  { href: "/dashboard/automations", label: "Automatizaciones", icon: Zap, moduleKey: "automations", beta: false },
+  // Flujos sigue en beta: el lienzo y el motor estan, pero el modulo es
+  // reciente y conviene que el cliente lo sepa antes de montar su operacion
+  // encima.
+  { href: "/dashboard/flujos", label: "Flujos", icon: Workflow, moduleKey: "flujos", beta: true },
+  { href: "/dashboard/followups", label: "Seguimientos", icon: History, moduleKey: "followups", beta: false },
+  { href: "/dashboard/tags", label: "Etiquetas", icon: Tag, moduleKey: "tags", beta: false },
 ];
+
+/** Distintivo de beta, del mismo tamaño que el de "Pronto" del menu. */
+function Beta() {
+  return (
+    <span className="rounded-[20px] border border-warning/50 bg-warning/10 px-[6px] py-px text-[9.5px] font-bold uppercase tracking-wide text-warning">
+      Beta
+    </span>
+  );
+}
 
 export function CampaignsTabs({ enabledModules }: { enabledModules?: string[] }) {
   const pathname = usePathname();
 
   return (
     <div className="mb-2 flex gap-1 border-b border-border">
-      {tabs.map(({ href, label, icon: Icon, moduleKey }) => {
+      {tabs.map(({ href, label, icon: Icon, moduleKey, beta }) => {
         const locked = enabledModules !== undefined && !enabledModules.includes(moduleKey);
         if (locked) {
           return (
@@ -46,6 +58,7 @@ export function CampaignsTabs({ enabledModules }: { enabledModules?: string[] })
           >
             <Icon size={14} />
             {label}
+            {beta && <Beta />}
           </Link>
         );
       })}

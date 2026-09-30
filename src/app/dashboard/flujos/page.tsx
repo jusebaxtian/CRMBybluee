@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Workflow } from "lucide-react";
+import { FlaskConical, Workflow } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
@@ -18,6 +18,15 @@ export default async function FlujosPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="flex items-start gap-2.5 rounded-[11px] border border-warning/40 bg-warning/10 px-3.5 py-2.5">
+        <FlaskConical size={15} className="mt-0.5 shrink-0 text-warning" />
+        <p className="text-[12.5px] leading-relaxed text-foreground">
+          <span className="font-semibold text-warning">Estamos en BETA.</span> Flujos es nuevo y lo estamos
+          puliendo: puede cambiar de aquí a poco y algo puede fallar. Pruébalo con confianza, pero antes de
+          montar encima toda tu operación, déjalo corriendo unos días y cuéntanos qué tal te fue.
+        </p>
+      </div>
+
       <div className="flex items-start justify-between gap-4">
         <p className="max-w-2xl text-sm text-muted">
           Arma la conversación en un lienzo: un mensaje con botones, qué pasa con cada respuesta, cuánto esperar
