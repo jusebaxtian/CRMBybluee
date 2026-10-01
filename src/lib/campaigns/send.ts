@@ -11,6 +11,7 @@ import { abrirConversacion } from "@/lib/whatsapp/conversacion";
 import { isWindowOpen } from "@/lib/whatsapp/message-window";
 import { recordOutboundMessage } from "@/lib/messaging/record";
 import { noSePuedeUsar, motivoDelExceso } from "@/lib/whatsapp/limite-plantilla";
+import { nombreDeDocumento } from "@/lib/whatsapp/nombre-archivo";
 
 // media_filename doesn't carry a mime type — infer a close-enough one from
 // its extension just to pick the right WhatsApp media kind (image/video/
@@ -231,7 +232,11 @@ async function runCampaignSendLoop(
   );
 
   let failures = 0;
-  const mediaKind = campaign.media_url ? mediaKindFromMime(guessMimeFromFilename(campaign.media_filename)) : null;
+  // El tipo sale del nombre del archivo; si la campaña no guardo nombre, del
+  // que conserva la URL. Sin este respaldo una campaña con adjunto y sin
+  // nombre guardado no mandaba el adjunto en absoluto.
+  const nombreAdjunto = nombreDeDocumento(campaign.media_filename, campaign.media_url) ?? null;
+  const mediaKind = campaign.media_url ? mediaKindFromMime(guessMimeFromFilename(nombreAdjunto)) : null;
 
   // Sending by { link } makes Meta re-fetch the file over HTTP for EVERY
   // recipient — with dozens of recipients that's dozens of independent
@@ -253,7 +258,7 @@ async function runCampaignSendLoop(
         account.access_token,
         buffer,
         mimeType,
-        campaign.media_filename ?? "archivo"
+        nombreAdjunto ?? "archivo"
       );
     } catch (err) {
       console.error(`campaign ${campaignId}: media pre-upload failed, falling back to link:`, err);
@@ -438,7 +443,7 @@ async function runCampaignSendLoop(
             waId,
             mediaKind,
             mediaId ? { id: mediaId } : { link: campaign.media_url },
-            campaign.media_filename ?? undefined,
+            nombreAdjunto ?? undefined,
             mediaKind !== "audio" ? personalizedBody ?? undefined : undefined
           );
         } else {

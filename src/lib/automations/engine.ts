@@ -13,6 +13,7 @@ import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { abrirConversacion } from "@/lib/whatsapp/conversacion";
 import { recordOutboundMessage } from "@/lib/messaging/record";
 import { contactoEnFlujo } from "@/lib/flujos/motor";
+import { nombreDeDocumento } from "@/lib/whatsapp/nombre-archivo";
 
 export type Automation = {
   id: string;
@@ -243,7 +244,7 @@ export async function executeAction(
         account.access_token,
         buffer,
         mimeType,
-        action.media_filename ?? "archivo"
+        nombreDeDocumento(action.media_filename, action.media_url) ?? "archivo"
       );
       source = { id: mediaId };
     } catch (err) {
@@ -256,7 +257,7 @@ export async function executeAction(
       contact.wa_id,
       mediaType,
       source,
-      action.media_filename ?? undefined,
+      nombreDeDocumento(action.media_filename, action.media_url),
       mediaType !== "audio" ? action.message_body ?? undefined : undefined
     );
 
@@ -264,7 +265,7 @@ export async function executeAction(
       await recordOutboundMessage(supabase, {
         conversationId,
         messageType: mediaType,
-        body: mediaType === "document" ? action.media_filename : action.message_body,
+        body: mediaType === "document" ? nombreDeDocumento(action.media_filename, action.media_url) ?? null : action.message_body,
         mediaUrl: action.media_url,
         waMessageId: result.messages[0]?.id,
         viaAutomationId: automation.id,

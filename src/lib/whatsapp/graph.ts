@@ -1,4 +1,5 @@
 import { traducirErrorMeta } from "@/lib/whatsapp/errores";
+import { nombreDeArchivoDeUrl } from "@/lib/whatsapp/nombre-archivo";
 
 const GRAPH_VERSION = "v21.0";
 const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`;
@@ -438,7 +439,12 @@ export async function sendMediaMessage(
   caption?: string
 ): Promise<{ messages: { id: string }[] }> {
   const mediaObject: Record<string, unknown> = { ...source };
-  if (type === "document" && filename) mediaObject.filename = filename;
+  if (type === "document") {
+    // Sin `filename` WhatsApp muestra el documento como "Sin titulo". Cuando
+    // no viene guardado, el nombre sale de la URL de subida, que lo conserva.
+    const nombre = filename ?? ("link" in source ? nombreDeArchivoDeUrl(source.link) ?? undefined : undefined);
+    if (nombre) mediaObject.filename = nombre;
+  }
   // Audio messages don't support captions in the Cloud API.
   if (type !== "audio" && caption) mediaObject.caption = caption;
 
@@ -479,7 +485,7 @@ export async function sendTemplateMessage(
   templateName: string,
   language: string,
   bodyParams?: string[],
-  headerMedia?: { type: "image" | "video" | "document"; link: string },
+  headerMedia?: { type: "image" | "video" | "document"; link: string; filename?: string },
   // Fills the one {{1}} a URL button's link is allowed to carry — e.g. the
   // contact's name appended to a tracking link. Index must match the
   // button's position among the template's URL/QUICK_REPLY buttons.
@@ -489,9 +495,16 @@ export async function sendTemplateMessage(
   const components: Record<string, unknown>[] = [];
 
   if (headerMedia) {
+    // Un encabezado de documento tambien necesita su nombre: sin el, la
+    // plantilla llega con el PDF "Sin titulo" aunque el archivo tenga nombre.
+    const contenido: Record<string, unknown> = { link: headerMedia.link };
+    if (headerMedia.type === "document") {
+      const nombre = headerMedia.filename ?? nombreDeArchivoDeUrl(headerMedia.link);
+      if (nombre) contenido.filename = nombre;
+    }
     components.push({
       type: "header",
-      parameters: [{ type: headerMedia.type, [headerMedia.type]: { link: headerMedia.link } }],
+      parameters: [{ type: headerMedia.type, [headerMedia.type]: contenido }],
     });
   }
   if (bodyParams && bodyParams.length > 0) {
