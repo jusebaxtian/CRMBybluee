@@ -18,6 +18,7 @@ type ExistingAutomation = {
   name: string;
   trigger_type: TriggerType;
   trigger_tag_id: string | null;
+  trigger_tag_ids?: string[] | null;
   trigger_keyword: string | null;
   whatsapp_account_id?: string | null;
   actions: InitialAction[];
@@ -43,6 +44,15 @@ export function NewAutomationForm({
     undefined
   );
   const [triggerType, setTriggerType] = useState<TriggerType>(automation?.trigger_type ?? "tag_added");
+  // Las etiquetas que disparan la automatizacion. Las de antes traian una
+  // sola en trigger_tag_id; se usa esa para no perderla al editar.
+  const [etiquetasElegidas, setEtiquetasElegidas] = useState<string[]>(
+    automation?.trigger_tag_ids?.length
+      ? automation.trigger_tag_ids
+      : automation?.trigger_tag_id
+        ? [automation.trigger_tag_id]
+        : []
+  );
   const [uploading, setUploading] = useState(false);
   const [lineaId, setLineaId] = useState(automation?.whatsapp_account_id ?? "");
   const plantillas = plantillasParaLinea(templates, lineas, lineaId);
@@ -89,19 +99,48 @@ export function NewAutomationForm({
         </select>
 
         {triggerType === "tag_added" ? (
-          <select
-            name="triggerTagId"
-            required
-            defaultValue={automation?.trigger_tag_id ?? ""}
-            className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
-          >
-            {tags.length === 0 && <option value="">No tienes etiquetas creadas</option>}
-            {tags.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
+          <div>
+            {/* Varias etiquetas: la automatizacion arranca con cualquiera de
+                ellas. Antes era una sola y para dos habia que duplicar la
+                automatizacion entera y mantener las dos a mano. */}
+            <input type="hidden" name="triggerTagIds" value={etiquetasElegidas.join(",")} />
+            <div className="flex flex-wrap gap-1.5">
+              {tags.length === 0 && (
+                <span className="text-[12.5px] text-muted">No tienes etiquetas creadas.</span>
+              )}
+              {tags.map((t) => {
+                const elegida = etiquetasElegidas.includes(t.id);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() =>
+                      setEtiquetasElegidas(
+                        elegida
+                          ? etiquetasElegidas.filter((id) => id !== t.id)
+                          : [...etiquetasElegidas, t.id]
+                      )
+                    }
+                    className={`rounded-full border px-2.5 py-1 text-[12.5px] transition-colors ${
+                      elegida
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border text-muted hover:text-foreground"
+                    }`}
+                  >
+                    {elegida && "✓ "}
+                    {t.name}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
+              {etiquetasElegidas.length === 0
+                ? "Elige al menos una etiqueta."
+                : etiquetasElegidas.length === 1
+                  ? "Arranca cuando se le ponga esa etiqueta."
+                  : `Arranca cuando se le ponga cualquiera de las ${etiquetasElegidas.length}.`}
+            </p>
+          </div>
         ) : triggerType === "button_tap" ? (
           <div>
             <input

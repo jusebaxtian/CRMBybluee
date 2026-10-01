@@ -18,7 +18,7 @@ export default async function EditAutomationPage({
 
   const { data: automation } = await supabase
     .from("automations")
-    .select("id, name, trigger_type, trigger_tag_id, trigger_keyword, whatsapp_account_id")
+    .select("id, name, trigger_type, trigger_tag_id, trigger_tag_ids, trigger_keyword, whatsapp_account_id")
     .eq("id", id)
     .eq("workspace_id", workspaceId ?? "")
     .maybeSingle();
@@ -87,6 +87,7 @@ export default async function EditAutomationPage({
               | "any_message"
               | "first_message_of_day",
             trigger_tag_id: automation.trigger_tag_id,
+            trigger_tag_ids: automation.trigger_tag_ids,
             trigger_keyword: automation.trigger_keyword,
             actions: actions ?? [],
           }}

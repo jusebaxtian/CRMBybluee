@@ -169,7 +169,9 @@ export default async function ConversationPage({
           .select("id, name, is_active")
           .eq("workspace_id", workspaceId ?? "")
           .eq("trigger_type", "tag_added")
-          .in("trigger_tag_id", assignedTagIds)
+          // Una automatizacion puede escuchar varias etiquetas: aqui interesa
+          // si alguna de las suyas coincide con alguna del contacto.
+          .overlaps("trigger_tag_ids", assignedTagIds)
       : Promise.resolve({ data: [] as { id: string; name: string; is_active: boolean }[] }),
     hasUnread
       ? supabase

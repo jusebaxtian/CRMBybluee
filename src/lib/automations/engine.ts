@@ -507,7 +507,10 @@ export async function runTagAddedAutomations(
     .select("id, workspace_id, whatsapp_account_id")
     .eq("workspace_id", workspaceId)
     .eq("trigger_type", "tag_added")
-    .eq("trigger_tag_id", tagId)
+    // Una automatizacion puede escuchar varias etiquetas: arranca con
+    // cualquiera de ellas. `contains` es la busqueda en el arreglo, con el
+    // indice GIN de la migracion 0128 detras.
+    .contains("trigger_tag_ids", [tagId])
     .eq("is_active", true);
   // Sin mensaje que diga por donde entro, cuenta la linea del hilo mas reciente.
   const conLinea = (todas ?? []).some((a) => a.whatsapp_account_id);

@@ -92,7 +92,13 @@ export async function createAutomation(_prevState: unknown, formData: FormData) 
     | "button_tap"
     | "any_message"
     | "first_message_of_day";
-  const triggerTagId = String(formData.get("triggerTagId") ?? "") || null;
+  // La forma nueva manda varias separadas por coma; se acepta la vieja --un
+  // solo id-- para no romper nada que siga enviandola.
+  const triggerTagIds = String(formData.get("triggerTagIds") ?? "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+  const triggerTagId = triggerTagIds[0] ?? (String(formData.get("triggerTagId") ?? "") || null);
   const triggerKeyword = String(formData.get("triggerKeyword") ?? "").trim() || null;
   const whatsappAccountId = String(formData.get("whatsappAccountId") ?? "").trim() || null;
   const actionsJson = String(formData.get("actionsJson") ?? "[]");
@@ -161,6 +167,8 @@ export async function createAutomation(_prevState: unknown, formData: FormData) 
       name,
       trigger_type: triggerType,
       trigger_tag_id: triggerType === "tag_added" ? triggerTagId : null,
+      trigger_tag_ids:
+        triggerType === "tag_added" ? (triggerTagIds.length > 0 ? triggerTagIds : [triggerTagId]) : null,
       trigger_keyword: triggerType === "keyword" || triggerType === "button_tap" ? triggerKeyword : null,
       whatsapp_account_id: whatsappAccountId,
       is_active: !aiAgent?.is_active,
@@ -194,7 +202,13 @@ export async function updateAutomation(_prevState: unknown, formData: FormData) 
     | "button_tap"
     | "any_message"
     | "first_message_of_day";
-  const triggerTagId = String(formData.get("triggerTagId") ?? "") || null;
+  // La forma nueva manda varias separadas por coma; se acepta la vieja --un
+  // solo id-- para no romper nada que siga enviandola.
+  const triggerTagIds = String(formData.get("triggerTagIds") ?? "")
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+  const triggerTagId = triggerTagIds[0] ?? (String(formData.get("triggerTagId") ?? "") || null);
   const triggerKeyword = String(formData.get("triggerKeyword") ?? "").trim() || null;
   const whatsappAccountId = String(formData.get("whatsappAccountId") ?? "").trim() || null;
   const actionsJson = String(formData.get("actionsJson") ?? "[]");
@@ -249,6 +263,8 @@ export async function updateAutomation(_prevState: unknown, formData: FormData) 
       name,
       trigger_type: triggerType,
       trigger_tag_id: triggerType === "tag_added" ? triggerTagId : null,
+      trigger_tag_ids:
+        triggerType === "tag_added" ? (triggerTagIds.length > 0 ? triggerTagIds : [triggerTagId]) : null,
       trigger_keyword: triggerType === "keyword" || triggerType === "button_tap" ? triggerKeyword : null,
       whatsapp_account_id: whatsappAccountId,
     })
