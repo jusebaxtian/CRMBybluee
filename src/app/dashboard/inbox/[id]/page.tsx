@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ContactTagPicker } from "@/components/tags/contact-tag-picker";
 import { MeterEnFlujo } from "@/components/flujos/meter-en-flujo";
 import { BloquearContacto } from "@/components/contacts/bloquear-contacto";
+import { EnviarCodigoAcceso } from "@/components/contacts/enviar-codigo-acceso";
 import { NotesEditor } from "@/components/inbox/notes-editor";
 import { ChatPane } from "@/components/inbox/chat-pane";
 import { RealtimeRefresh } from "@/components/ui/realtime-refresh";
@@ -381,6 +382,16 @@ export default async function ConversationPage({
             <p className="text-[11px] leading-relaxed text-muted">
               Mete a este contacto a un flujo. Mientras esté dentro, las automatizaciones y el agente de IA no
               le responden.
+            </p>
+          </div>
+        )}
+
+        {esAdmin && (
+          <div className="mt-6">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Acceso del cliente</p>
+            <EnviarCodigoAcceso contactId={conversation.contact_id} conversationId={conversation.id} />
+            <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
+              Para cuando el cliente perdió su contraseña. Solo funciona si te escribió en las últimas 24 horas.
             </p>
           </div>
         )}

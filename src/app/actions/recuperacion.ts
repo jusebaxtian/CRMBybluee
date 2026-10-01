@@ -5,7 +5,9 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { isPlatformAdmin } from "@/lib/admin";
-import { createAuthenticationTemplate, sendAuthenticationCode } from "@/lib/whatsapp/graph";
+import { createAuthenticationTemplate, sendAuthenticationCode, sendTextMessage } from "@/lib/whatsapp/graph";
+import { recordOutboundMessage } from "@/lib/messaging/record";
+import { resolveSendAccount } from "@/lib/whatsapp/account";
 import {
   ENVIOS_POR_HORA,
   INTENTOS_MAXIMOS,
@@ -402,4 +404,111 @@ export async function crearPlantillaDeRecuperacion(whatsappAccountId: string, no
 
   revalidatePath("/admin/whatsapp");
   return { success: true as const };
+}
+
+/**
+ * Enviarle el código de acceso al cliente por el chat abierto.
+ *
+ * La vía que funciona hoy: Meta no deja mandar un código por plantilla --la
+ * de Authentication exige verificación del negocio, y una Utility con un
+ * código la rechaza por categoría incorrecta (comprobado el 1 oct 2026)--.
+ * Pero cuando el cliente escribe a soporte, esa conversación queda abierta 24
+ * horas y dentro de ella se puede mandar texto libre sin plantilla.
+ *
+ * El mensaje va guiado paso a paso: alguien que perdió el acceso no tiene por
+ * qué adivinar a dónde entrar ni con qué correo.
+ */
+export async function enviarCodigoPorElChat(contactId: string, conversationId: string) {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
+
+  const admin = createAdminClient();
+
+  const { data: contacto } = await admin
+    .from("contacts")
+    .select("id, wa_id, name")
+    .eq("id", contactId)
+    .maybeSingle();
+  if (!contacto) return { error: "Contacto no encontrado." };
+
+  const numero = soloDigitos(contacto.wa_id as string);
+  if (!numero) return { error: "Este contacto tiene el número oculto: no se puede identificar su cuenta." };
+
+  // ¿De quién es este número? Se busca el espacio registrado con él, que es
+  // como se identifica al dueño de una cuenta.
+  const { data: espacio } = await admin
+    .from("workspaces")
+    .select("id, name, phone_e164, phone")
+    .or(`phone_e164.eq.+${numero},phone.eq.${numero}`)
+    .maybeSingle();
+  if (!espacio) {
+    return { error: "Ningún espacio está registrado con este número, así que no sé de qué cuenta es." };
+  }
+
+  const { data: dueño } = await admin
+    .from("workspace_members")
+    .select("user_id")
+    .eq("workspace_id", espacio.id)
+    .eq("role", "owner")
+    .maybeSingle();
+  if (!dueño) return { error: "Ese espacio no tiene dueño registrado." };
+
+  const { data: usuario } = await admin.auth.admin.getUserById(dueño.user_id as string);
+  const correo = usuario?.user?.email;
+  if (!correo) return { error: "No se pudo leer el correo de esa cuenta." };
+
+  // La línea por la que está abierta la conversación: el código tiene que
+  // salir por donde el cliente escribió, no por otra.
+  const { data: conversacion } = await admin
+    .from("conversations")
+    .select("whatsapp_account_id")
+    .eq("id", conversationId)
+    .maybeSingle();
+
+  const cuenta = await resolveSendAccount(admin, espacio.id, conversacion?.whatsapp_account_id ?? null);
+  if (!cuenta) return { error: "No hay línea de WhatsApp disponible para enviar." };
+
+  const codigo = generarCodigo();
+  const { error: errorInsert } = await admin.from("password_reset_codes").insert({
+    workspace_id: espacio.id,
+    user_id: dueño.user_id,
+    phone_e164: `+${numero}`,
+    code_hash: hashDe(codigo),
+    expires_at: new Date(Date.now() + MINUTOS_DE_VIDA * 60_000).toISOString(),
+  });
+  if (errorInsert) return { error: "No se pudo generar el código. Intenta de nuevo." };
+
+  const texto = [
+    "🔐 *Recuperar tu acceso a Bybluee*",
+    "",
+    "Sigue estos 3 pasos:",
+    "",
+    "*1.* Entra a: https://crmbybluee.blue/recuperar",
+    '*2.* Toca "Ya tengo un código"',
+    `*3.* Escribe tu correo *${correo}* y este código:`,
+    "",
+    `*${codigo}*`,
+    "",
+    `Después podrás crear tu contraseña nueva. El código vence en ${MINUTOS_DE_VIDA} minutos.`,
+    "",
+    "Si no pediste esto, ignora el mensaje y no compartas el código con nadie.",
+  ].join("\n");
+
+  try {
+    const enviado = await sendTextMessage(cuenta.phone_number_id, cuenta.access_token, numero, texto);
+    await recordOutboundMessage(admin, {
+      conversationId,
+      messageType: "text",
+      body: texto,
+      waMessageId: enviado.messages[0]?.id,
+      sentBySupport: true,
+      // Que no cuente para disparar seguimientos: es una gestión de soporte.
+      excludeFromFollowups: true,
+    });
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "No se pudo enviar el mensaje." };
+  }
+
+  revalidatePath(`/dashboard/inbox/${conversationId}`);
+  return { ok: true as const, correo };
 }

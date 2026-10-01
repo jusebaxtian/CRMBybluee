@@ -32,6 +32,11 @@ export default function RecuperarPage() {
           setCorreo(email);
           setPaso("codigo");
         }}
+        // Quien ya recibio su codigo por el chat de soporte entra directo a
+        // escribirlo: pedirle que lo solicite otra vez lo mandaria a un
+        // callejon sin salida, porque hoy el envio automatico no funciona
+        // (Meta exige verificacion del negocio para las plantillas de codigo).
+        onYaTengoCodigo={() => setPaso("codigo")}
       />
     );
   }
@@ -67,7 +72,13 @@ export default function RecuperarPage() {
   );
 }
 
-function PasoCorreo({ onEnviado }: { onEnviado: (telefono: string, correo: string) => void }) {
+function PasoCorreo({
+  onEnviado,
+  onYaTengoCodigo,
+}: {
+  onEnviado: (telefono: string, correo: string) => void;
+  onYaTengoCodigo: () => void;
+}) {
   const [state, action, pending] = useActionState<RecuperacionState, FormData>(
     async (prev, formData) => {
       const resultado = await solicitarCodigo(prev, formData);
@@ -109,6 +120,13 @@ function PasoCorreo({ onEnviado }: { onEnviado: (telefono: string, correo: strin
         <BotonEnviar cargando={pending} textoCargando="Enviando código...">
           Enviarme el código
         </BotonEnviar>
+        <button
+          type="button"
+          onClick={onYaTengoCodigo}
+          className="text-[13px] font-medium text-primary hover:underline"
+        >
+          Ya tengo un código
+        </button>
       </form>
     </AuthShell>
   );
@@ -137,7 +155,11 @@ function PasoCodigo({
   return (
     <AuthShell
       titulo="Escribe el código"
-      descripcion={`Te enviamos un código de 6 dígitos por WhatsApp al ${telefono || "número registrado"}. Vence en 10 minutos.`}
+      descripcion={
+        telefono
+          ? `Te enviamos un código de 6 dígitos por WhatsApp al ${telefono}. Vence en 10 minutos.`
+          : "Escribe el correo de tu cuenta y el código de 6 dígitos que te enviamos por WhatsApp."
+      }
       pie={
         <button type="button" onClick={onVolver} className="font-semibold text-primary hover:underline">
           Usar otro correo
@@ -145,7 +167,19 @@ function PasoCodigo({
       }
     >
       <form action={action} noValidate className="flex flex-col gap-4">
-        <input type="hidden" name="email" value={correo} />
+        {correo ? (
+          <input type="hidden" name="email" value={correo} />
+        ) : (
+          <Campo
+            etiqueta="Correo electrónico"
+            name="email"
+            type="email"
+            autoComplete="email"
+            placeholder="tu@empresa.com"
+            error={state?.errores?.email}
+            disabled={pending}
+          />
+        )}
         <Campo
           etiqueta="Código"
           name="codigo"
