@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildTemplateSendParams } from "@/lib/whatsapp/variables";
-import { ajustarVariables, cuantasVariables, normalizarValor, valorDeContacto } from "@/lib/contactos/campos";
+import { ajustarVariables, cuantasVariables, normalizarValor, valorDeContacto } from "@/lib/contactos/variables";
 
 /**
  * El caso real que pidió esto: "Hola {{1}}, tienes una cita para el {{2}} a
@@ -10,9 +10,9 @@ import { ajustarVariables, cuantasVariables, normalizarValor, valorDeContacto } 
 const contacto = {
   name: "Felipe",
   wa_id: "573001112233",
-  campo1: "23 de octubre",
-  campo2: "8:00 p. m.",
-  campo3: null,
+  variable2: "23 de octubre",
+  variable3: "8:00 p. m.",
+  variable4: null,
 };
 
 describe("emparejar variables con datos del contacto", () => {
@@ -20,7 +20,7 @@ describe("emparejar variables con datos del contacto", () => {
     const r = buildTemplateSendParams(
       {
         variable_count: 3,
-        variables_origen: [{ origen: "nombre" }, { origen: "campo1" }, { origen: "campo2" }],
+        variables_origen: [{ origen: "nombre" }, { origen: "variable2" }, { origen: "variable3" }],
       },
       contacto
     );
@@ -30,10 +30,10 @@ describe("emparejar variables con datos del contacto", () => {
 
   it("avisa qué dato le falta al contacto en vez de mandar el mensaje a medias", () => {
     const r = buildTemplateSendParams(
-      { variable_count: 2, variables_origen: [{ origen: "nombre" }, { origen: "campo3" }] },
+      { variable_count: 2, variables_origen: [{ origen: "nombre" }, { origen: "variable4" }] },
       contacto
     );
-    expect(r.faltan).toEqual(["campo3"]);
+    expect(r.faltan).toEqual(["variable4"]);
   });
 
   it("las plantillas viejas siguen funcionando igual que siempre", () => {
@@ -50,7 +50,7 @@ describe("emparejar variables con datos del contacto", () => {
 
   it("usa el nombre genérico cuando el contacto no tiene nombre usable", () => {
     const r = buildTemplateSendParams(
-      { variable_count: 2, variables_origen: [{ origen: "nombre" }, { origen: "campo1" }] },
+      { variable_count: 2, variables_origen: [{ origen: "nombre" }, { origen: "variable2" }] },
       { ...contacto, name: "👋" }
     );
     expect(r.bodyParams?.[0]).toBe("que tal");
@@ -59,8 +59,8 @@ describe("emparejar variables con datos del contacto", () => {
 
   it("aplana los saltos de línea del dato, que Meta rechaza", () => {
     const r = buildTemplateSendParams(
-      { variable_count: 1, variables_origen: [{ origen: "campo1" }] },
-      { ...contacto, campo1: "23 de\n\noctubre" }
+      { variable_count: 1, variables_origen: [{ origen: "variable2" }] },
+      { ...contacto, variable2: "23 de\n\noctubre" }
     );
     expect(r.bodyParams).toEqual(["23 de octubre"]);
   });
@@ -82,7 +82,7 @@ describe("ajustar el emparejamiento al editar el texto", () => {
   });
 
   it("recorta si el texto quedó con menos variables", () => {
-    const actual = ajustarVariables([{ origen: "nombre" }, { origen: "campo1" }, { origen: "campo2" }], 1);
+    const actual = ajustarVariables([{ origen: "nombre" }, { origen: "variable2" }, { origen: "variable3" }], 1);
     expect(actual).toEqual([{ origen: "nombre" }]);
   });
 });
@@ -112,7 +112,7 @@ describe("validación al importar", () => {
 
 describe("leer el valor del contacto", () => {
   it("devuelve null cuando está vacío, para poder avisar", () => {
-    expect(valorDeContacto("campo3", contacto)).toBeNull();
-    expect(valorDeContacto("campo1", contacto)).toBe("23 de octubre");
+    expect(valorDeContacto("variable4", contacto)).toBeNull();
+    expect(valorDeContacto("variable2", contacto)).toBe("23 de octubre");
   });
 });

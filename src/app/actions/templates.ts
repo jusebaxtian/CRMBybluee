@@ -16,7 +16,7 @@ import { requireWorkspace } from "@/lib/auth/with-workspace";
 import { CATEGORIA_PLANTILLA_POR_DEFECTO } from "@/lib/templates/defaults";
 import { wabasDelEspacio } from "@/lib/whatsapp/wabas";
 import { noSePuedeUsar, motivoDelExceso } from "@/lib/whatsapp/limite-plantilla";
-import { cuantasVariables, type VariableDePlantilla } from "@/lib/contactos/campos";
+import { cuantasVariables, type VariableDePlantilla } from "@/lib/contactos/variables";
 
 export async function syncTemplates() {
   const ctx = await requireWorkspace();

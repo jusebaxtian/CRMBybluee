@@ -6,14 +6,14 @@ import { createClient } from "@/lib/supabase/server";
 import { maybeTrackPurchaseFromTag } from "@/lib/meta/conversions";
 import { normalizeWaId } from "@/lib/phone";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
-import { normalizarValor, type TipoCampo } from "@/lib/contactos/campos";
+import { normalizarValor, type TipoVariable } from "@/lib/contactos/variables";
 
 type ImportRow = {
   phone: string;
   name: string | null;
   tagNames: string[];
-  /** Las tres columnas propias del espacio, por indice: 1, 2 y 3. */
-  campos: (string | null)[];
+  /** Las variables propias del espacio, en orden: 2, 3 y 4. */
+  valores: (string | null)[];
 };
 
 function normalizeHeader(h: string): string {
@@ -41,10 +41,10 @@ function matchColumn(headers: string[], candidates: string[]): number {
  * ejemplo. Asi funciona tanto si el cliente descarga la plantilla como si
  * arma el archivo a su manera.
  */
-function indicesDeCampos(headers: string[], nombres: string[]): number[] {
+function indicesDeVariables(headers: string[], nombres: string[]): number[] {
   return [0, 1, 2].map((i) => {
     const propio = normalizeHeader(nombres[i] ?? "");
-    const candidatos = [propio, `columna ${i + 1}`, `campo ${i + 1}`].filter(Boolean);
+    const candidatos = [propio, `variable ${i + 2}`, `columna ${i + 2}`].filter(Boolean);
     return matchColumn(headers, candidatos);
   });
 }
@@ -57,7 +57,7 @@ function parseTagNames(value: unknown): string[] {
     .filter(Boolean);
 }
 
-function rowsFromCsv(text: string, nombresDeCampos: string[]): ImportRow[] {
+function rowsFromCsv(text: string, nombresDeVariables: string[]): ImportRow[] {
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length === 0) return [];
 
@@ -66,9 +66,9 @@ function rowsFromCsv(text: string, nombresDeCampos: string[]): ImportRow[] {
   const nameIdx = matchColumn(headers, ["nombre", "name"]);
   const tagsIdx = matchColumn(headers, ["etiquetas", "tags", "etiqueta"]);
   // Las columnas propias se buscan por el nombre que el espacio les puso
-  // (pasado en `nombresDeCampos`) y tambien por "columna 1/2/3", que es como
+  // (pasado en `nombresDeVariables`) y tambien por "columna 1/2/3", que es como
   // salen en la plantilla de ejemplo.
-  const camposIdx = indicesDeCampos(headers, nombresDeCampos);
+  const variablesIdx = indicesDeVariables(headers, nombresDeVariables);
 
   const hasHeader = phoneIdx !== -1 || nameIdx !== -1 || tagsIdx !== -1;
   const dataLines = hasHeader ? lines.slice(1) : lines;
@@ -81,12 +81,12 @@ function rowsFromCsv(text: string, nombresDeCampos: string[]): ImportRow[] {
       phone: cols[effectivePhoneIdx] ?? "",
       name: cols[effectiveNameIdx] || null,
       tagNames: tagsIdx !== -1 ? parseTagNames(cols[tagsIdx]) : [],
-      campos: camposIdx.map((idx) => (idx === -1 ? null : cols[idx] || null)),
+      valores: variablesIdx.map((idx) => (idx === -1 ? null : cols[idx] || null)),
     };
   });
 }
 
-async function rowsFromExcel(buffer: ArrayBuffer, nombresDeCampos: string[]): Promise<ImportRow[]> {
+async function rowsFromExcel(buffer: ArrayBuffer, nombresDeVariables: string[]): Promise<ImportRow[]> {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer);
   const sheet = workbook.worksheets[0];
@@ -101,7 +101,7 @@ async function rowsFromExcel(buffer: ArrayBuffer, nombresDeCampos: string[]): Pr
   const phoneIdx = matchColumn(headers, ["celular", "telefono", "phone", "numero"]);
   const nameIdx = matchColumn(headers, ["nombre", "name"]);
   const tagsIdx = matchColumn(headers, ["etiquetas", "tags", "etiqueta"]);
-  const camposIdx = indicesDeCampos(headers, nombresDeCampos);
+  const variablesIdx = indicesDeVariables(headers, nombresDeVariables);
 
   if (phoneIdx === -1) return [];
 
@@ -119,7 +119,7 @@ async function rowsFromExcel(buffer: ArrayBuffer, nombresDeCampos: string[]): Pr
       phone,
       name: nameCell ? String(nameCell).trim() || null : null,
       tagNames: parseTagNames(tagsCell),
-      campos: camposIdx.map((idx) => {
+      valores: variablesIdx.map((idx) => {
         if (idx === -1) return null;
         const celda = row.getCell(idx + 1).value;
         if (celda == null) return null;
@@ -144,22 +144,22 @@ export async function importContactsFile(formData: FormData) {
 
   // Como se llaman las tres columnas propias en este espacio: es lo que se
   // busca en los encabezados del archivo.
-  const { data: camposDelEspacio } = await supabase
-    .from("campos_personalizados")
+  const { data: propiasDelEspacio } = await supabase
+    .from("variables_personalizadas")
     .select("indice, nombre, tipo")
     .eq("workspace_id", workspaceId)
     .order("indice");
-  const nombresDeCampos = [1, 2, 3].map(
-    (i) => (camposDelEspacio ?? []).find((c) => c.indice === i)?.nombre ?? ""
+  const nombresDeVariables = [2, 3, 4].map(
+    (i) => (propiasDelEspacio ?? []).find((v) => v.indice === i)?.nombre ?? ""
   );
-  const tiposDeCampos = [1, 2, 3].map(
-    (i) => ((camposDelEspacio ?? []).find((c) => c.indice === i)?.tipo ?? "texto") as TipoCampo
+  const tiposDeVariables = [2, 3, 4].map(
+    (i) => ((propiasDelEspacio ?? []).find((v) => v.indice === i)?.tipo ?? "texto") as TipoVariable
   );
 
   const isExcel = file.name.toLowerCase().endsWith(".xlsx");
   const rawRows = isExcel
-    ? await rowsFromExcel(await file.arrayBuffer(), nombresDeCampos)
-    : rowsFromCsv(await file.text(), nombresDeCampos);
+    ? await rowsFromExcel(await file.arrayBuffer(), nombresDeVariables)
+    : rowsFromCsv(await file.text(), nombresDeVariables);
 
   const invalidCount = rawRows.length === 0 ? 0 : rawRows.filter((r) => !normalizeWaId(r.phone)).length;
 
@@ -187,17 +187,17 @@ export async function importContactsFile(formData: FormData) {
   // cada columna. Una celda vacia no borra lo que el contacto ya tenia: quien
   // sube media base no deberia perder el resto.
   const valoresDe = (r: ImportRow) => {
-    const campos: Record<string, string> = {};
-    r.campos.forEach((valor, i) => {
+    const valores: Record<string, string> = {};
+    r.valores.forEach((valor, i) => {
       if (valor == null || valor === "") return;
-      const revisado = normalizarValor(valor, tiposDeCampos[i]);
+      const revisado = normalizarValor(valor, tiposDeVariables[i]);
       if (!revisado.ok) {
         rechazados.push(`${r.phone}: ${revisado.motivo}`);
         return;
       }
-      if (revisado.valor) campos[`campo${i + 1}`] = revisado.valor;
+      if (revisado.valor) valores[`variable${i + 2}`] = revisado.valor;
     });
-    return campos;
+    return valores;
   };
 
   const rechazados: string[] = [];
@@ -436,15 +436,15 @@ export async function resetContactBlockedStatus(contactId: string) {
  * importar, se titula la plantilla de ejemplo y se nombra la variable al
  * emparejarla con una plantilla de WhatsApp.
  */
-export async function guardarCamposPersonalizados(
-  campos: { indice: number; nombre: string; tipo: string }[]
+export async function guardarVariablesPersonalizadas(
+  propias: { indice: number; nombre: string; tipo: string }[]
 ) {
   const ctx = await requireWorkspace();
   if ("error" in ctx) return { error: ctx.error };
   const { supabase, workspaceId } = ctx;
 
-  const limpios = campos
-    .filter((c) => [1, 2, 3].includes(c.indice))
+  const limpios = propias
+    .filter((c) => [2, 3, 4].includes(c.indice))
     .map((c) => ({
       workspace_id: workspaceId,
       indice: c.indice,
@@ -459,7 +459,7 @@ export async function guardarCamposPersonalizados(
 
   if (sinNombre.length > 0) {
     await supabase
-      .from("campos_personalizados")
+      .from("variables_personalizadas")
       .delete()
       .eq("workspace_id", workspaceId)
       .in("indice", sinNombre);
@@ -467,7 +467,7 @@ export async function guardarCamposPersonalizados(
 
   if (conNombre.length > 0) {
     const { error } = await supabase
-      .from("campos_personalizados")
+      .from("variables_personalizadas")
       .upsert(conNombre, { onConflict: "workspace_id,indice" });
     if (error) return { error: error.message };
   }
@@ -479,26 +479,26 @@ export async function guardarCamposPersonalizados(
 }
 
 /** Cambia a mano el valor de una columna propia en un contacto. */
-export async function guardarCampoDeContacto(contactId: string, indice: number, valor: string) {
-  if (![1, 2, 3].includes(indice)) return { error: "Columna inválida." };
+export async function guardarVariableDeContacto(contactId: string, indice: number, valor: string) {
+  if (![2, 3, 4].includes(indice)) return { error: "Esa variable no existe: solo la 2, la 3 y la 4 son propias." };
 
   const ctx = await requireWorkspace();
   if ("error" in ctx) return { error: ctx.error };
   const { supabase, workspaceId } = ctx;
 
   const { data: campo } = await supabase
-    .from("campos_personalizados")
+    .from("variables_personalizadas")
     .select("tipo")
     .eq("workspace_id", workspaceId)
     .eq("indice", indice)
     .maybeSingle();
 
-  const revisado = normalizarValor(valor, ((campo?.tipo as TipoCampo) ?? "texto"));
+  const revisado = normalizarValor(valor, ((campo?.tipo as TipoVariable) ?? "texto"));
   if (!revisado.ok) return { error: revisado.motivo };
 
   const { error } = await supabase
     .from("contacts")
-    .update({ [`campo${indice}`]: revisado.valor || null })
+    .update({ [`variable${indice}`]: revisado.valor || null })
     .eq("id", contactId)
     .eq("workspace_id", workspaceId);
   if (error) return { error: error.message };

@@ -4,10 +4,10 @@ import { Info } from "lucide-react";
 import {
   ORIGENES,
   etiquetaDeOrigen,
-  type CampoPersonalizado,
+  type VariablePersonalizada,
   type OrigenVariable,
   type VariableDePlantilla,
-} from "@/lib/contactos/campos";
+} from "@/lib/contactos/variables";
 
 /**
  * Con qué se rellena cada {{n}} de la plantilla.
@@ -19,11 +19,12 @@ import {
  */
 export function EmparejarVariables({
   variables,
-  campos,
+  propias,
   onCambiar,
 }: {
   variables: VariableDePlantilla[];
-  campos: CampoPersonalizado[];
+  /** Las variables propias del espacio, con el nombre que les pusieron. */
+  propias: VariablePersonalizada[];
   onCambiar: (variables: VariableDePlantilla[]) => void;
 }) {
   if (variables.length === 0) return null;
@@ -58,8 +59,8 @@ export function EmparejarVariables({
                 className="min-w-0 flex-1 rounded-[8px] border border-border bg-surface px-2 py-1.5 text-[12.5px] text-foreground outline-none focus:border-primary"
               >
                 {ORIGENES.map((o) => (
-                  <option key={o.origen} value={o.origen}>
-                    {etiquetaDeOrigen(o.origen, campos)}
+                  <option key={o} value={o}>
+                    {etiquetaDeOrigen(o, propias)}
                   </option>
                 ))}
               </select>

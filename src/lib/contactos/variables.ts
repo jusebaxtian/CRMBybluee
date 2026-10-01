@@ -8,19 +8,23 @@
  * parámetro). Aquí se define de dónde sale cada una.
  */
 
-export const INDICES_CAMPO = [1, 2, 3] as const;
-export type IndiceCampo = (typeof INDICES_CAMPO)[number];
+/**
+ * Las variables propias son la 2, la 3 y la 4: la {{1}} siempre es el nombre
+ * del contacto, que ya existia antes de esto.
+ */
+export const INDICES_VARIABLE = [2, 3, 4] as const;
+export type IndiceVariable = (typeof INDICES_VARIABLE)[number];
 
-export type TipoCampo = "texto" | "numero" | "fecha";
+export type TipoVariable = "texto" | "numero" | "fecha";
 
-export type CampoPersonalizado = {
-  indice: IndiceCampo;
+export type VariablePersonalizada = {
+  indice: IndiceVariable;
   nombre: string;
-  tipo: TipoCampo;
+  tipo: TipoVariable;
 };
 
 /** De dónde sale el valor de una variable de plantilla. */
-export type OrigenVariable = "nombre" | "campo1" | "campo2" | "campo3";
+export type OrigenVariable = "nombre" | "variable2" | "variable3" | "variable4";
 
 export type VariableDePlantilla = {
   origen: OrigenVariable;
@@ -28,24 +32,31 @@ export type VariableDePlantilla = {
   ejemplo?: string;
 };
 
-export const ORIGENES: { origen: OrigenVariable; etiqueta: string }[] = [
-  { origen: "nombre", etiqueta: "Nombre del contacto" },
-  { origen: "campo1", etiqueta: "Columna 1" },
-  { origen: "campo2", etiqueta: "Columna 2" },
-  { origen: "campo3", etiqueta: "Columna 3" },
-];
+export const ORIGENES: OrigenVariable[] = ["nombre", "variable2", "variable3", "variable4"];
 
 /** La columna de la tabla `contacts` que corresponde a un origen. */
-export function columnaDe(origen: OrigenVariable): "name" | "campo1" | "campo2" | "campo3" {
+export function columnaDe(origen: OrigenVariable): "name" | "variable2" | "variable3" | "variable4" {
   return origen === "nombre" ? "name" : origen;
 }
 
-/** Nombre que ve el usuario, usando el que el espacio le puso a la columna. */
-export function etiquetaDeOrigen(origen: OrigenVariable, campos: CampoPersonalizado[]): string {
-  if (origen === "nombre") return "Nombre del contacto";
-  const indice = Number(origen.replace("campo", "")) as IndiceCampo;
-  const campo = campos.find((c) => c.indice === indice);
-  return campo?.nombre?.trim() || `Columna ${indice}`;
+/** El numero de variable de un origen: "variable3" -> 3, "nombre" -> 1. */
+export function indiceDe(origen: OrigenVariable): number {
+  return origen === "nombre" ? 1 : Number(origen.replace("variable", ""));
+}
+
+/**
+ * Nombre que ve el usuario.
+ *
+ * Si el espacio le puso nombre a la variable, ese manda ("Fecha de la cita").
+ * Si no, se muestra como "Variable 3", que es como la nombra el cliente
+ * cuando escribe {{3}} en la plantilla.
+ */
+export function etiquetaDeOrigen(origen: OrigenVariable, variables: VariablePersonalizada[]): string {
+  if (origen === "nombre") return "Variable 1 · Nombre del contacto";
+  const indice = indiceDe(origen) as IndiceVariable;
+  const propia = variables.find((v) => v.indice === indice);
+  const nombre = propia?.nombre?.trim();
+  return nombre ? `Variable ${indice} · ${nombre}` : `Variable ${indice}`;
 }
 
 /** Cuántas variables {{n}} declara un texto de plantilla. */
@@ -70,7 +81,11 @@ export function ajustarVariables(
     // La primera variable casi siempre es el nombre; el resto se deja sin
     // elegir a proposito, para que nadie mande la fecha equivocada por
     // aceptar un valor por defecto.
-    lista.push({ origen: lista.length === 0 ? "nombre" : "campo1" });
+    // La {{1}} es el nombre; a partir de ahi, cada variable propone la suya
+    // --{{2}} con variable2, {{3}} con variable3-- que es lo que la gente
+    // espera y evita emparejamientos cruzados por despiste.
+    const siguiente = lista.length + 1;
+    lista.push({ origen: siguiente === 1 ? "nombre" : (`variable${Math.min(siguiente, 4)}` as OrigenVariable) });
   }
   return lista;
 }
@@ -78,7 +93,12 @@ export function ajustarVariables(
 /** Texto plano de un valor de contacto, listo para mandarle a WhatsApp. */
 export function valorDeContacto(
   origen: OrigenVariable,
-  contacto: { name?: string | null; campo1?: string | null; campo2?: string | null; campo3?: string | null }
+  contacto: {
+    name?: string | null;
+    variable2?: string | null;
+    variable3?: string | null;
+    variable4?: string | null;
+  }
 ): string | null {
   const bruto = origen === "nombre" ? contacto.name : contacto[origen];
   const limpio = (bruto ?? "").toString().replace(/\s+/g, " ").trim();
@@ -94,7 +114,7 @@ export function valorDeContacto(
  */
 export function normalizarValor(
   valor: string,
-  tipo: TipoCampo
+  tipo: TipoVariable
 ): { ok: true; valor: string } | { ok: false; motivo: string } {
   const limpio = valor.replace(/\s+/g, " ").trim();
   if (!limpio) return { ok: true, valor: "" };

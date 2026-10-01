@@ -1,4 +1,4 @@
-import { valorDeContacto, type OrigenVariable, type VariableDePlantilla } from "@/lib/contactos/campos";
+import { valorDeContacto, type OrigenVariable, type VariableDePlantilla } from "@/lib/contactos/variables";
 
 // Con qué se rellena {{1}} / {{nombre}} cuando el contacto no tiene un nombre
 // aprovechable. No puede quedar vacío: si la plantilla declara una variable,
@@ -70,9 +70,9 @@ export function buildTemplateSendParams(
   contact: {
     name: string | null;
     wa_id: string;
-    campo1?: string | null;
-    campo2?: string | null;
-    campo3?: string | null;
+    variable2?: string | null;
+    variable3?: string | null;
+    variable4?: string | null;
   }
 ): {
   bodyParams: string[] | undefined;

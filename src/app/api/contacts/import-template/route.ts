@@ -11,17 +11,17 @@ export async function GET() {
     return NextResponse.json({ error: NO_WORKSPACE_ERROR }, { status: 401 });
   }
 
-  // Las tres columnas propias van con el nombre que el espacio les puso: el
-  // cliente ve "Fecha de la cita" y no "Columna 2", que es lo que hace que
+  // Las variables propias van con el nombre que el espacio les puso: el
+  // cliente ve "Fecha de la cita" y no "Variable 2", que es lo que hace que
   // sepa que escribir debajo.
-  const { data: campos } = await supabase
-    .from("campos_personalizados")
+  const { data: propias } = await supabase
+    .from("variables_personalizadas")
     .select("indice, nombre")
     .eq("workspace_id", workspaceId)
     .order("indice");
 
-  const nombreDeCampo = (i: number) =>
-    (campos ?? []).find((c) => c.indice === i)?.nombre?.trim() || `Columna ${i}`;
+  const nombreDeVariable = (i: number) =>
+    (propias ?? []).find((v) => v.indice === i)?.nombre?.trim() || `Variable ${i}`;
 
   const workbook = new ExcelJS.Workbook();
 
@@ -30,9 +30,9 @@ export async function GET() {
     { header: "Celular", key: "celular", width: 20 },
     { header: "Nombre", key: "nombre", width: 26 },
     { header: "Etiquetas", key: "etiquetas", width: 30 },
-    { header: nombreDeCampo(1), key: "campo1", width: 24 },
-    { header: nombreDeCampo(2), key: "campo2", width: 24 },
-    { header: nombreDeCampo(3), key: "campo3", width: 24 },
+    { header: nombreDeVariable(2), key: "variable2", width: 24 },
+    { header: nombreDeVariable(3), key: "variable3", width: 24 },
+    { header: nombreDeVariable(4), key: "variable4", width: 24 },
   ];
   sheet.getRow(1).fill = {
     type: "pattern",
@@ -45,9 +45,9 @@ export async function GET() {
     celular: "3001234567",
     nombre: "Juan Pérez",
     etiquetas: "Clientes VIP, Interesados",
-    campo1: "23 de octubre",
-    campo2: "8:00 p. m.",
-    campo3: "",
+    variable2: "23 de octubre",
+    variable3: "8:00 p. m.",
+    variable4: "",
   });
   sheet.addRow({ celular: "573007654321", nombre: "María Gómez", etiquetas: "" });
 

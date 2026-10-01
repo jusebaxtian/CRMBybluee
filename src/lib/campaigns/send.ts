@@ -162,9 +162,9 @@ async function runCampaignSendLoop(
       name: string | null;
       likely_blocked: boolean;
       marketing_opt_out_at: string | null;
-      campo1: string | null;
-      campo2: string | null;
-      campo3: string | null;
+      variable2: string | null;
+      variable3: string | null;
+      variable4: string | null;
     };
   };
   const PAGE_SIZE = 1000;
@@ -173,7 +173,7 @@ async function runCampaignSendLoop(
     const { data: batch } = await supabase
       .from("campaign_recipients")
       .select(
-        "id, contact_id, contacts(wa_id, name, likely_blocked, marketing_opt_out_at, campo1, campo2, campo3)"
+        "id, contact_id, contacts(wa_id, name, likely_blocked, marketing_opt_out_at, variable2, variable3, variable4)"
       )
       .eq("campaign_id", campaignId)
       .eq("status", "pending")
@@ -216,14 +216,14 @@ async function runCampaignSendLoop(
     }
   }
 
-  // Como se llaman las tres columnas en este espacio: el motivo de un fallo
-  // tiene que decir "le falta la Fecha de la cita", no "le falta campo2".
-  const { data: camposDelEspacio } = await supabase
-    .from("campos_personalizados")
+  // Como se llaman las variables propias en este espacio: el motivo de un
+  // fallo tiene que decir "le falta la Fecha de la cita", no "variable2".
+  const { data: propiasDelEspacio } = await supabase
+    .from("variables_personalizadas")
     .select("indice, nombre")
     .eq("workspace_id", workspaceId);
-  const etiquetasDeCampos = new Map<string, string>(
-    (camposDelEspacio ?? []).map((c) => [`campo${c.indice}`, (c.nombre as string) || `Columna ${c.indice}`])
+  const etiquetasDeVariables = new Map<string, string>(
+    (propiasDelEspacio ?? []).map((v) => [`variable${v.indice}`, (v.nombre as string) || `Variable ${v.indice}`])
   );
 
   let failures = 0;
@@ -282,9 +282,9 @@ async function runCampaignSendLoop(
       name: string | null;
       likely_blocked: boolean;
       marketing_opt_out_at: string | null;
-      campo1: string | null;
-      campo2: string | null;
-      campo3: string | null;
+      variable2: string | null;
+      variable3: string | null;
+      variable4: string | null;
     };
     const { wa_id: waId, likely_blocked: likelyBlocked } = contact;
 
@@ -344,7 +344,7 @@ async function runCampaignSendLoop(
         // se dice cual: mandar "tu cita es el" sin fecha es peor que no
         // mandar, y Meta ademas rechaza el parametro vacio (132000).
         if (faltan.length > 0) {
-          const nombres = faltan.map((f) => etiquetasDeCampos.get(f) ?? f).join(", ");
+          const nombres = faltan.map((f) => etiquetasDeVariables.get(f) ?? f).join(", ");
           await supabase
             .from("campaign_recipients")
             .update({

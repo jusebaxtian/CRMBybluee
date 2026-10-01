@@ -7,7 +7,7 @@ import { normalizarNombrePlantilla } from "@/lib/templates/nombre";
 import { Button } from "@/components/ui/button";
 import { CATEGORIA_PLANTILLA_POR_DEFECTO } from "@/lib/templates/defaults";
 import type { WabaOption } from "@/lib/whatsapp/wabas";
-import { ajustarVariables, cuantasVariables, type CampoPersonalizado, type VariableDePlantilla } from "@/lib/contactos/campos";
+import { ajustarVariables, cuantasVariables, type VariablePersonalizada, type VariableDePlantilla } from "@/lib/contactos/variables";
 import { EmparejarVariables } from "@/components/templates/emparejar-variables";
 import {
   LIMITE_CUERPO,
@@ -59,11 +59,11 @@ function submitWithProgress(
 
 export function CreateTemplateForm({
   wabas = [],
-  campos = [],
+  propias = [],
 }: {
   wabas?: WabaOption[];
-  /** Como se llaman las tres columnas propias de este espacio. */
-  campos?: CampoPersonalizado[];
+  /** Como se llaman las variables 2, 3 y 4 en este espacio. */
+  propias?: VariablePersonalizada[];
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -321,7 +321,7 @@ export function CreateTemplateForm({
         )}
       </div>
 
-      <EmparejarVariables variables={variables} campos={campos} onCambiar={setVariables} />
+      <EmparejarVariables variables={variables} propias={propias} onCambiar={setVariables} />
 
 
       <div>
