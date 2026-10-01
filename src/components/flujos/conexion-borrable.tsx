@@ -45,6 +45,11 @@ export function ConexionBorrable({
         <button
           type="button"
           title="Quitar esta conexión"
+          // `nodrag nopan` es lo que hace que esto se pueda pulsar: sin esas
+          // clases React Flow toma el boton de raton como el inicio de un
+          // arrastre del lienzo y el clic nunca llega al boton.
+          className="nodrag nopan flex h-[22px] w-[22px] items-center justify-center rounded-full border border-border bg-surface text-muted shadow-sm transition-all hover:scale-110 hover:border-red-400 hover:bg-red-400/10 hover:text-red-400"
+          onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
             setEdges((edges) => edges.filter((edge) => edge.id !== id));
@@ -53,10 +58,10 @@ export function ConexionBorrable({
             position: "absolute",
             transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
             pointerEvents: "all",
+            zIndex: 10,
           }}
-          className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-border bg-surface text-muted opacity-60 transition-all hover:scale-125 hover:border-red-400 hover:text-red-400 hover:opacity-100"
         >
-          <X size={11} />
+          <X size={12} />
         </button>
       </EdgeLabelRenderer>
     </>

@@ -61,7 +61,7 @@ function Lienzo({
       target: c.destino,
       sourceHandle: c.salida,
       type: "borrable",
-      animated: true,
+      animated: false,
     }))
   );
 
@@ -94,7 +94,7 @@ function Lienzo({
     (c: Connection) =>
       setEdges((prev) =>
         addEdge(
-          { ...c, type: "borrable", animated: true },
+          { ...c, type: "borrable", animated: false },
           prev.filter((e) => !(e.source === c.source && (e.sourceHandle ?? null) === (c.sourceHandle ?? null)))
         )
       ),
@@ -197,6 +197,9 @@ function Lienzo({
           nodeTypes={tiposDeNodo}
           edgeTypes={tiposDeConexion}
           onNodeClick={(_, n) => setSeleccionado(n.id)}
+          // Doble clic sobre la linea tambien la quita: es la salida cuando la
+          // ✕ queda tapada por un bloque encima.
+          onEdgeDoubleClick={(_, e) => setEdges((prev) => prev.filter((x) => x.id !== e.id))}
           onPaneClick={() => setSeleccionado(null)}
           onDragOver={(e) => {
             e.preventDefault();
