@@ -167,6 +167,7 @@ async function runCampaignSendLoop(
       name: string | null;
       likely_blocked: boolean;
       marketing_opt_out_at: string | null;
+      bloqueado_el: string | null;
       variable2: string | null;
       variable3: string | null;
       variable4: string | null;
@@ -178,7 +179,7 @@ async function runCampaignSendLoop(
     const { data: batch } = await supabase
       .from("campaign_recipients")
       .select(
-        "id, contact_id, contacts(wa_id, name, likely_blocked, marketing_opt_out_at, variable2, variable3, variable4)"
+        "id, contact_id, contacts(wa_id, name, likely_blocked, marketing_opt_out_at, bloqueado_el, variable2, variable3, variable4)"
       )
       .eq("campaign_id", campaignId)
       .eq("status", "pending")
@@ -291,11 +292,21 @@ async function runCampaignSendLoop(
       name: string | null;
       likely_blocked: boolean;
       marketing_opt_out_at: string | null;
+      bloqueado_el: string | null;
       variable2: string | null;
       variable3: string | null;
       variable4: string | null;
     };
     const { wa_id: waId, likely_blocked: likelyBlocked } = contact;
+
+    // Lo bloqueamos nosotros: WhatsApp no le entrega nada.
+    if (contact.bloqueado_el) {
+      await supabase
+        .from("campaign_recipients")
+        .update({ status: "failed", error_message: "Contacto bloqueado — no se le envió." })
+        .eq("id", recipient.id);
+      continue;
+    }
 
     // Pidio no recibir marketing: Meta rechaza el envio de todas formas, y
     // cada intento pesa contra la calidad del numero. Mejor no gastarlo.

@@ -681,3 +681,87 @@ export async function sendAuthenticationCode(
     }),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Bloquear contactos
+//
+// Bloqueo de verdad, del lado de Meta: WhatsApp deja de entregar los mensajes
+// de esa persona a este numero. No es ocultarlos en el CRM.
+//
+// Distinto de `contacts.likely_blocked`, que es lo contrario: la sospecha de
+// que el contacto nos bloqueo a nosotros, deducida de los fallos de entrega.
+// ---------------------------------------------------------------------------
+
+export type ResultadoBloqueo = {
+  /** Numeros que quedaron bloqueados. */
+  exitosos: string[];
+  /** Numeros que Meta rechazo, con su motivo ya traducido. */
+  fallidos: { numero: string; motivo: string }[];
+};
+
+function leerResultadoBloqueo(data: unknown, numeros: string[]): ResultadoBloqueo {
+  const respuesta = data as {
+    block_users?: {
+      added_users?: { input?: string; wa_id?: string }[];
+      failed_users?: { input?: string; errors?: { code: number; message?: string; title?: string }[] }[];
+    };
+  };
+
+  const bloque = respuesta?.block_users;
+  const exitosos = (bloque?.added_users ?? []).map((u) => u.input ?? u.wa_id ?? "").filter(Boolean);
+  const fallidos = (bloque?.failed_users ?? []).map((u) => ({
+    numero: u.input ?? "",
+    motivo: traducirErrorMeta(u.errors?.[0]),
+  }));
+
+  // Si Meta no detalla nada, se da por bueno lo pedido: la respuesta de exito
+  // simple ({"success":true}) no trae listas.
+  if (exitosos.length === 0 && fallidos.length === 0) return { exitosos: numeros, fallidos: [] };
+  return { exitosos, fallidos };
+}
+
+/** Bloquea uno o varios numeros en esta linea. */
+export async function bloquearUsuarios(
+  phoneNumberId: string,
+  accessToken: string,
+  numeros: string[]
+): Promise<ResultadoBloqueo> {
+  const data = await graphFetch(`/${phoneNumberId}/block_users`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      block_users: numeros.map((user) => ({ user })),
+    }),
+  });
+  return leerResultadoBloqueo(data, numeros);
+}
+
+/** Quita el bloqueo. */
+export async function desbloquearUsuarios(
+  phoneNumberId: string,
+  accessToken: string,
+  numeros: string[]
+): Promise<ResultadoBloqueo> {
+  const data = await graphFetch(`/${phoneNumberId}/block_users`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      block_users: numeros.map((user) => ({ user })),
+    }),
+  });
+  return leerResultadoBloqueo(data, numeros);
+}
+
+/** Los numeros bloqueados hoy en esta linea, segun Meta. */
+export async function listarBloqueados(
+  phoneNumberId: string,
+  accessToken: string
+): Promise<string[]> {
+  const data = await graphFetch(`/${phoneNumberId}/block_users`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const lista = (data as { data?: { wa_id?: string }[] })?.data ?? [];
+  return lista.map((u) => u.wa_id ?? "").filter(Boolean);
+}

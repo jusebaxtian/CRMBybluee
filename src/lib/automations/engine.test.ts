@@ -13,7 +13,11 @@ import { isContactExcludedFromAutomations } from "@/lib/automations/engine";
  */
 function fakeSupabase(estado: {
   conversacion?: { followups_enabled: boolean } | null;
-  contacto?: { likely_blocked: boolean; marketing_opt_out_at?: string | null } | null;
+  contacto?: {
+    likely_blocked: boolean;
+    marketing_opt_out_at?: string | null;
+    bloqueado_el?: string | null;
+  } | null;
   etiquetas?: { tags: { excludes_followups: boolean } | null }[];
   enFlujo?: boolean;
 }) {
@@ -205,6 +209,32 @@ describe("etiqueta que dispara y a la vez excluye", () => {
       contacto: { likely_blocked: false },
       etiquetas: [],
       enFlujo: true,
+    });
+    await expect(
+      isContactExcludedFromAutomations(supabase, "c1", { ignorarEtiquetaQueExcluye: true })
+    ).resolves.toBe(true);
+  });
+});
+
+// Un contacto bloqueado no recibe nada: WhatsApp no le entrega, así que cada
+// intento es cupo gastado para que Meta lo rechace.
+describe("contacto bloqueado", () => {
+  it("queda fuera de todas las automatizaciones", async () => {
+    const supabase = fakeSupabase({
+      conversacion: { followups_enabled: true },
+      contacto: { likely_blocked: false, bloqueado_el: "2026-09-30T23:00:00Z" },
+      etiquetas: [],
+      enFlujo: false,
+    });
+    await expect(isContactExcludedFromAutomations(supabase, "c1")).resolves.toBe(true);
+  });
+
+  it("y tampoco lo salva el disparador por etiqueta", async () => {
+    const supabase = fakeSupabase({
+      conversacion: { followups_enabled: true },
+      contacto: { likely_blocked: false, bloqueado_el: "2026-09-30T23:00:00Z" },
+      etiquetas: [],
+      enFlujo: false,
     });
     await expect(
       isContactExcludedFromAutomations(supabase, "c1", { ignorarEtiquetaQueExcluye: true })

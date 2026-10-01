@@ -12,6 +12,7 @@ import {
   Search,
   SlidersHorizontal,
   AlertTriangle,
+  Ban,
 } from "lucide-react";
 import { ContactTagPicker } from "@/components/tags/contact-tag-picker";
 import { EnviarPlantillaPopover, type PlantillaOption } from "@/components/contacts/enviar-plantilla-popover";
@@ -36,6 +37,8 @@ type Contact = {
   adHeadline: string | null;
   /** Fecha en que Meta informó que ya no quiere mensajes de marketing. */
   marketingOptOutAt: string | null;
+  /** Fecha en que lo bloqueamos: WhatsApp no entrega sus mensajes. */
+  bloqueadoEl: string | null;
 };
 
 type Agente = { id: string; name: string | null; email: string };
@@ -519,6 +522,14 @@ export function ContactsTable({
                             }
                           >
                             <Megaphone size={12} className="shrink-0 text-primary" />
+                          </span>
+                        )}
+                        {c.bloqueadoEl && (
+                          <span
+                            title={`Bloqueado el ${new Date(c.bloqueadoEl).toLocaleDateString("es-CO")}. WhatsApp no entrega sus mensajes y queda fuera de campañas y automatizaciones.`}
+                            className="flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full bg-red-400/15"
+                          >
+                            <Ban size={10} className="shrink-0 text-red-400" />
                           </span>
                         )}
                         {c.marketingOptOutAt && (

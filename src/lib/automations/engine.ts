@@ -561,10 +561,13 @@ export async function isContactExcludedFromAutomations(
 
   const { data: contact } = await supabase
     .from("contacts")
-    .select("likely_blocked, marketing_opt_out_at")
+    .select("likely_blocked, marketing_opt_out_at, bloqueado_el")
     .eq("id", contactId)
     .maybeSingle();
   if (contact?.likely_blocked) return true;
+  // Lo bloqueamos nosotros: WhatsApp no le entrega nada, asi que mandarle es
+  // gastar cupo para que Meta lo rechace.
+  if (contact?.bloqueado_el) return true;
   // Pidio no recibir marketing (131050): Meta no entrega nada que no sea
   // respuesta a un mensaje suyo, y cada intento pesa contra la calidad.
   if (contact?.marketing_opt_out_at) return true;

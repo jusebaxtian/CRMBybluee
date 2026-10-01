@@ -24,6 +24,7 @@ export default async function ContactsPage() {
     wa_id: string;
     created_at: string;
     marketing_opt_out_at: string | null;
+    bloqueado_el: string | null;
     variable2: string | null;
     variable3: string | null;
     variable4: string | null;
@@ -36,7 +37,7 @@ export default async function ContactsPage() {
       const { data: batch } = await supabase
         .from("contacts")
         .select(
-          "id, name, wa_id, created_at, marketing_opt_out_at, variable2, variable3, variable4, contact_tags(tag_id), conversations(ad_source_id, ad_headline, assigned_agent_id)"
+          "id, name, wa_id, created_at, marketing_opt_out_at, bloqueado_el, variable2, variable3, variable4, contact_tags(tag_id), conversations(ad_source_id, ad_headline, assigned_agent_id)"
         )
         .eq("workspace_id", workspaceId)
         .order("created_at", { ascending: false })
@@ -117,6 +118,7 @@ export default async function ContactsPage() {
         (c.conversations as unknown as { assigned_agent_id: string | null }[]).find((cv) => cv.assigned_agent_id)
           ?.assigned_agent_id ?? null,
       marketingOptOutAt: c.marketing_opt_out_at,
+      bloqueadoEl: c.bloqueado_el,
       variable2: c.variable2,
       variable3: c.variable3,
       variable4: c.variable4,

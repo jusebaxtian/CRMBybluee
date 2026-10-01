@@ -4,6 +4,7 @@ import { ArrowLeft, Zap, Megaphone } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { ContactTagPicker } from "@/components/tags/contact-tag-picker";
 import { MeterEnFlujo } from "@/components/flujos/meter-en-flujo";
+import { BloquearContacto } from "@/components/contacts/bloquear-contacto";
 import { NotesEditor } from "@/components/inbox/notes-editor";
 import { ChatPane } from "@/components/inbox/chat-pane";
 import { RealtimeRefresh } from "@/components/ui/realtime-refresh";
@@ -49,7 +50,7 @@ export default async function ConversationPage({
     supabase
       .from("conversations")
       .select(
-        "id, contact_id, last_read_at, assigned_agent_id, ad_source_id, ad_headline, ad_body, followups_enabled, ai_handoff_requested, ai_manually_paused, whatsapp_account_id, contacts(name, wa_id, notes, likely_blocked, contact_tags(tag_id, tags(excludes_followups)))"
+        "id, contact_id, last_read_at, assigned_agent_id, ad_source_id, ad_headline, ad_body, followups_enabled, ai_handoff_requested, ai_manually_paused, whatsapp_account_id, contacts(name, wa_id, notes, likely_blocked, bloqueado_el, contact_tags(tag_id, tags(excludes_followups)))"
       )
       .eq("id", id)
       .eq("workspace_id", workspaceId ?? "")
@@ -109,6 +110,7 @@ export default async function ConversationPage({
     wa_id: string;
     notes: string | null;
     likely_blocked: boolean;
+    bloqueado_el: string | null;
     contact_tags: { tag_id: string; tags: { excludes_followups: boolean } | null }[];
   };
   // Solo el administrador de la plataforma: qué espacio compró este contacto
@@ -382,6 +384,15 @@ export default async function ConversationPage({
             </p>
           </div>
         )}
+
+        <div className="mt-6">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Bloqueo</p>
+          <BloquearContacto
+            contactId={conversation.contact_id}
+            bloqueado={Boolean(contact.bloqueado_el)}
+            nombre={contact.name || contact.wa_id}
+          />
+        </div>
 
         <div className="mt-6">
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
