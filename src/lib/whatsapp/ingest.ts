@@ -13,7 +13,7 @@ import { maybeRespondWithAiAgent } from "@/lib/ai/agent";
 import { transcribeAudio } from "@/lib/ai/providers";
 import { toPublicUrl } from "@/lib/supabase/config";
 import { recordInboundMessage } from "@/lib/messaging/record";
-import { iniciarPorMensaje, procesarEntrada } from "@/lib/flujos/motor";
+import { iniciarPorBoton, iniciarPorMensaje, procesarEntrada } from "@/lib/flujos/motor";
 import { traducirErrorEnvio } from "@/lib/whatsapp/errores";
 
 // WhatsApp never tells a business when a customer has blocked them (privacy
@@ -528,6 +528,14 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
         if (loTomoUnFlujo) continue;
 
         if (isButtonTap && tappedButtonPayload) {
+          // Un flujo que escuche este boton manda sobre la automatizacion.
+          const flujoDelBoton = await iniciarPorBoton(supabase, workspaceId, contact.id, conversation.id, {
+            id: tappedButtonPayload,
+            titulo: tappedButtonTitle,
+            whatsappAccountId,
+          });
+          if (flujoDelBoton) continue;
+
           await runButtonTapAutomations(supabase, workspaceId, contact.id, tappedButtonPayload, whatsappAccountId);
         }
 

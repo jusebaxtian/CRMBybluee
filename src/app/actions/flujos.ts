@@ -148,7 +148,7 @@ export async function guardarLienzo(
   // mensaje entrante, sin tener que leer el grafo completo de cada flujo.
   const inicio = nodos.find((n) => n.tipo === "inicio");
   const disparadores = (inicio?.datos.disparadores ?? []).filter((d) => {
-    if (d.tipo === "keyword") return Boolean(d.valor?.trim());
+    if (d.tipo === "keyword" || d.tipo === "button_tap") return Boolean(d.valor?.trim());
     if (d.tipo === "tag") return Boolean(d.tagId);
     return true;
   });
@@ -159,7 +159,7 @@ export async function guardarLienzo(
       disparadores.map((d) => ({
         flujo_id: flujoId,
         tipo: d.tipo,
-        valor: d.tipo === "keyword" ? d.valor?.trim() ?? null : null,
+        valor: d.tipo === "keyword" || d.tipo === "button_tap" ? d.valor?.trim() ?? null : null,
         tag_id: d.tipo === "tag" ? d.tagId ?? null : null,
       }))
     );

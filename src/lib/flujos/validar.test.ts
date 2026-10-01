@@ -186,3 +186,30 @@ describe("bloques nuevos sin configurar", () => {
     expect(avisos.some((a) => a.nivel === "error" && a.texto.includes(textoEsperado))).toBe(true);
   });
 });
+
+// El caso del 1 oct 2026: un masivo con el botón "Si, Quiero Conocer", 15
+// personas lo tocaron y nadie les respondió porque los flujos no se podían
+// disparar con un botón.
+describe("disparador por botón", () => {
+  it("acepta el botón con su texto", () => {
+    const nodos: NodoParaValidar[] = [
+      { id: "i", tipo: "inicio", datos: { disparadores: [{ tipo: "button_tap", valor: "Si, Quiero Conocer" }] } },
+      { id: "m", tipo: "mensaje", datos: { texto: "Con gusto te cuento" } },
+      { id: "f", tipo: "fin", datos: {} },
+    ];
+    const conexiones: ConexionParaValidar[] = [
+      { origen_id: "i", destino_id: "m", salida: "sig" },
+      { origen_id: "m", destino_id: "f", salida: "sig" },
+    ];
+    expect(revisarFlujo(nodos, conexiones)).toHaveLength(0);
+  });
+
+  it("marca el botón sin texto", () => {
+    const nodos: NodoParaValidar[] = [
+      { id: "i", tipo: "inicio", datos: { disparadores: [{ tipo: "button_tap", valor: "  " }] } },
+      { id: "f", tipo: "fin", datos: {} },
+    ];
+    const avisos = revisarFlujo(nodos, [{ origen_id: "i", destino_id: "f", salida: "sig" }]);
+    expect(avisos.some((a) => a.nivel === "error" && a.texto.includes("sin el texto del botón"))).toBe(true);
+  });
+});

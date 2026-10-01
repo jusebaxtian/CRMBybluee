@@ -48,6 +48,13 @@ export function revisarFlujo(
       if (d.tipo === "keyword" && !d.valor?.trim()) {
         avisos.push({ nivel: "error", nodoId: inicio.id, texto: "Hay un disparador por palabra clave sin palabra." });
       }
+      if (d.tipo === "button_tap" && !d.valor?.trim()) {
+        avisos.push({
+          nivel: "error",
+          nodoId: inicio.id,
+          texto: "Hay un disparador por botón sin el texto del botón.",
+        });
+      }
       if (d.tipo === "tag" && !d.tagId) {
         avisos.push({ nivel: "error", nodoId: inicio.id, texto: "Hay un disparador por etiqueta sin etiqueta elegida." });
       }

@@ -184,7 +184,13 @@ export const BLOQUES_ARRASTRABLES: TipoBloque[] = [
 ];
 
 /** Como entra un contacto al flujo. Son los mismos de las automatizaciones. */
-export type TipoDisparador = "keyword" | "any_message" | "first_message_of_day" | "tag" | "manual";
+export type TipoDisparador =
+  | "keyword"
+  | "button_tap"
+  | "any_message"
+  | "first_message_of_day"
+  | "tag"
+  | "manual";
 
 export type Disparador = {
   tipo: TipoDisparador;
@@ -199,6 +205,13 @@ export const DISPARADORES: { tipo: TipoDisparador; nombre: string; ayuda: string
     tipo: "keyword",
     nombre: "Escribe una palabra clave",
     ayuda: 'Entra cuando el contacto escribe algo que contiene esa palabra (ej. "precio").',
+    pideValor: true,
+  },
+  {
+    tipo: "button_tap",
+    nombre: "Toca un botón",
+    ayuda:
+      'Entra cuando el contacto toca ese botón de una plantilla o de un mensaje con botones. Escribe el texto del botón tal como lo ve, por ejemplo "Si, Quiero Conocer".',
     pideValor: true,
   },
   {
@@ -287,6 +300,7 @@ export function resumenDe(tipo: TipoBloque, datos: DatosBloque): string {
     return d
       .map((x) => {
         if (x.tipo === "keyword") return `Escribe "${x.valor?.trim() || "…"}"`;
+        if (x.tipo === "button_tap") return `Toca "${x.valor?.trim() || "…"}"`;
         return DISPARADORES.find((o) => o.tipo === x.tipo)?.nombre ?? x.tipo;
       })
       .join(" · ");

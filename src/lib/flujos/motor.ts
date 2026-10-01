@@ -708,3 +708,47 @@ export async function iniciarAMano(
   }
   return { ok: true };
 }
+
+/**
+ * Arranca el flujo que escuche este boton.
+ *
+ * Se compara contra el texto del boton y contra su identificador, sin
+ * distinguir mayusculas ni espacios de sobra: el usuario escribe en el
+ * disparador lo que VE en el boton ("Si, Quiero Conocer"), y lo que manda
+ * Meta puede venir como id o como titulo segun el tipo de boton.
+ */
+export async function iniciarPorBoton(
+  supabase: Supabase,
+  workspaceId: string,
+  contactId: string,
+  conversationId: string | null,
+  boton: { id: string | null; titulo: string | null; whatsappAccountId?: string | null }
+): Promise<boolean> {
+  const candidatos = [boton.id, boton.titulo]
+    .map((v) => (v ?? "").trim().toLowerCase())
+    .filter(Boolean);
+  if (candidatos.length === 0) return false;
+
+  const { data: flujos } = await supabase
+    .from("flujos")
+    .select("id, updated_at, whatsapp_account_id, flujo_disparadores(tipo, valor)")
+    .eq("workspace_id", workspaceId)
+    .eq("activo", true)
+    .order("updated_at", { ascending: false });
+
+  for (const flujo of flujos ?? []) {
+    const lineaDelFlujo = flujo.whatsapp_account_id as string | null;
+    if (lineaDelFlujo && boton.whatsappAccountId && lineaDelFlujo !== boton.whatsappAccountId) continue;
+
+    const disparadores = (flujo.flujo_disparadores ?? []) as { tipo: string; valor: string | null }[];
+    const coincide = disparadores.some(
+      (d) => d.tipo === "button_tap" && candidatos.includes((d.valor ?? "").trim().toLowerCase())
+    );
+    if (!coincide) continue;
+
+    const ejecucion = await iniciarFlujo(supabase, flujo.id as string, contactId, conversationId);
+    if (ejecucion) return true;
+  }
+
+  return false;
+}
