@@ -157,3 +157,57 @@ describe("exclusión mientras el contacto está dentro de un flujo", () => {
     await expect(isContactExcludedFromAutomations(supabase, "c1")).resolves.toBe(false);
   });
 });
+
+// El caso real del 30 sep 2026: la automatización "UpSell" arrancaba con la
+// etiqueta "Plan Anual", y esa misma etiqueta tenía la marca de excluir
+// seguimientos. La automatización no se disparaba nunca y no había forma de
+// saber por qué.
+describe("etiqueta que dispara y a la vez excluye", () => {
+  it("la marca de la etiqueta ya no frena al disparador por etiqueta", async () => {
+    const supabase = fakeSupabase({
+      conversacion: { followups_enabled: true },
+      contacto: { likely_blocked: false },
+      etiquetas: [{ tags: { excludes_followups: true } }],
+      enFlujo: false,
+    });
+    await expect(
+      isContactExcludedFromAutomations(supabase, "c1", { ignorarEtiquetaQueExcluye: true })
+    ).resolves.toBe(false);
+  });
+
+  it("pero sigue frenando a los demás disparadores", async () => {
+    const supabase = fakeSupabase({
+      conversacion: { followups_enabled: true },
+      contacto: { likely_blocked: false },
+      etiquetas: [{ tags: { excludes_followups: true } }],
+      enFlujo: false,
+    });
+    await expect(isContactExcludedFromAutomations(supabase, "c1")).resolves.toBe(true);
+  });
+
+  it("lo que protege de verdad sigue frenando aunque se ignore la etiqueta", async () => {
+    // Contacto que pidió no recibir marketing: ahí no hay intención del equipo
+    // que valga, Meta rechaza el envío igual.
+    const supabase = fakeSupabase({
+      conversacion: { followups_enabled: true },
+      contacto: { likely_blocked: false, marketing_opt_out_at: "2026-09-01T00:00:00Z" },
+      etiquetas: [],
+      enFlujo: false,
+    });
+    await expect(
+      isContactExcludedFromAutomations(supabase, "c1", { ignorarEtiquetaQueExcluye: true })
+    ).resolves.toBe(true);
+  });
+
+  it("y un contacto dentro de un flujo tampoco recibe la automatización", async () => {
+    const supabase = fakeSupabase({
+      conversacion: { followups_enabled: true },
+      contacto: { likely_blocked: false },
+      etiquetas: [],
+      enFlujo: true,
+    });
+    await expect(
+      isContactExcludedFromAutomations(supabase, "c1", { ignorarEtiquetaQueExcluye: true })
+    ).resolves.toBe(true);
+  });
+});

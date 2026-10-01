@@ -499,10 +499,12 @@ export async function runTagAddedAutomations(
   contactId: string,
   tagId: string
 ) {
-  // A contact tagged e.g. "Ya compró" (excludes_followups) shouldn't have any
-  // more automations fire on them, whether triggered by keyword or by
-  // another tag being added — only manual mass campaigns should still reach them.
-  if (await isContactExcludedFromAutomations(supabase, contactId)) return;
+  // Aqui la marca "excluye seguimientos" NO frena: si alguien configuro que
+  // esta etiqueta dispare esta automatizacion, es que la quiere. Ver la nota
+  // en isContactExcludedFromAutomations.
+  if (await isContactExcludedFromAutomations(supabase, contactId, { ignorarEtiquetaQueExcluye: true })) {
+    return;
+  }
 
   const { data: todas } = await supabase
     .from("automations")
@@ -530,7 +532,24 @@ export async function runTagAddedAutomations(
 // follow-up step fires too, since the tag may have been added mid-wait.
 export async function isContactExcludedFromAutomations(
   supabase: SupabaseClient,
-  contactId: string
+  contactId: string,
+  opciones: {
+    /**
+     * Ignorar la marca "excluye seguimientos" de las etiquetas.
+     *
+     * Solo lo usa el disparador por etiqueta, y por un caso real: una
+     * automatizacion "UpSell" que arranca con la etiqueta "Plan Anual", y esa
+     * misma etiqueta tiene puesta la marca -- razonable, un cliente que ya
+     * compro no debe recibir seguimientos. El resultado era una
+     * automatizacion que no podia dispararse NUNCA y sin decir por que.
+     *
+     * Poner una etiqueta es una accion deliberada de alguien del equipo, y
+     * configurar que esa etiqueta dispare algo es otra. Esa intencion pesa
+     * mas que una marca pensada para frenar seguimientos automaticos. Lo
+     * demas --bloqueado, sin marketing, dentro de un flujo-- sigue frenando.
+     */
+    ignorarEtiquetaQueExcluye?: boolean;
+  } = {}
 ): Promise<boolean> {
   // Puede tener un hilo por linea (migracion 0108): basta con que uno
   // tenga los seguimientos apagados.
@@ -552,6 +571,8 @@ export async function isContactExcludedFromAutomations(
   // Dentro de un flujo manda el flujo: dos sistemas contestando a la vez le
   // dejan al cliente una conversacion cruzada.
   if (await contactoEnFlujo(supabase as never, contactId)) return true;
+
+  if (opciones.ignorarEtiquetaQueExcluye) return false;
 
   const { data: tags } = await supabase
     .from("contact_tags")
