@@ -7,6 +7,7 @@ import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
 import { listWorkspaceAgents } from "@/lib/agents";
 import { noSePuedeUsar } from "@/lib/whatsapp/limite-plantilla";
+import type { VariablePersonalizada } from "@/lib/contactos/variables";
 
 export default async function ContactsPage() {
   const supabase = await createClient();
@@ -23,6 +24,9 @@ export default async function ContactsPage() {
     wa_id: string;
     created_at: string;
     marketing_opt_out_at: string | null;
+    variable2: string | null;
+    variable3: string | null;
+    variable4: string | null;
     contact_tags: { tag_id: string }[];
     conversations: { ad_source_id: string | null; ad_headline: string | null; assigned_agent_id: string | null }[];
   }[] = [];
@@ -32,7 +36,7 @@ export default async function ContactsPage() {
       const { data: batch } = await supabase
         .from("contacts")
         .select(
-          "id, name, wa_id, created_at, marketing_opt_out_at, contact_tags(tag_id), conversations(ad_source_id, ad_headline, assigned_agent_id)"
+          "id, name, wa_id, created_at, marketing_opt_out_at, variable2, variable3, variable4, contact_tags(tag_id), conversations(ad_source_id, ad_headline, assigned_agent_id)"
         )
         .eq("workspace_id", workspaceId)
         .order("created_at", { ascending: false })
@@ -62,6 +66,13 @@ export default async function ContactsPage() {
 
   // Para mostrar "asignado a" en la tabla: los agentes del espacio.
   const agentes = await listWorkspaceAgents(supabase, workspaceId);
+
+  // Como se llaman las variables 2, 3 y 4 en este espacio.
+  const { data: propias } = await supabase
+    .from("variables_personalizadas")
+    .select("indice, nombre, tipo")
+    .eq("workspace_id", workspaceId ?? "")
+    .order("indice");
 
   const { data: allTags } = await supabase
     .from("tags")
@@ -106,6 +117,9 @@ export default async function ContactsPage() {
         (c.conversations as unknown as { assigned_agent_id: string | null }[]).find((cv) => cv.assigned_agent_id)
           ?.assigned_agent_id ?? null,
       marketingOptOutAt: c.marketing_opt_out_at,
+      variable2: c.variable2,
+      variable3: c.variable3,
+      variable4: c.variable4,
       fromAds: !!conversation?.ad_source_id,
       adHeadline: conversation?.ad_headline ?? null,
     };
@@ -123,6 +137,7 @@ export default async function ContactsPage() {
         lineas={lineas ?? []}
         plantillas={(plantillas ?? []).filter((t) => !noSePuedeUsar(t.body_text))}
         agentes={agentes}
+        propias={(propias ?? []) as VariablePersonalizada[]}
       />
     </div>
   );

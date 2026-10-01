@@ -17,6 +17,9 @@ import { ContactTagPicker } from "@/components/tags/contact-tag-picker";
 import { EnviarPlantillaPopover, type PlantillaOption } from "@/components/contacts/enviar-plantilla-popover";
 import type { LineaOption } from "@/components/automations/selector-linea";
 import { updateContact, bulkDeleteContacts, bulkAddTagToContacts } from "@/app/actions/contacts";
+import { INDICES_VARIABLE, type VariablePersonalizada } from "@/lib/contactos/variables";
+import { CeldaVariable } from "@/components/contacts/celda-variable";
+import { ConfigurarVariables } from "@/components/contacts/configurar-variables";
 
 type Tag = { id: string; name: string; color: string };
 type Contact = {
@@ -25,6 +28,9 @@ type Contact = {
   wa_id: string;
   created_at: string;
   assignedAgentId: string | null;
+  variable2: string | null;
+  variable3: string | null;
+  variable4: string | null;
   assignedTagIds: string[];
   fromAds: boolean;
   adHeadline: string | null;
@@ -47,14 +53,29 @@ export function ContactsTable({
   lineas,
   plantillas,
   agentes = [],
+  propias = [],
 }: {
   contacts: Contact[];
   allTags: Tag[];
   lineas: LineaOption[];
   plantillas: PlantillaOption[];
   agentes?: Agente[];
+  /** Las variables 2, 3 y 4 con el nombre que les puso este espacio. */
+  propias?: VariablePersonalizada[];
 }) {
   const agentesPorId = new Map(agentes.map((a) => [a.id, a]));
+
+  // Solo se muestran las variables que el espacio nombró, o las que ya tienen
+  // datos cargados. A quien no las usa no se le llena la tabla de columnas
+  // vacías.
+  const columnasVisibles = INDICES_VARIABLE.map((indice) => {
+    const propia = propias.find((p) => p.indice === indice);
+    const hayDatos = contacts.some((c) =>
+      indice === 2 ? c.variable2 : indice === 3 ? c.variable3 : c.variable4
+    );
+    if (!propia?.nombre?.trim() && !hayDatos) return null;
+    return { indice, nombre: propia?.nombre?.trim() || `Variable ${indice}` };
+  }).filter(Boolean) as { indice: number; nombre: string }[];
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -234,6 +255,7 @@ export function ContactsTable({
           />
         </div>
         <div className="relative">
+          <ConfigurarVariables propias={propias} />
           <button
             type="button"
             onClick={() => setFiltersOpen((o) => !o)}
@@ -413,6 +435,11 @@ export function ContactsTable({
               <th className="px-5 py-3 font-medium">Número</th>
               <th className="px-5 py-3 font-medium">Etiquetas</th>
               {agentes.length > 0 && <th className="px-5 py-3 font-medium">Atiende</th>}
+              {columnasVisibles.map((v) => (
+                <th key={v.indice} className="px-5 py-3 font-medium" title={`Rellena {{${v.indice}}} en tus plantillas`}>
+                  {v.nombre}
+                </th>
+              ))}
               <th className="px-5 py-3 font-medium">Contacto desde</th>
               <th className="px-5 py-3 font-medium"></th>
             </tr>
@@ -420,7 +447,10 @@ export function ContactsTable({
           <tbody>
             {filteredContacts.length === 0 && (
               <tr>
-                <td colSpan={agentes.length > 0 ? 7 : 6} className="px-5 py-6 text-center text-muted">
+                <td
+                  colSpan={(agentes.length > 0 ? 7 : 6) + columnasVisibles.length}
+                  className="px-5 py-6 text-center text-muted"
+                >
                   Sin resultados para estos filtros.
                 </td>
               </tr>
@@ -528,6 +558,17 @@ export function ContactsTable({
                         )}
                       </td>
                     )}
+                    {columnasVisibles.map((v) => (
+                      <td key={v.indice} className="px-5 py-3">
+                        <CeldaVariable
+                          contactId={c.id}
+                          indice={v.indice}
+                          valor={
+                            v.indice === 2 ? c.variable2 : v.indice === 3 ? c.variable3 : c.variable4
+                          }
+                        />
+                      </td>
+                    ))}
                     <td className="px-5 py-3 text-muted">
                       {new Date(c.created_at).toLocaleDateString("es-CO")}
                     </td>
