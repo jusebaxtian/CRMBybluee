@@ -8,6 +8,7 @@ import { DeleteTemplateButton } from "@/components/templates/delete-template-but
 import { TemplatePreview } from "@/components/templates/template-preview";
 import { TemplateHeaderMediaUpload } from "@/components/templates/template-header-media-upload";
 import { opcionesDeWaba, wabasDelEspacio } from "@/lib/whatsapp/wabas";
+import type { CampoPersonalizado } from "@/lib/contactos/campos";
 import { noSePuedeUsar, quedaJusto, motivoDelExceso, avisoDeMargenJusto } from "@/lib/whatsapp/limite-plantilla";
 
 const statusLabel: Record<string, string> = {
@@ -33,6 +34,14 @@ export default async function TemplatesPage() {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
   await requireModule(supabase, workspaceId, "templates");
+
+  // Las tres columnas propias: el emparejamiento de variables las ofrece por
+  // su nombre real ("Fecha de la cita"), no como "Columna 2".
+  const { data: campos } = await supabase
+    .from("campos_personalizados")
+    .select("indice, nombre, tipo")
+    .eq("workspace_id", workspaceId ?? "")
+    .order("indice");
 
   const { data: templates } = await supabase
     .from("templates")
@@ -62,7 +71,7 @@ export default async function TemplatesPage() {
 
       <div className="rounded-[13px] border border-border bg-surface p-6">
         <h2 className="mb-4 text-sm font-semibold text-foreground">Crear nueva plantilla</h2>
-        <CreateTemplateForm wabas={wabas} />
+        <CreateTemplateForm wabas={wabas} campos={(campos ?? []) as CampoPersonalizado[]} />
       </div>
 
       <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning">

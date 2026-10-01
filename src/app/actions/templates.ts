@@ -16,6 +16,7 @@ import { requireWorkspace } from "@/lib/auth/with-workspace";
 import { CATEGORIA_PLANTILLA_POR_DEFECTO } from "@/lib/templates/defaults";
 import { wabasDelEspacio } from "@/lib/whatsapp/wabas";
 import { noSePuedeUsar, motivoDelExceso } from "@/lib/whatsapp/limite-plantilla";
+import { cuantasVariables, type VariableDePlantilla } from "@/lib/contactos/campos";
 
 export async function syncTemplates() {
   const ctx = await requireWorkspace();
@@ -181,6 +182,9 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
   const bodyText = String(formData.get("bodyText") ?? "").trim();
   const footerText = String(formData.get("footerText") ?? "").trim();
   const buttonsJson = String(formData.get("buttonsJson") ?? "[]");
+  // Con que se rellena cada {{n}} al enviar, y el ejemplo que ve el revisor
+  // de Meta. Viene del formulario como JSON porque es una lista ordenada.
+  const variablesJson = String(formData.get("variablesJson") ?? "[]");
   const wabaElegida = String(formData.get("wabaId") ?? "");
 
   if (!/^[a-z0-9_]+$/.test(name)) {
@@ -197,6 +201,22 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
   }
   if (["image", "video", "document"].includes(headerKind) && (!headerFile || headerFile.size === 0)) {
     return { error: "Sube el archivo de ejemplo para el encabezado." };
+  }
+
+  let variables: VariableDePlantilla[] = [];
+  try {
+    const parseadas = JSON.parse(variablesJson) as VariableDePlantilla[];
+    if (Array.isArray(parseadas)) variables = parseadas;
+  } catch {
+    return { error: "No se entendieron las variables de la plantilla." };
+  }
+
+  // Cada variable del texto necesita saber de donde sale. Sin esto, al enviar
+  // se rellenarian todas con el nombre --que es lo que hacia antes-- y el
+  // mensaje saldria mal o Meta lo rechazaria.
+  const cuantas = cuantasVariables(bodyText);
+  if (cuantas > 0 && variables.length !== cuantas) {
+    return { error: `La plantilla tiene ${cuantas} variable(s): indica con qué se rellena cada una.` };
   }
 
   let rawButtons: { type: "URL" | "QUICK_REPLY"; text: string; url: string }[];
@@ -290,6 +310,7 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
       headerText: headerKind === "text" ? headerText : undefined,
       headerMedia,
       bodyText,
+      ejemplos: variables.map((v) => v.ejemplo ?? ""),
       footerText: footerText || undefined,
       buttons: buttons.length > 0 ? buttons : undefined,
     });
@@ -310,6 +331,7 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
         body_text: bodyText,
         buttons: buttons.length > 0 ? buttons : null,
         variable_count: variableCount,
+        variables_origen: variables.length > 0 ? variables : null,
         header_format: headerKind === "none" ? null : (headerKind.toUpperCase() as string),
         header_text: headerKind === "text" ? headerText : null,
         header_media_url: headerMediaUrl,

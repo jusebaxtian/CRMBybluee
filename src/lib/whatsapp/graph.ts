@@ -271,6 +271,12 @@ export async function createMetaTemplate(
     bodyText: string;
     footerText?: string;
     buttons?: TemplateButtonInput[];
+    /**
+     * Valor de muestra de cada variable, en orden. Meta los usa para revisar
+     * la plantilla y son lo que ve el revisor: con ejemplos reales
+     * ("23 de octubre") la aprueba mas rapido que con "valor2".
+     */
+    ejemplos?: string[];
   }
 ): Promise<{ id: string; status: string; category: string }> {
   const components: Record<string, unknown>[] = [];
@@ -292,7 +298,13 @@ export async function createMetaTemplate(
   const bodyVariableCount = (input.bodyText.match(/\{\{\d+\}\}/g) ?? []).length;
   if (bodyVariableCount > 0) {
     bodyComponent.example = {
-      body_text: [Array.from({ length: bodyVariableCount }, (_, i) => (i === 0 ? "Juan" : `valor${i + 1}`))],
+      body_text: [
+        Array.from({ length: bodyVariableCount }, (_, i) => {
+          const dado = input.ejemplos?.[i]?.trim();
+          if (dado) return dado;
+          return i === 0 ? "Juan" : `valor${i + 1}`;
+        }),
+      ],
     };
   }
   components.push(bodyComponent);

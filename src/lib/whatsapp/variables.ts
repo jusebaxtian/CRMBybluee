@@ -1,3 +1,5 @@
+import { valorDeContacto, type OrigenVariable, type VariableDePlantilla } from "@/lib/contactos/campos";
+
 // Con qué se rellena {{1}} / {{nombre}} cuando el contacto no tiene un nombre
 // aprovechable. No puede quedar vacío: si la plantilla declara una variable,
 // Meta rechaza el envío con el error 132000 cuando el parámetro va en blanco.
@@ -42,28 +44,75 @@ export function substituteContactVariables(
     .replace(/\{\{\s*1\s*\}\}/g, name);
 }
 
-// Approved Meta templates only take NUMBERED {{1}}, {{2}}... placeholders,
-// filled at send time via separate "components" — not the free-text
-// {{nombre}} token above. Every current caller maps {{1}} in the body (and,
-// if present, the one {{1}} a URL button's link is allowed to carry) to the
-// contact's name, since that's the variable this feature was built for.
+/**
+ * Rellena las variables numeradas de una plantilla aprobada.
+ *
+ * Antes se mandaba SIEMPRE el nombre del contacto, una sola vez: una plantilla
+ * con dos o tres variables fallaba en cada envio, porque Meta responde 132000
+ * cuando falta un parametro. Ahora cada variable toma el dato con el que se
+ * emparejo al crear la plantilla (`variables_origen`): el nombre, o una de las
+ * tres columnas propias del espacio.
+ *
+ * Cuando la plantilla no tiene emparejamiento guardado --las creadas antes de
+ * esto-- se mantiene el comportamiento viejo: todas al nombre. Cambiarlo por
+ * sorpresa habria roto envios que hoy funcionan.
+ *
+ * `faltan` sale con los datos que el contacto no tiene. Quien envia decide que
+ * hacer: la campaña lo salta y lo marca, en vez de mandar "tu cita es el" a
+ * medias.
+ */
 export function buildTemplateSendParams(
   template: {
     variable_count?: number | null;
     buttons?: { type: "URL" | "QUICK_REPLY"; text: string; url?: string }[] | null;
+    variables_origen?: VariableDePlantilla[] | null;
   },
-  contact: { name: string | null; wa_id: string }
+  contact: {
+    name: string | null;
+    wa_id: string;
+    campo1?: string | null;
+    campo2?: string | null;
+    campo3?: string | null;
+  }
 ): {
   bodyParams: string[] | undefined;
   buttonUrlParam: { index: number; value: string } | undefined;
+  faltan: OrigenVariable[];
 } {
   const contactName = contactDisplayName(contact);
-  const bodyParams = (template.variable_count ?? 0) > 0 ? [contactName] : undefined;
+  const cuantas = template.variable_count ?? 0;
+  const emparejamiento = template.variables_origen ?? null;
+  const faltan: OrigenVariable[] = [];
+
+  let bodyParams: string[] | undefined;
+  if (cuantas > 0) {
+    if (!emparejamiento || emparejamiento.length === 0) {
+      bodyParams = [contactName];
+    } else {
+      bodyParams = [];
+      for (let i = 0; i < cuantas; i += 1) {
+        const origen = emparejamiento[i]?.origen ?? "nombre";
+        if (origen === "nombre") {
+          bodyParams.push(contactName);
+          continue;
+        }
+        const valor = valorDeContacto(origen, contact);
+        if (!valor) {
+          faltan.push(origen);
+          // Se mete algo para no dejar el array corto: si el que llama decide
+          // enviar igual, al menos no revienta con un error incomprensible.
+          bodyParams.push("");
+          continue;
+        }
+        bodyParams.push(sanitizeParam(valor));
+      }
+    }
+  }
 
   const urlButtonIndex = (template.buttons ?? []).findIndex(
     (b) => b.type === "URL" && b.url?.includes("{{1}}")
   );
   const buttonUrlParam = urlButtonIndex >= 0 ? { index: urlButtonIndex, value: contactName } : undefined;
 
-  return { bodyParams, buttonUrlParam };
+  return { bodyParams, buttonUrlParam, faltan };
 }

@@ -162,6 +162,9 @@ async function runCampaignSendLoop(
       name: string | null;
       likely_blocked: boolean;
       marketing_opt_out_at: string | null;
+      campo1: string | null;
+      campo2: string | null;
+      campo3: string | null;
     };
   };
   const PAGE_SIZE = 1000;
@@ -169,7 +172,9 @@ async function runCampaignSendLoop(
   for (let offset = 0; ; offset += PAGE_SIZE) {
     const { data: batch } = await supabase
       .from("campaign_recipients")
-      .select("id, contact_id, contacts(wa_id, name, likely_blocked, marketing_opt_out_at)")
+      .select(
+        "id, contact_id, contacts(wa_id, name, likely_blocked, marketing_opt_out_at, campo1, campo2, campo3)"
+      )
       .eq("campaign_id", campaignId)
       .eq("status", "pending")
       .range(offset, offset + PAGE_SIZE - 1);
@@ -210,6 +215,16 @@ async function runCampaignSendLoop(
       if (batch.length < PAGE_SIZE) break;
     }
   }
+
+  // Como se llaman las tres columnas en este espacio: el motivo de un fallo
+  // tiene que decir "le falta la Fecha de la cita", no "le falta campo2".
+  const { data: camposDelEspacio } = await supabase
+    .from("campos_personalizados")
+    .select("indice, nombre")
+    .eq("workspace_id", workspaceId);
+  const etiquetasDeCampos = new Map<string, string>(
+    (camposDelEspacio ?? []).map((c) => [`campo${c.indice}`, (c.nombre as string) || `Columna ${c.indice}`])
+  );
 
   let failures = 0;
   const mediaKind = campaign.media_url ? mediaKindFromMime(guessMimeFromFilename(campaign.media_filename)) : null;
@@ -267,6 +282,9 @@ async function runCampaignSendLoop(
       name: string | null;
       likely_blocked: boolean;
       marketing_opt_out_at: string | null;
+      campo1: string | null;
+      campo2: string | null;
+      campo3: string | null;
     };
     const { wa_id: waId, likely_blocked: likelyBlocked } = contact;
 
@@ -320,7 +338,22 @@ async function runCampaignSendLoop(
     }
     try {
       if (campaign.send_type === "template" && template) {
-        const { bodyParams, buttonUrlParam } = buildTemplateSendParams(template, contact);
+        const { bodyParams, buttonUrlParam, faltan } = buildTemplateSendParams(template, contact);
+
+        // Al contacto le falta un dato que la plantilla necesita. Se salta y
+        // se dice cual: mandar "tu cita es el" sin fecha es peor que no
+        // mandar, y Meta ademas rechaza el parametro vacio (132000).
+        if (faltan.length > 0) {
+          const nombres = faltan.map((f) => etiquetasDeCampos.get(f) ?? f).join(", ");
+          await supabase
+            .from("campaign_recipients")
+            .update({
+              status: "failed",
+              error_message: `Le falta el dato: ${nombres}. Complétalo en Contactos y vuelve a enviarle.`,
+            })
+            .eq("id", recipient.id);
+          continue;
+        }
         const result = await sendTemplateMessage(
           account.phone_number_id,
           account.access_token,

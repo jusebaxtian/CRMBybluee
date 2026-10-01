@@ -7,6 +7,8 @@ import { normalizarNombrePlantilla } from "@/lib/templates/nombre";
 import { Button } from "@/components/ui/button";
 import { CATEGORIA_PLANTILLA_POR_DEFECTO } from "@/lib/templates/defaults";
 import type { WabaOption } from "@/lib/whatsapp/wabas";
+import { ajustarVariables, cuantasVariables, type CampoPersonalizado, type VariableDePlantilla } from "@/lib/contactos/campos";
+import { EmparejarVariables } from "@/components/templates/emparejar-variables";
 import {
   LIMITE_CUERPO,
   RESERVA_POR_VARIABLE,
@@ -55,7 +57,14 @@ function submitWithProgress(
   });
 }
 
-export function CreateTemplateForm({ wabas = [] }: { wabas?: WabaOption[] }) {
+export function CreateTemplateForm({
+  wabas = [],
+  campos = [],
+}: {
+  wabas?: WabaOption[];
+  /** Como se llaman las tres columnas propias de este espacio. */
+  campos?: CampoPersonalizado[];
+}) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [category, setCategory] = useState<string>(CATEGORIA_PLANTILLA_POR_DEFECTO);
@@ -79,6 +88,14 @@ export function CreateTemplateForm({ wabas = [] }: { wabas?: WabaOption[] }) {
   const seExcede = noSePuedeUsar(bodyText);
   const justa = quedaJusto(bodyText);
 
+  // El emparejamiento sigue al texto: si se agrega o quita un {{n}}, la lista
+  // crece o se recorta sola sin perder lo ya elegido.
+  const [variables, setVariables] = useState<VariableDePlantilla[]>([]);
+  const cuantasEnElTexto = cuantasVariables(bodyText);
+  if (variables.length !== cuantasEnElTexto) {
+    setVariables(ajustarVariables(variables, cuantasEnElTexto));
+  }
+
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -93,6 +110,7 @@ export function CreateTemplateForm({ wabas = [] }: { wabas?: WabaOption[] }) {
 
     const formData = new FormData(e.currentTarget);
     formData.set("buttonsJson", JSON.stringify(buttons));
+    formData.set("variablesJson", JSON.stringify(variables));
 
     try {
       const result = await submitWithProgress(formData, setProgress);
@@ -104,6 +122,7 @@ export function CreateTemplateForm({ wabas = [] }: { wabas?: WabaOption[] }) {
         setCategory(CATEGORIA_PLANTILLA_POR_DEFECTO);
         setLanguage("es");
         setBodyText("");
+        setVariables([]);
         setHeaderKind("none");
         setHeaderText("");
         setFooterText("");
@@ -301,6 +320,9 @@ export function CreateTemplateForm({ wabas = [] }: { wabas?: WabaOption[] }) {
           </p>
         )}
       </div>
+
+      <EmparejarVariables variables={variables} campos={campos} onCambiar={setVariables} />
+
 
       <div>
         <label htmlFor="footerText" className="mb-1 block text-sm font-medium text-muted">
