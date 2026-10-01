@@ -1,3 +1,4 @@
+import { cuantasVariables } from "@/lib/contactos/variables";
 import { traducirErrorMeta } from "@/lib/whatsapp/errores";
 import { nombreDeArchivoDeUrl } from "@/lib/whatsapp/nombre-archivo";
 
@@ -296,7 +297,10 @@ export async function createMetaTemplate(
   // Meta rejects a body with {{n}} placeholders unless an example value is
   // supplied for each one — "Juan" stands in for the contact name, which is
   // what every current caller maps {{1}} to at send time.
-  const bodyVariableCount = (input.bodyText.match(/\{\{\d+\}\}/g) ?? []).length;
+  // Se cuenta por el indice mas alto, no por cuantas veces aparece: "Hola
+  // {{1}}, gracias {{1}}" es UNA variable usada dos veces, y mandarle dos
+  // ejemplos a Meta es tan invalido como no mandarle ninguno.
+  const bodyVariableCount = cuantasVariables(input.bodyText);
   if (bodyVariableCount > 0) {
     bodyComponent.example = {
       body_text: [

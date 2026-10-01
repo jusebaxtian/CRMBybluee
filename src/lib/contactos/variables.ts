@@ -59,11 +59,45 @@ export function etiquetaDeOrigen(origen: OrigenVariable, variables: VariablePers
   return nombre ? `Variable ${indice} · ${nombre}` : `Variable ${indice}`;
 }
 
+/**
+ * Deja las variables en su forma canonica: "{{ 2 }}" -> "{{2}}".
+ *
+ * Hace falta porque la gente escribe los espacios sin darse cuenta y cada
+ * sitio contaba distinto. El 2 oct 2026 eso dejo a un cliente sin poder crear
+ * su plantilla: el emparejamiento veia una variable y el envio a Meta veia
+ * cero, asi que la plantilla viajaba sin el ejemplo obligatorio y Meta la
+ * rechazaba con "Al componente de tipo BODY le faltan los campos esperados
+ * (example)".
+ */
+export function normalizarVariables(texto: string): string {
+  return texto.replace(/\{\{\s*(\d+)\s*\}\}/g, "{{$1}}");
+}
+
 /** Cuántas variables {{n}} declara un texto de plantilla. */
 export function cuantasVariables(texto: string): number {
   const encontradas = texto.match(/\{\{\s*(\d+)\s*\}\}/g) ?? [];
   const numeros = encontradas.map((v) => Number(v.replace(/\D/g, "")));
   return numeros.length === 0 ? 0 : Math.max(...numeros);
+}
+
+/**
+ * Las variables que el texto se salto.
+ *
+ * WhatsApp exige que esten numeradas desde {{1}} y en orden: un cuerpo que
+ * usa solo {{2}} lo rechaza. Y antes de eso confundia aqui, porque el
+ * emparejamiento pedia el ejemplo de una {{1}} que no existia en el mensaje.
+ */
+export function variablesSaltadas(texto: string): number[] {
+  const usadas = new Set(
+    (texto.match(/\{\{\s*(\d+)\s*\}\}/g) ?? []).map((v) => Number(v.replace(/\D/g, "")))
+  );
+  if (usadas.size === 0) return [];
+  const mayor = Math.max(...usadas);
+  const faltan: number[] = [];
+  for (let i = 1; i <= mayor; i += 1) {
+    if (!usadas.has(i)) faltan.push(i);
+  }
+  return faltan;
 }
 
 /**

@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { buildTemplateSendParams } from "@/lib/whatsapp/variables";
-import { ajustarVariables, cuantasVariables, normalizarValor, valorDeContacto } from "@/lib/contactos/variables";
+import {
+  ajustarVariables,
+  cuantasVariables,
+  normalizarValor,
+  normalizarVariables,
+  valorDeContacto,
+  variablesSaltadas,
+} from "@/lib/contactos/variables";
 
 /**
  * El caso real que pidió esto: "Hola {{1}}, tienes una cita para el {{2}} a
@@ -114,5 +121,41 @@ describe("leer el valor del contacto", () => {
   it("devuelve null cuando está vacío, para poder avisar", () => {
     expect(valorDeContacto("variable4", contacto)).toBeNull();
     expect(valorDeContacto("variable2", contacto)).toBe("23 de octubre");
+  });
+});
+
+// El fallo del 2 oct 2026: un cliente no podía crear su plantilla y Meta
+// respondía "Al componente de tipo BODY le faltan los campos esperados
+// (example)". La causa eran tres formas distintas de contar las variables.
+describe("contar variables: una sola forma para todos", () => {
+  it("cuenta igual con espacios dentro de las llaves", () => {
+    // Este era el caso roto: el emparejamiento veía 1 y el envío a Meta veía
+    // 0, así que la plantilla viajaba sin el ejemplo obligatorio.
+    expect(cuantasVariables("Hola {{ 1 }} que tal")).toBe(1);
+    expect(normalizarVariables("Hola {{ 1 }} que tal")).toBe("Hola {{1}} que tal");
+  });
+
+  it("una variable repetida sigue siendo una", () => {
+    // Antes contaba 2 y le mandaba dos ejemplos a Meta para una sola variable.
+    expect(cuantasVariables("Hola {{1}}, gracias {{1}}")).toBe(1);
+  });
+
+  it("normalizar no toca nada más del texto", () => {
+    expect(normalizarVariables("Precio: $1.000 {{2}} y {{ 3 }}")).toBe("Precio: $1.000 {{2}} y {{3}}");
+  });
+});
+
+describe("numeración sin huecos", () => {
+  it("detecta que falta {{1}} cuando solo se usa {{2}}", () => {
+    expect(variablesSaltadas("Tu cita es el {{2}}")).toEqual([1]);
+  });
+
+  it("detecta varios huecos", () => {
+    expect(variablesSaltadas("Hola {{1}} el {{4}}")).toEqual([2, 3]);
+  });
+
+  it("una numeración correcta no da huecos", () => {
+    expect(variablesSaltadas("Hola {{1}}, cita {{2}} a las {{3}}")).toEqual([]);
+    expect(variablesSaltadas("Sin variables")).toEqual([]);
   });
 });

@@ -16,7 +16,12 @@ import { requireWorkspace } from "@/lib/auth/with-workspace";
 import { CATEGORIA_PLANTILLA_POR_DEFECTO } from "@/lib/templates/defaults";
 import { wabasDelEspacio } from "@/lib/whatsapp/wabas";
 import { noSePuedeUsar, motivoDelExceso } from "@/lib/whatsapp/limite-plantilla";
-import { cuantasVariables, type VariableDePlantilla } from "@/lib/contactos/variables";
+import {
+  cuantasVariables,
+  normalizarVariables,
+  variablesSaltadas,
+  type VariableDePlantilla,
+} from "@/lib/contactos/variables";
 
 export async function syncTemplates() {
   const ctx = await requireWorkspace();
@@ -38,7 +43,7 @@ export async function syncTemplates() {
       for (const t of metaTemplates) {
         const bodyComponent = t.components.find((c) => c.type === "BODY");
         const bodyText = bodyComponent?.text ?? "";
-        const variableCount = (bodyText.match(/\{\{\d+\}\}/g) ?? []).length;
+        const variableCount = cuantasVariables(bodyText);
 
         // A template created directly in Meta Business Manager (not through
         // "Crear plantilla" here) used to sync in with NO header info at all —
@@ -179,7 +184,9 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
     | "document";
   const headerText = String(formData.get("headerText") ?? "").trim();
   const headerFile = formData.get("headerFile") as File | null;
-  const bodyText = String(formData.get("bodyText") ?? "").trim();
+  // Se normaliza aqui, antes de todo: asi el texto que se valida, el que se
+  // le manda a Meta y el que se guarda son exactamente el mismo.
+  const bodyText = normalizarVariables(String(formData.get("bodyText") ?? "").trim());
   const footerText = String(formData.get("footerText") ?? "").trim();
   const buttonsJson = String(formData.get("buttonsJson") ?? "[]");
   // Con que se rellena cada {{n}} al enviar, y el ejemplo que ve el revisor
@@ -214,6 +221,16 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
   // Cada variable del texto necesita saber de donde sale. Sin esto, al enviar
   // se rellenarian todas con el nombre --que es lo que hacia antes-- y el
   // mensaje saldria mal o Meta lo rechazaria.
+  // WhatsApp exige numeracion desde {{1}} y sin huecos. Mejor decirlo aqui
+  // que dejar que Meta lo rechace con un mensaje incomprensible.
+  const saltadas = variablesSaltadas(bodyText);
+  if (saltadas.length > 0) {
+    const lista = saltadas.map((n) => `{{${n}}}`).join(", ");
+    return {
+      error: `Las variables tienen que empezar en {{1}} y seguir en orden. Te falta ${lista} en el mensaje.`,
+    };
+  }
+
   const cuantas = cuantasVariables(bodyText);
   if (cuantas > 0 && variables.length !== cuantas) {
     return { error: `La plantilla tiene ${cuantas} variable(s): indica con qué se rellena cada una.` };
@@ -315,7 +332,7 @@ export async function createTemplate(_prevState: unknown, formData: FormData) {
       buttons: buttons.length > 0 ? buttons : undefined,
     });
 
-    const variableCount = (bodyText.match(/\{\{\d+\}\}/g) ?? []).length;
+    const variableCount = cuantasVariables(bodyText);
 
     // Meta already accepted the template at this point — if this insert
     // fails silently, the client sees a false "success" while the template

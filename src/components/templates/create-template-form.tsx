@@ -7,7 +7,13 @@ import { normalizarNombrePlantilla } from "@/lib/templates/nombre";
 import { Button } from "@/components/ui/button";
 import { CATEGORIA_PLANTILLA_POR_DEFECTO } from "@/lib/templates/defaults";
 import type { WabaOption } from "@/lib/whatsapp/wabas";
-import { ajustarVariables, cuantasVariables, type VariablePersonalizada, type VariableDePlantilla } from "@/lib/contactos/variables";
+import {
+  ajustarVariables,
+  cuantasVariables,
+  variablesSaltadas,
+  type VariablePersonalizada,
+  type VariableDePlantilla,
+} from "@/lib/contactos/variables";
 import { EmparejarVariables } from "@/components/templates/emparejar-variables";
 import {
   LIMITE_CUERPO,
@@ -92,6 +98,9 @@ export function CreateTemplateForm({
   // crece o se recorta sola sin perder lo ya elegido.
   const [variables, setVariables] = useState<VariableDePlantilla[]>([]);
   const cuantasEnElTexto = cuantasVariables(bodyText);
+  // Si el texto usa {{2}} sin {{1}}, WhatsApp lo rechaza. Se avisa mientras
+  // escribe en vez de dejar que lo descubra al enviar a aprobacion.
+  const saltadas = variablesSaltadas(bodyText);
   if (variables.length !== cuantasEnElTexto) {
     setVariables(ajustarVariables(variables, cuantasEnElTexto));
   }
@@ -321,7 +330,16 @@ export function CreateTemplateForm({
         )}
       </div>
 
-      <EmparejarVariables variables={variables} propias={propias} onCambiar={setVariables} />
+      {saltadas.length > 0 && (
+        <p className="rounded-[9px] border border-red-400/40 bg-red-400/10 px-3 py-2 text-xs leading-relaxed text-foreground">
+          Las variables tienen que empezar en {"{{1}}"} y seguir en orden. En tu mensaje falta{" "}
+          {saltadas.map((n) => `{{${n}}}`).join(", ")}. WhatsApp rechaza las plantillas que se saltan un número.
+        </p>
+      )}
+
+      {saltadas.length === 0 && (
+        <EmparejarVariables variables={variables} propias={propias} onCambiar={setVariables} />
+      )}
 
 
       <div>
@@ -436,7 +454,7 @@ export function CreateTemplateForm({
         </div>
       )}
 
-      <Button type="submit" disabled={uploading || seExcede} className="self-start">
+      <Button type="submit" disabled={uploading || seExcede || saltadas.length > 0} className="self-start">
         {uploading ? "Enviando a Meta..." : "Enviar plantilla a aprobación"}
       </Button>
     </form>
