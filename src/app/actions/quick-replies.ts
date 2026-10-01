@@ -17,6 +17,8 @@ type ActionInput = {
     | "send_template";
   message_body?: string;
   tag_id?: string;
+  /** Segundos a esperar antes de este mensaje. 0 = de inmediato. */
+  delay_seconds?: number;
   media_url?: string;
   media_filename?: string;
   template_id?: string;
@@ -37,6 +39,9 @@ function actionRow(a: ActionInput, quickReplyId: string, index: number) {
     media_filename: a.action_type === "send_document" ? a.media_filename : null,
     template_id: a.action_type === "send_template" ? a.template_id : null,
     buttons: a.action_type === "send_message" && a.buttons?.length ? a.buttons : null,
+    // Tope de 24 horas: una respuesta rapida que espera mas que eso no se
+    // podria entregar, porque se sale de la ventana de WhatsApp.
+    delay_seconds: Math.min(Math.max(0, Math.round(a.delay_seconds ?? 0)), 86_400),
   };
 }
 

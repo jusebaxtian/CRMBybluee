@@ -26,7 +26,7 @@ export default async function EditQuickReplyPage({
 
   const { data: actions } = await supabase
     .from("quick_reply_actions")
-    .select("action_type, message_body, tag_id, media_url, media_filename, template_id")
+    .select("action_type, message_body, tag_id, media_url, media_filename, template_id, delay_seconds")
     .eq("quick_reply_id", id)
     .order("position", { ascending: true });
 

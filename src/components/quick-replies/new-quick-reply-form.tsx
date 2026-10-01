@@ -55,7 +55,7 @@ export function NewQuickReplyForm({
           templates={templates}
           initialActions={quickReply?.actions}
           hideAgentActions
-          showDelay={false}
+          showDelay
           onUploadingChange={setUploading}
         />
       </div>

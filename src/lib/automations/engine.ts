@@ -100,7 +100,7 @@ export async function executeAction(
     const { data: qrActions } = await supabase
       .from("quick_reply_actions")
       .select(
-        "position, action_type, message_body, tag_id, media_url, media_filename, template_id, buttons, templates(meta_template_name, language, body_text, header_format, header_media_url, variable_count, buttons)"
+        "position, action_type, message_body, tag_id, media_url, media_filename, template_id, delay_seconds, buttons, templates(meta_template_name, language, body_text, header_format, header_media_url, variable_count, buttons)"
       )
       .eq("quick_reply_id", action.quick_reply_id)
       .order("position");
@@ -113,7 +113,9 @@ export async function executeAction(
         {
           ...qrAction,
           quick_reply_id: null,
-          delay_seconds: 0,
+          // La espera que configuro el usuario para ESTE mensaje. Antes iba
+          // fija en 0 y los mensajes salian todos en el mismo segundo.
+          delay_seconds: qrAction.delay_seconds ?? 0,
           target_agent_id: null,
           agent_distribution: null,
           templates: qrAction.templates as unknown as AutomationAction["templates"],
