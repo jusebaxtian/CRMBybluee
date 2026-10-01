@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { runTagAddedAutomations } from "@/lib/automations/engine";
+import { iniciarPorEtiqueta } from "@/lib/flujos/motor";
 import { maybeTrackPurchaseFromTag } from "@/lib/meta/conversions";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
 import { cargarContactosDeEtiqueta } from "@/lib/dashboard/datos";
@@ -137,7 +138,12 @@ export async function toggleContactTag(input: {
       .from("contact_tags")
       .insert({ contact_id: input.contactId, tag_id: input.tagId });
 
-    await runTagAddedAutomations(supabase, workspaceId, input.contactId, input.tagId);
+    // Flujos va primero y manda: si uno arranca con esta etiqueta, se hace
+    // cargo del contacto y las automatizaciones no se meten encima.
+    const loTomoUnFlujo = await iniciarPorEtiqueta(supabase, workspaceId, input.contactId, input.tagId);
+    if (!loTomoUnFlujo) {
+      await runTagAddedAutomations(supabase, workspaceId, input.contactId, input.tagId);
+    }
     await maybeTrackPurchaseFromTag(supabase, workspaceId, input.contactId, input.tagId);
   } else {
     await supabase

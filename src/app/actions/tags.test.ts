@@ -13,16 +13,22 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  * pruebas fallan aunque la base siga protegida.
  */
 
-const { requireWorkspace, runTagAddedAutomations, maybeTrackPurchaseFromTag } = vi.hoisted(() => ({
-  requireWorkspace: vi.fn(),
-  runTagAddedAutomations: vi.fn(),
-  maybeTrackPurchaseFromTag: vi.fn(),
-}));
+const { requireWorkspace, runTagAddedAutomations, maybeTrackPurchaseFromTag, iniciarPorEtiqueta } = vi.hoisted(
+  () => ({
+    requireWorkspace: vi.fn(),
+    runTagAddedAutomations: vi.fn(),
+    maybeTrackPurchaseFromTag: vi.fn(),
+    // Por defecto ningun flujo escucha la etiqueta: asi las pruebas de
+    // automatizaciones siguen valiendo tal cual.
+    iniciarPorEtiqueta: vi.fn().mockResolvedValue(false),
+  })
+);
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/auth/with-workspace", () => ({ requireWorkspace }));
 vi.mock("@/lib/automations/engine", () => ({ runTagAddedAutomations }));
 vi.mock("@/lib/meta/conversions", () => ({ maybeTrackPurchaseFromTag }));
+vi.mock("@/lib/flujos/motor", () => ({ iniciarPorEtiqueta }));
 
 import {
   toggleTagExcludesFollowups,
@@ -199,5 +205,22 @@ describe("toggleContactTag — el hueco que RLS no cubre", () => {
     const { llamadas } = sinEspacio();
     await toggleContactTag({ contactId: "c1", tagId: "tag-1", assign: true });
     expect(llamadas).toHaveLength(0);
+  });
+});
+
+// Flujos manda sobre las automatizaciones: si un flujo arranca con esta
+// etiqueta, se hace cargo del contacto y la automatizacion no corre encima.
+// Sin esto el cliente recibiria los dos mensajes a la vez.
+describe("etiqueta que dispara un flujo", () => {
+  it("no corre la automatización cuando un flujo se hizo cargo", async () => {
+    iniciarPorEtiqueta.mockResolvedValueOnce(true);
+    runTagAddedAutomations.mockClear();
+
+    conEspacio({ etiquetaEncontrada: true });
+
+    await toggleContactTag({ contactId: "c1", tagId: "tag-1", assign: true });
+
+    expect(iniciarPorEtiqueta).toHaveBeenCalled();
+    expect(runTagAddedAutomations).not.toHaveBeenCalled();
   });
 });

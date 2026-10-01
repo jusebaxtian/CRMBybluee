@@ -553,6 +553,7 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           const arranco = await iniciarPorMensaje(supabase, workspaceId, contact.id, conversation.id, {
             texto: message.text?.body ?? null,
             esPrimeroDelDia: await esElPrimerMensajeDelDia(supabase, contact.id, message.id),
+            whatsappAccountId,
           });
           if (arranco) continue;
         }

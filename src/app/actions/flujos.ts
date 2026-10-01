@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
 import { revisarFlujo } from "@/lib/flujos/validar";
 import type { DatosBloque, TipoBloque } from "@/lib/flujos/bloques";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
  * Guardado del lienzo.
@@ -249,5 +250,59 @@ export async function activarFlujo(flujoId: string, activo: boolean) {
 
   revalidatePath(`/dashboard/flujos/${flujoId}`);
   revalidatePath("/dashboard/flujos");
+  return { ok: true as const };
+}
+
+/** Por qué línea de WhatsApp sale este flujo. */
+export async function guardarLineaDelFlujo(flujoId: string, whatsappAccountId: string | null) {
+  const ctx = await flujoDelEspacio(flujoId);
+  if ("error" in ctx) return ctx;
+
+  const { error } = await ctx.supabase
+    .from("flujos")
+    .update({ whatsapp_account_id: whatsappAccountId, updated_at: new Date().toISOString() })
+    .eq("id", flujoId);
+  if (error) return { error: error.message };
+
+  revalidatePath(`/dashboard/flujos/${flujoId}`);
+  return { ok: true as const };
+}
+
+/**
+ * Mete al contacto a un flujo desde el chat.
+ *
+ * Solo para flujos activos que tengan el disparador de entrada manual. El
+ * motivo del "no" se devuelve tal cual para mostrarlo: un agente tiene que
+ * saber si el flujo está en borrador o si el contacto ya está en otro.
+ */
+export async function meterContactoEnFlujo(flujoId: string, contactId: string, conversationId: string | null) {
+  const supabase = await createClient();
+  const workspaceId = await getWorkspaceId(supabase);
+  if (!workspaceId) return { error: "Sin espacio de trabajo." };
+
+  const { data: flujo } = await supabase
+    .from("flujos")
+    .select("id")
+    .eq("id", flujoId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (!flujo) return { error: "Flujo no encontrado." };
+
+  const { data: contacto } = await supabase
+    .from("contacts")
+    .select("id")
+    .eq("id", contactId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (!contacto) return { error: "Contacto no encontrado." };
+
+  // El motor escribe con la llave de servicio: mueve al contacto, manda
+  // mensajes y programa esperas, que no es algo que deba poder hacer el
+  // navegador por su cuenta.
+  const { iniciarAMano } = await import("@/lib/flujos/motor");
+  const resultado = await iniciarAMano(createAdminClient(), flujoId, contactId, conversationId);
+  if (!resultado.ok) return { error: resultado.motivo };
+
+  revalidatePath(`/dashboard/inbox/${conversationId ?? ""}`);
   return { ok: true as const };
 }

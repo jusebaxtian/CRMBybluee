@@ -151,10 +151,18 @@ export async function avanzar(supabase: Supabase, ejecucionId: string): Promise<
         .maybeSingle()
     : { data: null };
 
+  // La linea del flujo manda sobre la del hilo: si el flujo es de la linea de
+  // ventas, sale por ventas aunque el contacto haya escrito por soporte.
+  const { data: flujoDelEnvio } = await supabase
+    .from("flujos")
+    .select("whatsapp_account_id")
+    .eq("id", ejecucion.flujo_id as string)
+    .maybeSingle();
+
   const cuenta = await resolveSendAccount(
     supabase,
     ejecucion.workspace_id as string,
-    conversacion?.whatsapp_account_id ?? null
+    (flujoDelEnvio?.whatsapp_account_id as string | null) ?? conversacion?.whatsapp_account_id ?? null
   );
   if (!cuenta) {
     await cerrar(supabase, ejecucionId, "cancelado");
@@ -578,11 +586,11 @@ export async function iniciarPorMensaje(
   workspaceId: string,
   contactId: string,
   conversationId: string | null,
-  entrada: { texto: string | null; esPrimeroDelDia: boolean }
+  entrada: { texto: string | null; esPrimeroDelDia: boolean; whatsappAccountId?: string | null }
 ): Promise<boolean> {
   const { data: flujos } = await supabase
     .from("flujos")
-    .select("id, updated_at, flujo_disparadores(tipo, valor)")
+    .select("id, updated_at, whatsapp_account_id, flujo_disparadores(tipo, valor)")
     .eq("workspace_id", workspaceId)
     .eq("activo", true)
     .order("updated_at", { ascending: false });
@@ -590,6 +598,11 @@ export async function iniciarPorMensaje(
   const texto = (entrada.texto ?? "").toLowerCase();
 
   for (const flujo of flujos ?? []) {
+    // Un flujo atado a una linea no arranca con un mensaje que llego por otra:
+    // el contacto que escribe a soporte no debe caer en el flujo de ventas.
+    const lineaDelFlujo = flujo.whatsapp_account_id as string | null;
+    if (lineaDelFlujo && entrada.whatsappAccountId && lineaDelFlujo !== entrada.whatsappAccountId) continue;
+
     const disparadores = (flujo.flujo_disparadores ?? []) as { tipo: string; valor: string | null }[];
     const coincide = disparadores.some((d) => {
       if (d.tipo === "any_message") return true;
@@ -608,4 +621,90 @@ export async function iniciarPorMensaje(
   }
 
   return false;
+}
+
+/**
+ * Arranca el flujo que escuche esta etiqueta.
+ *
+ * Se llama justo despues de ponersela al contacto. Igual que con los
+ * mensajes, solo entra un flujo: el editado mas recientemente entre los que
+ * la escuchan.
+ */
+export async function iniciarPorEtiqueta(
+  supabase: Supabase,
+  workspaceId: string,
+  contactId: string,
+  tagId: string
+): Promise<boolean> {
+  const { data: flujos } = await supabase
+    .from("flujos")
+    .select("id, updated_at, flujo_disparadores(tipo, tag_id)")
+    .eq("workspace_id", workspaceId)
+    .eq("activo", true)
+    .order("updated_at", { ascending: false });
+
+  for (const flujo of flujos ?? []) {
+    const disparadores = (flujo.flujo_disparadores ?? []) as { tipo: string; tag_id: string | null }[];
+    if (!disparadores.some((d) => d.tipo === "tag" && d.tag_id === tagId)) continue;
+
+    // La conversacion puede no existir todavia (un contacto importado al que
+    // nadie le ha escrito): el flujo la abre al mandar su primer mensaje.
+    const { data: conversacion } = await supabase
+      .from("conversations")
+      .select("id")
+      .eq("contact_id", contactId)
+      .order("last_message_at", { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
+
+    const ejecucion = await iniciarFlujo(
+      supabase,
+      flujo.id as string,
+      contactId,
+      (conversacion?.id as string | null) ?? null
+    );
+    if (ejecucion) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Mete a un contacto al flujo a mano, desde el chat.
+ *
+ * Devuelve por que no se pudo, cuando no se pudo: el agente tiene que saber
+ * si el contacto ya estaba en otro flujo o si el flujo esta en borrador, en
+ * vez de ver que "no paso nada".
+ */
+export async function iniciarAMano(
+  supabase: Supabase,
+  flujoId: string,
+  contactId: string,
+  conversationId: string | null
+): Promise<{ ok: true } | { ok: false; motivo: string }> {
+  const { data: flujo } = await supabase
+    .from("flujos")
+    .select("id, activo, flujo_disparadores(tipo)")
+    .eq("id", flujoId)
+    .maybeSingle();
+  if (!flujo) return { ok: false, motivo: "Ese flujo ya no existe." };
+  if (!flujo.activo) return { ok: false, motivo: "El flujo está en borrador: actívalo primero." };
+
+  const disparadores = (flujo.flujo_disparadores ?? []) as { tipo: string }[];
+  if (!disparadores.some((d) => d.tipo === "manual")) {
+    return {
+      ok: false,
+      motivo: 'Este flujo no permite entrada manual. Agrégale el disparador "Un agente lo mete a mano".',
+    };
+  }
+
+  if (await contactoEnFlujo(supabase, contactId)) {
+    return { ok: false, motivo: "Este contacto ya está dentro de un flujo. Espera a que termine." };
+  }
+
+  const ejecucion = await iniciarFlujo(supabase, flujoId, contactId, conversationId);
+  if (!ejecucion) {
+    return { ok: false, motivo: "No se pudo arrancar: revisa que el bloque de inicio esté conectado." };
+  }
+  return { ok: true };
 }

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, Zap, Megaphone } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { ContactTagPicker } from "@/components/tags/contact-tag-picker";
+import { MeterEnFlujo } from "@/components/flujos/meter-en-flujo";
 import { NotesEditor } from "@/components/inbox/notes-editor";
 import { ChatPane } from "@/components/inbox/chat-pane";
 import { RealtimeRefresh } from "@/components/ui/realtime-refresh";
@@ -162,6 +163,16 @@ export default async function ConversationPage({
 
   // Segunda ronda: lo unico que necesitaba conocer la conversacion primero.
   // Tambien va en paralelo entre si.
+  // Flujos activos que aceptan entrada manual: son los unicos que tiene
+  // sentido ofrecerle al agente en el chat.
+  const { data: flujosManuales } = await supabase
+    .from("flujos")
+    .select("id, nombre, flujo_disparadores!inner(tipo)")
+    .eq("workspace_id", workspaceId ?? "")
+    .eq("activo", true)
+    .eq("flujo_disparadores.tipo", "manual")
+    .order("nombre");
+
   const [{ data: automations }] = await Promise.all([
     assignedTagIds.length > 0
       ? supabase
@@ -354,6 +365,23 @@ export default async function ConversationPage({
             assignedTagIds={assignedTagIds}
           />
         </div>
+
+        {(flujosManuales ?? []).length > 0 && (
+          <div className="mt-6">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">Flujos</p>
+              <MeterEnFlujo
+                contactId={conversation.contact_id}
+                conversationId={conversation.id}
+                flujos={(flujosManuales ?? []).map((f) => ({ id: f.id as string, nombre: f.nombre as string }))}
+              />
+            </div>
+            <p className="text-[11px] leading-relaxed text-muted">
+              Mete a este contacto a un flujo. Mientras esté dentro, las automatizaciones y el agente de IA no
+              le responden.
+            </p>
+          </div>
+        )}
 
         <div className="mt-6">
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">

@@ -8,6 +8,7 @@ import { listWorkspaceAgents } from "@/lib/agents";
 import { noSePuedeUsar } from "@/lib/whatsapp/limite-plantilla";
 import { LienzoFlujo, type ConexionInicial, type NodoInicial } from "@/components/flujos/lienzo";
 import { ActivarFlujo } from "@/components/flujos/activar-flujo";
+import { LineaDelFlujo } from "@/components/flujos/linea-del-flujo";
 import type { DatosBloque, TipoBloque } from "@/lib/flujos/bloques";
 
 export default async function FlujoPage({ params }: { params: Promise<{ id: string }> }) {
@@ -18,7 +19,7 @@ export default async function FlujoPage({ params }: { params: Promise<{ id: stri
 
   const { data: flujo } = await supabase
     .from("flujos")
-    .select("id, nombre, activo")
+    .select("id, nombre, activo, whatsapp_account_id")
     .eq("id", id)
     .eq("workspace_id", workspaceId ?? "")
     .maybeSingle();
@@ -68,6 +69,15 @@ export default async function FlujoPage({ params }: { params: Promise<{ id: stri
 
   const agentes = await listWorkspaceAgents(supabase, workspaceId);
 
+  // Las lineas conectadas del espacio: por cual sale el flujo y cual lo
+  // dispara.
+  const { data: lineas } = await supabase
+    .from("whatsapp_accounts")
+    .select("id, label, display_phone_number")
+    .eq("workspace_id", workspaceId ?? "")
+    .neq("status", "frozen")
+    .order("connected_at");
+
   // Los disparadores viven en su propia tabla pero se editan dentro del
   // bloque de inicio: aqui se devuelven a ese bloque para pintarlos.
   const disparadoresDelInicio = (disparadores ?? []).map((d) => ({
@@ -113,6 +123,11 @@ export default async function FlujoPage({ params }: { params: Promise<{ id: stri
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-3">
+          <LineaDelFlujo
+            flujoId={id}
+            lineaActual={(flujo.whatsapp_account_id as string | null) ?? null}
+            lineas={lineas ?? []}
+          />
           <span
             className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
               flujo.activo ? "border-success text-success" : "border-border text-muted"
