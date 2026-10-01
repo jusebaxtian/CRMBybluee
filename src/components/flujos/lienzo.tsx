@@ -19,6 +19,7 @@ import { AlertTriangle, Check, Loader2, Save } from "lucide-react";
 import { BLOQUES, BLOQUES_ARRASTRABLES, type DatosBloque, type TipoBloque } from "@/lib/flujos/bloques";
 import { revisarFlujo, type Aviso } from "@/lib/flujos/validar";
 import { BloqueNodo, type DatosNodo } from "@/components/flujos/bloque-nodo";
+import { ConexionBorrable } from "@/components/flujos/conexion-borrable";
 import { PanelBloque, type Catalogos } from "@/components/flujos/panel-bloque";
 import { guardarLienzo } from "@/app/actions/flujos";
 
@@ -26,6 +27,8 @@ export type NodoInicial = { id: string; tipo: TipoBloque; datos: DatosBloque; x:
 export type ConexionInicial = { origen: string; destino: string; salida: string | null };
 
 const tiposDeNodo = { bloque: BloqueNodo };
+// Todas las lineas llevan su ✕ para quitarlas.
+const tiposDeConexion = { borrable: ConexionBorrable };
 
 let contador = 0;
 const nuevoId = () => "n" + Date.now() + contador++;
@@ -57,6 +60,7 @@ function Lienzo({
       source: c.origen,
       target: c.destino,
       sourceHandle: c.salida,
+      type: "borrable",
       animated: true,
     }))
   );
@@ -90,7 +94,7 @@ function Lienzo({
     (c: Connection) =>
       setEdges((prev) =>
         addEdge(
-          { ...c, animated: true },
+          { ...c, type: "borrable", animated: true },
           prev.filter((e) => !(e.source === c.source && (e.sourceHandle ?? null) === (c.sourceHandle ?? null)))
         )
       ),
@@ -174,7 +178,8 @@ function Lienzo({
           );
         })}
           <p className="mt-1 text-[10.5px] leading-relaxed text-muted">
-            Arrástralos al lienzo o haz clic. Une los puntos de la derecha con el siguiente bloque.
+            Arrástralos al lienzo o haz clic. Une los puntos de la derecha con el siguiente bloque, y para
+            quitar una línea haz clic en la ✕ que tiene en el medio.
           </p>
         </div>
       </div>
@@ -190,6 +195,7 @@ function Lienzo({
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           nodeTypes={tiposDeNodo}
+          edgeTypes={tiposDeConexion}
           onNodeClick={(_, n) => setSeleccionado(n.id)}
           onPaneClick={() => setSeleccionado(null)}
           onDragOver={(e) => {
