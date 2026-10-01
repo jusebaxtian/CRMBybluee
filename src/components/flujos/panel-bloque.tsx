@@ -53,8 +53,10 @@ export function PanelBloque({
     onCambiar({ ...datos, disparadores: copia });
   };
 
+  // El panel se desplaza: el bloque de botones con sus tres campos, o el de
+  // la IA con su objetivo, se salen de la altura del lienzo.
   return (
-    <aside className="flex w-[300px] shrink-0 flex-col gap-4 border-l border-border bg-surface p-4">
+    <aside className="flex w-[300px] shrink-0 flex-col gap-4 overflow-y-auto border-l border-border bg-surface p-4">
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-sm font-semibold text-foreground">{def.nombre}</p>

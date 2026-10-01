@@ -149,8 +149,14 @@ function Lienzo({
 
   return (
     <div className="flex h-[calc(100vh-230px)] min-h-[480px] overflow-hidden rounded-[13px] border border-border bg-surface">
-      <div className="flex w-[190px] shrink-0 flex-col gap-2 border-r border-border p-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">Bloques</p>
+      {/* La paleta se desplaza sola: con doce bloques ya no caben en pantalla y
+          los de abajo quedaban cortados sin forma de llegar a ellos. El
+          titulo se queda fijo arriba para no perder la referencia. */}
+      <div className="flex w-[190px] shrink-0 flex-col border-r border-border">
+        <p className="shrink-0 px-3 pb-2 pt-3 text-[11px] font-semibold uppercase tracking-wide text-muted">
+          Bloques
+        </p>
+        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 pb-3">
         {BLOQUES_ARRASTRABLES.map((tipo) => {
           const def = BLOQUES[tipo];
           return (
@@ -167,9 +173,10 @@ function Lienzo({
             </button>
           );
         })}
-        <p className="mt-1 text-[10.5px] leading-relaxed text-muted">
-          Arrástralos al lienzo o haz clic. Une los puntos de la derecha con el siguiente bloque.
-        </p>
+          <p className="mt-1 text-[10.5px] leading-relaxed text-muted">
+            Arrástralos al lienzo o haz clic. Une los puntos de la derecha con el siguiente bloque.
+          </p>
+        </div>
       </div>
 
       <div className="relative min-w-0 flex-1" ref={lienzoRef}>
