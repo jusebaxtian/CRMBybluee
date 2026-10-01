@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   contactDisplayName,
   substituteContactVariables,
+  variablesFaltantesEnTexto,
   buildTemplateSendParams,
 } from "@/lib/whatsapp/variables";
 
@@ -112,5 +113,43 @@ describe("buildTemplateSendParams — parametros para plantillas de Meta", () =>
       contacto
     );
     expect(buttonUrlParam).toBeUndefined();
+  });
+});
+
+// Las variables propias del espacio también funcionan en texto libre
+// (automatizaciones, respuestas rápidas y campañas de mensaje libre), con el
+// mismo formato numerado que usan las plantillas: {{1}} es el nombre.
+describe("variables propias en texto libre", () => {
+  const conDatos = {
+    name: "Felipe",
+    wa_id: "573001112233",
+    variable2: "23 de octubre",
+    variable3: "8:00 p. m.",
+    variable4: null,
+  };
+
+  it("reemplaza cada número con su dato", () => {
+    expect(substituteContactVariables("Hola {{1}}, tu cita es el {{2}} a las {{3}}", conDatos)).toBe(
+      "Hola Felipe, tu cita es el 23 de octubre a las 8:00 p. m."
+    );
+  });
+
+  it("quita el marcador cuando el contacto no tiene ese dato", () => {
+    // Que al cliente le llegue "{{4}}" se ve roto y Meta lo lee como spam.
+    expect(substituteContactVariables("Tu código es {{4}} listo", conDatos)).toBe("Tu código es listo");
+  });
+
+  it("limpia el hueco que deja la variable vacía", () => {
+    // Ni espacios dobles, ni coma suelta: el mensaje tiene que poder leerse.
+    expect(substituteContactVariables("Hola {{1}}, {{4}}, nos vemos", conDatos)).toBe("Hola Felipe, nos vemos");
+  });
+
+  it("sigue aceptando {{nombre}} de lo ya escrito por los clientes", () => {
+    expect(substituteContactVariables("Hola {{nombre}}", conDatos)).toBe("Hola Felipe");
+  });
+
+  it("dice qué variables no puede rellenar", () => {
+    expect(variablesFaltantesEnTexto("Cita el {{2}}, código {{4}}", conDatos)).toEqual(["variable4"]);
+    expect(variablesFaltantesEnTexto("Hola {{1}}", conDatos)).toEqual([]);
   });
 });

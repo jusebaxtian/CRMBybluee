@@ -36,12 +36,61 @@ export function contactDisplayName(contact: { name: string | null; wa_id: string
 // sends too.
 export function substituteContactVariables(
   text: string,
-  contact: { name: string | null; wa_id: string }
+  contact: {
+    name: string | null;
+    wa_id: string;
+    variable2?: string | null;
+    variable3?: string | null;
+    variable4?: string | null;
+  }
 ): string {
   const name = contactDisplayName(contact);
-  return text
+  let resultado = text
     .replace(/\{\{\s*nombre\s*\}\}/gi, name)
     .replace(/\{\{\s*1\s*\}\}/g, name);
+
+  // {{2}}, {{3}} y {{4}} toman las variables propias del espacio. Si el
+  // contacto no tiene ese dato se quita el marcador en vez de dejarlo: que le
+  // llegue "tu cita es el {{2}}" es peor que una frase coja -- parece un
+  // sistema roto y es justo lo que Meta lee como spam.
+  for (const indice of [2, 3, 4] as const) {
+    const valor = valorDeContacto(`variable${indice}` as OrigenVariable, contact);
+    resultado = resultado.replace(new RegExp(`\{\{\s*${indice}\s*\}\}`, "g"), valor ? sanitizeParam(valor) : "");
+  }
+
+  // Limpieza del hueco que deja una variable vacia: espacios dobles, el
+  // espacio antes de la coma y la coma que se queda sola. Sin esto sale
+  // "Hola Felipe,, nos vemos", que se ve igual de roto que el {{4}} crudo.
+  return resultado
+    .replace(/[ 	]{2,}/g, " ")
+    .replace(/ +([,.;:!?])/g, "$1")
+    .replace(/([,;:])\s*(?=[,;:])/g, "")
+    .trim();
+}
+
+/**
+ * Que variables del texto no puede rellenar este contacto.
+ *
+ * Quien envia decide: una campaña se salta al contacto y lo deja anotado, en
+ * vez de mandarle el mensaje con huecos.
+ */
+export function variablesFaltantesEnTexto(
+  text: string,
+  contact: {
+    name: string | null;
+    wa_id: string;
+    variable2?: string | null;
+    variable3?: string | null;
+    variable4?: string | null;
+  }
+): OrigenVariable[] {
+  const faltan: OrigenVariable[] = [];
+  for (const indice of [2, 3, 4] as const) {
+    if (!new RegExp(`\{\{\s*${indice}\s*\}\}`).test(text)) continue;
+    const origen = `variable${indice}` as OrigenVariable;
+    if (!valorDeContacto(origen, contact)) faltan.push(origen);
+  }
+  return faltan;
 }
 
 /**

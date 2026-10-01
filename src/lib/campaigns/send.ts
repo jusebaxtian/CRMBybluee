@@ -1,7 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendTemplateMessage, sendTextMessage, sendMediaMessage, uploadMedia } from "@/lib/whatsapp/graph";
 import { mediaKindFromMime } from "@/lib/whatsapp/media-limits";
-import { substituteContactVariables, buildTemplateSendParams } from "@/lib/whatsapp/variables";
+import {
+  substituteContactVariables,
+  buildTemplateSendParams,
+  variablesFaltantesEnTexto,
+} from "@/lib/whatsapp/variables";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { abrirConversacion } from "@/lib/whatsapp/conversacion";
 import { isWindowOpen } from "@/lib/whatsapp/message-window";
@@ -402,6 +406,24 @@ async function runCampaignSendLoop(
           isWindowOpen(lastInbound?.created_at ?? null, Date.now());
         if (!windowOpen) {
           throw new Error("La ventana de 24h se cerró para este contacto antes del envío.");
+        }
+
+        // Mismo criterio que con plantillas: si el mensaje libre usa {{2}},
+        // {{3}} o {{4}} y el contacto no tiene ese dato, se le salta en vez de
+        // mandarle la frase con un hueco.
+        if (campaign.message_body) {
+          const faltanEnTexto = variablesFaltantesEnTexto(campaign.message_body, contact);
+          if (faltanEnTexto.length > 0) {
+            const nombres = faltanEnTexto.map((f) => etiquetasDeVariables.get(f) ?? f).join(", ");
+            await supabase
+              .from("campaign_recipients")
+              .update({
+                status: "failed",
+                error_message: `Le falta el dato: ${nombres}. Complétalo en Contactos y vuelve a enviarle.`,
+              })
+              .eq("id", recipient.id);
+            continue;
+          }
         }
 
         const personalizedBody = campaign.message_body

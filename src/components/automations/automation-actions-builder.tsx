@@ -512,12 +512,15 @@ export function AutomationActionsBuilder({
                 value={action.message_body}
                 onChange={(e) => updateAction(index, { message_body: e.target.value })}
                 rows={2}
-                placeholder="Mensaje a enviar... usa {{nombre}} para el nombre del contacto"
+                placeholder="Mensaje a enviar... usa {{1}} para el nombre del contacto"
                 className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
               />
-              <p className="text-[11px] text-muted">
-                Escribe <code className="rounded bg-surface-hover px-1">{"{{nombre}}"}</code> donde quieras que
-                aparezca el nombre del contacto.
+              <p className="text-[11px] leading-relaxed text-muted">
+                Escribe <code className="rounded bg-surface-hover px-1">{"{{1}}"}</code> para el nombre del
+                contacto, y <code className="rounded bg-surface-hover px-1">{"{{2}}"}</code>,{" "}
+                <code className="rounded bg-surface-hover px-1">{"{{3}}"}</code> o{" "}
+                <code className="rounded bg-surface-hover px-1">{"{{4}}"}</code> para tus variables. Si el
+                contacto no tiene ese dato, el mensaje sale sin él.
               </p>
 
               <BottomButtonsEditor
