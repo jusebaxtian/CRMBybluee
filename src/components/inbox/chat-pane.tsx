@@ -32,6 +32,7 @@ export function ChatPane({
   contactId,
   contactName = "",
   messages,
+  hayMasAntiguos,
   quickReplies = [],
   automations = [],
   approvedTemplates = [],
@@ -41,6 +42,8 @@ export function ChatPane({
   contactId: string;
   contactName?: string;
   messages: OptimisticMessage[];
+  /** La conversacion es mas larga de lo que cabe en pantalla. */
+  hayMasAntiguos?: boolean;
   quickReplies?: { id: string; name: string }[];
   automations?: { id: string; name: string }[];
   approvedTemplates?: ApprovedTemplate[];
@@ -120,6 +123,7 @@ export function ChatPane({
       )}
       <MessagesScrollArea
         messages={combined}
+        hayMasAntiguos={hayMasAntiguos}
         onReply={setReplyingTo}
         onForward={setReenviando}
         onRegistrarPago={esAdmin ? setPagoDe : undefined}

@@ -59,11 +59,13 @@ function SeparadorDeFecha({ iso }: { iso: string }) {
 
 export function MessagesScrollArea({
   messages,
+  hayMasAntiguos,
   onReply,
   onForward,
   onRegistrarPago,
 }: {
   messages: Message[];
+  hayMasAntiguos?: boolean;
   onReply?: (target: { waMessageId: string; preview: string }) => void;
   onForward?: (target: { messageId: string; preview: string }) => void;
   onRegistrarPago?: (target: { messageId: string; preview: string }) => void;
@@ -91,6 +93,13 @@ export function MessagesScrollArea({
     // pinned to the left edge (see MessageComposer), so message bubbles never
     // render underneath it.
     <PullToRefresh className="flex-1 space-y-3 py-3 pl-16 pr-3 sm:py-5 sm:pl-16 sm:pr-5">
+      {/* Se dice en pantalla en vez de recortar en silencio: antes la
+          conversacion simplemente se quedaba quieta y nadie sabia por que. */}
+      {hayMasAntiguos && (
+        <p className="pb-1 text-center text-[11px] text-muted">
+          Se muestran los mensajes más recientes de esta conversación.
+        </p>
+      )}
       {messages.map((m, i) => {
         // Un separador cada vez que cambia el dia respecto al mensaje anterior.
         const cambiaDeDia = i === 0 || diaDe(m.created_at) !== diaDe(messages[i - 1].created_at);

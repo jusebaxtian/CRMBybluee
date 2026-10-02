@@ -25,6 +25,15 @@ import { EspacioDelClienteCard, type EspacioDelCliente, type InvitacionPendiente
 import { invitacionesPendientesDeContacto } from "@/lib/billing/invitaciones-pendientes";
 import { noSePuedeUsar } from "@/lib/whatsapp/limite-plantilla";
 
+/**
+ * Cuantos mensajes se pintan en el chat.
+ *
+ * Tiene que quedar POR DEBAJO del tope de PostgREST (1.000 filas): al pedir
+ * mas, la respuesta se corta sin avisar y nadie se entera de que faltan.
+ */
+const MENSAJES_EN_PANTALLA = 400;
+
+
 export default async function ConversationPage({
   params,
 }: {
@@ -56,13 +65,22 @@ export default async function ConversationPage({
       .eq("id", id)
       .eq("workspace_id", workspaceId ?? "")
       .maybeSingle(),
+    // Se piden los MAS RECIENTES y luego se les da la vuelta para pintarlos.
+    //
+    // Antes se pedian todos en orden ascendente y sin limite. PostgREST corta
+    // en 1.000 filas (PGRST_DB_MAX_ROWS) sin avisar, asi que una conversacion
+    // mas larga devolvia los 1.000 mensajes MAS VIEJOS y se quedaba congelada
+    // en el pasado: lo que reporto tusrepuestos.com.co el 2 oct 2026 con el
+    // chat de whirlpool, parado aunque los mensajes nuevos si estaban
+    // guardados. Pidiendo los ultimos, pasar de 1.000 deja de romper nada.
     supabase
       .from("messages")
       .select(
         "id, direction, body, status, message_type, media_url, media_mime_type, error_detail, wa_message_id, context_wa_message_id, buttons, created_at"
       )
       .eq("conversation_id", id)
-      .order("created_at", { ascending: true }),
+      .order("created_at", { ascending: false })
+      .limit(MENSAJES_EN_PANTALLA),
     supabase
       .from("tags")
       .select("id, name, color")
@@ -159,7 +177,11 @@ export default async function ConversationPage({
   // Only write when there's something new to mark read — an unconditional
   // update on every render would re-trigger the conversations-table realtime
   // subscription that refreshes this same page, looping forever.
-  const lastMessage = messages?.[messages.length - 1];
+  // Vienen del mas nuevo al mas viejo; el chat los pinta al reves.
+  const mensajesEnOrden = [...(messages ?? [])].reverse();
+  const hayMasAntiguos = (messages?.length ?? 0) >= MENSAJES_EN_PANTALLA;
+
+  const lastMessage = mensajesEnOrden[mensajesEnOrden.length - 1];
   const hasUnread =
     !!lastMessage &&
     (!conversation.last_read_at || new Date(lastMessage.created_at) > new Date(conversation.last_read_at));
@@ -279,7 +301,8 @@ export default async function ConversationPage({
           conversationId={id}
           contactId={conversation.contact_id}
           contactName={contact.name?.trim() || contact.wa_id}
-          messages={messages ?? []}
+          messages={mensajesEnOrden}
+          hayMasAntiguos={hayMasAntiguos}
           quickReplies={quickReplies ?? []}
           automations={allAutomations ?? []}
           approvedTemplates={plantillasDeLaLinea}
