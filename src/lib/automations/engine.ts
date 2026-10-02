@@ -8,7 +8,11 @@ import {
   uploadMedia,
 } from "@/lib/whatsapp/graph";
 import { maybeTrackPurchaseFromTag } from "@/lib/meta/conversions";
-import { substituteContactVariables, buildTemplateSendParams } from "@/lib/whatsapp/variables";
+import {
+  substituteContactVariables,
+  buildTemplateSendParams,
+  motivoDeNoEnviar,
+} from "@/lib/whatsapp/variables";
 import type { VariableDePlantilla } from "@/lib/contactos/variables";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { abrirConversacion } from "@/lib/whatsapp/conversacion";
@@ -174,7 +178,9 @@ export async function executeAction(
 
   const { data: contact } = await supabase
     .from("contacts")
-    .select("wa_id, name")
+    // Las columnas propias van aqui: sin ellas la plantilla sale con el
+    // parametro en blanco y Meta rechaza el mensaje entero (131008).
+    .select("wa_id, name, variable2, variable3, variable4")
     .eq("id", contactId)
     .single();
 
@@ -288,7 +294,12 @@ export async function executeAction(
           }
         : undefined;
 
-    const { bodyParams, buttonUrlParam } = buildTemplateSendParams(action.templates, contact);
+    const params = buildTemplateSendParams(action.templates, contact);
+    // Al contacto le falta un dato de la plantilla. No se le manda a medias:
+    // Meta rechazaria el mensaje y quedaria como un fallo sin explicacion.
+    if (motivoDeNoEnviar(params)) return;
+
+    const { bodyParams, buttonUrlParam } = params;
     const result = await sendTemplateMessage(
       account.phone_number_id,
       account.access_token,

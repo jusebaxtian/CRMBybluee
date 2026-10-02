@@ -3,7 +3,7 @@ import { callAiProvider, type ChatTurn } from "@/lib/ai/providers";
 import { sendTextMessage, sendTemplateMessage } from "@/lib/whatsapp/graph";
 import { buildFollowupSystemPrompt, followupFinalInstruction, formatoWhatsApp } from "@/lib/ai/agent";
 import { isContactExcludedFromAutomations } from "@/lib/automations/engine";
-import { buildTemplateSendParams } from "@/lib/whatsapp/variables";
+import { buildTemplateSendParams, motivoDeNoEnviar } from "@/lib/whatsapp/variables";
 import type { VariableDePlantilla } from "@/lib/contactos/variables";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { isWindowOpen } from "@/lib/whatsapp/message-window";
@@ -173,7 +173,13 @@ async function sendFollowup(
   step: FollowupStep,
   numero: number
 ) {
-  const { data: contact } = await supabase.from("contacts").select("wa_id, name").eq("id", contactId).single();
+  const { data: contact } = await supabase
+    .from("contacts")
+    // Las columnas propias: sin ellas la plantilla viaja con el parametro
+    // en blanco y Meta la rechaza entera (131008).
+    .select("wa_id, name, variable2, variable3, variable4")
+    .eq("id", contactId)
+    .single();
   if (!contact) return;
 
   const { data: lastInbound } = await supabase
@@ -237,7 +243,11 @@ async function sendFollowup(
           }
         : undefined;
 
-    const { bodyParams, buttonUrlParam } = buildTemplateSendParams(template, contact);
+    const params = buildTemplateSendParams(template, contact);
+    // Falta un dato: mejor no mandar el seguimiento que mandarlo roto.
+    if (motivoDeNoEnviar(params)) return;
+
+    const { bodyParams, buttonUrlParam } = params;
     const result = await sendTemplateMessage(
       account.phone_number_id,
       account.access_token,

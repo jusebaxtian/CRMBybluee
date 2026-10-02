@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { validarPlantilla } from "@/lib/templates/validar-creacion";
-import { buildTemplateSendParams } from "@/lib/whatsapp/variables";
+import { buildTemplateSendParams, motivoDeNoEnviar } from "@/lib/whatsapp/variables";
 
 /**
  * El caso real que destapó todo esto: ConexionFit Colombia, 1 oct 2026. Una
@@ -79,5 +79,51 @@ describe("plantilla de varias variables sin emparejar", () => {
     );
     expect(sinEmparejar).toBe(false);
     expect(bodyParams).toEqual(["Felipe"]);
+  });
+});
+
+/**
+ * El 1 oct 2026, ya con la plantilla aprobada y emparejada, el envio desde el
+ * chat seguia fallando: "Falta un dato obligatorio en el mensaje". La consulta
+ * del contacto traia solo wa_id y name, asi que las columnas propias llegaban
+ * vacias y el parametro viajaba en blanco.
+ */
+describe("un parametro en blanco nunca sale", () => {
+  const plantillaDeLaCita = {
+    variable_count: 2,
+    variables_origen: [{ origen: "variable2" as const }, { origen: "variable3" as const }],
+  };
+
+  it("avisa que falta el dato cuando el contacto no lo tiene", () => {
+    const r = buildTemplateSendParams(plantillaDeLaCita, {
+      name: "Juan Carlos",
+      wa_id: "573006027659",
+      variable2: null,
+      variable3: null,
+    });
+    expect(r.faltan).toEqual(["variable2", "variable3"]);
+    expect(motivoDeNoEnviar(r)).toContain("le falta el dato");
+  });
+
+  it("los nombra como el cliente los llamo, no como variable2", () => {
+    const r = buildTemplateSendParams(plantillaDeLaCita, {
+      name: "Juan Carlos",
+      wa_id: "573006027659",
+      variable2: null,
+      variable3: "7:50 p. m.",
+    });
+    const etiquetas = new Map([["variable2", "Día de la sesión"]]);
+    expect(motivoDeNoEnviar(r, etiquetas)).toContain("Día de la sesión");
+  });
+
+  it("con los datos puestos deja enviar", () => {
+    const r = buildTemplateSendParams(plantillaDeLaCita, {
+      name: "Juan Carlos",
+      wa_id: "573006027659",
+      variable2: "lunes 1 de octubre",
+      variable3: "7:50 p. m.",
+    });
+    expect(motivoDeNoEnviar(r)).toBeNull();
+    expect(r.bodyParams).toEqual(["lunes 1 de octubre", "7:50 p. m."]);
   });
 });

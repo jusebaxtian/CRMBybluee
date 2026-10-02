@@ -22,7 +22,7 @@ import {
 import { validateMediaMime, validateMediaSize } from "@/lib/whatsapp/media-limits";
 import { transcodeVideoToH264 } from "@/lib/whatsapp/video-transcode";
 import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
-import { buildTemplateSendParams } from "@/lib/whatsapp/variables";
+import { buildTemplateSendParams, motivoDeNoEnviar } from "@/lib/whatsapp/variables";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { crearPlantillaSaludoInicial } from "@/lib/templates/saludo-inicial";
 import { abrirConversacion } from "@/lib/whatsapp/conversacion";
@@ -600,7 +600,9 @@ export async function sendTemplateToConversation(input: {
   const [{ data: conversation }, { data: template }] = await Promise.all([
     supabase
       .from("conversations")
-      .select("id, workspace_id, whatsapp_account_id, contacts(wa_id, name)")
+      .select(
+        "id, workspace_id, whatsapp_account_id, contacts(wa_id, name, variable2, variable3, variable4)"
+      )
       .eq("id", input.conversationId)
       .single(),
     supabase
@@ -620,7 +622,13 @@ export async function sendTemplateToConversation(input: {
   );
   if (!account) return { error: "Este workspace no tiene WhatsApp conectado." };
 
-  const contact = conversation.contacts as unknown as { wa_id: string; name: string | null };
+  const contact = conversation.contacts as unknown as {
+    wa_id: string;
+    name: string | null;
+    variable2: string | null;
+    variable3: string | null;
+    variable4: string | null;
+  };
 
   const headerFormat = template.header_format as "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | null;
   const headerMedia =
@@ -632,7 +640,26 @@ export async function sendTemplateToConversation(input: {
       : undefined;
 
   try {
-    const { bodyParams, buttonUrlParam } = buildTemplateSendParams(template, contact);
+    const params = buildTemplateSendParams(template, contact);
+
+    // Un parametro vacio no sale: Meta rechaza el mensaje entero y el cliente
+    // solo ve "Falta un dato obligatorio". Se dice que falta y donde.
+    const { data: propiasDelEspacio } = await supabase
+      .from("variables_personalizadas")
+      .select("indice, nombre")
+      .eq("workspace_id", conversation.workspace_id);
+    const motivo = motivoDeNoEnviar(
+      params,
+      new Map(
+        (propiasDelEspacio ?? []).map((v) => [
+          `variable${v.indice}`,
+          (v.nombre as string) || `Variable ${v.indice}`,
+        ])
+      )
+    );
+    if (motivo) return { error: motivo };
+
+    const { bodyParams, buttonUrlParam } = params;
     const result = await sendTemplateMessage(
       account.phone_number_id,
       account.access_token,

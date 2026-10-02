@@ -110,6 +110,29 @@ export function variablesFaltantesEnTexto(
  * hacer: la campaña lo salta y lo marca, en vez de mandar "tu cita es el" a
  * medias.
  */
+/**
+ * Las columnas que hacen falta para que un contacto reciba una plantilla, o
+ * null si se le puede enviar.
+ *
+ * Existe porque un parametro vacio no es un envio a medias: Meta rechaza el
+ * mensaje entero con "Parameter of type text is missing text value" (131008).
+ * Mejor no enviarlo y decir que falta.
+ */
+export function motivoDeNoEnviar(
+  resultado: { faltan: OrigenVariable[]; sinEmparejar: boolean },
+  /** Como se llama cada columna en este espacio ("Fecha de la cita"). */
+  etiquetas?: Map<string, string>
+): string | null {
+  if (resultado.sinEmparejar) {
+    return "La plantilla tiene varias variables sin emparejar. Abre Plantillas e indica con qué se rellena cada una.";
+  }
+  if (resultado.faltan.length === 0) return null;
+  const nombres = resultado.faltan
+    .map((f) => etiquetas?.get(f) ?? (f === "nombre" ? "nombre" : `Variable ${f.replace("variable", "")}`))
+    .join(", ");
+  return `A este contacto le falta el dato: ${nombres}. Complétalo en Contactos y vuelve a enviarle.`;
+}
+
 export function buildTemplateSendParams(
   template: {
     variable_count?: number | null;
