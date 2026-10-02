@@ -45,8 +45,9 @@ export function ConfigurarVariables({ propias }: { propias: VariablePersonalizad
         <div>
           <p className="text-sm font-medium text-foreground">Tus variables</p>
           <p className="mt-0.5 text-[11px] leading-relaxed text-muted">
-            La {"{{1}}"} siempre es el nombre. Estas son las tuyas: dales un nombre y aparecen como columna,
-            en el Excel y al crear plantillas.
+            Estas son tus columnas propias: dales un nombre y aparecen en la tabla, en el Excel y al crear
+            plantillas. La {"{{1}}"} es el nombre del contacto por defecto, pero al crear una plantilla puedes
+            emparejarla con cualquiera de estas.
           </p>
         </div>
         <button type="button" onClick={() => setAbierto(false)} className="text-muted hover:text-foreground">

@@ -127,11 +127,23 @@ export function buildTemplateSendParams(
   bodyParams: string[] | undefined;
   buttonUrlParam: { index: number; value: string } | undefined;
   faltan: OrigenVariable[];
+  /**
+   * La plantilla declara varias variables pero no tiene emparejamiento, asi
+   * que no hay forma de saber que va en cada una. El envio esta condenado al
+   * 132000 de Meta: quien llama deberia pararlo y decir por que.
+   */
+  sinEmparejar: boolean;
 } {
   const contactName = contactDisplayName(contact);
   const cuantas = template.variable_count ?? 0;
   const emparejamiento = template.variables_origen ?? null;
   const faltan: OrigenVariable[] = [];
+
+  // Sin emparejamiento solo se puede rellenar la primera variable, con el
+  // nombre. Con una sola variable eso es exactamente lo correcto --y lo que
+  // hacia el CRM desde siempre--; con dos o mas, el mensaje sale corto de
+  // parametros y Meta lo rechaza entero.
+  const sinEmparejar = cuantas > 1 && (!emparejamiento || emparejamiento.length === 0);
 
   let bodyParams: string[] | undefined;
   if (cuantas > 0) {
@@ -163,5 +175,5 @@ export function buildTemplateSendParams(
   );
   const buttonUrlParam = urlButtonIndex >= 0 ? { index: urlButtonIndex, value: contactName } : undefined;
 
-  return { bodyParams, buttonUrlParam, faltan };
+  return { bodyParams, buttonUrlParam, faltan, sinEmparejar };
 }

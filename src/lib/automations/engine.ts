@@ -9,6 +9,7 @@ import {
 } from "@/lib/whatsapp/graph";
 import { maybeTrackPurchaseFromTag } from "@/lib/meta/conversions";
 import { substituteContactVariables, buildTemplateSendParams } from "@/lib/whatsapp/variables";
+import type { VariableDePlantilla } from "@/lib/contactos/variables";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { abrirConversacion } from "@/lib/whatsapp/conversacion";
 import { recordOutboundMessage } from "@/lib/messaging/record";
@@ -46,6 +47,8 @@ export type AutomationAction = {
     header_format: "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | null;
     header_media_url: string | null;
     variable_count?: number;
+    /** Con que se rellena cada {{n}} al enviar. Ver lib/contactos/variables. */
+    variables_origen?: VariableDePlantilla[] | null;
     buttons?: { type: "URL" | "QUICK_REPLY"; text: string; url?: string }[] | null;
   } | null;
 };
@@ -100,7 +103,7 @@ export async function executeAction(
     const { data: qrActions } = await supabase
       .from("quick_reply_actions")
       .select(
-        "position, action_type, message_body, tag_id, media_url, media_filename, template_id, delay_seconds, buttons, templates(meta_template_name, language, body_text, header_format, header_media_url, variable_count, buttons)"
+        "position, action_type, message_body, tag_id, media_url, media_filename, template_id, delay_seconds, buttons, templates(meta_template_name, language, body_text, header_format, header_media_url, variable_count, variables_origen, buttons)"
       )
       .eq("quick_reply_id", action.quick_reply_id)
       .order("position");
@@ -318,7 +321,7 @@ async function fetchActions(
   const { data } = await supabase
     .from("automation_actions")
     .select(
-      "position, action_type, message_body, tag_id, media_url, media_filename, template_id, quick_reply_id, delay_seconds, target_agent_id, agent_distribution, buttons, templates(meta_template_name, language, body_text, header_format, header_media_url, variable_count, buttons)"
+      "position, action_type, message_body, tag_id, media_url, media_filename, template_id, quick_reply_id, delay_seconds, target_agent_id, agent_distribution, buttons, templates(meta_template_name, language, body_text, header_format, header_media_url, variable_count, variables_origen, buttons)"
     )
     .eq("automation_id", automationId)
     .order("position");

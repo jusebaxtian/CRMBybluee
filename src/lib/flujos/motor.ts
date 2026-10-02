@@ -286,7 +286,7 @@ export async function avanzar(supabase: Supabase, ejecucionId: string): Promise<
       }
       const { data: plantilla } = await supabase
         .from("templates")
-        .select("meta_template_name, language, body_text, header_format, header_media_url, variable_count, buttons")
+        .select("meta_template_name, language, body_text, header_format, header_media_url, variable_count, variables_origen, buttons")
         .eq("id", datos.plantillaId)
         .maybeSingle();
       await ejecutarComoAccion(supabase, ejecucion.workspace_id as string, ejecucion.contact_id as string, {

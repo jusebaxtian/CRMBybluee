@@ -12,6 +12,7 @@ import { isWindowOpen } from "@/lib/whatsapp/message-window";
 import { recordOutboundMessage } from "@/lib/messaging/record";
 import { noSePuedeUsar, motivoDelExceso } from "@/lib/whatsapp/limite-plantilla";
 import { nombreDeDocumento } from "@/lib/whatsapp/nombre-archivo";
+import type { VariableDePlantilla } from "@/lib/contactos/variables";
 
 // media_filename doesn't carry a mime type — infer a close-enough one from
 // its extension just to pick the right WhatsApp media kind (image/video/
@@ -64,6 +65,8 @@ type PreparedCampaignSend = {
     header_media_url: string | null;
     header_media_mime_type: string | null;
     variable_count: number;
+    /** Con que se rellena cada {{n}} al enviar. Ver lib/contactos/variables. */
+    variables_origen: VariableDePlantilla[] | null;
     buttons: { type: "URL" | "QUICK_REPLY"; text: string; url?: string }[] | null;
   } | null;
   templateHeaderMedia: { type: "image" | "video" | "document"; link: string } | undefined;
@@ -84,7 +87,7 @@ async function prepareCampaignSend(
   const { data: campaign } = await supabase
     .from("campaigns")
     .select(
-      "id, send_type, message_body, media_url, media_filename, whatsapp_account_id, templates(meta_template_name, language, body_text, header_format, header_media_url, header_media_mime_type, variable_count, buttons)"
+      "id, send_type, message_body, media_url, media_filename, whatsapp_account_id, templates(meta_template_name, language, body_text, header_format, header_media_url, header_media_mime_type, variable_count, variables_origen, buttons)"
     )
     .eq("id", campaignId)
     .single();
@@ -358,7 +361,25 @@ async function runCampaignSendLoop(
     }
     try {
       if (campaign.send_type === "template" && template) {
-        const { bodyParams, buttonUrlParam, faltan } = buildTemplateSendParams(template, contact);
+        const { bodyParams, buttonUrlParam, faltan, sinEmparejar } = buildTemplateSendParams(
+          template,
+          contact
+        );
+
+        // La plantilla tiene varias variables y nadie dijo con que se rellena
+        // cada una, asi que Meta rechazaria los envios uno por uno con un
+        // error que no explica nada. Se para aqui y se dice donde arreglarlo.
+        if (sinEmparejar) {
+          await supabase
+            .from("campaign_recipients")
+            .update({
+              status: "failed",
+              error_message:
+                "La plantilla tiene varias variables sin emparejar. Abre Plantillas e indica con qué se rellena cada una; después vuelve a enviarle.",
+            })
+            .eq("id", recipient.id);
+          continue;
+        }
 
         // Al contacto le falta un dato que la plantilla necesita. Se salta y
         // se dice cual: mandar "tu cita es el" sin fecha es peor que no

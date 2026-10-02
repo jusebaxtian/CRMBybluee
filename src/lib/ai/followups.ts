@@ -4,6 +4,7 @@ import { sendTextMessage, sendTemplateMessage } from "@/lib/whatsapp/graph";
 import { buildFollowupSystemPrompt, followupFinalInstruction, formatoWhatsApp } from "@/lib/ai/agent";
 import { isContactExcludedFromAutomations } from "@/lib/automations/engine";
 import { buildTemplateSendParams } from "@/lib/whatsapp/variables";
+import type { VariableDePlantilla } from "@/lib/contactos/variables";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { isWindowOpen } from "@/lib/whatsapp/message-window";
 import { recordOutboundMessage } from "@/lib/messaging/record";
@@ -109,12 +110,14 @@ async function processWorkspaceFollowups(
     header_format: "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | null;
     header_media_url: string | null;
     variable_count: number;
+    /** Con que se rellena cada {{n}} al enviar. Ver lib/contactos/variables. */
+    variables_origen: VariableDePlantilla[] | null;
     buttons: { type: "URL" | "QUICK_REPLY"; text: string; url?: string }[] | null;
   } | null = null;
   if (agent.followup_template_id) {
     const { data } = await supabase
       .from("templates")
-      .select("meta_template_name, language, body_text, header_format, header_media_url, variable_count, buttons")
+      .select("meta_template_name, language, body_text, header_format, header_media_url, variable_count, variables_origen, buttons")
       .eq("id", agent.followup_template_id)
       .maybeSingle();
     template = data;
@@ -163,6 +166,8 @@ async function sendFollowup(
     header_format: "TEXT" | "IMAGE" | "VIDEO" | "DOCUMENT" | null;
     header_media_url: string | null;
     variable_count: number;
+    /** Con que se rellena cada {{n}} al enviar. Ver lib/contactos/variables. */
+    variables_origen: VariableDePlantilla[] | null;
     buttons: { type: "URL" | "QUICK_REPLY"; text: string; url?: string }[] | null;
   } | null,
   step: FollowupStep,

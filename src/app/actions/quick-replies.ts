@@ -160,7 +160,7 @@ export async function sendQuickReply(quickReplyId: string, contactId: string) {
   const { data: actionsRaw } = await supabase
     .from("quick_reply_actions")
     .select(
-      "position, action_type, message_body, tag_id, media_url, media_filename, template_id, buttons, templates(meta_template_name, language, body_text, header_format, header_media_url, variable_count, buttons)"
+      "position, action_type, message_body, tag_id, media_url, media_filename, template_id, buttons, templates(meta_template_name, language, body_text, header_format, header_media_url, variable_count, variables_origen, buttons)"
     )
     .eq("quick_reply_id", quickReplyId)
     .order("position");

@@ -14,6 +14,7 @@ import { toPublicUrl } from "@/lib/supabase/config";
 import { NO_WORKSPACE_ERROR } from "@/lib/auth/with-workspace";
 import { CATEGORIA_PLANTILLA_POR_DEFECTO } from "@/lib/templates/defaults";
 import { wabasDelEspacio } from "@/lib/whatsapp/wabas";
+import { validarPlantilla } from "@/lib/templates/validar-creacion";
 
 // Plain REST endpoint (not a Server Action) so the client can submit via
 // XMLHttpRequest and get real upload progress for the header file — fetch/
@@ -41,9 +42,11 @@ export async function POST(request: NextRequest) {
     | "document";
   const headerText = String(formData.get("headerText") ?? "").trim();
   const headerFile = formData.get("headerFile") as File | null;
-  const bodyText = String(formData.get("bodyText") ?? "").trim();
   const footerText = String(formData.get("footerText") ?? "").trim();
   const buttonsJson = String(formData.get("buttonsJson") ?? "[]");
+  // Con que se rellena cada {{n}} al enviar, y el ejemplo que ve el revisor
+  // de Meta. Viene del formulario como JSON porque es una lista ordenada.
+  const variablesJson = String(formData.get("variablesJson") ?? "[]");
   const wabaElegida = String(formData.get("wabaId") ?? "");
 
   if (!/^[a-z0-9_]+$/.test(name)) {
@@ -52,9 +55,14 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
-  if (!bodyText) {
-    return NextResponse.json({ error: "El cuerpo del mensaje es obligatorio." }, { status: 400 });
+  // El cuerpo, el limite de 1.024, la numeracion sin huecos y el
+  // emparejamiento de variables: todo en validarPlantilla(), que es la misma
+  // regla que ve el formulario mientras se escribe.
+  const revisada = validarPlantilla(String(formData.get("bodyText") ?? ""), variablesJson);
+  if ("error" in revisada) {
+    return NextResponse.json({ error: revisada.error }, { status: 400 });
   }
+  const { bodyText, variableCount, variables, ejemplos } = revisada;
   if (headerKind === "text" && !headerText) {
     return NextResponse.json({ error: "Escribe el texto del encabezado." }, { status: 400 });
   }
@@ -196,11 +204,10 @@ export async function POST(request: NextRequest) {
       headerText: headerKind === "text" ? headerText : undefined,
       headerMedia,
       bodyText,
+      ejemplos,
       footerText: footerText || undefined,
       buttons: buttons.length > 0 ? buttons : undefined,
     });
-
-    const variableCount = (bodyText.match(/\{\{\d+\}\}/g) ?? []).length;
 
     // Meta already accepted the template at this point — if this insert
     // fails silently (as it used to, since the error was never checked),
@@ -217,6 +224,7 @@ export async function POST(request: NextRequest) {
         body_text: bodyText,
         buttons: buttons.length > 0 ? buttons : null,
         variable_count: variableCount,
+        variables_origen: variables.length > 0 ? variables : null,
         header_format: headerKind === "none" ? null : (headerKind.toUpperCase() as string),
         header_text: headerKind === "text" ? headerText : null,
         header_media_url: headerMediaUrl,

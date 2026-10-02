@@ -1,27 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { normalizarNombrePlantilla } from "@/lib/templates/nombre";
 import { createAdminClient } from "@/lib/supabase/admin";
-import {
-  createMetaTemplate,
-  deleteMetaTemplate,
-  listTemplates,
-  uploadTemplateHeaderExample,
-  type TemplateButtonInput,
-} from "@/lib/whatsapp/graph";
+import { deleteMetaTemplate, listTemplates } from "@/lib/whatsapp/graph";
 import { validateMediaFile } from "@/lib/whatsapp/media-limits";
 import { toPublicUrl } from "@/lib/supabase/config";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
-import { CATEGORIA_PLANTILLA_POR_DEFECTO } from "@/lib/templates/defaults";
 import { wabasDelEspacio } from "@/lib/whatsapp/wabas";
-import { noSePuedeUsar, motivoDelExceso } from "@/lib/whatsapp/limite-plantilla";
-import {
-  cuantasVariables,
-  normalizarVariables,
-  variablesSaltadas,
-  type VariableDePlantilla,
-} from "@/lib/contactos/variables";
+import { cuantasVariables, type VariableDePlantilla } from "@/lib/contactos/variables";
 
 export async function syncTemplates() {
   const ctx = await requireWorkspace();
@@ -169,206 +155,46 @@ export async function setTemplateHeaderMedia(templateId: string, formData: FormD
   return { success: true as const };
 }
 
-export async function createTemplate(_prevState: unknown, formData: FormData) {
-  const name = normalizarNombrePlantilla(String(formData.get("name") ?? ""), { final: true });
-  const language = String(formData.get("language") ?? "es");
-  const category = String(formData.get("category") ?? CATEGORIA_PLANTILLA_POR_DEFECTO) as
-    | "MARKETING"
-    | "UTILITY"
-    | "AUTHENTICATION";
-  const headerKind = String(formData.get("headerKind") ?? "none") as
-    | "none"
-    | "text"
-    | "image"
-    | "video"
-    | "document";
-  const headerText = String(formData.get("headerText") ?? "").trim();
-  const headerFile = formData.get("headerFile") as File | null;
-  // Se normaliza aqui, antes de todo: asi el texto que se valida, el que se
-  // le manda a Meta y el que se guarda son exactamente el mismo.
-  const bodyText = normalizarVariables(String(formData.get("bodyText") ?? "").trim());
-  const footerText = String(formData.get("footerText") ?? "").trim();
-  const buttonsJson = String(formData.get("buttonsJson") ?? "[]");
-  // Con que se rellena cada {{n}} al enviar, y el ejemplo que ve el revisor
-  // de Meta. Viene del formulario como JSON porque es una lista ordenada.
-  const variablesJson = String(formData.get("variablesJson") ?? "[]");
-  const wabaElegida = String(formData.get("wabaId") ?? "");
-
-  if (!/^[a-z0-9_]+$/.test(name)) {
-    return { error: "El nombre solo puede tener minúsculas, números y guiones bajos (_)." };
-  }
-  if (!bodyText) return { error: "El cuerpo del mensaje es obligatorio." };
-  // Meta aprueba plantillas que despues fallan en cada envio porque el
-  // mensaje ya armado se pasa de 1.024 caracteres. Se corta aqui, antes de
-  // mandarla a aprobacion, en vez de descubrirlo destinatario por
-  // destinatario.
-  if (noSePuedeUsar(bodyText)) return { error: motivoDelExceso(bodyText) };
-  if (headerKind === "text" && !headerText) {
-    return { error: "Escribe el texto del encabezado." };
-  }
-  if (["image", "video", "document"].includes(headerKind) && (!headerFile || headerFile.size === 0)) {
-    return { error: "Sube el archivo de ejemplo para el encabezado." };
-  }
-
-  let variables: VariableDePlantilla[] = [];
-  try {
-    const parseadas = JSON.parse(variablesJson) as VariableDePlantilla[];
-    if (Array.isArray(parseadas)) variables = parseadas;
-  } catch {
-    return { error: "No se entendieron las variables de la plantilla." };
-  }
-
-  // Cada variable del texto necesita saber de donde sale. Sin esto, al enviar
-  // se rellenarian todas con el nombre --que es lo que hacia antes-- y el
-  // mensaje saldria mal o Meta lo rechazaria.
-  // WhatsApp exige numeracion desde {{1}} y sin huecos. Mejor decirlo aqui
-  // que dejar que Meta lo rechace con un mensaje incomprensible.
-  const saltadas = variablesSaltadas(bodyText);
-  if (saltadas.length > 0) {
-    const lista = saltadas.map((n) => `{{${n}}}`).join(", ");
-    return {
-      error: `Las variables tienen que empezar en {{1}} y seguir en orden. Te falta ${lista} en el mensaje.`,
-    };
-  }
-
-  const cuantas = cuantasVariables(bodyText);
-  if (cuantas > 0 && variables.length !== cuantas) {
-    return { error: `La plantilla tiene ${cuantas} variable(s): indica con qué se rellena cada una.` };
-  }
-
-  let rawButtons: { type: "URL" | "QUICK_REPLY"; text: string; url: string }[];
-  try {
-    rawButtons = JSON.parse(buttonsJson);
-  } catch {
-    return { error: "Botones inválidos." };
-  }
-  const buttons: TemplateButtonInput[] = rawButtons
-    .filter((b) => b.text.trim())
-    .map((b) =>
-      b.type === "URL"
-        ? { type: "URL" as const, text: b.text.trim(), url: b.url.trim() }
-        : { type: "QUICK_REPLY" as const, text: b.text.trim() }
-    );
-  for (const b of buttons) {
-    if (b.type === "URL" && !b.url) {
-      return { error: `Escribe la URL del botón "${b.text}".` };
-    }
-    if (b.type === "URL" && !/^https?:\/\//i.test(b.url)) {
-      return { error: `La URL del botón "${b.text}" debe empezar con https:// o http://.` };
-    }
-  }
-  // Meta allows mixing Quick Reply and URL buttons in one template, but
-  // requires each type to be grouped contiguously (e.g. QR, QR, URL is fine;
-  // QR, URL, QR is rejected) — reorder rather than trust the UI's order.
-  buttons.sort((a, b) => (a.type === b.type ? 0 : a.type === "QUICK_REPLY" ? -1 : 1));
-
+/**
+ * Con qué se rellena cada variable de una plantilla que YA existe en Meta.
+ *
+ * El texto de una plantilla aprobada no se puede tocar, pero el
+ * emparejamiento es dato nuestro: se puede arreglar sin recrearla ni volver a
+ * pasar por aprobación. Hace falta porque todas las plantillas creadas antes
+ * del 1 oct 2026 --y las que creó la ruta mientras ignoraba el
+ * emparejamiento-- se guardaron sin él, y al enviarlas Meta las rechaza con
+ * el 132000.
+ */
+export async function guardarEmparejamiento(templateId: string, variables: VariableDePlantilla[]) {
   const ctx = await requireWorkspace();
   if ("error" in ctx) return { error: ctx.error };
   const { supabase, workspaceId } = ctx;
 
-  // La plantilla se crea en una WABA concreta (migracion 0106). Con una
-  // sola WABA no hay nada que elegir; con varias, el formulario pide la linea.
-  const wabas = await wabasDelEspacio(supabase, workspaceId);
-  if (wabas.length === 0) return { error: "Este workspace no tiene WhatsApp conectado." };
-  const waba = wabas.length === 1 ? wabas[0] : wabas.find((w) => w.wabaId === wabaElegida);
-  if (!waba) return { error: "Elige la línea para la que es la plantilla." };
-  const account = { waba_id: waba.wabaId, access_token: waba.accessToken };
+  const { data: template } = await supabase
+    .from("templates")
+    .select("body_text")
+    .eq("id", templateId)
+    .eq("workspace_id", workspaceId)
+    .single();
+  if (!template) return { error: "Plantilla no encontrada." };
 
-  let headerMedia: { format: "IMAGE" | "VIDEO" | "DOCUMENT"; handle: string } | undefined;
-  let headerMediaUrl: string | null = null;
-  let headerMediaMimeType: string | null = null;
-
-  if (["image", "video", "document"].includes(headerKind) && headerFile) {
-    const validationError = validateMediaFile(headerKind as "image" | "video" | "document", headerFile);
-    if (validationError) return { error: validationError };
-
-    const buffer = Buffer.from(await headerFile.arrayBuffer());
-    const appId = process.env.NEXT_PUBLIC_META_APP_ID;
-    if (!appId) return { error: "Falta configurar NEXT_PUBLIC_META_APP_ID en el servidor." };
-
-    try {
-      const handle = await uploadTemplateHeaderExample(
-        appId,
-        account.access_token,
-        buffer,
-        headerFile.type,
-        headerFile.name
-      );
-      headerMedia = { format: headerKind.toUpperCase() as "IMAGE" | "VIDEO" | "DOCUMENT", handle };
-    } catch (err) {
-      return {
-        error: `No se pudo subir el archivo de ejemplo a Meta: ${err instanceof Error ? err.message : "error desconocido"}`,
-      };
-    }
-
-    // Our own copy — this is what actually gets attached when a campaign or
-    // automation sends the template later (Meta's upload handle is only
-    // used once, at template-creation time, not for every send).
-    const admin = createAdminClient();
-    const path = `${workspaceId}/templates/${Date.now()}-${headerFile.name}`;
-    const { error: uploadError } = await admin.storage
-      .from("chat-media")
-      .upload(path, headerFile, { contentType: headerFile.type });
-    if (uploadError) return { error: uploadError.message };
-
-    const {
-      data: { publicUrl: rawPublicUrl2 },
-    } = admin.storage.from("chat-media").getPublicUrl(path);
-    const publicUrl = toPublicUrl(rawPublicUrl2);
-    headerMediaUrl = publicUrl;
-    headerMediaMimeType = headerFile.type;
+  // El número de variables lo manda el cuerpo aprobado, no el formulario: así
+  // un emparejamiento corto o largo no deja la plantilla peor de como estaba.
+  const cuantas = cuantasVariables(template.body_text ?? "");
+  if (cuantas === 0) return { error: "Esta plantilla no tiene variables que emparejar." };
+  if (variables.length !== cuantas) {
+    return { error: `La plantilla tiene ${cuantas} variable(s): indica con qué se rellena cada una.` };
   }
 
-  try {
-    const result = await createMetaTemplate(account.waba_id, account.access_token, {
-      name,
-      language,
-      category,
-      headerText: headerKind === "text" ? headerText : undefined,
-      headerMedia,
-      bodyText,
-      ejemplos: variables.map((v) => v.ejemplo ?? ""),
-      footerText: footerText || undefined,
-      buttons: buttons.length > 0 ? buttons : undefined,
-    });
+  const { error } = await supabase
+    .from("templates")
+    .update({ variable_count: cuantas, variables_origen: variables })
+    .eq("id", templateId)
+    .eq("workspace_id", workspaceId);
+  if (error) return { error: error.message };
 
-    const variableCount = cuantasVariables(bodyText);
-
-    // Meta already accepted the template at this point — if this insert
-    // fails silently, the client sees a false "success" while the template
-    // never appears locally and is unusable.
-    const { error: upsertError } = await supabase.from("templates").upsert(
-      {
-        workspace_id: workspaceId,
-        waba_id: account.waba_id,
-        meta_template_name: name,
-        language,
-        category,
-        status: result.status,
-        body_text: bodyText,
-        buttons: buttons.length > 0 ? buttons : null,
-        variable_count: variableCount,
-        variables_origen: variables.length > 0 ? variables : null,
-        header_format: headerKind === "none" ? null : (headerKind.toUpperCase() as string),
-        header_text: headerKind === "text" ? headerText : null,
-        header_media_url: headerMediaUrl,
-        header_media_mime_type: headerMediaMimeType,
-        synced_at: new Date().toISOString(),
-        created_via: "crm",
-      },
-      { onConflict: "workspace_id,waba_id,meta_template_name,language" }
-    );
-    if (upsertError) {
-      return {
-        error: `La plantilla se creó en Meta, pero no se pudo guardar aquí: ${upsertError.message}. Usa "Sincronizar" para traerla.`,
-      };
-    }
-
-    revalidatePath("/dashboard/templates");
-    return { success: true };
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : "Error desconocido." };
-  }
+  revalidatePath("/dashboard/templates");
+  return { success: true };
 }
 
 export async function deleteTemplate(templateId: string) {

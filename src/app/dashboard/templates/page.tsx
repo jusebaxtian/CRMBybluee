@@ -7,8 +7,9 @@ import { requireModule } from "@/lib/entitlements";
 import { DeleteTemplateButton } from "@/components/templates/delete-template-button";
 import { TemplatePreview } from "@/components/templates/template-preview";
 import { TemplateHeaderMediaUpload } from "@/components/templates/template-header-media-upload";
+import { EmparejarExistente } from "@/components/templates/emparejar-existente";
 import { opcionesDeWaba, wabasDelEspacio } from "@/lib/whatsapp/wabas";
-import type { VariablePersonalizada } from "@/lib/contactos/variables";
+import type { VariableDePlantilla, VariablePersonalizada } from "@/lib/contactos/variables";
 import { noSePuedeUsar, quedaJusto, motivoDelExceso, avisoDeMargenJusto } from "@/lib/whatsapp/limite-plantilla";
 
 const statusLabel: Record<string, string> = {
@@ -46,7 +47,7 @@ export default async function TemplatesPage() {
   const { data: templates } = await supabase
     .from("templates")
     .select(
-      "id, meta_template_name, language, category, status, body_text, variable_count, header_format, header_text, header_media_url, buttons, waba_id"
+      "id, meta_template_name, language, category, status, body_text, variable_count, variables_origen, header_format, header_text, header_media_url, buttons, waba_id"
     )
     .eq("workspace_id", workspaceId ?? "")
     // Solo se muestran/usan plantillas creadas desde el formulario del CRM —
@@ -194,6 +195,13 @@ export default async function TemplatesPage() {
                     </span>
                   )}
                 </div>
+
+                <EmparejarExistente
+                  templateId={t.id}
+                  variableCount={t.variable_count}
+                  emparejamiento={t.variables_origen as VariableDePlantilla[] | null}
+                  propias={(propias ?? []) as VariablePersonalizada[]}
+                />
 
                 {t.status !== "DELETED" && (
                   <div className="mt-3 border-t border-border pt-3">

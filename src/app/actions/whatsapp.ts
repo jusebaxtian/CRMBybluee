@@ -605,7 +605,7 @@ export async function sendTemplateToConversation(input: {
       .single(),
     supabase
       .from("templates")
-      .select("meta_template_name, language, body_text, header_format, header_media_url, variable_count, buttons")
+      .select("meta_template_name, language, body_text, header_format, header_media_url, variable_count, variables_origen, buttons")
       .eq("id", input.templateId)
       .single(),
   ]);

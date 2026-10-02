@@ -57,7 +57,7 @@ const POR_CODIGO: Record<number, string> = {
 
   // --- Plantillas ----------------------------------------------------------
   132000:
-    "La plantilla espera otra cantidad de datos de los que se enviaron. Revisa las variables ({{1}}, {{2}}…) de la plantilla.",
+    "La plantilla espera otra cantidad de datos de los que se enviaron. Abre Plantillas y revisa que cada variable ({{1}}, {{2}}…) tenga indicado con qué se rellena.",
   132001:
     "Esa plantilla no existe en la línea desde la que estás enviando. Recuerda que las plantillas pertenecen a la cuenta de WhatsApp de cada número: créala eligiendo esa línea, o envía desde la línea donde sí existe.",
   132005: "El texto de la plantilla es más largo de lo que permite WhatsApp. Acórtalo y vuelve a enviarla a aprobación.",

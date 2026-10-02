@@ -9,8 +9,11 @@
  */
 
 /**
- * Las variables propias son la 2, la 3 y la 4: la {{1}} siempre es el nombre
- * del contacto, que ya existia antes de esto.
+ * Las columnas propias de cada espacio son la 2, la 3 y la 4. La {{1}} no
+ * tiene columna propia porque su valor por defecto es el nombre del contacto,
+ * que ya existia antes de esto -- pero eso es solo el valor por defecto: al
+ * crear o editar una plantilla, la {{1}} se puede emparejar con cualquiera de
+ * las cuatro, igual que las demas.
  */
 export const INDICES_VARIABLE = [2, 3, 4] as const;
 export type IndiceVariable = (typeof INDICES_VARIABLE)[number];
