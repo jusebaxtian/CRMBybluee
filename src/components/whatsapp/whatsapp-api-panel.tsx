@@ -22,9 +22,11 @@ const messagingLimitLabel: Record<string, string> = {
   TIER_50: "50 conversaciones/día",
   TIER_250: "250 conversaciones/día",
   TIER_1K: "1.000 conversaciones/día",
+  TIER_2K: "2.000 conversaciones/día",
   TIER_10K: "10.000 conversaciones/día",
   TIER_100K: "100.000 conversaciones/día",
   UNLIMITED: "Sin límite",
+  TIER_UNLIMITED: "Sin límite",
 };
 
 export type WhatsAppAccount = {

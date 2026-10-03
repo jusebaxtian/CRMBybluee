@@ -126,13 +126,22 @@ export type ConexionApi = {
   /** name_status de Meta: si el nombre para mostrar esta aprobado. */
   nombreVerificado: boolean | null;
   nombreParaMostrar: string | null;
-  /**
-   * account_review_status del WABA. Lo mas cercano a "portafolio verificado"
-   * que devuelve el token: la verificacion del negocio exige un permiso que
-   * el Embedded Signup no concede.
-   */
+  /** account_review_status del WABA: la revision de la cuenta de WhatsApp Business. */
   cuentaRevision: "aprobada" | "pendiente" | "rechazada" | null;
+  /** business_verification_status del WABA: si el negocio dueño esta verificado en Meta. */
+  negocioVerificado: "verificado" | "pendiente" | "sin_verificar" | null;
 };
+
+/** Lo que Meta devuelve en business_verification_status, en tres estados. */
+export function estadoDeVerificacion(valor: string | undefined): ConexionApi["negocioVerificado"] {
+  if (!valor) return null;
+  const v = valor.toLowerCase();
+  if (v === "verified") return "verificado";
+  if (v === "not_verified") return "sin_verificar";
+  if (/pending|review/.test(v)) return "pendiente";
+  if (/fail|reject|revok|expir/.test(v)) return "sin_verificar";
+  return null;
+}
 
 export type Conexiones = { conexiones: ConexionApi[]; maxPermitidoPlan: number };
 
@@ -141,6 +150,7 @@ const LIMITE_POR_TRAMO: Record<string, number> = {
   TIER_50: 50,
   TIER_250: 250,
   TIER_1K: 1_000,
+  TIER_2K: 2_000,
   TIER_10K: 10_000,
   TIER_100K: 100_000,
 };
@@ -183,7 +193,9 @@ export async function cargarConexiones(supabase: SupabaseClient, workspaceId: st
       try {
         [meta, waba] = await Promise.all([
           getPhoneNumberStatus(c.phone_number_id, c.access_token),
-          c.waba_id ? getWabaStatus(c.waba_id, c.access_token) : Promise.resolve(null),
+          // Si la consulta de la cuenta falla, el numero se pinta igual: antes
+          // un error aqui dejaba toda la tarjeta en blanco.
+          c.waba_id ? getWabaStatus(c.waba_id, c.access_token).catch(() => null) : Promise.resolve(null),
         ]);
       } catch {
         // Meta caido o token vencido: la tarjeta se pinta con lo que hay en
@@ -208,6 +220,7 @@ export async function cargarConexiones(supabase: SupabaseClient, workspaceId: st
           ? meta.name_status === "APPROVED" || meta.name_status === "AVAILABLE_WITHOUT_REVIEW"
           : null,
         nombreParaMostrar: meta?.verified_name ?? null,
+        negocioVerificado: estadoDeVerificacion(waba?.business_verification_status),
         cuentaRevision: !revision ? null : revision === "APPROVED" ? "aprobada" : revision === "REJECTED" ? "rechazada" : "pendiente",
       };
     })

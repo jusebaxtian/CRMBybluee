@@ -81,6 +81,28 @@ function Tarjeta({ c }: { c: ConexionApi }) {
         </div>
 
         <div className="flex items-center justify-between">
+          <dt className="whitespace-nowrap font-dash-ui text-[11.5px] font-medium text-dash-text-2">Negocio en Meta</dt>
+          <dd
+            className={`font-dash-ui text-[11.5px] font-semibold ${
+              c.negocioVerificado === null
+                ? "text-dash-text-3"
+                : c.negocioVerificado === "verificado"
+                  ? "text-dash-green-text"
+                  : "text-dash-amber"
+            }`}
+            title="Verificación del negocio dueño de esta cuenta de WhatsApp en Meta"
+          >
+            {c.negocioVerificado === null
+              ? "—"
+              : c.negocioVerificado === "verificado"
+                ? "Verificado"
+                : c.negocioVerificado === "pendiente"
+                  ? "En revisión"
+                  : "Sin verificar"}
+          </dd>
+        </div>
+
+        <div className="flex items-center justify-between">
           <dt className="whitespace-nowrap font-dash-ui text-[11.5px] font-medium text-dash-text-2">Nombre en Meta</dt>
           <dd className={`font-dash-ui text-[11.5px] font-semibold ${c.nombreVerificado === null ? "text-dash-text-3" : c.nombreVerificado ? "text-dash-green-text" : "text-dash-amber"}`}>
             {c.nombreVerificado === null ? "—" : c.nombreVerificado ? "Verificado" : "Pendiente"}

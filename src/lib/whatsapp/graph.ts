@@ -121,19 +121,26 @@ export type WabaStatus = {
   name: string;
   /** APPROVED, PENDING, REJECTED... la revision de la cuenta de WhatsApp Business. */
   account_review_status?: string;
+  /**
+   * verified, not_verified, pending... la verificacion del negocio dueño de
+   * esta cuenta. Es por cuenta de WhatsApp (WABA), no por portafolio: dos
+   * lineas del mismo cliente pueden salir distintas.
+   */
+  business_verification_status?: string;
 };
 
 /**
- * Estado de revision de la cuenta de WhatsApp Business (WABA).
+ * Estado de la cuenta de WhatsApp Business (WABA): su revision y la
+ * verificacion del negocio dueño.
  *
- * Es lo mas cercano a "portafolio verificado" que devuelve el token del
- * Embedded Signup. La verificacion del negocio dueño (business
- * verification_status) exige el permiso business_management, que ese token
- * no tiene: Meta responde "(#200) Requires business_management permission".
- * Conseguirlo obliga a cambiar la app en Meta y pasar revision.
+ * Aqui se escribio que la verificacion del negocio exigia el permiso
+ * business_management. Era falso para este campo: el 3 oct 2026 se comprobo
+ * que el token del Embedded Signup lo lee sin problema desde la WABA. Lo que
+ * si pide ese permiso es el limite de mensajes del PORTAFOLIO, que se lee
+ * desde el nodo del negocio y no desde aqui.
  */
 export async function getWabaStatus(wabaId: string, accessToken: string): Promise<WabaStatus> {
-  return graphFetch(`/${wabaId}?fields=name,account_review_status`, {
+  return graphFetch(`/${wabaId}?fields=name,account_review_status,business_verification_status`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 }
