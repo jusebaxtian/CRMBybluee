@@ -123,14 +123,42 @@ export type ConexionApi = {
   calidad: "alta" | "media" | "baja" | null;
   limiteDiario: number | null;
   usadoHoy: number | null;
-  /** name_status de Meta: si el nombre para mostrar esta aprobado. */
-  nombreVerificado: boolean | null;
+  /** Estado del nombre para mostrar en Meta. Ver estadoDelNombre. */
+  nombreEstado: "aprobado" | "en_revision" | "rechazado" | "sin_nombre" | null;
   nombreParaMostrar: string | null;
   /** account_review_status del WABA: la revision de la cuenta de WhatsApp Business. */
   cuentaRevision: "aprobada" | "pendiente" | "rechazada" | null;
   /** business_verification_status del WABA: si el negocio dueño esta verificado en Meta. */
   negocioVerificado: "verificado" | "pendiente" | "sin_verificar" | null;
 };
+
+/**
+ * El nombre para mostrar de la linea, a partir de name_status y new_name_status.
+ *
+ * Antes todo lo que no fuera aprobado se pintaba "Pendiente", y eso mentia: el
+ * 3 oct 2026 la linea de Ventas tenia name_status NON_EXISTS y new_name_status
+ * NONE --ningun nombre aprobado y ninguno enviado a revision-- y la tarjeta
+ * decia "Pendiente", como si bastara con esperar. No hay nada que esperar si
+ * nunca se envio.
+ *
+ * AVAILABLE_WITHOUT_REVIEW es un nombre ya utilizable que no necesito
+ * revision: cuenta como aprobado.
+ */
+export function estadoDelNombre(
+  nombre: string | undefined,
+  nuevo: string | undefined
+): ConexionApi["nombreEstado"] {
+  if (!nombre && !nuevo) return null;
+  const actual = (nombre ?? "").toUpperCase();
+  const enviado = (nuevo ?? "").toUpperCase();
+
+  if (actual === "APPROVED" || actual === "AVAILABLE_WITHOUT_REVIEW") return "aprobado";
+  if (actual === "PENDING_REVIEW" || enviado === "PENDING_REVIEW") return "en_revision";
+  if (actual === "DECLINED" || enviado === "DECLINED") return "rechazado";
+  // NON_EXISTS, NONE o EXPIRED: no hay un nombre vigente y nada en revision.
+  if (actual === "NON_EXISTS" || actual === "NONE" || actual === "EXPIRED") return "sin_nombre";
+  return null;
+}
 
 /** Lo que Meta devuelve en business_verification_status, en tres estados. */
 export function estadoDeVerificacion(valor: string | undefined): ConexionApi["negocioVerificado"] {
@@ -213,12 +241,7 @@ export async function cargarConexiones(supabase: SupabaseClient, workspaceId: st
         calidad: meta?.quality_rating ? (CALIDAD[meta.quality_rating] ?? null) : null,
         limiteDiario,
         usadoHoy: limiteDiario !== null ? (usadoPorCuenta.get(c.id) ?? 0) : null,
-        // AVAILABLE_WITHOUT_REVIEW es un nombre aprobado que no necesito
-        // revision; es el estado mas comun. Tratarlo como pendiente pintaba
-        // "Nombre pendiente" en numeros perfectamente sanos.
-        nombreVerificado: meta?.name_status
-          ? meta.name_status === "APPROVED" || meta.name_status === "AVAILABLE_WITHOUT_REVIEW"
-          : null,
+        nombreEstado: estadoDelNombre(meta?.name_status, meta?.new_name_status),
         nombreParaMostrar: meta?.verified_name ?? null,
         negocioVerificado: estadoDeVerificacion(waba?.business_verification_status),
         cuentaRevision: !revision ? null : revision === "APPROVED" ? "aprobada" : revision === "REJECTED" ? "rechazada" : "pendiente",
