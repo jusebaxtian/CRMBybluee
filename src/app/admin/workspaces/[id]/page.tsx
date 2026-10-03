@@ -8,6 +8,8 @@ import { WorkspaceAdminEditor } from "@/components/admin/workspace-admin-editor"
 import { EditClientFields } from "@/components/admin/edit-client-fields";
 import { NotifyActivationButton } from "@/components/admin/notify-activation-button";
 import { ClienteEnMiChat, type ClienteDeEspacio } from "@/components/admin/cliente-en-mi-chat";
+import { PagosDelCliente, type PagoDelCliente } from "@/components/admin/pagos-del-cliente";
+import { toPublicUrl } from "@/lib/supabase/config";
 import { getActivationTemplateConfig } from "@/app/actions/admin-whatsapp";
 import { limiteDeNumeros } from "@/lib/whatsapp/limite-numeros";
 import { limiteDeAgentes } from "@/lib/agentes/limite-agentes";
@@ -109,6 +111,36 @@ export default async function AdminWorkspaceDetailPage({
   const { data: clienteRows } = await supabase.rpc("admin_cliente_de_espacio", { p_workspace_id: id });
   const cliente = ((clienteRows ?? []) as ClienteDeEspacio[])[0] ?? null;
 
+  // Solo los pagos aprobados: son los que de verdad entraron. Los pendientes
+  // y rechazados se ven en la pantalla de Pagos, donde se aprueban.
+  const { data: pagosAprobados } = await supabase
+    .from("payments")
+    .select("id, provider, amount_cents, currency, created_at, reviewed_at, proof_path")
+    .eq("workspace_id", id)
+    .eq("status", "approved")
+    .order("created_at", { ascending: false });
+
+  const adminStorage = createAdminClient();
+  const pagos: PagoDelCliente[] = await Promise.all(
+    (pagosAprobados ?? []).map(async (p) => {
+      let proofUrl: string | null = null;
+      if (p.proof_path) {
+        const { data } = await adminStorage.storage.from("payment-proofs").createSignedUrl(p.proof_path, 60 * 10);
+        // La URL firmada se arma con la base interna del servidor; hay que
+        // pasarla a la publica o el enlace no abre desde el navegador.
+        proofUrl = data?.signedUrl ? toPublicUrl(data.signedUrl) : null;
+      }
+      return {
+        id: p.id as string,
+        provider: p.provider as string,
+        amount_cents: Number(p.amount_cents),
+        currency: (p.currency as string) ?? "COP",
+        fecha: ((p.reviewed_at as string | null) ?? (p.created_at as string)),
+        proofUrl,
+      };
+    })
+  );
+
   const daysSinceLastSignIn = lastSignInAt
     ? Math.max(0, Math.floor((Date.now() - new Date(lastSignInAt).getTime()) / (1000 * 60 * 60 * 24)))
     : null;
@@ -156,6 +188,7 @@ export default async function AdminWorkspaceDetailPage({
             hasTemplateConfig={!!activationConfig}
           />
         </div>
+        <PagosDelCliente pagos={pagos} />
       </div>
 
       <ClienteEnMiChat workspaceId={workspace.id} cliente={cliente} />

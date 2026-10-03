@@ -34,6 +34,19 @@ const statusLabel: Record<string, string> = {
   canceled: "Cancelado",
 };
 
+/**
+ * El estado tal como se ve en la columna.
+ *
+ * "Prueba vencida" y "Pago pendiente" son el mismo `status` en la base
+ * (past_due) y se distinguen por si el cliente llego a activarse alguna vez.
+ * El filtro usa esta misma funcion para que las opciones del desplegable
+ * digan exactamente lo que se lee en la tabla.
+ */
+function etiquetaDeEstado(r: FilaCliente): string {
+  if (r.status === "past_due" && !r.everActivated) return "Prueba vencida";
+  return statusLabel[r.status] ?? r.status;
+}
+
 function daysSince(dateStr: string, ahora: number): number {
   return Math.max(0, Math.floor((ahora - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24)));
 }
@@ -47,7 +60,20 @@ export function ClientesTabla({ rows, plans }: { rows: FilaCliente[]; plans: { i
   const [q, setQ] = useState("");
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
+  const [plan, setPlan] = useState("");
+  const [estado, setEstado] = useState("");
   const [ahora] = useState(() => Date.now());
+
+  const planesPresentes = useMemo(() => {
+    const vistos = new Map<string, string>();
+    for (const r of rows) vistos.set(r.planId ?? "", r.planId ? r.plan : "Sin plan");
+    return [...vistos].sort((a, b) => a[1].localeCompare(b[1], "es"));
+  }, [rows]);
+
+  const estadosPresentes = useMemo(
+    () => [...new Set(rows.map(etiquetaDeEstado))].sort((a, b) => a.localeCompare(b, "es")),
+    [rows]
+  );
 
   const filas = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -58,14 +84,16 @@ export function ClientesTabla({ rows, plans }: { rows: FilaCliente[]; plans: { i
         const campos = [r.email, r.name, r.fullName ?? "", r.phone ?? "", r.cliente ?? ""].map((x) => x.toLowerCase());
         if (!campos.some((c) => c.includes(t))) return false;
       }
+      if (plan && (r.planId ?? "") !== plan) return false;
+      if (estado && etiquetaDeEstado(r) !== estado) return false;
       const creado = new Date(r.createdAt);
       if (d && creado < d) return false;
       if (h && creado > h) return false;
       return true;
     });
-  }, [rows, q, desde, hasta]);
+  }, [rows, q, desde, hasta, plan, estado]);
 
-  const hayFiltro = !!(q || desde || hasta);
+  const hayFiltro = !!(q || desde || hasta || plan || estado);
 
   return (
     <>
@@ -80,6 +108,32 @@ export function ClientesTabla({ rows, plans }: { rows: FilaCliente[]; plans: { i
             className="w-full rounded-md border border-border bg-background py-2 pl-9 pr-3 text-sm text-foreground outline-none focus:border-primary"
           />
         </div>
+        <select
+          value={plan}
+          onChange={(e) => setPlan(e.target.value)}
+          className="rounded-md border border-border bg-background px-2 py-2 text-sm text-foreground outline-none focus:border-primary"
+        >
+          <option value="">Todos los planes</option>
+          {planesPresentes.map(([id, nombre]) => (
+            <option key={id} value={id}>
+              {nombre}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={estado}
+          onChange={(e) => setEstado(e.target.value)}
+          className="rounded-md border border-border bg-background px-2 py-2 text-sm text-foreground outline-none focus:border-primary"
+        >
+          <option value="">Todos los estados</option>
+          {estadosPresentes.map((e) => (
+            <option key={e} value={e}>
+              {e}
+            </option>
+          ))}
+        </select>
+
         <div className="flex items-center gap-1.5 text-xs text-muted">
           <span>Creado entre</span>
           <input
@@ -103,6 +157,8 @@ export function ClientesTabla({ rows, plans }: { rows: FilaCliente[]; plans: { i
               setQ("");
               setDesde("");
               setHasta("");
+              setPlan("");
+              setEstado("");
             }}
             className="text-xs text-muted hover:text-foreground"
           >
@@ -155,9 +211,7 @@ export function ClientesTabla({ rows, plans }: { rows: FilaCliente[]; plans: { i
                     planId={r.planId}
                     status={r.status}
                     plans={plans}
-                    etiquetaEstado={
-                      r.status === "past_due" && !r.everActivated ? "Prueba vencida" : (statusLabel[r.status] ?? r.status)
-                    }
+                    etiquetaEstado={etiquetaDeEstado(r)}
                   />
                   {r.accessDisabled && (
                     <span className="mt-1 inline-block w-fit rounded-full border border-red-400 px-2 py-0.5 text-xs text-red-400">
