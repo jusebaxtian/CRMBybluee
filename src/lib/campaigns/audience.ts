@@ -55,11 +55,20 @@ export async function resolveCampaignAudience(
     rows.push(...batch);
     if (batch.length < PAGE_SIZE) break;
   }
-  const matchedBeforeWindow = rows.length;
-  const contactIds =
-    audienceWindow === "open"
-      ? rows.filter((r) => r.has_open_window).map((r) => r.contact_id)
-      : rows.map((r) => r.contact_id);
+
+  // Un contacto, una vez. La funcion de la base ya agrupa por contacto (0132),
+  // pero esto es lo ultimo antes de guardar destinatarios, y la tabla rechaza
+  // el lote ENTERO si un contacto se repite: el 5 oct 2026 eso dejo campañas
+  // vacias en citytours porque un contacto con una conversacion por linea
+  // salia tres veces. La ventana queda abierta si lo esta en cualquiera.
+  const ventanaPorContacto = new Map<string, boolean>();
+  for (const r of rows) {
+    ventanaPorContacto.set(r.contact_id, (ventanaPorContacto.get(r.contact_id) ?? false) || r.has_open_window);
+  }
+  const matchedBeforeWindow = ventanaPorContacto.size;
+  const contactIds = [...ventanaPorContacto]
+    .filter(([, abierta]) => audienceWindow !== "open" || abierta)
+    .map(([id]) => id);
 
   return { contactIds, matchedBeforeWindow };
 }

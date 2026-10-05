@@ -184,9 +184,16 @@ export async function createCampaign(_prevState: unknown, formData: FormData) {
     };
   }
 
-  await supabase.from("campaign_recipients").insert(
+  // Antes se ignoraba el error de este insert: si Postgres rechazaba el lote,
+  // la campaña quedaba creada y vacia, y al darle Enviar salian 0 sin explicar
+  // por que. Ahora la campaña no queda a medias y se dice que paso.
+  const { error: errorDestinatarios } = await supabase.from("campaign_recipients").insert(
     contactIds.map((id) => ({ campaign_id: campaign.id, contact_id: id }))
   );
+  if (errorDestinatarios) {
+    await supabase.from("campaigns").delete().eq("id", campaign.id);
+    return { error: `No se pudieron guardar los destinatarios de la campaña: ${errorDestinatarios.message}` };
+  }
 
   redirect(`/dashboard/campaigns/${campaign.id}`);
 }
@@ -277,9 +284,15 @@ export async function updateCampaign(campaignId: string, _prevState: unknown, fo
   // Recipients are recomputed from scratch — the old list may no longer
   // match the (possibly changed) audience filters.
   await supabase.from("campaign_recipients").delete().eq("campaign_id", campaignId);
-  await supabase.from("campaign_recipients").insert(
+  const { error: errorDestinatarios } = await supabase.from("campaign_recipients").insert(
     contactIds.map((id) => ({ campaign_id: campaignId, contact_id: id }))
   );
+  if (errorDestinatarios) {
+    // La lista vieja ya se borro; se avisa para que no parezca que se guardo.
+    return {
+      error: `No se pudieron guardar los destinatarios: ${errorDestinatarios.message}. Vuelve a guardar la campaña.`,
+    };
+  }
 
   redirect(`/dashboard/campaigns/${campaignId}`);
 }
