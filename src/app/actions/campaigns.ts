@@ -18,8 +18,12 @@ function readAudienceParams(formData: FormData, sendType: "template" | "free_tex
     createdToRaw: String(formData.get("createdTo") ?? "") || null,
     // Free-form messages only work within the 24h window — forcing this
     // avoids creating a campaign that would fail on every single recipient.
-    audienceWindow:
-      sendType === "free_text" ? "open" : (String(formData.get("audienceWindow") ?? "all") as "all" | "open"),
+    // Una plantilla, en cambio, llega con la ventana abierta o cerrada: para
+    // eso se hacen los masivos. Se ignora lo que mande el formulario porque
+    // hasta el 5 oct 2026 habia un casillero que lo reducia a quien escribio
+    // en las ultimas 24 h (69 contactos quedaban en 3) y los borradores viejos
+    // lo guardaron.
+    audienceWindow: sendType === "free_text" ? "open" : "all",
   };
 }
 

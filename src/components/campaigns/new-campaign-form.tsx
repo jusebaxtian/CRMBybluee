@@ -28,7 +28,6 @@ export type CampaignInitialValues = {
   excludeTagIds: string[];
   createdFrom: string | null;
   createdTo: string | null;
-  audienceWindow: "all" | "open";
   scheduledAt: string | null; // ISO
   whatsappAccountId: string | null;
 };
@@ -81,7 +80,6 @@ export function NewCampaignForm({
   const [excludeTagIds, setExcludeTagIds] = useState<string[]>(initialValues?.excludeTagIds ?? []);
   const [createdFrom, setCreatedFrom] = useState(initialValues?.createdFrom ?? "");
   const [createdTo, setCreatedTo] = useState(initialValues?.createdTo ?? "");
-  const [windowOnly, setWindowOnly] = useState(initialValues?.audienceWindow === "open");
   const [sendMode, setSendMode] = useState<"now" | "schedule">(initialValues?.scheduledAt ? "schedule" : "now");
   const [scheduledAt, setScheduledAt] = useState(toLocalInputValue(initialValues?.scheduledAt ?? null));
 
@@ -101,7 +99,6 @@ export function NewCampaignForm({
     excludeTagIds.forEach((id) => formData.append("excludeTagIds", id));
     if (createdFrom) formData.set("createdFrom", createdFrom);
     if (createdTo) formData.set("createdTo", createdTo);
-    if (sendType === "template" && windowOnly) formData.set("audienceWindow", "open");
 
     setCountLoading(true);
     const timeout = setTimeout(() => {
@@ -110,7 +107,7 @@ export function NewCampaignForm({
         .finally(() => setCountLoading(false));
     }, 350);
     return () => clearTimeout(timeout);
-  }, [sendType, includeTagIds, excludeTagIds, createdFrom, createdTo, windowOnly]);
+  }, [sendType, includeTagIds, excludeTagIds, createdFrom, createdTo]);
 
   async function handleFile(file: File, kind: Exclude<MediaKind, "">) {
     setUploading(true);
@@ -403,20 +400,6 @@ export function NewCampaignForm({
           </div>
         </div>
 
-        {sendType === "template" && (
-          <label className="flex items-center gap-1.5 text-xs text-muted">
-            <input
-              type="checkbox"
-              checked={windowOnly}
-              onChange={(e) => setWindowOnly(e.target.checked)}
-              className="accent-primary"
-            />
-            Enviar solo a contactos con la ventana de 24h abierta
-          </label>
-        )}
-        {sendType === "template" && windowOnly && (
-          <input type="hidden" name="audienceWindow" value="open" />
-        )}
 
         <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
           <Users size={15} className="shrink-0 text-primary" />

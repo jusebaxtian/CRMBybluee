@@ -64,7 +64,6 @@ export default async function EditCampaignPage({
     excludeTagIds: campaign.audience_exclude_tag_ids ?? [],
     createdFrom: campaign.audience_created_from ? campaign.audience_created_from.slice(0, 10) : null,
     createdTo: campaign.audience_created_to ? campaign.audience_created_to.slice(0, 10) : null,
-    audienceWindow: campaign.audience_window as "all" | "open",
     scheduledAt: campaign.scheduled_at,
     whatsappAccountId: campaign.whatsapp_account_id,
   };
