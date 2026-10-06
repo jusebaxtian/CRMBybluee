@@ -43,3 +43,6 @@ next-env.d.ts
 # Source screenshots the user dropped in for the landing page — copied into public/landing/, not needed in the repo
 img/
 scratchpad/
+
+# graphify: mapa del codigo generado en local, se regenera cuando se necesite
+graphify-out/
