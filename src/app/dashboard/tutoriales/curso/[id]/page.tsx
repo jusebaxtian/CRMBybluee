@@ -13,7 +13,7 @@ function precioCop(cents: number, currency: string) {
   );
 }
 
-/** Ficha del curso: si el espacio ya pagó muestra las lecciones; si no, cómo pagar. */
+/** Ficha del servicio: si el espacio ya pagó muestra las lecciones; si no, cómo pagar. */
 export default async function CursoPage({
   params,
   searchParams,
@@ -34,7 +34,7 @@ export default async function CursoPage({
 
   const { data: curso } = await supabase
     .from("cursos")
-    .select("id, titulo, descripcion, portada_url, precio_cents, currency, datos_transferencia, activo")
+    .select("id, titulo, descripcion, portada_url, precio_cents, currency, activo")
     .eq("id", id)
     .maybeSingle();
   if (!curso) notFound();
@@ -75,16 +75,28 @@ export default async function CursoPage({
         <ArrowLeft size={15} /> Volver a Capacitaciones
       </Link>
 
-      <div className="overflow-hidden rounded-[15px] border border-border bg-surface">
-        {curso.portada_url && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={curso.portada_url} alt="" className="h-52 w-full object-cover sm:h-72" />
-        )}
-        <div className="flex flex-col gap-2 p-6">
-          <h1 className="font-dash-display text-[24px] font-bold tracking-[-.4px] text-foreground">{curso.titulo}</h1>
-          {curso.descripcion && <p className="whitespace-pre-line text-sm leading-relaxed text-muted">{curso.descripcion}</p>}
-          <div className="mt-2 flex flex-wrap items-center gap-3">
-            <span className="rounded-full bg-primary/15 px-3 py-1 text-sm font-bold text-success">
+      {/* Ficha de producto. Arriba, el cartel completo y la tarjeta de compra lado a lado
+          (miden casi lo mismo, asi que no queda hueco). Debajo, la descripcion a todo el
+          ancho y en dos columnas de texto en pantalla ancha.
+
+          Antes la descripcion iba dentro de la tarjeta de la derecha y dejaba un hueco
+          vacio bajo el cartel; ponerla bajo el cartel solo movia el hueco al otro lado.
+
+          Orden en el codigo --cartel, compra, descripcion--: en telefono se lee asi y la
+          compra no queda enterrada bajo un texto largo. */}
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+        <div className="relative aspect-video w-full overflow-hidden rounded-[15px] border border-border bg-[#0e1411]">
+          {curso.portada_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={curso.portada_url} alt={curso.titulo} className="absolute inset-0 h-full w-full object-contain" />
+          ) : (
+            <span className="absolute inset-0 bg-gradient-to-br from-[#16351f] to-[#0e1411]" />
+          )}
+        </div>
+        <div className="flex flex-col gap-3 rounded-[15px] border border-border bg-surface p-5">
+          <h1 className="font-dash-display text-[22px] font-bold leading-tight tracking-[-.4px] text-foreground">{curso.titulo}</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-[26px] font-bold leading-none tracking-[-.5px] text-foreground">
               {curso.precio_cents > 0 ? precioCop(curso.precio_cents, curso.currency) : "Gratis"}
             </span>
             <span className="text-xs text-muted">
@@ -92,34 +104,38 @@ export default async function CursoPage({
             </span>
             {acceso && <span className="rounded-full bg-success/15 px-3 py-1 text-xs font-bold text-success">Comprado ✓</span>}
           </div>
+          {/* UN solo bloque de compra, dentro de la misma tarjeta del producto: antes habia
+              un "Comprar ahora" aqui y otra tarjeta de pago mas abajo, dos botones de compra
+              compitiendo. */}
+          {!acceso && (
+            <ComprarCurso cursoId={curso.id} precio={precioCop(curso.precio_cents, curso.currency)} hayPendiente={pendiente} />
+          )}
         </div>
+        {curso.descripcion && (
+          <div className="rounded-[15px] border border-border bg-surface p-5 lg:col-span-2">
+            <p className="mb-2 text-sm font-semibold text-foreground">Descripción</p>
+            <p className="whitespace-pre-line text-sm leading-relaxed text-muted lg:columns-2 lg:gap-10">{curso.descripcion}</p>
+          </div>
+        )}
       </div>
 
       {acceso ? (
         <BibliotecaTutoriales tutoriales={(lecciones ?? []) as Tutorial[]} abrirInicial={null} />
       ) : (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
-          <div className="rounded-[13px] border border-border bg-surface p-5">
-            <p className="mb-3 text-sm font-semibold text-foreground">Contenido del curso</p>
-            <ul className="flex flex-col gap-2">
-              {(listado ?? []).map((l, i) => (
-                <li key={l.id} className="flex items-center gap-3 border-b border-border pb-2 text-sm last:border-b-0">
-                  <span className="text-xs text-muted">{String(i + 1).padStart(2, "0")}</span>
-                  <PlayCircle size={15} className="shrink-0 text-muted" />
-                  <span className="min-w-0 flex-1 truncate text-foreground">{l.titulo}</span>
-                  {l.duracion && <span className="text-xs text-muted">{l.duracion}</span>}
-                  <Lock size={13} className="shrink-0 text-muted" />
-                </li>
-              ))}
-              {(listado ?? []).length === 0 && <li className="text-sm text-muted">Pronto se publicarán las lecciones.</li>}
-            </ul>
-          </div>
-          <ComprarCurso
-            cursoId={curso.id}
-            precio={precioCop(curso.precio_cents, curso.currency)}
-            datosTransferencia={curso.datos_transferencia}
-            hayPendiente={pendiente}
-          />
+        <div className="rounded-[13px] border border-border bg-surface p-5">
+          <p className="mb-3 text-sm font-semibold text-foreground">Contenido del servicio</p>
+          <ul className="flex flex-col gap-2">
+            {(listado ?? []).map((l, i) => (
+              <li key={l.id} className="flex items-center gap-3 border-b border-border pb-2 text-sm last:border-b-0">
+                <span className="text-xs text-muted">{String(i + 1).padStart(2, "0")}</span>
+                <PlayCircle size={15} className="shrink-0 text-muted" />
+                <span className="min-w-0 flex-1 truncate text-foreground">{l.titulo}</span>
+                {l.duracion && <span className="text-xs text-muted">{l.duracion}</span>}
+                <Lock size={13} className="shrink-0 text-muted" />
+              </li>
+            ))}
+            {(listado ?? []).length === 0 && <li className="text-sm text-muted">Pronto se publicarán las lecciones.</li>}
+          </ul>
         </div>
       )}
     </div>

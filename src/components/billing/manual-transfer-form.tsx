@@ -1,11 +1,20 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { uploadPaymentProof } from "@/app/actions/billing";
 import { Button } from "@/components/ui/button";
 
-export function ManualTransferForm() {
+/**
+ * `planId` es el plan que se esta pagando; viaja con el comprobante para que, al
+ * aprobarlo, el espacio quede con ese plan. `montoSugeridoCop` es su precio en
+ * pesos y llega ya escrito: asi el comprobante coincide con el plan, que es lo
+ * que permite aplicarlo. Sin ninguno de los dos, funciona como siempre.
+ */
+export function ManualTransferForm({ planId, montoSugeridoCop }: { planId?: string; montoSugeridoCop?: number }) {
+  // Dos formularios de transferencia pueden estar en la misma pagina (renovar y
+  // cambiar de plan): ids fijos repetidos romperian las etiquetas.
+  const uid = useId();
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [pending, setPending] = useState(false);
@@ -34,25 +43,27 @@ export function ManualTransferForm() {
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-3">
+      {planId && <input type="hidden" name="planId" value={planId} />}
       <div>
-        <label htmlFor="amount" className="mb-1 block text-xs font-medium text-muted">
+        <label htmlFor={`${uid}-amount`} className="mb-1 block text-xs font-medium text-muted">
           Monto pagado (COP)
         </label>
         <input
-          id="amount"
+          id={`${uid}-amount`}
           name="amount"
           type="number"
           required
+          defaultValue={montoSugeridoCop}
           placeholder="150000"
           className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
         />
       </div>
       <div>
-        <label htmlFor="proof" className="mb-1 block text-xs font-medium text-muted">
+        <label htmlFor={`${uid}-proof`} className="mb-1 block text-xs font-medium text-muted">
           Comprobante de transferencia
         </label>
         <input
-          id="proof"
+          id={`${uid}-proof`}
           name="proof"
           type="file"
           required

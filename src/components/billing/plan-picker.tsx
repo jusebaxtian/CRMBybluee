@@ -27,12 +27,38 @@ const cycleLabel: Record<string, string> = {
   yearly: "año",
 };
 
-export function PlanPicker({ plans, currentPlanId }: { plans: Plan[]; currentPlanId: string | null }) {
+/**
+ * `modoCambio` es para quien YA tiene un plan pagado. Elegir otro no cambia el
+ * plan del espacio: lleva a la pantalla de pago de ese plan, y el espacio solo
+ * cambia cuando el pago se aprueba. Sin el, elegir fija el plan al instante
+ * (como siempre), que es lo correcto antes de pagar por primera vez.
+ *
+ * `proximoPlanId` es el plan inmediatamente superior al actual: lleva el boton
+ * "Subir de nivel". El resto dice "Tomar plan".
+ */
+export function PlanPicker({
+  plans,
+  currentPlanId,
+  modoCambio = false,
+  proximoPlanId = null,
+}: {
+  plans: Plan[];
+  currentPlanId: string | null;
+  modoCambio?: boolean;
+  proximoPlanId?: string | null;
+}) {
   const router = useRouter();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSelect(planId: string) {
+    if (modoCambio) {
+      // Recarga completa, no navegacion del lado del cliente: el boton de Bold
+      // solo se dibuja bien si la pagina carga con el ya presente.
+      setPendingId(planId);
+      window.location.assign(`/dashboard/billing?plan=${planId}#pagar`);
+      return;
+    }
     setPendingId(planId);
     setError(null);
     const result = await selectWorkspacePlan(planId);
@@ -50,11 +76,12 @@ export function PlanPicker({ plans, currentPlanId }: { plans: Plan[]; currentPla
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {plans.map((plan) => {
           const isCurrent = plan.id === currentPlanId;
+          const esProximo = modoCambio && plan.id === proximoPlanId;
           return (
             <div
               key={plan.id}
               className={`flex flex-col rounded-xl border p-5 ${
-                isCurrent ? "border-primary bg-primary/5" : "border-border bg-surface"
+                isCurrent ? "border-primary bg-primary/5" : esProximo ? "border-primary/50 bg-surface" : "border-border bg-surface"
               }`}
             >
               <div className="flex flex-wrap items-center gap-2">
@@ -108,14 +135,18 @@ export function PlanPicker({ plans, currentPlanId }: { plans: Plan[]; currentPla
                 className={`mt-5 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60 ${
                   isCurrent
                     ? "cursor-default bg-primary/15 text-primary"
-                    : "bg-primary text-white hover:bg-primary-hover"
+                    : modoCambio && !esProximo
+                      ? "border border-primary text-primary hover:bg-primary/10"
+                      : "bg-primary text-white hover:bg-primary-hover"
                 }`}
               >
                 {isCurrent
                   ? "Plan actual"
                   : pendingId === plan.id
-                    ? "Seleccionando..."
-                    : "Elegir este plan"}
+                    ? modoCambio ? "Abriendo..." : "Seleccionando..."
+                    : modoCambio
+                      ? esProximo ? "Subir de nivel" : "Tomar plan"
+                      : "Elegir este plan"}
               </button>
             </div>
           );

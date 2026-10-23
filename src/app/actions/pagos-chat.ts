@@ -5,6 +5,7 @@ import { origenPublico } from "@/lib/http/origen-publico";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPlatformAdmin } from "@/lib/admin";
+import { diasDemoValidos } from "@/lib/billing/demo";
 import {
   activarEspacioConPago,
   copiarComprobante,
@@ -126,7 +127,7 @@ export async function registrarPagoDesdeChat(input: {
   let diasDemo: number | null = null;
   if (esDemo) {
     diasDemo = Math.round(Number(input.diasDemo));
-    if (!diasDemo || diasDemo < 1 || diasDemo > 365) return { error: "Los días de demo deben estar entre 1 y 365." };
+    if (!diasDemoValidos(diasDemo)) return { error: "El demo dura 3, 4, 5 o 7 días." };
   } else {
     amountCents = Math.round(Number(String(input.amount ?? "").replace(/[^\d.,]/g, "").replace(",", ".")) * 100);
     if (!amountCents || amountCents <= 0) return { error: "Escribe el monto pagado." };
@@ -140,12 +141,11 @@ export async function registrarPagoDesdeChat(input: {
     if (venceEl.getTime() < Date.now()) return { error: "La fecha de vencimiento ya pasó." };
   }
 
-  const { data: plan } = await supabase
-    .from("plans")
-    .select("id, name, price_cents, currency, billing_cycle")
-    .eq("id", input.planId)
-    .maybeSingle();
-  if (!plan) return { error: "Elige un plan." };
+  // Un demo siempre usa el plan DEMO, sin importar el plan que haya elegido el formulario.
+  const { data: plan } = esDemo
+    ? await supabase.from("plans").select("id, name, price_cents, currency, billing_cycle").eq("is_demo", true).limit(1).maybeSingle()
+    : await supabase.from("plans").select("id, name, price_cents, currency, billing_cycle").eq("id", input.planId).maybeSingle();
+  if (!plan) return { error: esDemo ? "No hay un plan DEMO configurado." : "Elige un plan." };
 
   const r = await resolverContacto(supabase, input);
   if (!r) return { error: "Contacto no encontrado." };
@@ -191,14 +191,15 @@ export async function registrarPagoDesdeChat(input: {
 }
 
 /** Admin → Pagos: enlace demo sin contacto (para prospectos que aun no escriben al chat). */
-export async function crearEnlaceDemo(input: { planId: string; diasDemo: number; nombre?: string }) {
+export async function crearEnlaceDemo(input: { diasDemo: number; nombre?: string }) {
   const a = await soloAdmin();
   if ("error" in a) return { error: a.error };
   const { supabase, userId } = a;
   const dias = Math.round(Number(input.diasDemo));
-  if (!dias || dias < 1 || dias > 365) return { error: "Los días de demo deben estar entre 1 y 365." };
-  const { data: plan } = await supabase.from("plans").select("id, currency").eq("id", input.planId).maybeSingle();
-  if (!plan) return { error: "Elige un plan." };
+  if (!diasDemoValidos(dias)) return { error: "El demo dura 3, 4, 5 o 7 días." };
+  // El plan lo pone el sistema: un demo es siempre el plan DEMO.
+  const { data: plan } = await supabase.from("plans").select("id, currency").eq("is_demo", true).limit(1).maybeSingle();
+  if (!plan) return { error: "No hay un plan DEMO configurado." };
 
   const token = nuevoTokenInvitacion();
   const { error } = await createAdminClient().from("invitaciones_registro").insert({

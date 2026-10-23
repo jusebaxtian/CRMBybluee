@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { ChevronDown, Lock, Search } from "lucide-react";
+import { ChevronDown, Info, Lock, Search } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { INPUT_AUTH, INPUT_AUTH_BASE } from "@/components/auth/campos";
 import { listaDePaises, PAIS_POR_DEFECTO, type Pais } from "@/lib/auth/telefono";
@@ -193,6 +193,15 @@ export function CampoTelefono({
             : "Solo el número local, sin el indicativo. Ej: 3001234567"}
         </p>
       )}
+      {/* Mucha gente creaba la cuenta y luego decia "ese no es el numero que va a quedar":
+          confundian este campo con la linea con la que van a atender a sus clientes. */}
+      <div className="mt-2.5 flex items-start gap-2 rounded-[9px] border border-info/25 bg-info/10 px-3 py-2">
+        <Info size={14} className="mt-[1px] shrink-0 text-info" aria-hidden="true" />
+        <p className="text-[12px] leading-relaxed text-muted">
+          Este número es solo para crear tu cuenta y poder contactarte. No es el que usarás para atender a tus clientes:
+          ese lo conectas después, ya dentro del CRM.
+        </p>
+      </div>
     </div>
   );
 }

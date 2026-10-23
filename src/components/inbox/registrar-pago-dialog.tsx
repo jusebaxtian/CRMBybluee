@@ -40,7 +40,7 @@ export function RegistrarPagoDialog({
   const [nota, setNota] = useState("");
   const [venceEl, setVenceEl] = useState("");
   const [modo, setModo] = useState<"pago" | "demo">(modoInicial);
-  const [diasDemo, setDiasDemo] = useState("2");
+  const [diasDemo, setDiasDemo] = useState("3");
   const [destino, setDestino] = useState<"espacio" | "invitacion">("espacio");
   const [resultado, setResultado] = useState<{ tipo: "activado"; espacio: string } | { tipo: "invitacion"; enlace: string } | null>(null);
   const [copiado, setCopiado] = useState(false);
@@ -235,6 +235,12 @@ export function RegistrarPagoDialog({
               </p>
             )}
 
+            {modo === "demo" ? (
+              <p className="rounded-[10px] border border-border bg-background px-3 py-2 text-xs text-muted">
+                <strong className="text-foreground">Plan DEMO</strong>: hasta 100 contactos, 1 número de WhatsApp, 2 usuarios y 100
+                envíos masivos. Sin precio.
+              </p>
+            ) : (
             <label className="text-xs font-medium text-muted">
               Plan
               <select value={planId} onChange={(e) => elegirPlan(e.target.value)} className={`${INPUT} mt-1`}>
@@ -245,18 +251,16 @@ export function RegistrarPagoDialog({
                 ))}
               </select>
             </label>
+            )}
             {modo === "demo" ? (
               <label className="text-xs font-medium text-muted">
                 Días de demo
-                <input
-                  type="number"
-                  min={1}
-                  max={365}
-                  inputMode="numeric"
-                  value={diasDemo}
-                  onChange={(e) => setDiasDemo(e.target.value)}
-                  className={`${INPUT} mt-1`}
-                />
+                <select value={diasDemo} onChange={(e) => setDiasDemo(e.target.value)} className={`${INPUT} mt-1`}>
+                  <option value="3">3 días</option>
+                  <option value="4">4 días</option>
+                  <option value="5">5 días</option>
+                  <option value="7">7 días</option>
+                </select>
                 <span className="mt-1 block text-[11px] font-normal text-muted">
                   Sin pago. Al cumplirse los días el espacio pasa a prueba vencida.
                 </span>

@@ -8,7 +8,7 @@ export default async function AdminPlansPage() {
   const { data: plans } = await supabase
     .from("plans")
     .select(
-      "id, name, price_cents, compare_price_cents, is_active, description, max_agents, max_whatsapp_numbers, badge_label"
+      "id, name, price_cents, compare_price_cents, is_active, description, max_agents, max_whatsapp_numbers, badge_label, is_demo, max_contacts, max_bulk_sends"
     )
     .order("price_cents");
 
@@ -52,6 +52,9 @@ export default async function AdminPlansPage() {
               initialDescription={plan.description ?? []}
               initialMaxAgents={plan.max_agents}
               initialMaxWhatsappNumbers={plan.max_whatsapp_numbers}
+              isDemo={!!plan.is_demo}
+              initialMaxContacts={plan.max_contacts ?? null}
+              initialMaxBulkSends={plan.max_bulk_sends ?? null}
               modules={modules ?? []}
               initialModuleKeys={enabledByPlan.get(plan.id) ?? []}
             />

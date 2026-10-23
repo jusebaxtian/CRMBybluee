@@ -47,6 +47,9 @@ export async function updatePlan(
     description: string[];
     maxAgents: number | null;
     maxWhatsappNumbers: number | null;
+    /** Tope de contactos guardados y de envios masivos en total. null = sin limite. */
+    maxContacts?: number | null;
+    maxBulkSends?: number | null;
     moduleKeys: string[];
   }
 ) {
@@ -56,7 +59,11 @@ export async function updatePlan(
   const name = input.name.trim();
   if (!name) return { error: "El nombre del plan es obligatorio." };
 
-  if (!input.priceCop || input.priceCop <= 0) {
+  // Un plan DEMO es una cuenta de prueba: no tiene precio.
+  const { data: actual } = await supabase.from("plans").select("is_demo").eq("id", planId).maybeSingle();
+  const esDemo = !!actual?.is_demo;
+
+  if (!esDemo && (!input.priceCop || input.priceCop <= 0)) {
     return { error: "Ingresa un precio valido." };
   }
 
@@ -79,14 +86,17 @@ export async function updatePlan(
     .from("plans")
     .update({
       name,
-      price_cents: Math.round(input.priceCop * 100),
+      price_cents: esDemo ? 0 : Math.round(input.priceCop * 100),
       compare_price_cents:
         input.comparePriceCop === null ? null : Math.round(input.comparePriceCop * 100),
       badge_label: badge === "" ? null : badge,
-      is_active: input.isActive,
+      // El DEMO nunca se ofrece a la venta: activarlo lo pondria en Facturacion a $0.
+      is_active: esDemo ? false : input.isActive,
       description: input.description.map((line) => line.trim()).filter(Boolean),
       max_agents: input.maxAgents,
       max_whatsapp_numbers: input.maxWhatsappNumbers,
+      ...(input.maxContacts !== undefined ? { max_contacts: input.maxContacts } : {}),
+      ...(input.maxBulkSends !== undefined ? { max_bulk_sends: input.maxBulkSends } : {}),
     })
     .eq("id", planId);
 

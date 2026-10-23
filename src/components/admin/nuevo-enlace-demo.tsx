@@ -9,11 +9,10 @@ const INPUT =
   "w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary";
 
 /** Admin → Pagos: enlace demo para un prospecto que aun no esta en el chat. */
-export function NuevoEnlaceDemo({ planes }: { planes: { id: string; name: string }[] }) {
+export function NuevoEnlaceDemo() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [planId, setPlanId] = useState(planes[0]?.id ?? "");
-  const [dias, setDias] = useState("2");
+  const [dias, setDias] = useState("3");
   const [nombre, setNombre] = useState("");
   const [enlace, setEnlace] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
@@ -23,7 +22,7 @@ export function NuevoEnlaceDemo({ planes }: { planes: { id: string; name: string
   function generar() {
     setError(null);
     startTransition(async () => {
-      const r = await crearEnlaceDemo({ planId, diasDemo: Number(dias), nombre });
+      const r = await crearEnlaceDemo({ diasDemo: Number(dias), nombre });
       if (r.error) {
         setError(r.error);
         return;
@@ -94,19 +93,17 @@ export function NuevoEnlaceDemo({ planes }: { planes: { id: string; name: string
             </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-[1fr_120px_1fr_auto] sm:items-end">
-              <label className="text-xs font-medium text-muted">
-                Plan
-                <select value={planId} onChange={(e) => setPlanId(e.target.value)} className={`${INPUT} mt-1`}>
-                  {planes.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <p className="text-xs text-muted sm:self-center">
+                <strong className="text-foreground">Plan DEMO</strong>: 100 contactos, 1 número, 2 usuarios, 100 envíos masivos.
+              </p>
               <label className="text-xs font-medium text-muted">
                 Días
-                <input type="number" min={1} max={365} value={dias} onChange={(e) => setDias(e.target.value)} className={`${INPUT} mt-1`} />
+                <select value={dias} onChange={(e) => setDias(e.target.value)} className={`${INPUT} mt-1`}>
+                  <option value="3">3 días</option>
+                  <option value="4">4 días</option>
+                  <option value="5">5 días</option>
+                  <option value="7">7 días</option>
+                </select>
               </label>
               <label className="text-xs font-medium text-muted">
                 Para quién (opcional)
@@ -116,7 +113,7 @@ export function NuevoEnlaceDemo({ planes }: { planes: { id: string; name: string
                 <button
                   type="button"
                   onClick={generar}
-                  disabled={pending || !planId}
+                  disabled={pending}
                   className="flex items-center gap-2 rounded-[10px] bg-primary px-4 py-2 text-xs font-bold text-white hover:bg-primary-hover disabled:opacity-50"
                 >
                   {pending && <Loader2 size={13} className="animate-spin" />} Generar

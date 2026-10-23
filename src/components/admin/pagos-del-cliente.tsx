@@ -18,7 +18,7 @@ const dinero = (centavos: number, moneda: string) =>
  * mezclados con los otros hacen dudar de cuánto pagó. Los pendientes se
  * revisan en la pantalla de Pagos, que es donde se aprueban.
  */
-export function PagosDelCliente({ pagos }: { pagos: PagoDelCliente[] }) {
+export function PagosDelCliente({ pagos, sinDocumento = false }: { pagos: PagoDelCliente[]; sinDocumento?: boolean }) {
   // Cada moneda por separado: sumar COP con otra moneda daria un numero sin
   // sentido. Casi siempre hay una sola.
   const totales = new Map<string, number>();
@@ -49,6 +49,7 @@ export function PagosDelCliente({ pagos }: { pagos: PagoDelCliente[] }) {
                 <th className="px-4 py-2 font-medium">Monto</th>
                 <th className="px-4 py-2 font-medium">Método</th>
                 <th className="px-4 py-2 font-medium">Comprobante</th>
+                <th className="px-4 py-2 font-medium">Soporte</th>
               </tr>
             </thead>
             <tbody>
@@ -78,11 +79,21 @@ export function PagosDelCliente({ pagos }: { pagos: PagoDelCliente[] }) {
                       <span className="text-muted">—</span>
                     )}
                   </td>
+                  <td className="px-4 py-2">
+                    <a href={`/api/soporte/${p.id}`} className="text-primary hover:underline">
+                      PDF
+                    </a>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+      {pagos.length > 0 && sinDocumento && (
+        <p className="mt-2 text-xs text-muted">
+          Este cliente todavía no registró sus datos legales: su soporte saldrá sin razón social, documento ni dirección hasta que los registre. Puedes cargarlos arriba.
+        </p>
       )}
     </div>
   );

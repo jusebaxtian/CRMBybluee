@@ -38,7 +38,7 @@ export default async function AdminPaymentsPage({
   const { data: payments } = await supabase
     .from("payments")
     .select(
-      "id, provider, amount_cents, status, proof_path, created_at, reviewed_at, workspace_id, workspaces(name)"
+      "id, provider, amount_cents, status, proof_path, created_at, reviewed_at, workspace_id, workspaces(name), plans(name, price_cents)"
     )
     // Una orden de Bold sin confirmar no es un pago: la pagina de Facturacion
     // tiene que crearla al renderizar para que el boton de Bold funcione, asi
@@ -108,8 +108,6 @@ export default async function AdminPaymentsPage({
     created_at: i.created_at as string,
   }));
 
-  const { data: planesDemo } = await admin.from("plans").select("id, name").eq("is_active", true).order("price_cents");
-
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -119,7 +117,7 @@ export default async function AdminPaymentsPage({
 
       <ResumenVentas ventas={ventas} desde={desde ?? null} hasta={hasta ?? null} />
 
-      <NuevoEnlaceDemo planes={planesDemo ?? []} />
+      <NuevoEnlaceDemo />
       <InvitacionesRegistro filas={invitacionFilas} />
 
       <div className="overflow-hidden rounded-xl border border-border bg-surface">
@@ -138,6 +136,10 @@ export default async function AdminPaymentsPage({
           <tbody>
             {paymentsWithUrls.map((p) => {
               const workspace = p.workspaces as unknown as { name: string } | null;
+              const planDelPago = p.plans as unknown as { name: string; price_cents: number } | null;
+              // El plan solo se aplica al aprobar si lo pagado es EXACTAMENTE su
+              // precio; cuando no coincide, se avisa antes de que apruebes.
+              const montoNoCoincide = !!planDelPago && Number(planDelPago.price_cents) !== Number(p.amount_cents);
               return (
                 <tr key={p.id} className="border-b border-border last:border-b-0">
                   <td className="px-5 py-3">
@@ -149,6 +151,19 @@ export default async function AdminPaymentsPage({
                   </td>
                   <td className="px-5 py-3 text-foreground">
                     ${(p.amount_cents / 100).toLocaleString("es-CO")}
+                    {planDelPago && (
+                      <p className="text-xs text-muted">
+                        Plan: {planDelPago.name}
+                        {montoNoCoincide && (
+                          <span
+                            className="ml-1.5 rounded-full border border-warning px-1.5 py-0.5 text-[10px] text-warning"
+                            title={`El plan cuesta $${(planDelPago.price_cents / 100).toLocaleString("es-CO")}: con otro monto no se cambia el plan al aprobar.`}
+                          >
+                            monto ≠ precio
+                          </span>
+                        )}
+                      </p>
+                    )}
                   </td>
                   <td className="px-5 py-3">
                     {p.proofUrl ? (

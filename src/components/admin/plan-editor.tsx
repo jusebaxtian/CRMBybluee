@@ -27,6 +27,9 @@ export function PlanEditor({
   initialDescription,
   initialMaxAgents,
   initialMaxWhatsappNumbers,
+  isDemo = false,
+  initialMaxContacts = null,
+  initialMaxBulkSends = null,
   modules,
   initialModuleKeys,
 }: {
@@ -39,6 +42,10 @@ export function PlanEditor({
   initialDescription: string[];
   initialMaxAgents: number | null;
   initialMaxWhatsappNumbers: number | null;
+  /** Cuenta de prueba: sin precio y sin poder ponerse a la venta. */
+  isDemo?: boolean;
+  initialMaxContacts?: number | null;
+  initialMaxBulkSends?: number | null;
   modules: Module[];
   initialModuleKeys: string[];
 }) {
@@ -53,6 +60,8 @@ export function PlanEditor({
   const [description, setDescription] = useState(initialDescription.join("\n"));
   const [maxAgents, setMaxAgents] = useState(toValue(initialMaxAgents));
   const [maxNumbers, setMaxNumbers] = useState(toValue(initialMaxWhatsappNumbers));
+  const [maxContacts, setMaxContacts] = useState(toValue(initialMaxContacts));
+  const [maxBulkSends, setMaxBulkSends] = useState(toValue(initialMaxBulkSends));
   const [moduleKeys, setModuleKeys] = useState<Set<string>>(new Set(initialModuleKeys));
 
   const [pending, setPending] = useState(false);
@@ -80,6 +89,8 @@ export function PlanEditor({
       description: description.split("\n"),
       maxAgents: toLimit(maxAgents),
       maxWhatsappNumbers: toLimit(maxNumbers),
+      maxContacts: toLimit(maxContacts),
+      maxBulkSends: toLimit(maxBulkSends),
       moduleKeys: [...moduleKeys],
     });
 
@@ -252,8 +263,31 @@ export function PlanEditor({
               className="w-28 rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-primary"
             />
           </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">Contactos guardados</label>
+            <input
+              type="number"
+              min={0}
+              value={maxContacts}
+              onChange={(e) => setMaxContacts(e.target.value)}
+              placeholder="Sin límite"
+              className="w-28 rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-primary"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">Envíos masivos (total)</label>
+            <input
+              type="number"
+              min={0}
+              value={maxBulkSends}
+              onChange={(e) => setMaxBulkSends(e.target.value)}
+              placeholder="Sin límite"
+              className="w-28 rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-primary"
+            />
+          </div>
           <p className="w-full text-[11px] text-muted">
             Deja el campo vacío para &quot;sin límite&quot;.
+            {isDemo && " Este es el plan DEMO: una cuenta de prueba de 3 a 7 días, sin precio y que no se ofrece a la venta."}
           </p>
         </div>
       </div>
