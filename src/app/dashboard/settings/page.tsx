@@ -4,10 +4,17 @@ import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
 import { requireModule, getEnabledModuleKeys } from "@/lib/entitlements";
 import { listWorkspaceAgents } from "@/lib/agents";
-import { getPhoneNumberStatus } from "@/lib/whatsapp/graph";
+import { getPhoneNumberStatus, getWabaStatus, tramoEfectivo } from "@/lib/whatsapp/graph";
 import { AgentProfileForm } from "@/components/account/agent-profile-form";
 import { AgentsList } from "@/components/account/agents-list";
 import { SettingsTabs } from "@/components/layout/settings-tabs";
+import { IntegracionesPanel, type ConexionGoogle } from "@/components/integraciones/integraciones-panel";
+import { ApiPanel } from "@/components/api/api-panel";
+import { DocumentacionApi } from "@/components/api/documentacion-api";
+import { WebhooksPanel } from "@/components/api/webhooks-panel";
+import { MODULO_API } from "@/lib/api-publica/permisos";
+import { LIMITE_POR_DEFECTO } from "@/lib/api-publica/autenticar";
+import { cargarPanelApi } from "@/lib/api-publica/panel";
 import { WhatsAppApiPanel } from "@/components/whatsapp/whatsapp-api-panel";
 import { AgentesPorLinea, type AgenteFila } from "@/components/ai-agent/agentes-por-linea";
 import { CtwaDatasetForm } from "@/components/whatsapp/ctwa-dataset-form";
@@ -55,7 +62,12 @@ export default async function SettingsPage() {
       .filter((a) => a.status !== "frozen")
       .map(async (a) => {
         try {
-          phoneStatuses[a.id] = await getPhoneNumberStatus(a.phone_number_id, a.access_token);
+          const [estado, waba] = await Promise.all([
+            getPhoneNumberStatus(a.phone_number_id, a.access_token),
+            a.waba_id ? getWabaStatus(a.waba_id, a.access_token).catch(() => null) : Promise.resolve(null),
+          ]);
+          const tramo = tramoEfectivo(estado.messaging_limit_tier, waba?.whatsapp_business_manager_messaging_limit);
+          phoneStatuses[a.id] = tramo ? { ...estado, messaging_limit_tier: tramo } : estado;
         } catch {
           phoneStatuses[a.id] = null;
         }
@@ -124,7 +136,7 @@ export default async function SettingsPage() {
     const { data: followupTemplates } = workspaceId
       ? await supabase
           .from("templates")
-          .select("id, meta_template_name, language, body_text")
+          .select("id, meta_template_name, language, body_text, header_format, header_text, header_media_url, buttons, variables_origen")
           .eq("workspace_id", workspaceId)
           .eq("status", "APPROVED")
           .eq("created_via", "crm")
@@ -141,6 +153,41 @@ export default async function SettingsPage() {
     );
   }
 
+  // Integraciones: la conexion es PERSONAL (cada usuario su Google), asi que se lee la del usuario actual.
+  const { data: { user: usuarioActual } } = await supabase.auth.getUser();
+  const { data: conexionGoogle } = usuarioActual
+    ? await supabase
+        .from("integraciones_conexiones")
+        .select("cuenta_email, estado")
+        .eq("user_id", usuarioActual.id)
+        .eq("proveedor", "google_calendar")
+        .maybeSingle()
+    : { data: null };
+  const { data: ajustesAgenda } = workspaceId
+    ? await supabase.from("agenda_ajustes").select("whatsapp_account_id").eq("workspace_id", workspaceId).maybeSingle()
+    : { data: null };
+  const integrationsSection = (
+    <IntegracionesPanel
+      moduloIncluido={enabledModules.includes("google_calendar")}
+      google={(conexionGoogle as ConexionGoogle) ?? null}
+      lineas={accounts
+        .filter((a) => a.status !== "frozen")
+        .map((a) => ({ id: a.id, nombre: a.label ? `${a.label} · ${a.display_phone_number}` : a.display_phone_number }))}
+      lineaDeCitas={(ajustesAgenda?.whatsapp_account_id as string | null | undefined) ?? null}
+    />
+  );
+
+  // API e integraciones: solo se consulta si el plan incluye el modulo.
+  const moduloApi = enabledModules.includes(MODULO_API);
+  const datosApi = moduloApi && workspaceId ? await cargarPanelApi(workspaceId) : null;
+  const apiSection = (
+    <ApiPanel
+      moduloIncluido={moduloApi}
+      llaves={datosApi?.llaves ?? []}
+      uso={datosApi?.uso ?? { llamadas24h: 0, errores24h: 0, limitePorMinuto: LIMITE_POR_DEFECTO }}
+      webhooks={<WebhooksPanel webhooks={datosApi?.webhooks ?? []} envios={datosApi?.envios ?? []} />} documentacion={<DocumentacionApi />} />
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -154,6 +201,8 @@ export default async function SettingsPage() {
         agentsContent={agentsSection}
         whatsappContent={whatsappSection}
         aiAgentContent={aiAgentSection}
+        integrationsContent={integrationsSection}
+        apiContent={apiSection}
       />
     </div>
   );

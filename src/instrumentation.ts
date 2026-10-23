@@ -26,7 +26,7 @@ export async function register() {
     return;
   }
 
-  const { processDueAutomationRuns } = await import("@/lib/automations/scheduler");
+  const { processDueAutomationRuns, processDueQuickReplyRuns } = await import("@/lib/automations/scheduler");
   const { expireTrials, expireLapsedActiveSubscriptions, cleanupAbandonedBoldOrders } = await import("@/lib/billing/scheduler");
   const { processAiFollowups } = await import("@/lib/ai/followups");
   const { cleanupOldNotifications } = await import("@/lib/notifications/scheduler");
@@ -35,6 +35,12 @@ export async function register() {
   const { processDueReminders } = await import("@/lib/recordatorios/scheduler");
   const { procesarEsperasDeFlujos } = await import("@/lib/flujos/scheduler");
 
+  const { procesarFidelidad } = await import("@/lib/fidelidad/envio");
+  const { procesarWebhooks } = await import("@/lib/api-publica/webhooks");
+  const { sincronizarGoogleCalendar } = await import("@/lib/integraciones/google/sincronizar");
+  const { sincronizarEstadoDePlantillas } = await import("@/lib/templates/sincronizar-estado");
+  const { sincronizarEtiquetaDemo } = await import("@/lib/demo/etiqueta-demo");
+
   const MINUTO = 60_000;
 
   // Antes eran ocho bloques setInterval identicos salvo el nombre y el
@@ -42,6 +48,17 @@ export async function register() {
   // justo lo que hay que saber al repartirlos entre dos procesos.
   const trabajos: { nombre: string; cadaMs: number; correr: () => Promise<unknown> }[] = [
     { nombre: "automatizaciones", cadaMs: 20_000, correr: processDueAutomationRuns },
+    // Cada 5 s: las esperas de las respuestas rapidas suelen ser de unos pocos segundos
+    // ("esperar 5 s") y a los 20 s de la vuelta anterior se sentirian rotas.
+    { nombre: "respuestas rapidas", cadaMs: 5_000, correr: processDueQuickReplyRuns },
+    // Respaldo y mantenimiento de la sincronizacion con Google: renueva los canales de avisos
+    // y revisa las citas por si algun aviso no llego.
+    // Cada 10 s: los avisos a los sistemas de los clientes (webhooks de la API) salen casi en vivo;
+    // sin nada pendiente es una consulta sobre un indice parcial.
+    { nombre: "webhooks de la API", cadaMs: 10_000, correr: procesarWebhooks },
+    { nombre: "google calendar", cadaMs: 3 * MINUTO, correr: sincronizarGoogleCalendar },
+    // Cada 10 min: las plantillas en revision se actualizan solas cuando Meta las aprueba o rechaza.
+    { nombre: "estado de plantillas", cadaMs: 10 * MINUTO, correr: sincronizarEstadoDePlantillas },
     { nombre: "campañas", cadaMs: 30_000, correr: processDueCampaigns },
     { nombre: "seguimientos IA", cadaMs: MINUTO, correr: processAiFollowups },
     { nombre: "recordatorios", cadaMs: MINUTO, correr: processDueReminders },
@@ -51,6 +68,13 @@ export async function register() {
     { nombre: "flujos", cadaMs: 30_000, correr: procesarEsperasDeFlujos },
     { nombre: "fin de prueba", cadaMs: 5 * MINUTO, correr: expireTrials },
     { nombre: "suscripciones vencidas", cadaMs: 5 * MINUTO, correr: expireLapsedActiveSubscriptions },
+    // Cada 10 min: el trabajo solo actua dentro de la ventana de envio (9:00-18:00
+    // Bogota) y cada mensaje se reserva en la base antes de salir, asi que correr
+    // seguido no repite nada y permite reintentar un fallo el mismo dia.
+    { nombre: "plan de fidelidad", cadaMs: 10 * MINUTO, correr: procesarFidelidad },
+    // Cada 2 min: una cuenta demo nueva queda etiquetada DEMO en el chat del
+    // administrador en cuanto se registra, sea cual sea el camino por el que se creo.
+    { nombre: "etiqueta DEMO", cadaMs: 2 * MINUTO, correr: sincronizarEtiquetaDemo },
     { nombre: "limpieza de notificaciones", cadaMs: 60 * MINUTO, correr: cleanupOldNotifications },
     { nombre: "espacios sin activar", cadaMs: 60 * MINUTO, correr: deleteStaleUnactivatedWorkspaces },
     { nombre: "ordenes de Bold abandonadas", cadaMs: 60 * MINUTO, correr: cleanupAbandonedBoldOrders },

@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import { LimiteApiAdmin } from "@/components/admin/limite-api-admin";
+import { LIMITE_POR_DEFECTO } from "@/lib/api-publica/autenticar";
 import Link from "next/link";
 import { ArrowLeft, LogIn } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -9,6 +11,7 @@ import { EditClientFields } from "@/components/admin/edit-client-fields";
 import { NotifyActivationButton } from "@/components/admin/notify-activation-button";
 import { ClienteEnMiChat, type ClienteDeEspacio } from "@/components/admin/cliente-en-mi-chat";
 import { PagosDelCliente, type PagoDelCliente } from "@/components/admin/pagos-del-cliente";
+import { DatosLegalesAdmin } from "@/components/admin/datos-legales-admin";
 import { toPublicUrl } from "@/lib/supabase/config";
 import { getActivationTemplateConfig } from "@/app/actions/admin-whatsapp";
 import { limiteDeNumeros } from "@/lib/whatsapp/limite-numeros";
@@ -24,7 +27,7 @@ export default async function AdminWorkspaceDetailPage({
 
   const { data: workspace } = await supabase
     .from("workspaces")
-    .select("id, name, status, plan_id, trial_ends_at, created_at, signup_ip, phone, extra_whatsapp_numbers, extra_agents")
+    .select("id, name, status, plan_id, trial_ends_at, created_at, signup_ip, phone, extra_whatsapp_numbers, extra_agents, razon_social, documento_tipo, documento_numero, direccion, datos_legales_el")
     .eq("id", id)
     .maybeSingle();
 
@@ -75,6 +78,8 @@ export default async function AdminWorkspaceDetailPage({
     .limit(5);
 
   const limiteNumeros = await limiteDeNumeros(supabase, id);
+  const { data: ajusteApi } = await createAdminClient().from("api_ajustes").select("limite_por_minuto").eq("workspace_id", id).maybeSingle();
+  const limiteApi = (ajusteApi?.limite_por_minuto as number | undefined) ?? LIMITE_POR_DEFECTO;
 
   // Vencimiento actual para el formulario: prueba -> trial_ends_at; si no,
   // la suscripcion activa mas lejana.
@@ -188,7 +193,18 @@ export default async function AdminWorkspaceDetailPage({
             hasTemplateConfig={!!activationConfig}
           />
         </div>
-        <PagosDelCliente pagos={pagos} />
+        <DatosLegalesAdmin
+          workspaceId={workspace.id}
+          registrados={!!workspace.datos_legales_el}
+          inicial={{
+            razonSocial: workspace.razon_social ?? "",
+            tipo: workspace.documento_tipo ?? "NIT",
+            numero: workspace.documento_numero ?? "",
+            direccion: workspace.direccion ?? "",
+          }}
+        />
+        <LimiteApiAdmin workspaceId={workspace.id} inicial={limiteApi} />
+        <PagosDelCliente pagos={pagos} sinDocumento={!workspace.datos_legales_el} />
       </div>
 
       <ClienteEnMiChat workspaceId={workspace.id} cliente={cliente} />

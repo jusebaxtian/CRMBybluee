@@ -2,15 +2,17 @@
 
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Users, Bot } from "lucide-react";
+import { Users, Bot, Plug, KeyRound } from "lucide-react";
 import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
 
-type Tab = "agents" | "whatsapp" | "ai";
+type Tab = "agents" | "whatsapp" | "ai" | "integrations" | "api";
 
 type Props = {
   agentsContent: React.ReactNode;
   whatsappContent: React.ReactNode;
   aiAgentContent?: React.ReactNode;
+  integrationsContent?: React.ReactNode;
+  apiContent?: React.ReactNode;
 };
 
 /** ?tab=whatsapp abre directo esa pestaña (enlace desde el dashboard). */
@@ -24,11 +26,11 @@ export function SettingsTabs(props: Props) {
 
 function SettingsTabsConUrl(props: Props) {
   const t = useSearchParams().get("tab");
-  const inicial: Tab = t === "whatsapp" || t === "ai" ? t : "agents";
+  const inicial: Tab = t === "whatsapp" || t === "ai" ? t : t === "integraciones" ? "integrations" : t === "api" ? "api" : "agents";
   return <SettingsTabsInner {...props} inicial={inicial} />;
 }
 
-function SettingsTabsInner({ agentsContent, whatsappContent, aiAgentContent, inicial }: Props & { inicial: Tab }) {
+function SettingsTabsInner({ agentsContent, whatsappContent, aiAgentContent, integrationsContent, apiContent, inicial }: Props & { inicial: Tab }) {
   const [tab, setTab] = useState<Tab>(inicial);
 
   return (
@@ -72,11 +74,41 @@ function SettingsTabsInner({ agentsContent, whatsappContent, aiAgentContent, ini
             Agente de IA
           </button>
         )}
+        {integrationsContent && (
+          <button
+            type="button"
+            onClick={() => setTab("integrations")}
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+              tab === "integrations"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted hover:text-foreground"
+            }`}
+          >
+            <Plug size={14} />
+            Integraciones
+          </button>
+        )}
+        {apiContent && (
+          <button
+            type="button"
+            onClick={() => setTab("api")}
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+              tab === "api"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted hover:text-foreground"
+            }`}
+          >
+            <KeyRound size={14} />
+            API
+          </button>
+        )}
       </div>
 
       <div className={tab === "agents" ? "block" : "hidden"}>{agentsContent}</div>
       <div className={tab === "whatsapp" ? "block" : "hidden"}>{whatsappContent}</div>
       {aiAgentContent && <div className={tab === "ai" ? "block" : "hidden"}>{aiAgentContent}</div>}
+      {integrationsContent && <div className={tab === "integrations" ? "block" : "hidden"}>{integrationsContent}</div>}
+      {apiContent && <div className={tab === "api" ? "block" : "hidden"}>{apiContent}</div>}
     </div>
   );
 }

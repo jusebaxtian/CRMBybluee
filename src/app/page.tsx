@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Reveal } from "@/components/marketing/reveal";
 import { SocialLinks } from "@/components/marketing/social-links";
 import { InsigniaPartner } from "@/components/marketing/insignia-partner";
+import { ApiConexiones } from "@/components/marketing/api-conexiones";
 import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
 import { AgenteEscribiendo, BandejaViva, Cinta, Contador, Flujo, Testimonios } from "@/components/marketing/viva";
 import { getActivePlansWithFeatures, planCycleLabel, formatCents } from "@/lib/billing/plans";
@@ -59,6 +60,7 @@ export default async function Home() {
     .maybeSingle();
   const salesWhatsappNumber = supportSetting?.value || "573000000000";
   const waHref = `https://wa.me/${salesWhatsappNumber}?text=${encodeURIComponent("Hola, quiero información sobre CRM ByBluee.")}`;
+  const waApiHref = `https://wa.me/${salesWhatsappNumber}?text=${encodeURIComponent("Hola, quiero información sobre la API y los webhooks de ByBluee.")}`;
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-background text-foreground">
@@ -74,6 +76,7 @@ export default async function Home() {
             <a href="#que" className="hover:text-foreground">Qué hace</a>
             <a href="#flujo" className="hover:text-foreground">Cómo funciona</a>
             <a href="#ia" className="hover:text-foreground">Agente IA</a>
+            <a href="#api" className="hover:text-foreground">API</a>
             <a href="#planes" className="hover:text-foreground">Planes</a>
             <a href="#faq" className="hover:text-foreground">Preguntas</a>
           </nav>
@@ -232,6 +235,9 @@ export default async function Home() {
           <Reveal delay={120}><AgenteEscribiendo /></Reveal>
         </div>
       </section>
+
+      {/* API y Webhooks */}
+      <ApiConexiones waHref={waApiHref} btn={BTN} btnGhost={BTN_GHOST} eyebrow={EYEBROW} h2={H2} />
 
       {/* Resultados */}
       <section id="prueba" className="mx-auto max-w-[1120px] px-5 py-20">
