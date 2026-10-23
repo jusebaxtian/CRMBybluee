@@ -8,6 +8,7 @@ type Message = {
   id: string;
   direction: string;
   body: string | null;
+  caption?: string | null;
   status: string;
   message_type: string;
   media_url: string | null;

@@ -1,10 +1,11 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import { VistaPreviaPlantilla, type PlantillaParaVista } from "@/components/templates/vista-previa-plantilla";
 import { Info, Users } from "lucide-react";
 import { createCampaign, updateCampaign, uploadCampaignMedia, previewAudienceCount } from "@/app/actions/campaigns";
 
-type Template = { id: string; meta_template_name: string; status: string; waba_id?: string };
+type Template = PlantillaParaVista & { status: string; waba_id?: string };
 type Tag = { id: string; name: string; excludes_followups: boolean };
 type WhatsAppAccountOption = { id: string; label: string | null; display_phone_number: string; waba_id?: string };
 type SendType = "template" | "free_text";
@@ -71,6 +72,13 @@ export function NewCampaignForm({
     ? templates.filter((t) => !t.waba_id || t.waba_id === wabaElegida)
     : templates;
   const lineaElegida = whatsappAccounts.find((a) => a.id === whatsappAccountId);
+  // La plantilla que se ve en la vista previa. Al cambiar de linea el selector se reinicia, asi que
+  // la eleccion solo vale para la linea en la que se hizo.
+  const [eleccion, setEleccion] = useState<{ waba: string | undefined; id: string } | null>(null);
+  const plantillaMostrada =
+    (eleccion && eleccion.waba === wabaElegida ? plantillasDeLinea.find((t) => t.id === eleccion.id) : undefined) ??
+    plantillasDeLinea.find((t) => t.id === initialValues?.templateId) ??
+    plantillasDeLinea[0];
   const [mediaKind, setMediaKind] = useState<MediaKind>("");
   const [mediaUrl, setMediaUrl] = useState(initialValues?.mediaUrl ?? "");
   const [mediaFilename, setMediaFilename] = useState(initialValues?.mediaFilename ?? "");
@@ -194,6 +202,7 @@ export function NewCampaignForm({
               required
               key={wabaElegida ?? "todas"}
               defaultValue={initialValues?.templateId ?? undefined}
+              onChange={(e) => setEleccion({ waba: wabaElegida, id: e.target.value })}
               className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
             >
               {plantillasDeLinea.map((t) => (
@@ -203,6 +212,7 @@ export function NewCampaignForm({
               ))}
             </select>
           )}
+          <VistaPreviaPlantilla className="mt-2" plantilla={plantillaMostrada} />
         </div>
       ) : (
         <div className="flex flex-col gap-2">

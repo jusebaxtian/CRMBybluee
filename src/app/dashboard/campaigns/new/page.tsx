@@ -11,7 +11,7 @@ export default async function NewCampaignPage() {
 
   const { data: templates } = await supabase
     .from("templates")
-    .select("id, meta_template_name, status, waba_id, body_text")
+    .select("id, meta_template_name, status, waba_id, body_text, header_format, header_text, header_media_url, buttons, variables_origen")
     .eq("workspace_id", workspaceId ?? "")
     .eq("status", "APPROVED")
     .eq("created_via", "crm")

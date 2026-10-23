@@ -48,5 +48,17 @@ export async function abrirConversacion(
     )
     .select("id, whatsapp_account_id")
     .single();
-  return data ?? null;
+  if (data) return data;
+
+  // Un agente solo ve sus propias conversaciones: crear una sin asignar no se la
+  // devuelve, y reutilizar una ajena le esta vedado. La funcion la abre y se la
+  // asigna al agente (o avisa si ya la atiende otro).
+  const { data: abierta } = await supabase.rpc("abrir_conversacion_como_miembro", {
+    p_workspace_id: workspaceId,
+    p_contact_id: contactId,
+    p_account_id: whatsappAccountId ?? null,
+    p_default_account_id: accountId,
+  });
+  const fila = Array.isArray(abierta) ? abierta[0] : abierta;
+  return fila ? { id: fila.id, whatsapp_account_id: fila.whatsapp_account_id } : null;
 }

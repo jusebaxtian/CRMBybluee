@@ -59,7 +59,7 @@ export default async function ContactsPage() {
       .order("connected_at"),
     supabase
       .from("templates")
-      .select("id, meta_template_name, waba_id, body_text")
+      .select("id, meta_template_name, waba_id, body_text, header_format, header_text, header_media_url, buttons, variables_origen")
       .eq("workspace_id", workspaceId ?? "")
       .eq("status", "APPROVED")
       .order("meta_template_name"),

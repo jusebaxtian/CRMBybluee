@@ -1,14 +1,17 @@
 "use client";
 
-import { forwardRef, useImperativeHandle, useRef, useState } from "react";
-import { Send, Paperclip, Mic, Square, X, Check, Play, Pause, RotateCcw, Reply } from "lucide-react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { Send, Paperclip, Mic, Square, X, Check, Play, Pause, RotateCcw, Reply, AlertCircle, ArrowLeftRight, FileText } from "lucide-react";
 import { sendMessage, sendChatMedia } from "@/app/actions/whatsapp";
 import type { OptimisticMessage } from "@/components/inbox/chat-pane";
 import { QuickReplyPicker } from "@/components/quick-replies/quick-reply-picker";
 import { AutomationPicker } from "@/components/automations/automation-picker";
 import { RecordatorioPicker } from "@/components/inbox/recordatorio-picker";
+import { CitaPicker } from "@/components/inbox/cita-picker";
 import { ResetAutomationsButton } from "@/components/automations/reset-automations-button";
 import { mediaKindFromMime, validateMediaSize } from "@/lib/whatsapp/media-limits";
+import { LARGO_MAXIMO_DEL_TEXTO, extensionDe, pesoLegible, revisarAdjunto } from "@/lib/whatsapp/revisar-adjunto";
+import { formatoDeReloj, nivelDeMuestra, resumirNiveles, ultimasBarras } from "@/lib/inbox/nota-de-voz";
 
 type RecordingStatus = "idle" | "recording" | "reviewing";
 
@@ -17,7 +20,8 @@ type RecordingStatus = "idle" | "recording" | "reviewing";
 // works, not just over the composer bar itself), but the upload
 // queue/validation logic all lives here already.
 export type MessageComposerHandle = {
-  enqueueUpload: (file: File) => void;
+  /** Un archivo (soltado o pegado): se muestra en la vista previa y se envia al confirmar. */
+  attachFile: (file: File) => void;
 };
 
 export const MessageComposer = forwardRef<MessageComposerHandle, {
@@ -57,6 +61,16 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewPlaying, setPreviewPlaying] = useState(false);
   const previewAudioRef = useRef<HTMLAudioElement>(null);
+  // Segundo actual de la nota mientras se escucha en la revision.
+  const [previewTime, setPreviewTime] = useState(0);
+  // Nivel del microfono (0 a 1, diez veces por segundo) para dibujar la onda.
+  // Es una referencia y no estado: se actualiza 10 veces por segundo y no debe
+  // repintar toda la caja de escribir cada vez.
+  const nivelesRef = useRef<number[]>([]);
+  const medicionRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  // Resumen de lo grabado (la onda fija de la revision).
+  const [resumen, setResumen] = useState<number[]>([]);
 
   // Typing "hola" [enter] "cómo estás" [enter] shouldn't have to wait for the
   // first message's round trip to Meta before the second can be typed and
@@ -115,7 +129,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
   // shouldn't have to wait for the first one's upload + Meta round trip
   // (transcoding included) to finish — enqueue and drain in the background
   // instead of disabling the mic/composer while an upload is in flight.
-  const fileQueueRef = useRef<File[]>([]);
+  const fileQueueRef = useRef<{ file: File; texto: string }[]>([]);
   const fileDraining = useRef(false);
 
   function drainFileQueue() {
@@ -124,10 +138,11 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
     (async () => {
       while (fileQueueRef.current.length > 0) {
         setUploading(true);
-        const file = fileQueueRef.current.shift()!;
+        const { file, texto } = fileQueueRef.current.shift()!;
         const formData = new FormData();
         formData.set("conversationId", conversationId);
         formData.set("file", file);
+        if (texto) formData.set("caption", texto);
         const result = await sendChatMedia(formData);
         if (result?.error) setUploadError(result.error);
         // RealtimeRefresh picks up each sent message row automatically.
@@ -137,7 +152,9 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
     })();
   }
 
-  function enqueueUpload(file: File) {
+  // Sube y envia YA, sin vista previa. Es lo que usan las notas de voz; los
+  // archivos que elige la persona pasan antes por proponerAdjunto.
+  function enqueueUpload(file: File, texto = "") {
     setUploadError(null);
     // Catch an oversized file before even uploading it — WhatsApp's real
     // limits (16MB video/audio, 5MB image, 100MB document); otherwise the
@@ -152,15 +169,46 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
         return;
       }
     }
-    fileQueueRef.current.push(file);
+    fileQueueRef.current.push({ file, texto });
     drainFileQueue();
   }
 
-  useImperativeHandle(ref, () => ({ enqueueUpload }));
+  // Archivos por revisar antes de enviarlos (el primero es el que se ve en la
+  // hoja; si se sueltan varios, se revisan uno por uno).
+  const [pendientes, setPendientes] = useState<File[]>([]);
+  const [textoDelAdjunto, setTextoDelAdjunto] = useState("");
+  const cambiarInputRef = useRef<HTMLInputElement>(null);
+
+  function proponerAdjunto(file: File) {
+    setUploadError(null);
+    setPendientes((p) => [...p, file]);
+  }
+
+  function siguienteAdjunto() {
+    setPendientes((p) => p.slice(1));
+    setTextoDelAdjunto("");
+  }
+
+  function enviarAdjunto() {
+    const file = pendientes[0];
+    if (!file) return;
+    const revision = revisarAdjunto(file, textoDelAdjunto);
+    if (revision.error) return;
+    enqueueUpload(file, revision.admiteTexto ? textoDelAdjunto.trim() : "");
+    siguienteAdjunto();
+  }
+
+  function cambiarAdjunto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) setPendientes((p) => [file, ...p.slice(1)]);
+    e.target.value = "";
+  }
+
+  useImperativeHandle(ref, () => ({ attachFile: proponerAdjunto }));
 
   function handleFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) enqueueUpload(file);
+    if (file) proponerAdjunto(file);
     e.target.value = "";
   }
 
@@ -217,12 +265,53 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
         const file = item.getAsFile();
         if (file) {
           e.preventDefault();
-          enqueueUpload(file);
+          proponerAdjunto(file);
         }
         return;
       }
     }
   }
+
+  // Mide el nivel del microfono mientras se graba. Es solo para dibujar la onda:
+  // si el navegador no deja (Safari antiguo, contexto de audio suspendido), la
+  // grabacion sigue igual y la onda queda baja, sin romper nada.
+  function iniciarMedicion(stream: MediaStream) {
+    nivelesRef.current = [];
+    try {
+      const Contexto =
+        window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Contexto) return;
+      const ctx = new Contexto();
+      void ctx.resume().catch(() => {});
+      const analizador = ctx.createAnalyser();
+      analizador.fftSize = 256;
+      ctx.createMediaStreamSource(stream).connect(analizador);
+      audioCtxRef.current = ctx;
+      const muestra = new Uint8Array(analizador.fftSize);
+      medicionRef.current = setInterval(() => {
+        analizador.getByteTimeDomainData(muestra);
+        nivelesRef.current.push(nivelDeMuestra(muestra));
+      }, 100);
+    } catch {
+      // Sin medicion: la onda queda baja, la grabacion no se ve afectada.
+    }
+  }
+
+  function detenerMedicion() {
+    if (medicionRef.current) clearInterval(medicionRef.current);
+    medicionRef.current = null;
+    void audioCtxRef.current?.close().catch(() => {});
+    audioCtxRef.current = null;
+  }
+
+  // Si se cierra el chat con la grabacion en curso, no deja el microfono ni el reloj abiertos.
+  useEffect(() => {
+    return () => {
+      if (medicionRef.current) clearInterval(medicionRef.current);
+      void audioCtxRef.current?.close().catch(() => {});
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
 
   async function startRecording() {
     setUploadError(null);
@@ -252,6 +341,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
       // el audio en un unico evento al parar, que es donde a veces llegaba
       // vacio y la nota se perdia sin aviso.
       recorder.start(1000);
+      iniciarMedicion(stream);
       mediaRecorderRef.current = recorder;
       recordedBlobRef.current = null;
       setRecStatus("recording");
@@ -297,6 +387,8 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
 
   async function handleCirclePress() {
     if (timerRef.current) clearInterval(timerRef.current);
+    detenerMedicion();
+    setResumen(resumirNiveles(nivelesRef.current, 14));
     const blob = await stopCapture();
     recordedBlobRef.current = blob;
     if (blob.size === 0) {
@@ -314,10 +406,12 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     setPreviewPlaying(false);
+    setPreviewTime(0);
   }
 
   async function cancelRecording() {
     if (timerRef.current) clearInterval(timerRef.current);
+    detenerMedicion();
     if (recStatus === "recording") {
       await stopCapture();
     }
@@ -363,89 +457,65 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
     }
   }
 
-  const mm = String(Math.floor(recordSeconds / 60)).padStart(2, "0");
-  const ss = String(recordSeconds % 60).padStart(2, "0");
-
   return (
     <div className="w-full min-w-0 border-t border-border bg-surface p-2 sm:p-4">
+      {previewUrl && (
+        <audio
+          ref={previewAudioRef}
+          src={previewUrl}
+          preload="auto"
+          playsInline
+          onTimeUpdate={(e) => setPreviewTime(e.currentTarget.currentTime)}
+          onEnded={() => {
+            setPreviewPlaying(false);
+            setPreviewTime(0);
+          }}
+          onPause={() => setPreviewPlaying(false)}
+          style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
+        />
+      )}
+
+      {/* Grabando: una pildora pequeña y translucida sobre la caja de escribir.
+          Antes era una pantalla completa que tapaba el chat y los avisos. El
+          contenedor de alto cero ancla la pildora justo encima de la caja. */}
       {recStatus !== "idle" && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/95 backdrop-blur-sm">
-          <button
-            type="button"
-            onClick={cancelRecording}
-            aria-label="Cancelar"
-            className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full bg-surface-hover text-foreground"
-            style={{ top: "max(1.25rem, env(safe-area-inset-top))" }}
-          >
-            <X size={20} />
-          </button>
-
-          <p className="mb-8 text-2xl font-medium tabular-nums text-foreground">
-            {mm}:{ss}
-          </p>
-
-          {recStatus === "recording" ? (
-            <button
-              type="button"
-              onClick={handleCirclePress}
-              aria-label="Detener grabación"
-              className="relative flex h-24 w-24 items-center justify-center rounded-full bg-red-500 text-white shadow-lg"
-            >
-              <span className="absolute inset-0 animate-ping rounded-full bg-red-500/50" />
-              <Square size={30} fill="white" className="relative" />
-            </button>
-          ) : (
-            <div className="flex flex-col items-center gap-6">
-              {previewUrl && (
-                <audio
-                  ref={previewAudioRef}
-                  src={previewUrl}
-                  preload="auto"
-                  playsInline
-                  onEnded={() => setPreviewPlaying(false)}
-                  onPause={() => setPreviewPlaying(false)}
-                  style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
-                />
-              )}
-              <button
-                type="button"
-                onClick={togglePreviewPlayback}
-                disabled={!previewUrl}
-                aria-label={previewPlaying ? "Pausar" : "Escuchar nota de voz"}
-                className="flex h-24 w-24 items-center justify-center rounded-full bg-surface-hover text-foreground disabled:opacity-50"
-              >
-                {previewPlaying ? <Pause size={30} /> : <Play size={30} className="ml-1" />}
-              </button>
-              <div className="flex items-center gap-6">
-                <button
-                  type="button"
-                  onClick={reRecord}
-                  aria-label="Grabar de nuevo"
-                  className="flex h-12 w-12 items-center justify-center rounded-full border border-border text-muted hover:text-foreground"
-                >
-                  <RotateCcw size={20} />
-                </button>
-                <button
-                  type="button"
-                  onClick={sendRecording}
-                  aria-label="Enviar nota de voz"
-                  className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-white shadow-lg hover:bg-primary-hover"
-                >
-                  <Check size={28} />
-                </button>
-              </div>
-            </div>
-          )}
-
-          <p className="mt-8 text-sm text-muted">
-            {recStatus === "recording"
-              ? "Toca para detener"
-              : previewPlaying
-                ? "Reproduciendo..."
-                : "Escucha, vuelve a grabar o envía"}
-          </p>
+        <div className="relative h-0 w-full">
+          <PildoraDeGrabacion
+            revisando={recStatus === "reviewing"}
+            segundos={recordSeconds}
+            nivelesRef={nivelesRef}
+            resumen={resumen}
+            sonando={previewPlaying}
+            tiempoDeReproduccion={previewTime}
+            onCancel={cancelRecording}
+            onStop={handleCirclePress}
+            onPlay={togglePreviewPlayback}
+            onRedo={reRecord}
+            onSend={sendRecording}
+          />
         </div>
       )}
+
+      {pendientes[0] && (
+        <HojaDeAdjunto
+          key={`${pendientes[0].name}-${pendientes[0].size}-${pendientes[0].lastModified}`}
+          archivo={pendientes[0]}
+          posicion={1}
+          total={pendientes.length}
+          texto={textoDelAdjunto}
+          onTexto={setTextoDelAdjunto}
+          onEnviar={enviarAdjunto}
+          onCancelar={siguienteAdjunto}
+          onCambiar={() => cambiarInputRef.current?.click()}
+        />
+      )}
+      <input
+        ref={cambiarInputRef}
+        type="file"
+        accept="image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.zip,.rar"
+        onChange={cambiarAdjunto}
+        className="hidden"
+      />
 
       {/* Floating cluster — a vertical stack pinned to the left edge, clear
           of the message bubbles and the input row instead of overlapping
@@ -469,11 +539,13 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
         <QuickReplyPicker contactId={contactId} quickReplies={quickReplies} />
         <AutomationPicker contactId={contactId} automations={automations} />
         <ResetAutomationsButton contactId={contactId} />
+        <CitaPicker contactId={contactId} contactName={contactName} />
         <RecordatorioPicker conversationId={conversationId} contactName={contactName} />
         <button
           type="button"
           onClick={startRecording}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-hover hover:text-foreground"
+          disabled={recStatus !== "idle"}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-hover hover:text-foreground disabled:opacity-40"
           title="Grabar nota de voz"
         >
           <Mic size={18} />
@@ -499,7 +571,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
       <form
         ref={formRef}
         onSubmit={handleSubmit}
-        className="flex w-full min-w-0 items-end gap-1.5 sm:gap-2"
+        className={`flex w-full min-w-0 items-end gap-1.5 sm:gap-2 ${recStatus !== "idle" ? "pointer-events-none opacity-50" : ""}`}
       >
         <textarea
           ref={bodyRef}
@@ -534,3 +606,311 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
     </div>
   );
 });
+
+const BARRAS_DE_LA_PILDORA = 14;
+
+/**
+ * Onda de barras. Mientras graba son las ultimas lecturas del microfono; al
+ * revisar es el resumen de toda la nota, y las barras ya escuchadas se pintan
+ * con el color principal.
+ */
+function Onda({ barras, color, progreso }: { barras: number[]; color: string; progreso?: number }) {
+  return (
+    <div aria-hidden className="flex h-6 min-w-0 flex-1 items-center gap-[2px] overflow-hidden">
+      {barras.map((a, i) => (
+        <span
+          key={i}
+          style={{ height: `${Math.max(3, a * 22)}px` }}
+          className={`w-[3px] shrink-0 rounded-full transition-[height] duration-100 ${
+            progreso === undefined ? color : i / barras.length < progreso ? "bg-primary" : "bg-muted/60"
+          }`}
+        />
+      ))}
+    </div>
+  );
+}
+
+function PildoraDeGrabacion({
+  revisando,
+  segundos,
+  nivelesRef,
+  resumen,
+  sonando,
+  tiempoDeReproduccion,
+  onCancel,
+  onStop,
+  onPlay,
+  onRedo,
+  onSend,
+}: {
+  revisando: boolean;
+  segundos: number;
+  nivelesRef: React.RefObject<number[]>;
+  resumen: number[];
+  sonando: boolean;
+  tiempoDeReproduccion: number;
+  onCancel: () => void;
+  onStop: () => void;
+  onPlay: () => void;
+  onRedo: () => void;
+  onSend: () => void;
+}) {
+  const [barras, setBarras] = useState<number[]>(() => ultimasBarras([], BARRAS_DE_LA_PILDORA));
+
+  // La onda en vivo se repinta diez veces por segundo, solo en la pildora.
+  useEffect(() => {
+    if (revisando) return;
+    const id = setInterval(() => setBarras(ultimasBarras(nivelesRef.current, BARRAS_DE_LA_PILDORA)), 100);
+    return () => clearInterval(id);
+  }, [revisando, nivelesRef]);
+
+  const escuchando = sonando || tiempoDeReproduccion > 0;
+  const progreso = segundos > 0 ? Math.min(1, tiempoDeReproduccion / segundos) : 0;
+  const boton = "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-hover hover:text-foreground";
+
+  return (
+    <div
+      role="group"
+      aria-label={revisando ? "Nota de voz grabada" : "Grabando nota de voz"}
+      className="absolute bottom-4 left-1/2 z-40 flex h-12 w-[min(94%,340px)] -translate-x-1/2 items-center gap-1.5 rounded-full border border-border bg-surface/80 pl-3.5 pr-1.5 shadow-xl backdrop-blur-md sm:bottom-6"
+    >
+      {revisando ? (
+        <>
+          <button
+            type="button"
+            onClick={onPlay}
+            aria-label={sonando ? "Pausar" : "Escuchar nota de voz"}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-hover text-foreground"
+          >
+            {sonando ? <Pause size={15} /> : <Play size={15} className="ml-0.5" />}
+          </button>
+          <Onda barras={resumen} color="" progreso={escuchando ? progreso : 0} />
+          <span className="w-11 shrink-0 text-right font-mono text-[13px] font-medium tabular-nums text-foreground">
+            {formatoDeReloj(escuchando ? tiempoDeReproduccion : segundos)}
+          </span>
+          <button type="button" onClick={onRedo} aria-label="Grabar de nuevo" className={boton}>
+            <RotateCcw size={16} />
+          </button>
+          <button type="button" onClick={onCancel} aria-label="Cancelar" className={boton}>
+            <X size={17} />
+          </button>
+          <button
+            type="button"
+            onClick={onSend}
+            aria-label="Enviar nota de voz"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-white hover:bg-primary-hover"
+          >
+            <Check size={18} />
+          </button>
+        </>
+      ) : (
+        <>
+          <span aria-hidden className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-red-500" />
+          <span className="w-11 shrink-0 font-mono text-[13px] font-medium tabular-nums text-foreground">
+            {formatoDeReloj(segundos)}
+          </span>
+          <Onda barras={barras} color="bg-red-500" />
+          <button type="button" onClick={onCancel} aria-label="Cancelar grabación" className={boton}>
+            <X size={17} />
+          </button>
+          <button
+            type="button"
+            onClick={onStop}
+            aria-label="Detener grabación"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-500 text-white hover:brightness-110"
+          >
+            <Square size={14} fill="white" />
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+const COLOR_DE_EXTENSION: Record<string, string> = {
+  PDF: "#d4332b",
+  XLS: "#188a4a",
+  XLSX: "#188a4a",
+  DOC: "#2563eb",
+  DOCX: "#2563eb",
+  PPT: "#d97706",
+  PPTX: "#d97706",
+};
+
+/**
+ * Vista previa de un archivo ANTES de enviarlo: se ve lo que se eligio, se le
+ * puede escribir un texto, y se puede cambiar o cancelar. Antes el archivo se
+ * enviaba en cuanto se elegia.
+ */
+export function HojaDeAdjunto({
+  archivo,
+  posicion,
+  total,
+  texto,
+  onTexto,
+  onEnviar,
+  onCancelar,
+  onCambiar,
+}: {
+  archivo: File;
+  posicion: number;
+  total: number;
+  texto: string;
+  onTexto: (t: string) => void;
+  onEnviar: () => void;
+  onCancelar: () => void;
+  onCambiar: () => void;
+}) {
+  const revision = revisarAdjunto(archivo, texto);
+  const areaRef = useRef<HTMLTextAreaElement>(null);
+  // La URL de la vista previa se crea una vez por archivo (la hoja se vuelve a
+  // montar con otra `key` cuando cambia el archivo) y se libera al cerrarla.
+  const [url] = useState(() =>
+    revision.tipo === "image" || revision.tipo === "video" ? URL.createObjectURL(archivo) : null
+  );
+  useEffect(() => {
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [url]);
+
+  useEffect(() => {
+    areaRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    const alTeclear = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancelar();
+    };
+    window.addEventListener("keydown", alTeclear);
+    return () => window.removeEventListener("keydown", alTeclear);
+  }, [onCancelar]);
+
+  // Mismo criterio que la caja de escribir: con teclado fisico Enter envia y
+  // Shift+Enter salta de linea; en pantallas tactiles Enter salta de linea.
+  function alPulsar(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+    const tactil = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+    if (e.ctrlKey || e.metaKey || (!e.shiftKey && !tactil)) {
+      e.preventDefault();
+      if (!revision.error) onEnviar();
+    }
+  }
+
+  const ext = extensionDe(archivo.name);
+  const falta = texto.length > LARGO_MAXIMO_DEL_TEXTO - 124;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-3 sm:items-center">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Vista previa del archivo"
+        className="flex max-h-full w-full max-w-md flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl"
+      >
+        <div className="flex items-center gap-2 px-3.5 pb-2 pt-3">
+          <p className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{archivo.name}</p>
+          {total > 1 && (
+            <span className="shrink-0 text-xs text-muted">
+              {posicion} de {total}
+            </span>
+          )}
+          <span className="shrink-0 text-xs tabular-nums text-muted">{pesoLegible(archivo.size)}</span>
+          <button
+            type="button"
+            onClick={onCancelar}
+            aria-label="Cancelar"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-hover hover:text-foreground"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="mx-3 flex h-64 items-center justify-center overflow-hidden rounded-xl bg-background sm:h-72">
+          {revision.tipo === "image" && url ? (
+            // eslint-disable-next-line @next/next/no-img-element -- vista previa local de un archivo que aun no se sube
+            <img src={url} alt={`Vista previa de ${archivo.name}`} className="h-full w-full object-contain" />
+          ) : revision.tipo === "video" && url ? (
+            <video src={url} controls playsInline preload="metadata" className="h-full w-full object-contain" />
+          ) : (
+            <div className="flex flex-col items-center gap-2 text-muted">
+              <FileText size={44} strokeWidth={1.5} />
+              <span
+                className="rounded-md px-2.5 py-0.5 font-mono text-xs font-semibold tracking-wide text-white"
+                style={{ background: COLOR_DE_EXTENSION[ext] ?? "#6b7280" }}
+              >
+                {ext}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2 overflow-y-auto px-3 pb-3 pt-2.5">
+          {revision.error && (
+            <div role="alert" className="flex items-start gap-2 rounded-lg bg-red-500/10 px-2.5 py-2 text-xs text-red-400">
+              <AlertCircle size={14} className="mt-px shrink-0" />
+              <span>{revision.error}</span>
+            </div>
+          )}
+          {!revision.error && revision.aviso && (
+            <div role="status" className="flex items-start gap-2 rounded-lg bg-amber-500/10 px-2.5 py-2 text-xs text-amber-400">
+              <AlertCircle size={14} className="mt-px shrink-0" />
+              <span>{revision.aviso}</span>
+            </div>
+          )}
+
+          {revision.admiteTexto ? (
+            <>
+              <textarea
+                ref={areaRef}
+                value={texto}
+                onChange={(e) => onTexto(e.target.value)}
+                onKeyDown={alPulsar}
+                rows={2}
+                placeholder="Añade un texto a este archivo (opcional)"
+                aria-label="Texto que viaja con el archivo"
+                // 16 px en movil: menos que eso hace que iOS y Android amplien la pagina al enfocar.
+                className="max-h-28 min-h-[3.25rem] w-full resize-none rounded-xl border border-border bg-background px-3 py-2 text-base leading-5 text-foreground outline-none focus:border-primary sm:text-sm"
+              />
+              {falta && (
+                <p className={`text-right text-[11px] tabular-nums ${texto.length > LARGO_MAXIMO_DEL_TEXTO ? "font-semibold text-red-400" : "text-muted"}`}>
+                  {texto.length} / {LARGO_MAXIMO_DEL_TEXTO}
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="text-xs text-muted">Los audios se envían sin texto.</p>
+          )}
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onCambiar}
+              className="flex h-9 items-center gap-1.5 rounded-full bg-surface-hover px-3.5 text-[13px] font-semibold text-foreground hover:brightness-95"
+            >
+              <ArrowLeftRight size={14} />
+              Cambiar
+            </button>
+            <span className="flex-1" />
+            <button
+              type="button"
+              onClick={onCancelar}
+              className="px-3 text-[13px] font-semibold text-muted hover:text-foreground"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={onEnviar}
+              disabled={!!revision.error}
+              className="flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-[13px] font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              <Send size={15} />
+              Enviar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

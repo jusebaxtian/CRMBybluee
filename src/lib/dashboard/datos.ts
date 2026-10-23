@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getPhoneNumberStatus, getWabaStatus } from "@/lib/whatsapp/graph";
+import { getPhoneNumberStatus, getWabaStatus, tramoEfectivo } from "@/lib/whatsapp/graph";
 
 /**
  * Datos del dashboard del cliente.
@@ -230,7 +230,8 @@ export async function cargarConexiones(supabase: SupabaseClient, workspaceId: st
         // la base y las metricas en blanco, no se cae el dashboard entero.
       }
 
-      const limiteDiario = meta?.messaging_limit_tier ? (LIMITE_POR_TRAMO[meta.messaging_limit_tier] ?? null) : null;
+      const tramo = tramoEfectivo(meta?.messaging_limit_tier, waba?.whatsapp_business_manager_messaging_limit);
+      const limiteDiario = tramo ? (LIMITE_POR_TRAMO[tramo] ?? null) : null;
       const revision = waba?.account_review_status;
 
       return {

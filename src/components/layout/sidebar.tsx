@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { EtiquetaDeTemporada } from "@/components/layout/etiqueta-de-temporada";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
@@ -17,6 +18,7 @@ import {
   LifeBuoy,
   CalendarDays,
   PlaySquare,
+  Sparkles,
 } from "lucide-react";
 
 // `built: false` items don't exist yet regardless of plan.
@@ -37,6 +39,7 @@ const navItems = [
 
 export function Sidebar({
   workspaceName,
+  demo = null,
   workspaceRole,
   billingLocked = false,
   isPlatformAdmin = false,
@@ -47,6 +50,8 @@ export function Sidebar({
   onNavigate,
 }: {
   workspaceName: string;
+  /** Cuenta DEMO: dias que le quedan. null si no es demo. */
+  demo?: { diasRestantes: number | null } | null;
   workspaceRole?: string | null;
   billingLocked?: boolean;
   isPlatformAdmin?: boolean;
@@ -69,6 +74,7 @@ export function Sidebar({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.png" alt="" aria-hidden className="h-8 w-8 rounded-[9px]" />
         <span className="font-dash-display text-[16px] font-bold tracking-[-.2px] text-foreground">ByBluee</span>
+        <EtiquetaDeTemporada />
       </div>
 
       {/* Navegacion */}
@@ -161,6 +167,30 @@ export function Sidebar({
             <p className="text-[11px] text-muted">{workspaceRole === "agent" ? "Agente" : "Administrador"}</p>
           </div>
         </div>
+
+        {demo && (
+          <Link
+            href="/dashboard/billing"
+            onClick={onNavigate}
+            className="flex items-start gap-2 rounded-[11px] border border-pink-500/30 bg-pink-500/10 p-[10px] transition-colors duration-150 hover:bg-pink-500/15"
+          >
+            <Sparkles size={14} className="mt-[1px] shrink-0 text-pink-500" aria-hidden />
+            <span className="min-w-0">
+              <span className="block text-[12px] font-bold text-pink-500">
+                Cuenta DEMO
+                {demo.diasRestantes !== null && (
+                  <span className="font-medium text-muted">
+                    {" "}
+                    · {demo.diasRestantes === 0 ? "termina hoy" : `${demo.diasRestantes} ${demo.diasRestantes === 1 ? "día" : "días"}`}
+                  </span>
+                )}
+              </span>
+              <span className="block text-[11px] leading-snug text-muted">
+                Actívate un plan para tener los beneficios ilimitados
+              </span>
+            </span>
+          </Link>
+        )}
 
         {supportHref && (
           <a

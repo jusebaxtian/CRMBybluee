@@ -3,8 +3,9 @@
 import { useState, useTransition } from "react";
 import { Lock, Send } from "lucide-react";
 import { sendTemplateToConversation } from "@/app/actions/whatsapp";
+import { VistaPreviaPlantilla, type PlantillaParaVista } from "@/components/templates/vista-previa-plantilla";
 
-type Template = { id: string; meta_template_name: string; language: string; body_text: string | null };
+type Template = PlantillaParaVista & { language: string; body_text: string | null };
 
 export function TemplateGatePicker({
   conversationId,
@@ -74,11 +75,7 @@ export function TemplateGatePicker({
         </div>
       )}
 
-      {selected?.body_text && (
-        <p className="mt-2 rounded-md border border-border bg-background p-2 text-xs text-muted">
-          {selected.body_text}
-        </p>
-      )}
+      <VistaPreviaPlantilla className="mt-2" plantilla={selected} />
 
       {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
       {success && <p className="mt-2 text-xs text-success">Plantilla enviada.</p>}

@@ -25,6 +25,7 @@ type Notification = {
 
 export function DashboardChrome({
   workspaceName,
+  demo = null,
   workspaceRole,
   billingLocked = false,
   isPlatformAdmin,
@@ -44,6 +45,8 @@ export function DashboardChrome({
   children,
 }: {
   workspaceName: string;
+  /** Cuenta DEMO: dias que le quedan. null si no es demo. */
+  demo?: { diasRestantes: number | null } | null;
   workspaceRole?: string | null;
   billingLocked?: boolean;
   isPlatformAdmin: boolean;
@@ -75,6 +78,7 @@ export function DashboardChrome({
         isImpersonating={isImpersonating}
       />
       <NotificationSound
+        esDemo={!!demo}
         workspaceId={workspaceId}
         planId={planId}
         workspaceStatus={workspaceStatus}
@@ -96,6 +100,7 @@ export function DashboardChrome({
       >
         <Sidebar
           workspaceName={workspaceName}
+          demo={demo}
           workspaceRole={workspaceRole}
           billingLocked={billingLocked}
           isPlatformAdmin={isPlatformAdmin}
@@ -113,6 +118,7 @@ export function DashboardChrome({
         {banner}
         <Topbar
           workspaceName={workspaceName}
+          demo={demo}
           userEmail={userEmail}
           notifications={notifications}
           workspaceId={workspaceId}

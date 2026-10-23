@@ -17,6 +17,8 @@ export async function createNotification(_prevState: unknown, formData: FormData
   const ctaLabel = String(formData.get("ctaLabel") ?? "").trim();
   const ctaUrl = String(formData.get("ctaUrl") ?? "").trim();
   const modo = String(formData.get("modo") ?? "campana") === "pantalla" ? "pantalla" : "campana";
+  // Una casilla sin marcar no se envia: "on" es que SI se excluye a los demos.
+  const excluirDemo = formData.get("excluirDemo") === "on";
 
   if (!title || !body) return { error: "Título y contenido son obligatorios." };
   if (scope === "status" && !targetStatus) {
@@ -44,6 +46,7 @@ export async function createNotification(_prevState: unknown, formData: FormData
     cta_label: ctaLabel || null,
     cta_url: ctaUrl || null,
     modo,
+    excluir_demo: excluirDemo,
     created_by: user?.id,
   });
 

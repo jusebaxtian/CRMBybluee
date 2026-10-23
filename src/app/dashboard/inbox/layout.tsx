@@ -6,6 +6,10 @@ import { InboxShell } from "@/components/inbox/inbox-shell";
 import { RealtimeRefresh } from "@/components/ui/realtime-refresh";
 import { listWorkspaceAgents } from "@/lib/agents";
 import { loadInboxPage } from "@/lib/inbox/load";
+import { cookies } from "next/headers";
+import { isPlatformAdmin } from "@/lib/admin";
+import { IMPERSONATION_COOKIE } from "@/lib/workspace";
+import { cargarCiclos } from "@/lib/inbox/ciclo-de-plan";
 
 export default async function InboxLayout({
   children,
@@ -48,6 +52,12 @@ export default async function InboxLayout({
 
   const agents = await listWorkspaceAgents(supabase, workspaceId);
 
+  // Mensual / semestral / anual de cada cliente, solo en el espacio propio del
+  // administrador. En "modo soporte" (viendo el espacio de un cliente) no se
+  // carga: esos contactos no son clientes del administrador.
+  const enModoSoporte = !!(await cookies()).get(IMPERSONATION_COOKIE)?.value;
+  const ciclos = !enModoSoporte && (await isPlatformAdmin(supabase)) ? await cargarCiclos(supabase) : {};
+
   return (
     <div className="-m-4 sm:-m-5">
       {workspaceId && (
@@ -67,6 +77,7 @@ export default async function InboxLayout({
             allTags={workspaceTags ?? []}
             agents={agents}
             channels={channels ?? []}
+            ciclos={ciclos}
           />
         }
       >

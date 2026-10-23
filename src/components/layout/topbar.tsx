@@ -17,6 +17,7 @@ type Notification = {
 
 export function Topbar({
   workspaceName,
+  demo = null,
   userEmail,
   notifications,
   workspaceId = null,
@@ -24,6 +25,8 @@ export function Topbar({
   onMenuClick,
 }: {
   workspaceName: string;
+  /** Cuenta DEMO: se muestra una insignia junto al nombre. */
+  demo?: { diasRestantes: number | null } | null;
   userEmail: string;
   notifications: Notification[];
   workspaceId?: string | null;
@@ -55,6 +58,11 @@ export function Topbar({
               {workspaceName.charAt(0).toUpperCase()}
             </div>
             <span className="hidden text-sm text-foreground sm:inline">{workspaceName}</span>
+            {demo && (
+              <span title="Cuenta DEMO: actívate un plan para tener los beneficios ilimitados" className="rounded-full bg-pink-500/15 px-2 py-0.5 text-[10.5px] font-bold leading-none text-pink-500">
+                DEMO
+              </span>
+            )}
             <ChevronDown size={14} className="text-muted" />
           </div>
           <div className="invisible absolute right-0 z-10 mt-2 w-56 rounded-lg border border-border bg-surface p-2 opacity-0 shadow-lg transition-opacity group-hover:visible group-hover:opacity-100">

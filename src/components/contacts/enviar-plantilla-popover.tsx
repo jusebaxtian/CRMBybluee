@@ -4,9 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LayoutTemplate, Loader2, X } from "lucide-react";
 import { sendTemplateToContact } from "@/app/actions/whatsapp";
+import { VistaPreviaPlantilla, type PlantillaParaVista } from "@/components/templates/vista-previa-plantilla";
 import { etiquetaLinea, plantillasParaLinea, type LineaOption } from "@/components/automations/selector-linea";
 
-export type PlantillaOption = { id: string; meta_template_name: string; waba_id: string; body_text: string | null };
+export type PlantillaOption = PlantillaParaVista & { waba_id: string; body_text: string | null };
 
 const SELECT =
   "w-full rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary";
@@ -114,11 +115,7 @@ export function EnviarPlantillaPopover({
                   ))}
                 </select>
               </label>
-              {elegida?.body_text && (
-                <p className="max-h-24 overflow-y-auto whitespace-pre-line rounded-[9px] border border-border bg-background px-2 py-1.5 text-xs text-muted">
-                  {elegida.body_text}
-                </p>
-              )}
+              <VistaPreviaPlantilla plantilla={elegida} />
               {error && <p className="text-xs text-red-400">{error}</p>}
               <button
                 type="button"

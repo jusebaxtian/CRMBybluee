@@ -8,12 +8,14 @@ import { TemplateGatePicker } from "@/components/templates/template-gate-picker"
 import { ForwardDialog } from "@/components/inbox/forward-dialog";
 import { RegistrarPagoDialog } from "@/components/inbox/registrar-pago-dialog";
 import { RecordatorioPicker } from "@/components/inbox/recordatorio-picker";
+import { CitaPicker } from "@/components/inbox/cita-picker";
 import { useMessageWindow } from "@/lib/use-message-window";
 
 export type OptimisticMessage = {
   id: string;
   direction: string;
   body: string | null;
+  caption?: string | null;
   status: string;
   message_type: string;
   media_url: string | null;
@@ -103,7 +105,7 @@ export function ChatPane({
     dragCounter.current = 0;
     setDragActive(false);
     for (const file of e.dataTransfer.files) {
-      composerRef.current?.enqueueUpload(file);
+      composerRef.current?.attachFile(file);
     }
   }
 
@@ -153,7 +155,8 @@ export function ChatPane({
         <div className="relative">
           {/* Fuera de la ventana de 24 h el compositor no se muestra, pero el
               recordatorio ("llamar al cliente") es justo lo que se necesita ahi. */}
-          <div className="absolute left-3 top-3 z-30 rounded-full border border-border bg-surface p-1.5 shadow-lg">
+          <div className="absolute left-3 top-3 z-30 flex flex-col items-center gap-2 rounded-full border border-border bg-surface p-1.5 shadow-lg">
+            <CitaPicker contactId={contactId} contactName={contactName} />
             <RecordatorioPicker conversationId={conversationId} contactName={contactName} />
           </div>
           <TemplateGatePicker conversationId={conversationId} templates={approvedTemplates} />

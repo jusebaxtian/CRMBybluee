@@ -10,6 +10,8 @@ type Message = {
   id: string;
   direction: string;
   body: string | null;
+  /** Texto que acompaña a un documento. */
+  caption?: string | null;
   status: string;
   message_type: string;
   media_url: string | null;
@@ -208,7 +210,7 @@ export function MessageBubble({
         )}
 
         {m.message_type === "audio" && m.media_url && (
-          <VoiceMessagePlayer src={m.media_url} tint={out ? "outbound" : "default"} />
+          <VoiceMessagePlayer src={m.media_url} tint={out ? "outbound" : "default"} transcripcion={m.body} />
         )}
 
         {m.message_type === "document" && m.media_url && (
@@ -224,8 +226,11 @@ export function MessageBubble({
           </a>
         )}
 
-        {m.body && m.message_type !== "document" && (
+        {m.body && m.message_type !== "document" && m.message_type !== "audio" && (
           <p className="whitespace-pre-wrap break-words">{m.body}</p>
+        )}
+        {m.message_type === "document" && m.caption && (
+          <p className="whitespace-pre-wrap break-words">{m.caption}</p>
         )}
 
         {DESCARGABLES.has(m.message_type) && m.media_url && (

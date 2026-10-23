@@ -129,7 +129,21 @@ export type WabaStatus = {
    * lineas del mismo cliente pueden salir distintas.
    */
   business_verification_status?: string;
+  /**
+   * Tramo de mensajeria vigente del negocio (TIER_250, TIER_2K...). Meta lo
+   * aplica por portafolio desde oct 2025: el campo del numero puede seguir
+   * mostrando el tramo viejo (250) cuando el negocio ya subio a 2.000.
+   */
+  whatsapp_business_manager_messaging_limit?: string;
 };
+
+const ORDEN_DE_TRAMOS = ["TIER_50", "TIER_250", "TIER_1K", "TIER_2K", "TIER_10K", "TIER_100K", "TIER_UNLIMITED"];
+
+/** El tramo mas alto entre el del numero y el del negocio: es el que Meta aplica de verdad. */
+export function tramoEfectivo(delNumero?: string | null, delNegocio?: string | null): string | undefined {
+  const rango = (t?: string | null) => (t ? ORDEN_DE_TRAMOS.indexOf(t) : -1);
+  return rango(delNegocio) > rango(delNumero) ? (delNegocio as string) : (delNumero ?? undefined);
+}
 
 /**
  * Estado de la cuenta de WhatsApp Business (WABA): su revision y la
@@ -142,7 +156,7 @@ export type WabaStatus = {
  * desde el nodo del negocio y no desde aqui.
  */
 export async function getWabaStatus(wabaId: string, accessToken: string): Promise<WabaStatus> {
-  return graphFetch(`/${wabaId}?fields=name,account_review_status,business_verification_status`, {
+  return graphFetch(`/${wabaId}?fields=name,account_review_status,business_verification_status,whatsapp_business_manager_messaging_limit`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 }
@@ -777,4 +791,16 @@ export async function listarBloqueados(
   });
   const lista = (data as { data?: { wa_id?: string }[] })?.data ?? [];
   return lista.map((u) => u.wa_id ?? "").filter(Boolean);
+}
+
+/** El estado actual en Meta de las plantillas con ese nombre (una por idioma). */
+export async function estadoDePlantilla(
+  wabaId: string,
+  accessToken: string,
+  nombre: string
+): Promise<{ name: string; language: string; status: string; category: string }[]> {
+  const data = await graphFetch(`/${wabaId}/message_templates?name=${encodeURIComponent(nombre)}&fields=name,language,status,category&limit=20`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return (data.data ?? []) as { name: string; language: string; status: string; category: string }[];
 }

@@ -5,6 +5,7 @@ import ExcelJS from "exceljs";
 import { createClient } from "@/lib/supabase/server";
 import { maybeTrackPurchaseFromTag } from "@/lib/meta/conversions";
 import { normalizeWaId } from "@/lib/phone";
+import { mensajeDeErrorDeContactos } from "@/lib/billing/demo";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
 import { normalizarValor, type TipoVariable } from "@/lib/contactos/variables";
 
@@ -214,7 +215,7 @@ export async function importContactsFile(formData: FormData) {
       })),
       { onConflict: "workspace_id,wa_id", ignoreDuplicates: false }
     );
-    if (upsertError) return { error: upsertError.message };
+    if (upsertError) return { error: mensajeDeErrorDeContactos(upsertError.message) };
   }
   if (sinNombre.length > 0) {
     const conDatos = sinNombre.filter((r) => Object.keys(valoresDe(r)).length > 0);
@@ -224,14 +225,14 @@ export async function importContactsFile(formData: FormData) {
         conDatos.map((r) => ({ workspace_id: workspaceId, wa_id: r.phone, ...valoresDe(r) })),
         { onConflict: "workspace_id,wa_id", ignoreDuplicates: false }
       );
-      if (upsertError) return { error: upsertError.message };
+      if (upsertError) return { error: mensajeDeErrorDeContactos(upsertError.message) };
     }
     if (pelados.length > 0) {
       const { error: upsertError } = await supabase.from("contacts").upsert(
         pelados.map((r) => ({ workspace_id: workspaceId, wa_id: r.phone })),
         { onConflict: "workspace_id,wa_id", ignoreDuplicates: true }
       );
-      if (upsertError) return { error: upsertError.message };
+      if (upsertError) return { error: mensajeDeErrorDeContactos(upsertError.message) };
     }
   }
 
@@ -322,7 +323,7 @@ export async function createContact(_prevState: unknown, formData: FormData) {
     { onConflict: "workspace_id,wa_id" }
   );
 
-  if (error) return { error: error.message };
+  if (error) return { error: mensajeDeErrorDeContactos(error.message) };
 
   revalidatePath("/dashboard/contacts");
   return { success: true };

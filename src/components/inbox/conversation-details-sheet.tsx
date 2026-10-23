@@ -3,9 +3,12 @@
 import { useState } from "react";
 import { Info, X, Zap, Megaphone } from "lucide-react";
 import { ContactTagPicker } from "@/components/tags/contact-tag-picker";
+import { claseAvatar, EtiquetaCiclo } from "@/components/inbox/etiqueta-ciclo";
+import type { Ciclo } from "@/lib/inbox/ciclo-de-plan";
 import { NotesEditor } from "@/components/inbox/notes-editor";
 import { ConversationAssignmentControl } from "@/components/inbox/conversation-assignment-control";
 import { ConversationFollowupsToggle } from "@/components/inbox/conversation-followups-toggle";
+import { BloquearContacto } from "@/components/contacts/bloquear-contacto";
 import { ContactBlockedNotice } from "@/components/inbox/contact-blocked-notice";
 import { AiHandoffNotice } from "@/components/inbox/ai-handoff-notice";
 import { ConversationAiToggle } from "@/components/inbox/conversation-ai-toggle";
@@ -27,6 +30,7 @@ export function ConversationDetailsSheet({
   notes,
   automations,
   likelyBlocked,
+  bloqueado = false,
   aiHandoffRequested,
   hasActiveAiAgent,
   aiManuallyPaused,
@@ -38,6 +42,7 @@ export function ConversationDetailsSheet({
   espaciosDelCliente = [],
   invitacionesPendientes = [],
   contactIdAdmin,
+  ciclo,
 }: {
   contactName: string | null;
   contactWaId: string;
@@ -50,6 +55,8 @@ export function ConversationDetailsSheet({
   notes: string | null;
   automations: Automation[];
   likelyBlocked: boolean;
+  /** Si el contacto ya esta bloqueado en WhatsApp (muestra "Desbloquear"). */
+  bloqueado?: boolean;
   aiHandoffRequested: boolean;
   hasActiveAiAgent: boolean;
   aiManuallyPaused: boolean;
@@ -63,6 +70,8 @@ export function ConversationDetailsSheet({
   invitacionesPendientes?: InvitacionPendiente[];
   /** Solo llega para el administrador de la plataforma. */
   contactIdAdmin?: string;
+  /** Mensual / semestral / anual. Solo llega para el administrador de la plataforma. */
+  ciclo?: Ciclo | null;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -99,11 +108,14 @@ export function ConversationDetailsSheet({
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-base font-semibold text-primary">
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base font-semibold ${claseAvatar(ciclo, "bg-primary/15 text-primary")}`}>
                 {(contactName ?? contactWaId).charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-foreground">{contactName ?? contactWaId}</p>
+                <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <span className="min-w-0 truncate">{contactName ?? contactWaId}</span>
+                  <EtiquetaCiclo ciclo={ciclo} />
+                </p>
                 <p className="truncate text-xs text-muted">{contactWaId}</p>
               </div>
             </div>
@@ -165,6 +177,11 @@ export function ConversationDetailsSheet({
                 allTags={allTags}
                 assignedTagIds={assignedTagIds}
               />
+            </div>
+
+            <div className="mt-6">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Bloqueo</p>
+              <BloquearContacto contactId={contactId} bloqueado={bloqueado} nombre={contactName || contactWaId} />
             </div>
 
             <div className="mt-6">

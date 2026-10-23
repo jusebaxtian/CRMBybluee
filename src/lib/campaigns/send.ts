@@ -12,6 +12,7 @@ import { isWindowOpen } from "@/lib/whatsapp/message-window";
 import { recordOutboundMessage } from "@/lib/messaging/record";
 import { noSePuedeUsar, motivoDelExceso } from "@/lib/whatsapp/limite-plantilla";
 import { nombreDeDocumento } from "@/lib/whatsapp/nombre-archivo";
+import { enviosMasivosHechos, limitesDelPlan, mensajeDeTopeDeEnvios } from "@/lib/billing/demo";
 import type { VariableDePlantilla } from "@/lib/contactos/variables";
 
 // media_filename doesn't carry a mime type — infer a close-enough one from
@@ -117,6 +118,28 @@ async function prepareCampaignSend(
 
   const account = await resolveSendAccount(supabase, workspaceId, campaign.whatsapp_account_id);
   if (!account) return { error: "Este workspace no tiene WhatsApp conectado." };
+
+  // Cuenta DEMO: tope de envios masivos en total. Va aqui, antes de pasar a
+  // "sending", porque es el unico punto por el que pasan el boton Enviar, las
+  // campañas programadas y las que se reanudan.
+  const limites = await limitesDelPlan(supabase, workspaceId);
+  if (limites.maxEnviosMasivos !== null) {
+    const [hechos, { count: pendientes }] = await Promise.all([
+      enviosMasivosHechos(supabase, workspaceId),
+      supabase.from("campaign_recipients").select("id", { count: "exact", head: true }).eq("campaign_id", campaignId).eq("status", "pending"),
+    ]);
+    const mensaje = mensajeDeTopeDeEnvios(limites.maxEnviosMasivos, hechos, pendientes ?? 0);
+    if (mensaje) {
+      // Una campaña programada ya llega aqui reclamada ("sending"). Si se deja asi,
+      // el planificador la reintenta para siempre; se cierra como fallida. Una
+      // manual sigue en borrador para que la persona reduzca la audiencia.
+      const { data: estado } = await supabase.from("campaigns").select("status").eq("id", campaignId).maybeSingle();
+      if (estado?.status === "sending") {
+        await supabase.from("campaigns").update({ status: "failed" }).eq("id", campaignId);
+      }
+      return { error: mensaje };
+    }
+  }
 
   const ahora = new Date().toISOString();
 

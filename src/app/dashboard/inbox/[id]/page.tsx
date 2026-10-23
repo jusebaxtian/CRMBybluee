@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Zap, Megaphone } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { cargarCiclos } from "@/lib/inbox/ciclo-de-plan";
+import { claseAvatar, EtiquetaCiclo } from "@/components/inbox/etiqueta-ciclo";
 import { ContactTagPicker } from "@/components/tags/contact-tag-picker";
 import { MeterEnFlujo } from "@/components/flujos/meter-en-flujo";
 import { BloquearContacto } from "@/components/contacts/bloquear-contacto";
@@ -60,7 +62,7 @@ export default async function ConversationPage({
     supabase
       .from("conversations")
       .select(
-        "id, contact_id, last_read_at, assigned_agent_id, ad_source_id, ad_headline, ad_body, followups_enabled, ai_handoff_requested, ai_manually_paused, whatsapp_account_id, contacts(name, wa_id, notes, likely_blocked, bloqueado_el, contact_tags(tag_id, tags(excludes_followups)))"
+        "id, contact_id, last_read_at, assigned_agent_id, ad_source_id, ad_headline, ad_body, followups_enabled, ai_handoff_requested, ai_manually_paused, whatsapp_account_id, contacts(name, wa_id, username, notes, likely_blocked, bloqueado_el, contact_tags(tag_id, tags(excludes_followups)))"
       )
       .eq("id", id)
       .eq("workspace_id", workspaceId ?? "")
@@ -76,7 +78,7 @@ export default async function ConversationPage({
     supabase
       .from("messages")
       .select(
-        "id, direction, body, status, message_type, media_url, media_mime_type, error_detail, wa_message_id, context_wa_message_id, buttons, created_at"
+        "id, direction, body, caption, status, message_type, media_url, media_mime_type, error_detail, wa_message_id, context_wa_message_id, buttons, created_at"
       )
       .eq("conversation_id", id)
       .order("created_at", { ascending: false })
@@ -115,7 +117,7 @@ export default async function ConversationPage({
       .order("name"),
     supabase
       .from("templates")
-      .select("id, meta_template_name, language, body_text, waba_id")
+      .select("id, meta_template_name, language, body_text, header_format, header_text, header_media_url, buttons, variables_origen, waba_id")
       .eq("workspace_id", workspaceId ?? "")
       .eq("status", "APPROVED")
       .eq("created_via", "crm")
@@ -127,6 +129,7 @@ export default async function ConversationPage({
   const contact = conversation.contacts as unknown as {
     name: string | null;
     wa_id: string;
+    username: string | null;
     notes: string | null;
     likely_blocked: boolean;
     bloqueado_el: string | null;
@@ -149,6 +152,9 @@ export default async function ConversationPage({
     espaciosDelCliente = (data ?? []) as EspacioDelCliente[];
     invitacionesPendientes = invitaciones;
   }
+
+  // Mensual / semestral / anual, solo para el administrador en su propio espacio.
+  const ciclo = esAdmin ? ((await cargarCiclos(supabase))[contact.wa_id] ?? null) : null;
 
   const assignedTagIds = contact.contact_tags.map((ct) => ct.tag_id);
   const excludedFromFollowupsByTag = contact.contact_tags.some((ct) => ct.tags?.excludes_followups);
@@ -240,12 +246,12 @@ export default async function ConversationPage({
           >
             <ArrowLeft size={18} />
           </Link>
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
+          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${claseAvatar(ciclo, "bg-primary/15 text-primary")}`}>
             {(contact.name ?? contact.wa_id).charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-foreground">
-              {isPhoneNumber(contact.wa_id) ? contact.wa_id : "Usuario"}
+              {isPhoneNumber(contact.wa_id) ? contact.wa_id : contact.username ? `@${contact.username}` : "Usuario"}
               {contact.name && <span className="text-muted"> · {contact.name}</span>}
             </p>
             <ConversationWindowStatus lastInboundAt={lastInboundAt} />
@@ -283,6 +289,7 @@ export default async function ConversationPage({
             notes={contact.notes}
             automations={automations ?? []}
             likelyBlocked={contact.likely_blocked}
+            bloqueado={Boolean(contact.bloqueado_el)}
             aiHandoffRequested={conversation.ai_handoff_requested}
             hasActiveAiAgent={hasActiveAiAgent}
             aiManuallyPaused={conversation.ai_manually_paused}
@@ -294,6 +301,7 @@ export default async function ConversationPage({
             espaciosDelCliente={espaciosDelCliente}
             invitacionesPendientes={invitacionesPendientes}
             contactIdAdmin={esAdmin ? conversation.contact_id : undefined}
+            ciclo={ciclo}
           />
         </div>
 
@@ -313,15 +321,16 @@ export default async function ConversationPage({
       <aside className="hidden w-72 shrink-0 overflow-y-auto bg-surface p-5 lg:block">
         {/* Una sola linea (inicial · nombre · numero) para liberar alto en el panel. */}
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-base font-semibold text-primary">
+          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base font-semibold ${claseAvatar(ciclo, "bg-primary/15 text-primary")}`}>
             {(contact.name ?? contact.wa_id).charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-foreground">
-              {contact.name ?? (isPhoneNumber(contact.wa_id) ? contact.wa_id : "Usuario")}
+            <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <span className="min-w-0 truncate">{contact.name ?? (isPhoneNumber(contact.wa_id) ? contact.wa_id : "Usuario")}</span>
+              <EtiquetaCiclo ciclo={ciclo} />
             </p>
             <p className="truncate text-xs text-muted">
-              {isPhoneNumber(contact.wa_id) ? contact.wa_id : "Usuario (sin número)"}
+              {isPhoneNumber(contact.wa_id) ? contact.wa_id : contact.username ? `@${contact.username} (sin número)` : "Usuario (sin número)"}
             </p>
           </div>
         </div>

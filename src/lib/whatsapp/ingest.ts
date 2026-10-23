@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { esContactoSinNumero, usuarioDeAviso } from "@/lib/whatsapp/usuario";
 import type { WhatsAppWebhookPayload } from "@/lib/whatsapp/webhook-types";
 import {
   runKeywordAutomations,
@@ -150,7 +151,9 @@ async function resolveContact(
   workspaceId: string,
   waId: string,
   bsuid: string | null,
-  profileName: string | undefined
+  profileName: string | undefined,
+  // @usuario de WhatsApp, si Meta lo mando. Solo se escribe cuando llega: un null nunca borra el que ya hay.
+  username: string | null = null
 ): Promise<{ id: string } | null> {
   // Regla del nombre (0104): el perfil de WhatsApp solo rellena cuando el
   // contacto no tiene nombre o cuando el nombre actual vino de WhatsApp. Si
@@ -172,7 +175,7 @@ async function resolveContact(
     if (existing) {
       await supabase
         .from("contacts")
-        .update({ wa_id: waId, ...nombreSiCorresponde(existing) })
+        .update({ wa_id: waId, ...nombreSiCorresponde(existing), ...(username ? { username } : {}) })
         .eq("id", existing.id);
       return existing;
     }
@@ -188,7 +191,7 @@ async function resolveContact(
   if (porNumero) {
     // Only include bsuid when we actually have one, so a null never wipes a
     // bsuid learned from an earlier message.
-    const cambios = { ...nombreSiCorresponde(porNumero), ...(bsuid ? { bsuid } : {}) };
+    const cambios = { ...nombreSiCorresponde(porNumero), ...(bsuid ? { bsuid } : {}), ...(username ? { username } : {}) };
     if (Object.keys(cambios).length > 0) {
       await supabase.from("contacts").update(cambios).eq("id", porNumero.id);
     }
@@ -204,6 +207,7 @@ async function resolveContact(
         name: profileName,
         name_source: "whatsapp",
         ...(bsuid ? { bsuid } : {}),
+        ...(username ? { username } : {}),
       },
       { onConflict: "workspace_id,wa_id", ignoreDuplicates: false }
     )
@@ -211,6 +215,31 @@ async function resolveContact(
     .single();
 
   return contact;
+}
+
+const MAX_MUESTRAS_DE_USUARIO = 40;
+
+/**
+ * Guarda una muestra (sin el texto del mensaje) del aviso de un contacto sin numero.
+ * Se detiene sola al llegar a MAX_MUESTRAS_DE_USUARIO.
+ */
+async function guardarMuestraDeUsuario(
+  supabase: ReturnType<typeof createAdminClient>,
+  workspaceId: string,
+  contacto: unknown,
+  mensaje: { type?: string; from?: string; user_id?: string } & Record<string, unknown>
+) {
+  try {
+    const { count } = await supabase.from("muestras_webhook_usuarios").select("id", { count: "exact", head: true });
+    if ((count ?? 0) >= MAX_MUESTRAS_DE_USUARIO) return;
+    await supabase.from("muestras_webhook_usuarios").insert({
+      workspace_id: workspaceId,
+      contacto: contacto ?? null,
+      mensaje: { type: mensaje.type ?? null, claves: Object.keys(mensaje), from: mensaje.from ?? null, user_id: mensaje.user_id ?? null },
+    });
+  } catch {
+    // Es un diagnostico: si falla, no pasa nada.
+  }
 }
 
 async function persistIncomingMedia(
@@ -328,7 +357,11 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           continue;
         }
 
-        const contact = await resolveContact(supabase, workspaceId, waId, bsuid, profileName);
+        const username = usuarioDeAviso(contactEntry, message);
+        // Pocas muestras de lo que Meta manda para quien escribe sin numero: sirven para saber
+        // en que campo llega el @usuario. Nunca frena ni rompe el ingreso del mensaje.
+        if (esContactoSinNumero(waId)) void guardarMuestraDeUsuario(supabase, workspaceId, contactEntry, message);
+        const contact = await resolveContact(supabase, workspaceId, waId, bsuid, profileName, username);
 
         if (!contact) {
           console.error("whatsapp webhook: no se pudo crear el contacto", { workspaceId, waId, bsuid, messageId: message.id });

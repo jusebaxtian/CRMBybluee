@@ -40,6 +40,8 @@ export type OutboundMessage = {
   buttons?: unknown | null;
   /** Automatizacion que lo origino, cuando no lo mando una persona. */
   viaAutomationId?: string | null;
+  /** Texto que acompaña a un DOCUMENTO (en imagen y video el texto va en `body`). */
+  caption?: string | null;
   /**
    * Marca que hay una persona contestando en vivo. Las campañas saltan a un
    * contacto con un `sent_by_support` reciente para no interrumpir una
@@ -75,6 +77,7 @@ export async function recordOutboundMessage(
       direction: "out",
       message_type: message.messageType,
       body: message.body ?? null,
+      caption: message.caption ?? null,
       media_url: message.mediaUrl ?? null,
       media_mime_type: message.mediaMimeType ?? null,
       wa_message_id: message.waMessageId ?? null,

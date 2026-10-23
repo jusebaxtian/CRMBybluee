@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { Search, SlidersHorizontal, X, Clock, Megaphone, ShieldAlert, Bot, Check, Pin, PinOff } from "lucide-react";
 import { setConversationPinned, cargarConversaciones } from "@/app/actions/conversations";
 import { NewMessageButton } from "@/components/inbox/new-message-button";
+import { claseAvatar, ESTILO_CICLO } from "@/components/inbox/etiqueta-ciclo";
+import type { Ciclo } from "@/lib/inbox/ciclo-de-plan";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { useMessageWindow } from "@/lib/use-message-window";
 import { isWindowExpiringSoon, msRemainingInWindow } from "@/lib/whatsapp/message-window";
@@ -94,6 +96,7 @@ export function ConversationListPanel({
   channels,
   hayMas,
   unreadConversationsCount,
+  ciclos = {},
 }: {
   conversations: Conversation[];
   contacts: Contact[];
@@ -102,6 +105,8 @@ export function ConversationListPanel({
   channels: Channel[];
   hayMas: boolean;
   unreadConversationsCount: number;
+  /** Ciclo del plan por numero de WhatsApp. Solo llega para el administrador de la plataforma. */
+  ciclos?: Record<string, Ciclo>;
 }) {
   const pathname = usePathname();
 
@@ -545,7 +550,10 @@ export function ConversationListPanel({
               }`}
             >
               <div className="relative shrink-0">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/15 text-sm font-semibold text-success">
+                <div
+                  title={ciclos[conv.contact.wa_id] ? `Plan ${ESTILO_CICLO[ciclos[conv.contact.wa_id]].texto.toLowerCase()}` : undefined}
+                  className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold ${claseAvatar(ciclos[conv.contact.wa_id], "bg-success/15 text-success")}`}
+                >
                   {(conv.contact.name ?? conv.contact.wa_id).charAt(0).toUpperCase()}
                 </div>
                 {!conv.answered && (

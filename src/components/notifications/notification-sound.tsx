@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/client";
 import { playChime } from "@/lib/sound/chime";
 
 type Props = {
+  /** Cuenta DEMO: no se le avisa de las notificaciones marcadas "no mostrar a demos". */
+  esDemo?: boolean;
   workspaceId: string | null;
   planId: string | null;
   workspaceStatus: string | null;
@@ -17,7 +19,7 @@ type Props = {
 // same trick for a delete, so an admin removing a notification makes it
 // disappear from an already-open dashboard instead of lingering until the
 // next navigation.
-export function NotificationSound({ workspaceId, planId, workspaceStatus }: Props) {
+export function NotificationSound({ workspaceId, planId, workspaceStatus, esDemo = false }: Props) {
   const router = useRouter();
   const audioCtxRef = useRef<AudioContext | null>(null);
 
@@ -52,7 +54,9 @@ export function NotificationSound({ workspaceId, planId, workspaceStatus }: Prop
       target_workspace_id?: string | null;
       target_plan_id?: string | null;
       target_status?: string | null;
+      excluir_demo?: boolean;
     }) {
+      if (esDemo && row.excluir_demo) return false;
       if (row.scope === "all") return true;
       if (row.scope === "workspace") return row.target_workspace_id === workspaceId;
       if (row.scope === "plan") return !!planId && row.target_plan_id === planId;
@@ -99,7 +103,7 @@ export function NotificationSound({ workspaceId, planId, workspaceStatus }: Prop
       window.removeEventListener("keydown", unlock);
       if (channel) supabase.removeChannel(channel);
     };
-  }, [workspaceId, planId, workspaceStatus, router]);
+  }, [workspaceId, planId, workspaceStatus, esDemo, router]);
 
   return null;
 }

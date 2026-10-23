@@ -305,6 +305,10 @@ export async function sendChatMedia(formData: FormData) {
   if (!conversationId || !file || file.size === 0) {
     return { error: "Adjunta un archivo." };
   }
+  // Texto que viaja con el archivo. WhatsApp lo admite en imagen, video y
+  // documento (no en audio) y lo limita a 1.024 caracteres.
+  const texto = String(formData.get("caption") ?? "").trim();
+  if (texto.length > 1024) return { error: "El texto que acompaña al archivo pasa de 1.024 caracteres." };
 
   const [
     {
@@ -333,6 +337,7 @@ export async function sendChatMedia(formData: FormData) {
 
   const contactWaId = (conversation.contacts as unknown as { wa_id: string }).wa_id;
   const mediaType = mediaTypeFromMime(file.type);
+  const textoDelArchivo = mediaType === "audio" ? "" : texto;
 
   // Catches an oversized/unsupported file synchronously, before spending an
   // upload on it — without this, WhatsApp accepts the send and only rejects
@@ -441,13 +446,17 @@ export async function sendChatMedia(formData: FormData) {
       contactWaId,
       mediaType,
       source,
-      uploadFilename
+      uploadFilename,
+      textoDelArchivo || undefined
     );
 
     await recordOutboundMessage(supabase, {
       conversationId,
       messageType: mediaType,
-      body: mediaType === "document" ? uploadFilename : null,
+      // Imagen y video: el texto va en body (asi lo muestran la burbuja y la lista).
+      // Documento: body es el nombre del archivo, y el texto va en caption.
+      body: mediaType === "document" ? uploadFilename : textoDelArchivo || null,
+      caption: mediaType === "document" ? textoDelArchivo || null : null,
       mediaUrl: publicUrl,
       mediaMimeType: uploadContentType,
       waMessageId: result.messages[0]?.id,
