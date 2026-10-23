@@ -3,6 +3,7 @@
 import { ChevronDown, Menu } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { CentroDeNotificaciones } from "@/components/notifications/centro-de-notificaciones";
 import { ChangePasswordButton } from "@/components/account/change-password-button";
 
 type Notification = {
@@ -50,6 +51,7 @@ export function Topbar({
       </div>
 
       <div className="flex items-center gap-3">
+        <CentroDeNotificaciones />
         <NotificationBell notifications={notifications} />
 
         <div className="group relative">

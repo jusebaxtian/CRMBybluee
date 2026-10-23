@@ -83,7 +83,7 @@ export function DashboardChrome({
         planId={planId}
         workspaceStatus={workspaceStatus}
       />
-      <PushNotifications />
+      <PushNotifications sinLeer={unreadMessagesCount} />
       {mobileNavOpen && (
         <button
           type="button"

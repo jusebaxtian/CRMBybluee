@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { armarAvisoDeMensaje } from "@/lib/push/aviso";
 
 let configured = false;
 function ensureConfigured() {
@@ -12,13 +13,14 @@ function ensureConfigured() {
   configured = true;
 }
 
+/** Devuelve a cuantos dispositivos les llego el aviso (los que el servicio de push acepto). */
 export async function sendPushToUsers(
   supabase: ReturnType<typeof createAdminClient>,
   userIds: string[],
-  payload: { title: string; body: string; url?: string; conversationId?: string }
-) {
-  if (!userIds.length) return;
-  if (!process.env.VAPID_PRIVATE_KEY || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) return;
+  payload: { title: string; body: string; url?: string; conversationId?: string; tag?: string }
+): Promise<number> {
+  if (!userIds.length) return 0;
+  if (!process.env.VAPID_PRIVATE_KEY || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) return 0;
   ensureConfigured();
 
   const { data: subscriptions } = await supabase
@@ -26,9 +28,10 @@ export async function sendPushToUsers(
     .select("id, endpoint, p256dh, auth_key")
     .in("user_id", userIds);
 
-  if (!subscriptions?.length) return;
+  if (!subscriptions?.length) return 0;
 
   const body = JSON.stringify(payload);
+  let entregados = 0;
 
   await Promise.all(
     subscriptions.map(async (sub) => {
@@ -40,6 +43,7 @@ export async function sendPushToUsers(
           },
           body
         );
+        entregados += 1;
       } catch (err) {
         const statusCode = (err as { statusCode?: number }).statusCode;
         // Expired/invalid subscription — clean it up so future sends don't retry it.
@@ -49,6 +53,7 @@ export async function sendPushToUsers(
       }
     })
   );
+  return entregados;
 }
 
 // Notifies the assigned agent if the conversation has one, otherwise every
@@ -75,15 +80,9 @@ export async function notifyNewMessage(
     recipientIds = (members ?? []).map((m) => m.user_id as string);
   }
 
-  // Title shows both the saved name and the raw number (e.g. "María González — 573215118640")
-  // so the notification is identifiable even before opening the app, same as
-  // the inbox list's name-then-phone layout.
-  const title = contactName ? `${contactName} — ${contactPhone}` : contactPhone;
-
-  await sendPushToUsers(supabase, recipientIds, {
-    title,
-    body: messagePreview.slice(0, 120),
-    url: `/dashboard/inbox/${conversationId}`,
-    conversationId,
-  });
+  await sendPushToUsers(
+    supabase,
+    recipientIds,
+    armarAvisoDeMensaje({ contactName, contactPhone, messagePreview, conversationId })
+  );
 }
