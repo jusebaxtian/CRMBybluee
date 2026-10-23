@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
+import type { createClient } from "@/lib/supabase/server";
+import { textoDeConfirmacion } from "@/lib/agenda/mensaje-cita";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEnabledModuleKeys } from "@/lib/entitlements";
 import { abrirConversacion } from "@/lib/whatsapp/conversacion";
@@ -15,7 +17,7 @@ import {
   rangosOcupados,
 } from "@/lib/integraciones/google/calendario";
 import { MODULO_GOOGLE_CALENDAR } from "@/lib/integraciones/google/contexto";
-import { bogotaAIso, sumarMinutos, textoDeFecha } from "@/lib/agenda/tiempo";
+import { bogotaAIso, sumarMinutos } from "@/lib/agenda/tiempo";
 import { normalizarCorreos } from "@/lib/agenda/correos";
 import { MENSAJE_MODO_SOPORTE, contextoDeCita } from "@/lib/agenda/contexto-de-cita";
 import { sendMessage } from "@/app/actions/whatsapp";
@@ -330,15 +332,30 @@ export async function listarEventosEntre(desdeIso: string, hastaIso: string): Pr
   });
 }
 
+type Supabase = Awaited<ReturnType<typeof createClient>>;
+
+type Preparada =
+  | { error: string; faltaPlantilla?: boolean }
+  | { modo: "texto"; para: string; conversacionId: string; texto: string }
+  | {
+      modo: "plantilla";
+      para: string;
+      conversacionId: string;
+      cuenta: { id: string; phone_number_id: string; access_token: string };
+      waId: string;
+      nombrePlantilla: string;
+      estadoPlantilla: string;
+      parametros: string[];
+      codigoMeet: string | null;
+      cuerpo: string;
+    };
+
 /**
- * Manda por WhatsApp al contacto el detalle de la cita y el link de Meet.
- * Con la ventana de 24 h abierta va como texto; cerrada, como plantilla aprobada
- * (con el boton "Ir a la reunion" cuando hay Meet).
+ * Decide COMO saldria la confirmacion de una cita (texto libre o plantilla) y arma
+ * todo lo necesario, sin enviar nada. Lo usan el envio real y la vista previa, asi
+ * lo que se ve antes de enviar es exactamente lo que va a salir.
  */
-export async function enviarEnlaceDeCita(id: string): Promise<{ success: true } | { error: string; faltaPlantilla?: boolean }> {
-  const ctx = await requireWorkspace();
-  if ("error" in ctx) return { error: ctx.error };
-  const { supabase, workspaceId } = ctx;
+async function prepararConfirmacionDeCita(supabase: Supabase, workspaceId: string, id: string): Promise<Preparada> {
   const { data: e } = await supabase
     .from("agenda_eventos")
     .select("titulo, inicio, meet_url, estado, contact_id, conversation_id, contacts(name, wa_id)")
@@ -354,6 +371,7 @@ export async function enviarEnlaceDeCita(id: string): Promise<{ success: true } 
   const titulo = e.titulo as string;
   const inicioIso = e.inicio as string;
   const meetUrl = (e.meet_url as string | null) ?? null;
+  const para = nombre ? `${nombre} (${contacto.wa_id})` : contacto.wa_id;
 
   // Con una linea elegida en Integraciones el mensaje sale SIEMPRE por ella (y se mira la
   // ventana de 24 h de esa linea); sin elegir, por la del chat de la cita.
@@ -376,14 +394,7 @@ export async function enviarEnlaceDeCita(id: string): Promise<{ success: true } 
 
   // Ventana abierta: texto libre.
   if (isWindowOpen((ultimoEntrante?.created_at as string | undefined) ?? null, Date.now())) {
-    const lineas = [
-      `${nombre ? `Hola ${nombre}, ` : "Hola, "}te confirmo nuestra cita: *${titulo}*.`,
-      `📅 ${textoDeFecha(inicioIso)} (hora de Colombia)`,
-    ];
-    if (meetUrl) lineas.push(`💻 Reunión por Meet: ${meetUrl}`);
-    const r = await sendMessage({ conversationId: conversacion.id as string, body: lineas.join("\n") });
-    if ("error" in r && r.error) return { error: r.error };
-    return { success: true as const };
+    return { modo: "texto", para, conversacionId: conversacion.id as string, texto: textoDeConfirmacion({ nombre, titulo, inicioIso, meetUrl }) };
   }
 
   // Ventana cerrada: plantilla aprobada de ESTA WABA.
@@ -409,30 +420,95 @@ export async function enviarEnlaceDeCita(id: string): Promise<{ success: true } 
       faltaPlantilla: true,
     };
   }
-  if (fila.status !== "APPROVED") {
-    return { error: `La plantilla de confirmación está en revisión de Meta (${fila.status}). Normalmente tarda unos minutos; intenta de nuevo más tarde.` };
-  }
 
   const parametros = parametrosDeCita({ contacto: nombre ?? null, empresa: (espacio?.name as string | undefined) ?? "", titulo, inicioIso });
+  return {
+    modo: "plantilla",
+    para,
+    conversacionId: conversacion.id as string,
+    cuenta,
+    waId: contacto.wa_id,
+    nombrePlantilla: fila.meta_template_name,
+    estadoPlantilla: fila.status,
+    parametros,
+    codigoMeet: codigo,
+    cuerpo: rellenarPlantilla(fila.body_text as string | null, parametros) ?? "",
+  };
+}
+
+const textoPlantillaEnRevision = (estado: string) =>
+  `La plantilla de confirmación está en revisión de Meta (${estado}). Normalmente tarda unos minutos; intenta de nuevo más tarde.`;
+
+/**
+ * Lo que se le va a mandar al cliente, para verlo ANTES de enviar: el texto, el
+ * boton de Meet si lo lleva y por que via sale (texto libre o plantilla).
+ */
+export async function vistaPreviaDeConfirmacion(
+  id: string
+): Promise<
+  | { para: string; via: "texto" | "plantilla"; texto: string; boton: string | null; aviso: string | null; puedeEnviar: boolean }
+  | { error: string; faltaPlantilla?: boolean }
+> {
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const p = await prepararConfirmacionDeCita(ctx.supabase, ctx.workspaceId, id);
+  if ("error" in p) return p;
+  if (p.modo === "texto") {
+    return { para: p.para, via: "texto", texto: p.texto, boton: null, aviso: null, puedeEnviar: true };
+  }
+  const aprobada = p.estadoPlantilla === "APPROVED";
+  return {
+    para: p.para,
+    via: "plantilla",
+    texto: p.cuerpo,
+    boton: p.codigoMeet ? "Ir a la reunión" : null,
+    aviso: aprobada
+      ? "El cliente no te ha escrito en las últimas 24 horas, así que va como plantilla aprobada por Meta."
+      : textoPlantillaEnRevision(p.estadoPlantilla),
+    puedeEnviar: aprobada,
+  };
+}
+
+/**
+ * Manda por WhatsApp al contacto el detalle de la cita y el link de Meet.
+ * Con la ventana de 24 h abierta va como texto; cerrada, como plantilla aprobada
+ * (con el boton "Ir a la reunion" cuando hay Meet).
+ */
+export async function enviarEnlaceDeCita(id: string): Promise<{ success: true } | { error: string; faltaPlantilla?: boolean }> {
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
+
+  const p = await prepararConfirmacionDeCita(supabase, workspaceId, id);
+  if ("error" in p) return p;
+
+  if (p.modo === "texto") {
+    const r = await sendMessage({ conversationId: p.conversacionId, body: p.texto });
+    if ("error" in r && r.error) return { error: r.error };
+    return { success: true as const };
+  }
+
+  if (p.estadoPlantilla !== "APPROVED") return { error: textoPlantillaEnRevision(p.estadoPlantilla) };
+
   try {
     const enviado = await sendTemplateMessage(
-      cuenta.phone_number_id,
-      cuenta.access_token,
-      contacto.wa_id,
-      fila.meta_template_name,
+      p.cuenta.phone_number_id,
+      p.cuenta.access_token,
+      p.waId,
+      p.nombrePlantilla,
       IDIOMA_CITA,
-      parametros,
+      p.parametros,
       undefined,
-      codigo ? { index: 0, value: codigo } : undefined
+      p.codigoMeet ? { index: 0, value: p.codigoMeet } : undefined
     );
     await recordOutboundMessage(supabase, {
-      conversationId: conversacion.id as string,
+      conversationId: p.conversacionId,
       messageType: "template",
-      body: rellenarPlantilla(fila.body_text as string | null, parametros),
+      body: p.cuerpo,
       waMessageId: enviado.messages[0]?.id,
       sentBySupport: true,
     });
-    revalidatePath(`/dashboard/inbox/${conversacion.id}`);
+    revalidatePath(`/dashboard/inbox/${p.conversacionId}`);
     return { success: true as const };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "No se pudo enviar la plantilla." };

@@ -10,15 +10,17 @@ import {
   crearPlantillasDeCitaDelEspacio,
   enviarEnlaceDeCita,
   ultimoCorreoDeContacto,
+  vistaPreviaDeConfirmacion,
   type EventoAgenda,
 } from "@/app/actions/agenda-eventos";
 import { buscarContactosParaRecordatorio } from "@/app/actions/recordatorios";
 import { INPUT_AGENDA } from "@/components/agenda/formulario-recordatorio";
 import { CorreosInput } from "@/components/agenda/correos-input";
-import { correoValido } from "@/lib/agenda/tiempo";
-import { isoABogotaLocal } from "@/lib/agenda/tiempo";
+import { ConfirmacionDeCita, type VistaConfirmacion } from "@/components/agenda/confirmacion-de-cita";
+import { bogotaAIso, correoValido, isoABogotaLocal, textoDeFecha } from "@/lib/agenda/tiempo";
 
 type Contacto = { id: string; nombre: string; wa_id: string };
+
 
 const DURACIONES = [
   { min: 15, texto: "15 minutos" },
@@ -75,17 +77,23 @@ export function FormularioEvento({
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [faltaPlantilla, setFaltaPlantilla] = useState(false);
+  // Despues de programar una cita nueva se ofrece mandarle la confirmacion al cliente desde aqui mismo.
+  const [creada, setCreada] = useState<{ id: string; meetUrl: string | null } | null>(null);
+  const [vista, setVista] = useState<VistaConfirmacion | null>(null);
+  const [enviadaA, setEnviadaA] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelada = existente?.estado === "cancelado";
 
+  const cerrar = creada ? onGuardado : onClose;
+
   useEffect(() => {
     function tecla(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") cerrar();
     }
     document.addEventListener("keydown", tecla);
     return () => document.removeEventListener("keydown", tecla);
-  }, [onClose]);
+  }, [cerrar]);
 
   // Desde el chat el contacto ya viene elegido: se suma el correo que se uso con el la ultima vez.
   useEffect(() => {
@@ -148,7 +156,27 @@ export function FormularioEvento({
         setError(r.error);
         return;
       }
+      // Cita nueva: en vez de cerrar, se muestra lo que se le mandaria al cliente para que lo envie con un toque.
+      const nueva = r as { id?: string; meetUrl?: string | null };
+      if (!existente && nueva.id) {
+        setCreada({ id: nueva.id, meetUrl: nueva.meetUrl ?? null });
+        vistaPreviaDeConfirmacion(nueva.id).then(setVista);
+        return;
+      }
       onGuardado();
+    });
+  }
+
+  function enviarConfirmacion() {
+    if (!creada) return;
+    setError(null);
+    setFaltaPlantilla(false);
+    startTransition(async () => {
+      const r = await enviarEnlaceDeCita(creada.id);
+      if ("error" in r) {
+        setError(r.error);
+        setFaltaPlantilla(Boolean(r.faltaPlantilla));
+      } else setEnviadaA(vista && "para" in vista ? vista.para : "el cliente");
     });
   }
 
@@ -190,6 +218,26 @@ export function FormularioEvento({
       setFaltaPlantilla(false);
       setAviso("Plantillas enviadas a Meta para revisión. Normalmente se aprueban en unos minutos; vuelve a intentar entonces.");
     });
+  }
+
+  if (creada) {
+    const inicioIso = bogotaAIso(cuando);
+    return (
+      <ConfirmacionDeCita
+        titulo={titulo}
+        fechaLegible={inicioIso ? textoDeFecha(inicioIso) : cuando}
+        meetUrl={creada.meetUrl}
+        vista={vista}
+        error={error}
+        aviso={aviso}
+        faltaPlantilla={faltaPlantilla}
+        enviadaA={enviadaA}
+        pending={pending}
+        onEnviar={enviarConfirmacion}
+        onCrearPlantillas={crearPlantillas}
+        onCerrar={cerrar}
+      />
+    );
   }
 
   return (
