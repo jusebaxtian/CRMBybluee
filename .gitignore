@@ -46,3 +46,9 @@ scratchpad/
 
 # graphify: mapa del codigo generado en local, se regenera cuando se necesite
 graphify-out/
+
+# Diseños de apoyo (imágenes y maquetas): no son código
+halloween/
+navidad/
+temporadas-disenos/
+api-seccion-disenos/
