@@ -37,6 +37,26 @@ export type DefinicionBloque = {
   salidasFijas: Salida[] | null;
 };
 
+export type TipoMedia = "image" | "video" | "audio" | "document";
+
+export const NOMBRE_MEDIA: Record<TipoMedia, string> = {
+  image: "Imagen",
+  video: "Video",
+  audio: "Audio",
+  document: "Documento",
+};
+
+/** La accion del motor de automatizaciones que manda cada tipo de archivo. */
+export const ACCION_DE_MEDIA: Record<TipoMedia, "send_image" | "send_video" | "send_audio" | "send_document"> = {
+  image: "send_image",
+  video: "send_video",
+  audio: "send_audio",
+  document: "send_document",
+};
+
+/** El audio no admite texto en WhatsApp: si hay texto, sale como un mensaje aparte. */
+export const MEDIA_SIN_PIE: TipoMedia = "audio";
+
 /** Maximo de botones por mensaje: es limite de WhatsApp, no nuestro. */
 export const MAX_BOTONES = 3;
 
@@ -53,7 +73,7 @@ export const BLOQUES: Record<TipoBloque, DefinicionBloque> = {
   mensaje: {
     tipo: "mensaje",
     nombre: "Mensaje",
-    descripcion: "Texto o archivo, sin esperar respuesta",
+    descripcion: "Texto, imagen, video, audio o documento, sin esperar respuesta",
     color: "var(--info)",
     maximo: null,
     aceptaEntrada: true,
@@ -245,6 +265,10 @@ export type DatosBloque = {
   disparadores?: Disparador[];
   /** mensaje / botones */
   texto?: string;
+  /** mensaje: archivo adjunto (imagen, video, audio o documento) ya subido */
+  mediaTipo?: TipoMedia;
+  mediaUrl?: string;
+  mediaNombre?: string;
   /** botones: los titulos que ve el cliente */
   botones?: string[];
   /** esperar */
@@ -305,7 +329,15 @@ export function resumenDe(tipo: TipoBloque, datos: DatosBloque): string {
       })
       .join(" · ");
   }
-  if (tipo === "mensaje") return datos.texto?.trim() || "Sin mensaje todavía";
+  if (tipo === "mensaje") {
+    const texto = datos.texto?.trim();
+    if (datos.mediaUrl && datos.mediaTipo) {
+      const adjunto = `📎 ${NOMBRE_MEDIA[datos.mediaTipo]}${datos.mediaNombre ? `: ${datos.mediaNombre}` : ""}`;
+      return texto ? `${adjunto}
+${texto}` : adjunto;
+    }
+    return texto || "Sin mensaje todavía";
+  }
   if (tipo === "botones") {
     const texto = datos.texto?.trim() || "Sin pregunta todavía";
     return texto;

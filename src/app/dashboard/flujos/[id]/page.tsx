@@ -43,7 +43,7 @@ export default async function FlujoPage({ params }: { params: Promise<{ id: stri
     supabase.from("tags").select("id, name").eq("workspace_id", workspaceId ?? "").order("name"),
     supabase
       .from("templates")
-      .select("id, meta_template_name, language, body_text")
+      .select("id, meta_template_name, language, body_text, header_format, header_text, header_media_url, buttons, variables_origen")
       .eq("workspace_id", workspaceId ?? "")
       .eq("status", "APPROVED")
       .eq("created_via", "crm")

@@ -93,8 +93,15 @@ export function revisarFlujo(
       }
     }
 
-    if (nodo.tipo === "mensaje" && !nodo.datos.texto?.trim()) {
-      avisos.push({ nivel: "error", nodoId: nodo.id, texto: "Un mensaje quedó vacío." });
+    if (nodo.tipo === "mensaje") {
+      const tieneArchivo = !!nodo.datos.mediaUrl && !!nodo.datos.mediaTipo;
+      if (!nodo.datos.texto?.trim() && !tieneArchivo) {
+        avisos.push({ nivel: "error", nodoId: nodo.id, texto: "Un mensaje quedó vacío." });
+      }
+      // Hay archivo a medias: el tipo sin la direccion, o al reves, no se puede enviar.
+      if (!!nodo.datos.mediaUrl !== !!nodo.datos.mediaTipo) {
+        avisos.push({ nivel: "error", nodoId: nodo.id, texto: "El archivo adjunto del mensaje quedó incompleto: súbelo de nuevo." });
+      }
     }
 
     if (nodo.tipo === "botones") {

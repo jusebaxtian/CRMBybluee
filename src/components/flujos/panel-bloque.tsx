@@ -1,6 +1,8 @@
 "use client";
 
 import { Trash2, X } from "lucide-react";
+import { AdjuntoDelBloque } from "@/components/flujos/adjunto-del-bloque";
+import { VistaPreviaPlantilla, type PlantillaParaVista } from "@/components/templates/vista-previa-plantilla";
 import {
   BLOQUES,
   DISPARADORES,
@@ -19,7 +21,7 @@ import {
  */
 export type Catalogos = {
   etiquetas: { id: string; name: string }[];
-  plantillas: { id: string; meta_template_name: string; language: string }[];
+  plantillas: (PlantillaParaVista & { language: string })[];
   agentes: { id: string; name: string | null; email: string }[];
   respuestasRapidas: { id: string; name: string }[];
   automatizaciones: { id: string; name: string }[];
@@ -154,7 +156,7 @@ export function PanelBloque({
       {(tipo === "mensaje" || tipo === "botones") && (
         <div>
           <label className="mb-1 block text-xs font-medium text-muted">
-            {tipo === "botones" ? "Pregunta" : "Mensaje"}
+            {tipo === "botones" ? "Pregunta" : datos.mediaUrl ? "Texto que acompaña al archivo (opcional)" : "Mensaje"}
           </label>
           <textarea
             rows={5}
@@ -165,6 +167,8 @@ export function PanelBloque({
           />
         </div>
       )}
+
+      {tipo === "mensaje" && <AdjuntoDelBloque datos={datos} onCambiar={onCambiar} />}
 
       {tipo === "botones" && (
         <div>
@@ -279,6 +283,7 @@ export function PanelBloque({
               </option>
             ))}
           </select>
+          <VistaPreviaPlantilla className="mt-2" plantilla={catalogos.plantillas.find((x) => x.id === datos.plantillaId)} />
           <p className="mt-2 text-[11px] leading-relaxed text-muted">
             Es lo único que WhatsApp entrega pasadas 24 horas desde el último mensaje del contacto. Úsalo
             después de una espera larga.

@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { resumeAutomationRun, isContactExcludedFromFollowups } from "@/lib/automations/engine";
+import { resumeAutomationRun, isContactExcludedFromFollowups, ejecutarRespuestaRapida } from "@/lib/automations/engine";
 
 // Picks up automation actions that were deferred with a delay and are now
 // due, and resumes them from where they left off. Runs in-process (see
@@ -62,5 +62,42 @@ export async function processDueAutomationRuns() {
       run.contact_id,
       run.next_position
     );
+  }
+}
+
+/**
+ * Retoma las respuestas rapidas cuyo siguiente mensaje ya cumplio su espera.
+ * Se reclama cada fila (borrado verificado) antes de enviar, igual que las
+ * automatizaciones, para que dos procesos no manden el mensaje dos veces.
+ */
+export async function processDueQuickReplyRuns() {
+  const supabase = createAdminClient();
+
+  const { data: vencidas } = await supabase
+    .from("respuesta_rapida_pendientes")
+    .select("id, workspace_id, quick_reply_id, contact_id, next_position")
+    .lte("run_at", new Date().toISOString())
+    .order("run_at")
+    .limit(50);
+
+  for (const run of vencidas ?? []) {
+    const { data: reclamada, error } = await supabase
+      .from("respuesta_rapida_pendientes")
+      .delete()
+      .eq("id", run.id)
+      .select("id")
+      .maybeSingle();
+    if (error || !reclamada) continue;
+
+    try {
+      await ejecutarRespuestaRapida(
+        supabase,
+        { id: run.quick_reply_id, workspace_id: run.workspace_id },
+        run.contact_id,
+        { desde: run.next_position }
+      );
+    } catch (err) {
+      console.error(`respuesta rápida pendiente ${run.id} falló:`, err);
+    }
   }
 }

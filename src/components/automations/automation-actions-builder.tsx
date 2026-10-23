@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { VistaPreviaPlantilla, type PlantillaParaVista } from "@/components/templates/vista-previa-plantilla";
 import { Trash2, Plus, Info, ChevronUp, ChevronDown, Clock, X, FileText } from "lucide-react";
 import { validateMediaSize, type MediaKind } from "@/lib/whatsapp/media-limits";
 
@@ -46,13 +47,14 @@ function uploadWithProgress(
 }
 
 type Tag = { id: string; name: string };
-type Template = { id: string; meta_template_name: string; language: string; status: string };
+type Template = PlantillaParaVista & { status: string; language: string };
 type Agent = { id: string; name: string | null; email: string };
 type QuickReply = { id: string; name: string };
 
 type ActionType =
   | "send_message"
   | "add_tag"
+  | "remove_tag"
   | "send_image"
   | "send_video"
   | "send_audio"
@@ -405,7 +407,7 @@ export function AutomationActionsBuilder({
   const serialized = actions.map((a) => ({
     action_type: a.action_type,
     message_body: captionableTypes.has(a.action_type) ? a.message_body || undefined : undefined,
-    tag_id: a.action_type === "add_tag" ? a.tag_id : undefined,
+    tag_id: a.action_type === "add_tag" || a.action_type === "remove_tag" ? a.tag_id : undefined,
     media_url: mediaLabel[a.action_type] ? a.media_url : undefined,
     media_filename: a.action_type === "send_document" ? a.media_filename : undefined,
     template_id: a.action_type === "send_template" ? a.template_id : undefined,
@@ -464,6 +466,7 @@ export function AutomationActionsBuilder({
                 <option value="send_quick_reply">Enviar respuesta rápida</option>
               )}
               <option value="add_tag">Agregar etiqueta</option>
+              <option value="remove_tag">Quitar etiqueta</option>
               {allowWaitForReply && (
                 <option value="wait_for_reply">Esperar respuesta del cliente</option>
               )}
@@ -530,7 +533,7 @@ export function AutomationActionsBuilder({
             </div>
           )}
 
-          {action.action_type === "add_tag" && (
+          {(action.action_type === "add_tag" || action.action_type === "remove_tag") && (
             <select
               value={action.tag_id}
               onChange={(e) => updateAction(index, { tag_id: e.target.value })}
@@ -734,6 +737,7 @@ export function AutomationActionsBuilder({
                   </option>
                 ))}
               </select>
+              <VistaPreviaPlantilla plantilla={approvedTemplates.find((t) => t.id === action.template_id)} />
               <p className="flex items-start gap-1.5 text-[11px] text-muted">
                 <Info size={13} className="mt-0.5 shrink-0" />
                 Usa plantillas para reabrir la conversación con un contacto aunque ya hayan

@@ -3,13 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { executeAction, type AutomationAction } from "@/lib/automations/engine";
+import { ejecutarRespuestaRapida } from "@/lib/automations/engine";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
 
 type ActionInput = {
   action_type:
     | "send_message"
     | "add_tag"
+    | "remove_tag"
     | "send_image"
     | "send_video"
     | "send_audio"
@@ -34,7 +35,7 @@ function actionRow(a: ActionInput, quickReplyId: string, index: number) {
     position: index,
     action_type: a.action_type,
     message_body: captionableTypes.has(a.action_type) ? a.message_body || null : null,
-    tag_id: a.action_type === "add_tag" ? a.tag_id : null,
+    tag_id: a.action_type === "add_tag" || a.action_type === "remove_tag" ? a.tag_id : null,
     media_url: mediaTypes.has(a.action_type) ? a.media_url : null,
     media_filename: a.action_type === "send_document" ? a.media_filename : null,
     template_id: a.action_type === "send_template" ? a.template_id : null,
@@ -144,9 +145,9 @@ export async function deleteQuickReply(quickReplyId: string) {
   return { success: true as const };
 }
 
-// Triggered by a single click from the chat — runs every action in order,
-// immediately, no delays or run-log (unlike keyword/tag automations, this
-// is a synchronous action the agent is actively watching).
+// Triggered by a single click from the chat. Cada mensaje respeta su espera
+// ("Esperar N segundos/minutos"): lo que no toca todavia queda programado y lo
+// envia el trabajo de fondo a su hora.
 export async function sendQuickReply(quickReplyId: string, contactId: string) {
   const supabase = await createClient();
 
@@ -157,28 +158,9 @@ export async function sendQuickReply(quickReplyId: string, contactId: string) {
     .single();
   if (!quickReply) return { error: "Respuesta rápida no encontrada." };
 
-  const { data: actionsRaw } = await supabase
-    .from("quick_reply_actions")
-    .select(
-      "position, action_type, message_body, tag_id, media_url, media_filename, template_id, buttons, templates(meta_template_name, language, body_text, header_format, header_media_url, variable_count, variables_origen, buttons)"
-    )
-    .eq("quick_reply_id", quickReplyId)
-    .order("position");
-
-  const actions: AutomationAction[] = (actionsRaw ?? []).map((a) => ({
-    ...a,
-    quick_reply_id: null,
-    delay_seconds: 0,
-    target_agent_id: null,
-    agent_distribution: null,
-    templates: a.templates as unknown as AutomationAction["templates"],
-  }));
-
   try {
-    for (const action of actions) {
-      await executeAction(supabase, quickReply, contactId, action);
-    }
-    return { success: true as const };
+    const { programada } = await ejecutarRespuestaRapida(supabase, quickReply, contactId);
+    return { success: true as const, programada };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "No se pudo enviar." };
   }

@@ -7,11 +7,9 @@ import { buildSystemPrompt, interpretAiReply, customerRequestedHuman } from "@/l
 import { mediaKindFromMime, validateMediaFile } from "@/lib/whatsapp/media-limits";
 import { toPublicUrl } from "@/lib/supabase/config";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
+import { MODELO_POR_DEFECTO, errorDeFormatoDeLlave, errorDeLlaveHeredada, mensajeDeErrorDeProveedor } from "@/lib/ai/llave";
 
-const defaultModel: Record<"openai" | "anthropic", string> = {
-  openai: "gpt-4o-mini",
-  anthropic: "claude-sonnet-5",
-};
+const defaultModel = MODELO_POR_DEFECTO;
 
 export async function saveAiAgent(_prevState: unknown, formData: FormData) {
   const provider = String(formData.get("provider") ?? "") as "openai" | "anthropic";
@@ -78,8 +76,17 @@ export async function saveAiAgent(_prevState: unknown, formData: FormData) {
     );
     const cualquiera = propio ?? (agentesDelEspacio ?? []).find((a) => a.provider === provider) ?? (agentesDelEspacio ?? [])[0];
     if (!cualquiera) return { error: "Pega tu API key." };
+    // Cambiar de proveedor sin pegar llave reutilizaba la del otro proveedor, y el
+    // nuevo la rechazaba ("invalid x-api-key"). Se dice claro en vez de probarla.
+    const heredada = errorDeLlaveHeredada(cualquiera.provider as "openai" | "anthropic", provider);
+    if (heredada) return { error: heredada };
     apiKey = cualquiera.api_key;
     keyChanged = cualquiera.provider !== provider;
+  }
+
+  if (submittedApiKey) {
+    const formato = errorDeFormatoDeLlave(provider, submittedApiKey);
+    if (formato) return { error: formato };
   }
 
   if (keyChanged) {
@@ -91,7 +98,7 @@ export async function saveAiAgent(_prevState: unknown, formData: FormData) {
       ]);
     } catch (err) {
       return {
-        error: `No se pudo validar la API key: ${err instanceof Error ? err.message : "error desconocido"}`,
+        error: `No se pudo validar la API key: ${mensajeDeErrorDeProveedor(provider, err, model)}`,
       };
     }
   }

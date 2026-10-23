@@ -90,6 +90,15 @@ async function getOrCreateConversation(
   return conversacion?.id ?? null;
 }
 
+/**
+ * Solo un uuid puede quedar en `messages.via_automation_id`. Los Flujos ejecutan
+ * acciones con un id de mentira ("flujo"): en la columna uuid ese texto hace
+ * fallar el insert, y el mensaje salia a WhatsApp pero no quedaba en el chat.
+ */
+export function idParaElChat(id: string): string | null {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ? id : null;
+}
+
 export async function executeAction(
   supabase: SupabaseClient,
   automation: Automation,
@@ -104,32 +113,7 @@ export async function executeAction(
   if (depth > 3) return;
 
   if (action.action_type === "send_quick_reply" && action.quick_reply_id) {
-    const { data: qrActions } = await supabase
-      .from("quick_reply_actions")
-      .select(
-        "position, action_type, message_body, tag_id, media_url, media_filename, template_id, delay_seconds, buttons, templates(meta_template_name, language, body_text, header_format, header_media_url, variable_count, variables_origen, buttons)"
-      )
-      .eq("quick_reply_id", action.quick_reply_id)
-      .order("position");
-
-    for (const qrAction of qrActions ?? []) {
-      await executeAction(
-        supabase,
-        automation,
-        contactId,
-        {
-          ...qrAction,
-          quick_reply_id: null,
-          // La espera que configuro el usuario para ESTE mensaje. Antes iba
-          // fija en 0 y los mensajes salian todos en el mismo segundo.
-          delay_seconds: qrAction.delay_seconds ?? 0,
-          target_agent_id: null,
-          agent_distribution: null,
-          templates: qrAction.templates as unknown as AutomationAction["templates"],
-        },
-        depth + 1
-      );
-    }
+    await ejecutarRespuestaRapida(supabase, { id: action.quick_reply_id, workspace_id: automation.workspace_id }, contactId, { depth });
     return;
   }
 
@@ -144,6 +128,19 @@ export async function executeAction(
       .upsert({ contact_id: contactId, tag_id: action.tag_id });
     if (error) throw new Error(`No se pudo aplicar la etiqueta: ${error.message}`);
     await maybeTrackPurchaseFromTag(supabase, automation.workspace_id, contactId, action.tag_id);
+    return;
+  }
+
+  // Quitar la etiqueta. Antes el motor no conocia este tipo: lo dejaba pasar sin
+  // hacer nada, y el bloque "Quitar etiqueta" de los flujos nunca quitaba ninguna.
+  // Si el contacto no la tenia, borrar no cambia nada (no es un error).
+  if (action.action_type === "remove_tag" && action.tag_id) {
+    const { error } = await supabase
+      .from("contact_tags")
+      .delete()
+      .eq("contact_id", contactId)
+      .eq("tag_id", action.tag_id);
+    if (error) throw new Error(`No se pudo quitar la etiqueta: ${error.message}`);
     return;
   }
 
@@ -231,7 +228,7 @@ export async function executeAction(
         body,
         buttons: urlButton ? [urlButton] : quickReplyButtons && quickReplyButtons.length > 0 ? quickReplyButtons : null,
         waMessageId: result.messages[0]?.id,
-        viaAutomationId: automation.id,
+        viaAutomationId: idParaElChat(automation.id),
       });
     }
   }
@@ -279,7 +276,7 @@ export async function executeAction(
         body: mediaType === "document" ? nombreDeDocumento(action.media_filename, action.media_url) ?? null : action.message_body,
         mediaUrl: action.media_url,
         waMessageId: result.messages[0]?.id,
-        viaAutomationId: automation.id,
+        viaAutomationId: idParaElChat(automation.id),
       });
     }
   }
@@ -318,11 +315,88 @@ export async function executeAction(
         body: action.templates.body_text || `[Plantilla: ${action.templates.meta_template_name}]`,
         mediaUrl: headerMedia?.link ?? null,
         waMessageId: result.messages[0]?.id,
-        viaAutomationId: automation.id,
+        viaAutomationId: idParaElChat(automation.id),
       });
     }
   }
 
+}
+
+/**
+ * Que de una respuesta rapida sale ahora y que queda para despues.
+ *
+ * La espera de cada mensaje es "esperar N segundos ANTES de enviarlo" (asi lo
+ * dice el formulario). Al encontrar un mensaje con espera se corta: ese y los
+ * que le siguen quedan para cuando se cumpla. Al retomar (`desde`), el mensaje
+ * por el que se retoma sale de inmediato porque su espera ya paso.
+ */
+export function planificarRespuestaRapida<T extends { position: number; delay_seconds: number }>(
+  acciones: T[],
+  desde?: number
+): { ahora: T[]; despues: { position: number; esperaSegundos: number } | null } {
+  let inicio = 0;
+  const ahora: T[] = [];
+  if (desde !== undefined) {
+    inicio = acciones.findIndex((a) => a.position === desde);
+    if (inicio === -1) return { ahora, despues: null };
+    ahora.push(acciones[inicio]);
+    inicio += 1;
+  }
+  for (let i = inicio; i < acciones.length; i++) {
+    const a = acciones[i];
+    if (a.delay_seconds > 0) return { ahora, despues: { position: a.position, esperaSegundos: a.delay_seconds } };
+    ahora.push(a);
+  }
+  return { ahora, despues: null };
+}
+
+/**
+ * Envia una respuesta rapida respetando la espera de cada mensaje. Lo que no
+ * toca todavia se guarda en respuesta_rapida_pendientes y lo retoma el trabajo
+ * de fondo (processDueQuickReplyRuns). Lo usan el clic desde el chat, las
+ * automatizaciones y los seguimientos.
+ */
+export async function ejecutarRespuestaRapida(
+  supabase: SupabaseClient,
+  quickReply: { id: string; workspace_id: string },
+  contactId: string,
+  opciones: { desde?: number; depth?: number } = {}
+): Promise<{ programada: boolean }> {
+  const { data } = await supabase
+    .from("quick_reply_actions")
+    .select(
+      "position, action_type, message_body, tag_id, media_url, media_filename, template_id, delay_seconds, buttons, templates(meta_template_name, language, body_text, header_format, header_media_url, variable_count, variables_origen, buttons)"
+    )
+    .eq("quick_reply_id", quickReply.id)
+    .order("position");
+
+  const acciones: AutomationAction[] = (data ?? []).map((a) => ({
+    ...a,
+    quick_reply_id: null,
+    delay_seconds: a.delay_seconds ?? 0,
+    target_agent_id: null,
+    agent_distribution: null,
+    templates: a.templates as unknown as AutomationAction["templates"],
+  }));
+
+  const { ahora, despues } = planificarRespuestaRapida(acciones, opciones.desde);
+
+  for (const accion of ahora) {
+    await executeAction(supabase, quickReply, contactId, accion, (opciones.depth ?? 0) + 1);
+  }
+
+  if (despues) {
+    const { error } = await supabase.from("respuesta_rapida_pendientes").insert({
+      workspace_id: quickReply.workspace_id,
+      quick_reply_id: quickReply.id,
+      contact_id: contactId,
+      next_position: despues.position,
+      run_at: new Date(Date.now() + despues.esperaSegundos * 1000).toISOString(),
+    });
+    if (error) throw new Error(`No se pudo programar el resto de la respuesta rápida: ${error.message}`);
+  }
+
+  return { programada: despues !== null };
 }
 
 async function fetchActions(

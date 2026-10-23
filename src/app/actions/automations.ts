@@ -12,6 +12,7 @@ type ActionInput = {
   action_type:
     | "send_message"
     | "add_tag"
+    | "remove_tag"
     | "send_image"
     | "send_video"
     | "send_audio"
@@ -43,7 +44,7 @@ function actionRow(a: ActionInput, automationId: string, index: number) {
     position: index,
     action_type: a.action_type,
     message_body: captionableTypes.has(a.action_type) ? a.message_body || null : null,
-    tag_id: a.action_type === "add_tag" ? a.tag_id : null,
+    tag_id: a.action_type === "add_tag" || a.action_type === "remove_tag" ? a.tag_id : null,
     media_url: mediaTypes.has(a.action_type) ? a.media_url : null,
     media_filename: a.action_type === "send_document" ? a.media_filename : null,
     template_id: a.action_type === "send_template" ? a.template_id : null,

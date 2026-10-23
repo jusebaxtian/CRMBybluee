@@ -241,3 +241,11 @@ describe("contacto bloqueado", () => {
     ).resolves.toBe(true);
   });
 });
+
+describe("idParaElChat", () => {
+  it("deja pasar un uuid y descarta el id de mentira de los Flujos", async () => {
+    const { idParaElChat } = await import("@/lib/automations/engine");
+    expect(idParaElChat("0b6c9d2e-1a3f-4c5d-8e7f-9a0b1c2d3e4f")).toBe("0b6c9d2e-1a3f-4c5d-8e7f-9a0b1c2d3e4f");
+    expect(idParaElChat("flujo")).toBeNull();
+  });
+});

@@ -17,7 +17,7 @@ export default async function NewAutomationPage() {
 
   const { data: templates } = await supabase
     .from("templates")
-    .select("id, meta_template_name, language, status, waba_id, body_text")
+    .select("id, meta_template_name, language, status, waba_id, body_text, header_format, header_text, header_media_url, buttons, variables_origen")
     .eq("workspace_id", workspaceId ?? "")
     .eq("created_via", "crm")
     .neq("status", "DELETED")

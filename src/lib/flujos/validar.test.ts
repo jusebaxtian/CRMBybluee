@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { revisarFlujo, type ConexionParaValidar, type NodoParaValidar } from "@/lib/flujos/validar";
-import { salidasDe } from "@/lib/flujos/bloques";
+import { resumenDe, salidasDe } from "@/lib/flujos/bloques";
 
 /** Inicio sin disparador: sirve para probar justamente ese aviso. */
 const inicio: NodoParaValidar = { id: "i", tipo: "inicio", datos: {} };
@@ -211,5 +211,31 @@ describe("disparador por botón", () => {
     ];
     const avisos = revisarFlujo(nodos, [{ origen_id: "i", destino_id: "f", salida: "sig" }]);
     expect(avisos.some((a) => a.nivel === "error" && a.texto.includes("sin el texto del botón"))).toBe(true);
+  });
+});
+
+describe("mensaje con archivo adjunto", () => {
+  const conexiones: ConexionParaValidar[] = [{ origen_id: "i", destino_id: "m", salida: "sig" }];
+  const errores = (datos: NodoParaValidar["datos"]) =>
+    revisarFlujo([inicioListo, { id: "m", tipo: "mensaje", datos }], conexiones).filter((a) => a.nivel === "error");
+
+  it("un archivo solo, sin texto, es un mensaje válido", () => {
+    expect(errores({ mediaTipo: "image", mediaUrl: "https://x/a.png", mediaNombre: "a.png" })).toHaveLength(0);
+  });
+
+  it("sin texto ni archivo sigue siendo un mensaje vacío", () => {
+    expect(errores({})).toHaveLength(1);
+    expect(errores({})[0].texto).toMatch(/vacío/);
+  });
+
+  it("un archivo a medias (tipo sin dirección, o al revés) es un error", () => {
+    expect(errores({ texto: "hola", mediaTipo: "image" }).some((a) => /incompleto/.test(a.texto))).toBe(true);
+    expect(errores({ texto: "hola", mediaUrl: "https://x/a.png" }).some((a) => /incompleto/.test(a.texto))).toBe(true);
+  });
+
+  it("el resumen del bloque muestra el archivo y el texto", () => {
+    expect(resumenDe("mensaje", { mediaTipo: "video", mediaUrl: "u", mediaNombre: "demo.mp4", texto: "Mira" })).toBe("📎 Video: demo.mp4\nMira");
+    expect(resumenDe("mensaje", { mediaTipo: "audio", mediaUrl: "u" })).toBe("📎 Audio");
+    expect(resumenDe("mensaje", { texto: "Hola" })).toBe("Hola");
   });
 });

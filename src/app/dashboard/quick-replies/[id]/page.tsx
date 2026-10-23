@@ -38,7 +38,7 @@ export default async function EditQuickReplyPage({
 
   const { data: templates } = await supabase
     .from("templates")
-    .select("id, meta_template_name, language, status, body_text")
+    .select("id, meta_template_name, language, status, body_text, header_format, header_text, header_media_url, buttons, variables_origen")
     .eq("workspace_id", workspaceId ?? "")
     .eq("created_via", "crm")
     .neq("status", "DELETED")

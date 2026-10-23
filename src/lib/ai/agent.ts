@@ -1,3 +1,4 @@
+import { tiempoLegible } from "@/lib/ai/seguimientos";
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { callAiProvider, type ChatTurn } from "@/lib/ai/providers";
 import { sendTextMessage, sendMediaMessage } from "@/lib/whatsapp/graph";
@@ -73,20 +74,84 @@ REGLA OBLIGATORIA, por encima de cualquier instrucción de venta anterior: si el
 // instruccion (ver followups.ts): con una "Informacion del negocio" de
 // decenas de miles de caracteres, puesto al principio el modelo lo diluia y
 // escribia seguimientos genericos aunque el cliente los hubiera cambiado.
-export function buildFollowupSystemPrompt(agentName: string, persona: string, focus: string): string {
-  return `Eres ${agentName}, un vendedor de WhatsApp para este negocio. El cliente dejó de responder hace un tiempo: el último mensaje de la conversación lo enviaste tú y no hubo respuesta. Tu tarea ahora es escribir UN solo mensaje corto de seguimiento — natural, cercano, en español, sin sonar robótico ni insistente — para intentar que el cliente responda. No es una respuesta a una pregunta ni una corrección: no pidas disculpas ni digas "disculpa la confusión". No repitas lo que ya dijiste, no seas insistente ni uses frases de venta agresivas. No incluyas marcadores ni etiquetas especiales, solo el texto del mensaje.
+/**
+ * Lo que el modelo necesita saber de ESTA conversacion para que el seguimiento
+ * no suene a plantilla. Sin esto solo veia el enfoque del paso y lo repetia
+ * tal cual en todas las conversaciones, cuando el cliente tenia poco historial.
+ */
+export type ContextoDeSeguimiento = {
+  /** Numero de este seguimiento (1, 2, 3...). */
+  numero: number;
+  minutosSinResponder: number;
+  /** Cuantos mensajes ha escrito el cliente en toda la conversacion. */
+  mensajesDelCliente: number;
+  ultimoDelCliente: string | null;
+  /** Lo ultimo que dijo el agente o el equipo ANTES de los seguimientos: lo que quedo sin respuesta. */
+  ultimoNuestro: string | null;
+  /** Seguimientos que ya se le enviaron, del mas viejo al mas nuevo. */
+  seguimientosPrevios: string[];
+  /** Un borrador anterior salio casi igual a este mensaje: hay que decirlo distinto. */
+  repiteA?: string | null;
+};
+
+const recortar = (texto: string, largo: number) => (texto.length > largo ? `${texto.slice(0, largo)}…` : texto);
+
+function situacionDelSeguimiento(c: ContextoDeSeguimiento): string {
+  const lineas: string[] = [];
+  lineas.push(
+    c.mensajesDelCliente === 0
+      ? "- El cliente todavia no ha escrito nada: el contacto lo abriste tú."
+      : c.mensajesDelCliente === 1
+        ? "- El cliente solo ha escrito UN mensaje en toda la conversacion (no sabes nada mas de el: no supongas datos suyos)."
+        : `- El cliente ha escrito ${c.mensajesDelCliente} mensajes en la conversacion.`
+  );
+  if (c.ultimoDelCliente) lineas.push(`- Lo ultimo que escribio el cliente: "${recortar(c.ultimoDelCliente, 300)}"`);
+  if (c.ultimoNuestro) lineas.push(`- Tu ultimo mensaje, el que quedo SIN respuesta: "${recortar(c.ultimoNuestro, 600)}"`);
+  lineas.push(`- Hace ${tiempoLegible(c.minutosSinResponder)} que el cliente no responde.`);
+  if (c.seguimientosPrevios.length > 0) {
+    lineas.push(
+      `- Ya le enviaste ${c.seguimientosPrevios.length} seguimiento(s) antes de este:\n${c.seguimientosPrevios
+        .map((s, i) => `  ${i + 1}) "${recortar(s, 350)}"`)
+        .join("\n")}`
+    );
+  }
+  return lineas.join("\n");
+}
+
+export function buildFollowupSystemPrompt(
+  agentName: string,
+  persona: string,
+  focus: string,
+  contexto?: ContextoDeSeguimiento
+): string {
+  const situacion = contexto
+    ? `
+
+SITUACION DE ESTA CONVERSACION (úsala: el seguimiento tiene que encajar con lo que de verdad pasó):
+${situacionDelSeguimiento(contexto)}
+
+REGLAS DEL SEGUIMIENTO:
+1. Continúa DESDE donde quedó la conversación. Si tu último mensaje le hizo una pregunta o le pidió algo (por ejemplo, que respondiera unas preguntas), retómalo y vuelve a pedírselo con otras palabras. No abras un tema nuevo como si no hubiera pasado nada.
+2. No repitas NINGUNA idea, dato ni frase de tus mensajes anteriores ni de los seguimientos previos. Si el enfoque toca algo que ya dijiste, cumple el mismo objetivo desde otro ángulo o con una pregunta distinta; nunca copies frases.
+3. Un solo mensaje, de 1 a 3 frases, que suene a una persona y no a un anuncio.${contexto.repiteA ? `\n4. IMPORTANTE: tu borrador anterior salió casi igual a este mensaje que ya enviaste: "${recortar(contexto.repiteA, 300)}". Escríbelo claramente distinto, con otras palabras y otra idea.` : ""}`
+    : "";
+
+  return `Eres ${agentName}, un vendedor de WhatsApp para este negocio. El cliente dejó de responder hace un tiempo: el último mensaje de la conversación lo enviaste tú y no hubo respuesta. Tu tarea ahora es escribir UN solo mensaje corto de seguimiento — natural, cercano, en español, sin sonar robótico ni insistente — para intentar que el cliente responda. No es una respuesta a una pregunta ni una corrección: no pidas disculpas ni digas "disculpa la confusión". No incluyas marcadores ni etiquetas especiales, solo el texto del mensaje.
 
 Formato WhatsApp: negrita con UN solo asterisco (*así*), nunca con dos (**así**); sin títulos ni viñetas de Markdown.
 
 Información del negocio:
-${persona || "(el dueño del negocio todavía no configuró esta información)"}
+${persona || "(el dueño del negocio todavía no configuró esta información)"}${situacion}
 
-ENFOQUE OBLIGATORIO DE ESTE SEGUIMIENTO (es la estrategia para este intento y manda sobre cualquier ejemplo de arriba): ${focus || "retomar el contacto de forma natural"}`;
+ENFOQUE DE ESTE SEGUIMIENTO (es la estrategia que el dueño del negocio definió para este intento; cúmplela, pero adáptala a la situación real de arriba y sin repetir lo ya dicho): ${focus || "retomar el contacto de forma natural"}`;
 }
 
 /** Instruccion final que se agrega como ultimo turno para que el enfoque no se pierda. */
-export function followupFinalInstruction(numero: number, focus: string): string {
-  return `[Instrucción para este mensaje] El cliente no ha respondido. Escribe ahora el seguimiento #${numero}, corto, siguiendo exactamente este enfoque: ${focus || "retomar el contacto de forma natural"}. Negrita solo con un asterisco (*texto*). Responde únicamente con el mensaje para el cliente.`;
+export function followupFinalInstruction(numero: number, focus: string, contexto?: ContextoDeSeguimiento): string {
+  const continuidad = contexto
+    ? " Continúa desde tu último mensaje sin respuesta y no repitas nada de lo que ya dijiste en la conversación ni en los seguimientos anteriores."
+    : "";
+  return `[Instrucción para este mensaje] El cliente no ha respondido. Escribe ahora el seguimiento #${numero}, corto, con este enfoque: ${focus || "retomar el contacto de forma natural"}.${continuidad} Negrita solo con un asterisco (*texto*). Responde únicamente con el mensaje para el cliente.`;
 }
 
 /** WhatsApp no entiende Markdown: **negrita** se ve con asteriscos literales. */

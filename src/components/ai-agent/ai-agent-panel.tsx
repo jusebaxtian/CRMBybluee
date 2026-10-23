@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { VistaPreviaPlantilla, type PlantillaParaVista } from "@/components/templates/vista-previa-plantilla";
 import { Bot, Sparkles } from "lucide-react";
 import { saveAiAgent, toggleAiAgentActive } from "@/app/actions/ai-agent";
 import { AiAgentMediaLibrary } from "@/components/ai-agent/ai-agent-media-library";
@@ -29,9 +30,7 @@ type MediaItem = {
   media_url: string;
 };
 
-type TemplateOption = {
-  id: string;
-  meta_template_name: string;
+type TemplateOption = PlantillaParaVista & {
   language: string;
 };
 
@@ -82,6 +81,7 @@ export function AiAgentPanel({
   const [state, action, pending] = useActionState(saveAiAgent, undefined);
   const [provider, setProvider] = useState<"openai" | "anthropic">(agent?.provider ?? "openai");
   const [active, setActive] = useState(agent?.is_active ?? false);
+  const [plantillaDeSeguimiento, setPlantillaDeSeguimiento] = useState(agent?.followup_template_id ?? "");
   const [togglePending, setTogglePending] = useState(false);
   const [followupEnabled, setFollowupEnabled] = useState(agent?.followup_enabled ?? false);
   const [steps, setSteps] = useState<StepDraft[]>(() => {
@@ -184,9 +184,13 @@ export function AiAgentPanel({
           <input
             name="apiKey"
             type="password"
-            required={!agent && !hayLlaveEnElEspacio}
+            required={(!agent && !hayLlaveEnElEspacio) || (!!agent && provider !== agent.provider)}
             placeholder={
-              agent || hayLlaveEnElEspacio
+              agent && provider !== agent.provider
+                ? provider === "openai"
+                  ? "Pega la API key de OpenAI (sk-...)"
+                  : "Pega la API key de Claude (sk-ant-...)"
+                : agent || hayLlaveEnElEspacio
                 ? "Déjalo vacío para usar la llave que ya guardaste"
                 : provider === "openai"
                   ? "sk-..."
@@ -209,7 +213,7 @@ export function AiAgentPanel({
             name="model"
             type="text"
             defaultValue={agent?.model ?? ""}
-            placeholder={provider === "openai" ? "gpt-4o-mini" : "claude-sonnet-5"}
+            placeholder={provider === "openai" ? "gpt-4o-mini" : "claude-sonnet-5-5"}
             className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
           />
         </div>
@@ -334,7 +338,8 @@ export function AiAgentPanel({
                 </label>
                 <select
                   name="followupTemplateId"
-                  defaultValue={agent?.followup_template_id ?? ""}
+                  value={plantillaDeSeguimiento}
+                  onChange={(e) => setPlantillaDeSeguimiento(e.target.value)}
                   className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
                 >
                   <option value="">Selecciona una plantilla aprobada</option>
@@ -349,6 +354,7 @@ export function AiAgentPanel({
                   sin respuesta del cliente — este es el mensaje que se usa en ese caso, sin importar
                   cuál paso corresponda.
                 </p>
+                <VistaPreviaPlantilla className="mt-2" plantilla={templates.find((t) => t.id === plantillaDeSeguimiento)} />
                 {templates.length === 0 && (
                   <p className="mt-1 text-[11px] text-red-400">
                     No tienes plantillas aprobadas todavía — crea una en Plantillas.

@@ -2,7 +2,7 @@ import type { createAdminClient } from "@/lib/supabase/admin";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { sendInteractiveButtonsMessage, sendTextMessage } from "@/lib/whatsapp/graph";
 import { recordOutboundMessage } from "@/lib/messaging/record";
-import { salidasDe, type DatosBloque, type TipoBloque } from "@/lib/flujos/bloques";
+import { ACCION_DE_MEDIA, MEDIA_SIN_PIE, salidasDe, type DatosBloque, type TipoBloque } from "@/lib/flujos/bloques";
 import { executeAction, type AutomationAction } from "@/lib/automations/engine";
 
 type Supabase = ReturnType<typeof createAdminClient>;
@@ -204,7 +204,21 @@ export async function avanzar(supabase: Supabase, ejecucionId: string): Promise<
     }
 
     if (tipo === "mensaje" || tipo === "inicio") {
-      if (tipo === "mensaje" && datos.texto?.trim()) {
+      // Archivo adjunto: lo manda el motor de automatizaciones (que ya sabe
+      // subirlo, validarlo y guardarlo en el chat). El texto va de pie del
+      // archivo, salvo en el audio, que no admite pie: ahi sale aparte.
+      const conArchivo = tipo === "mensaje" && !!datos.mediaUrl && !!datos.mediaTipo;
+      if (conArchivo && datos.mediaTipo) {
+        const pie = datos.mediaTipo === MEDIA_SIN_PIE ? undefined : datos.texto?.trim() || undefined;
+        await ejecutarComoAccion(supabase, ejecucion.workspace_id as string, ejecucion.contact_id as string, {
+          action_type: ACCION_DE_MEDIA[datos.mediaTipo],
+          media_url: datos.mediaUrl,
+          media_filename: datos.mediaNombre ?? null,
+          message_body: pie ?? null,
+        });
+      }
+      const textoAparte = conArchivo ? datos.mediaTipo === MEDIA_SIN_PIE && !!datos.texto?.trim() : !!datos.texto?.trim();
+      if (tipo === "mensaje" && textoAparte && datos.texto) {
         const enviado = await sendTextMessage(
           cuenta.phone_number_id,
           cuenta.access_token,
