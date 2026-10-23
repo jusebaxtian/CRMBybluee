@@ -1,7 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { AlarmClock, Check, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { AlarmClock, CalendarDays, Check, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import Link from "next/link";
+import { listarEventosEntre, type EventoAgenda } from "@/app/actions/agenda-eventos";
+import { FormularioEvento } from "@/components/agenda/formulario-evento";
 import { listarRecordatoriosEntre, type RecordatorioAgenda } from "@/app/actions/recordatorios";
 import { FormularioRecordatorio } from "@/components/agenda/formulario-recordatorio";
 
@@ -29,10 +32,35 @@ function rangoDelMes(anio: number, mes: number) {
  * contactos. Clic en uno para editarlo; "+" en un dia o el boton para crear
  * buscando el contacto.
  */
-export function Agenda({ inicial, mesInicial }: { inicial: RecordatorioAgenda[]; mesInicial: string }) {
+export function Agenda({
+  inicial,
+  eventosIniciales,
+  mesInicial,
+  googleListo,
+  moduloIncluido,
+  requiereReconexion = false,
+  correoDeCuenta = null,
+  modoSoporte = false,
+}: {
+  inicial: RecordatorioAgenda[];
+  eventosIniciales: EventoAgenda[];
+  mesInicial: string;
+  /** Tiene el modulo y ya conecto su Google: puede programar citas. */
+  googleListo: boolean;
+  moduloIncluido: boolean;
+  /** Su conexion con Google venció: tiene que volver a conectar. */
+  requiereReconexion?: boolean;
+  /** Correo de la cuenta de quien mira la Agenda: invitado por defecto en las citas nuevas. */
+  correoDeCuenta?: string | null;
+  /** El administrador de la plataforma mirando la cuenta de un cliente: no se programan citas desde ahi. */
+  modoSoporte?: boolean;
+}) {
   const [anio, mes] = mesInicial.split("-").map(Number);
   const [cursor, setCursor] = useState({ anio, mes: mes - 1 });
   const [items, setItems] = useState<RecordatorioAgenda[]>(inicial);
+  const [eventos, setEventos] = useState<EventoAgenda[]>(eventosIniciales);
+  const [editandoEvento, setEditandoEvento] = useState<EventoAgenda | null>(null);
+  const [nuevoEvento, setNuevoEvento] = useState<Date | null>(null);
   const [cargando, setCargando] = useState(false);
   const [editando, setEditando] = useState<RecordatorioAgenda | null>(null);
   const [nuevoEn, setNuevoEn] = useState<Date | null>(null);
@@ -45,9 +73,13 @@ export function Agenda({ inicial, mesInicial }: { inicial: RecordatorioAgenda[];
     const n = ++pedido.current;
     const { inicio, finExclusivo } = rangoDelMes(anio, mes);
     setCargando(true);
-    listarRecordatoriosEntre(inicio.toISOString(), finExclusivo.toISOString()).then((r) => {
+    Promise.all([
+      listarRecordatoriosEntre(inicio.toISOString(), finExclusivo.toISOString()),
+      listarEventosEntre(inicio.toISOString(), finExclusivo.toISOString()),
+    ]).then(([r, e]) => {
       if (n !== pedido.current) return;
       setItems(r);
+      setEventos(e);
       setCargando(false);
     });
   }
@@ -56,6 +88,11 @@ export function Agenda({ inicial, mesInicial }: { inicial: RecordatorioAgenda[];
   for (const r of items) {
     const k = claveDia(new Date(r.recordar_en));
     porDia.set(k, [...(porDia.get(k) ?? []), r]);
+  }
+  const eventosPorDia = new Map<string, EventoAgenda[]>();
+  for (const e of eventos) {
+    const k = claveDia(new Date(e.inicio));
+    eventosPorDia.set(k, [...(eventosPorDia.get(k) ?? []), e]);
   }
   const hoy = claveDia(new Date());
   const titulo = new Date(cursor.anio, cursor.mes, 1).toLocaleDateString("es-CO", { month: "long", year: "numeric" });
@@ -73,6 +110,8 @@ export function Agenda({ inicial, mesInicial }: { inicial: RecordatorioAgenda[];
   function guardado() {
     setEditando(null);
     setNuevoEn(null);
+    setEditandoEvento(null);
+    setNuevoEvento(null);
     cargar(cursor.anio, cursor.mes);
   }
 
@@ -99,14 +138,36 @@ export function Agenda({ inicial, mesInicial }: { inicial: RecordatorioAgenda[];
           </button>
           {cargando && <span className="text-xs text-muted">Cargando…</span>}
         </div>
-        <button
-          type="button"
-          onClick={() => setNuevoEn(new Date(Date.now() + 60 * 60 * 1000))}
-          className="flex items-center gap-2 rounded-[10px] bg-primary px-4 py-[10px] text-[12.5px] font-bold text-white hover:bg-primary-hover"
-        >
-          <Plus size={16} />
-          Nuevo recordatorio
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {googleListo ? (
+            <button
+              type="button"
+              onClick={() => setNuevoEvento(new Date(Date.now() + 60 * 60 * 1000))}
+              className="flex items-center gap-2 rounded-[10px] bg-primary px-4 py-[10px] text-[12.5px] font-bold text-white hover:bg-primary-hover"
+            >
+              <CalendarDays size={16} />
+              Nueva cita
+            </button>
+          ) : modoSoporte ? (
+            <span className="max-w-xs text-xs text-muted">Modo soporte: las citas se programan desde la cuenta del cliente (se crearían en tu Google).</span>
+          ) : (
+            moduloIncluido && (
+              <Link href="/dashboard/settings?tab=integraciones" className="text-xs text-primary hover:underline">
+                {requiereReconexion ? "Tu conexión con Google venció: vuelve a conectar para programar citas" : "Conecta tu Google Calendar para programar citas"}
+              </Link>
+            )
+          )}
+          <button
+            type="button"
+            onClick={() => setNuevoEn(new Date(Date.now() + 60 * 60 * 1000))}
+            className={`flex items-center gap-2 rounded-[10px] px-4 py-[10px] text-[12.5px] font-bold ${
+              googleListo ? "border border-border text-foreground hover:bg-surface-hover" : "bg-primary text-white hover:bg-primary-hover"
+            }`}
+          >
+            <Plus size={16} />
+            Nuevo recordatorio
+          </button>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-[13px] border border-border bg-surface">
@@ -122,6 +183,7 @@ export function Agenda({ inicial, mesInicial }: { inicial: RecordatorioAgenda[];
             const k = claveDia(d);
             const delMes = d.getMonth() === cursor.mes;
             const lista = porDia.get(k) ?? [];
+            const citas = eventosPorDia.get(k) ?? [];
             return (
               <div
                 key={k}
@@ -145,6 +207,27 @@ export function Agenda({ inicial, mesInicial }: { inicial: RecordatorioAgenda[];
                   </button>
                 </div>
                 <ul className="flex flex-col gap-1">
+                  {citas.map((e) => (
+                    <li key={e.id}>
+                      <button
+                        type="button"
+                        onClick={() => setEditandoEvento(e)}
+                        title={`${e.contacto}: ${e.titulo}${e.estado === "cancelado" ? " · cancelada" : ""}`}
+                        className={`flex w-full items-start gap-1 rounded-md border px-1.5 py-1 text-left text-[11px] leading-tight hover:bg-info/20 ${
+                          e.estado === "cancelado" ? "border-border bg-surface-hover/60 text-muted line-through" : "border-info/40 bg-info/10 text-foreground"
+                        }`}
+                      >
+                        <CalendarDays size={10} className="mt-0.5 shrink-0 text-info" />
+                        <span className="min-w-0">
+                          <span className="font-semibold">
+                            {new Date(e.inicio).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit" })}
+                          </span>{" "}
+                          <span className="text-muted">{e.contacto}</span>
+                          <span className="block truncate">{e.titulo}</span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
                   {lista.map((r) => (
                     <li key={r.id}>
                       <button
@@ -174,7 +257,9 @@ export function Agenda({ inicial, mesInicial }: { inicial: RecordatorioAgenda[];
       </div>
 
       {editando && <FormularioRecordatorio existente={editando} onClose={() => setEditando(null)} onGuardado={guardado} />}
-      {nuevoEn && <FormularioRecordatorio fechaInicial={nuevoEn} onClose={() => setNuevoEn(null)} onGuardado={guardado} />}
+      {nuevoEn && <FormularioRecordatorio fechaInicial={nuevoEn} googleListo={googleListo} onClose={() => setNuevoEn(null)} onGuardado={guardado} />}
+      {editandoEvento && <FormularioEvento existente={editandoEvento} onClose={() => setEditandoEvento(null)} onGuardado={guardado} />}
+      {nuevoEvento && <FormularioEvento fechaInicial={nuevoEvento} correoDeCuenta={correoDeCuenta} onClose={() => setNuevoEvento(null)} onGuardado={guardado} />}
     </div>
   );
 }

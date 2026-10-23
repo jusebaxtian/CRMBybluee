@@ -1,0 +1,22 @@
+{
+  "language": "es",
+  "category": "UTILITY",
+  "plantillas": [
+    {
+      "name": "confirmacion_cita_meet",
+      "alternativas": ["confirmacion_cita_meet_v2"],
+      "conMeet": true,
+      "body": "Hola {{1}}, te confirmamos tu cita con {{2}}: {{3}}.\n\nFecha y hora: {{4}} (hora de Colombia).\n\nEntra a la reunión con el botón de abajo. Si necesitas cambiarla, respóndenos por este chat.",
+      "ejemplos": ["Marcela", "Distribuciones Andina", "Demostración del servicio", "jueves 22 de octubre, 3:00 p. m."],
+      "boton": { "text": "Ir a la reunión", "url": "https://meet.google.com/{{1}}" }
+    },
+    {
+      "name": "confirmacion_cita",
+      "alternativas": ["confirmacion_cita_v2"],
+      "conMeet": false,
+      "body": "Hola {{1}}, te confirmamos tu cita con {{2}}: {{3}}.\n\nFecha y hora: {{4}} (hora de Colombia).\n\nSi necesitas cambiarla, respóndenos por este chat.",
+      "ejemplos": ["Marcela", "Distribuciones Andina", "Demostración del servicio", "jueves 22 de octubre, 3:00 p. m."],
+      "boton": null
+    }
+  ]
+}

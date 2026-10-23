@@ -2,7 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { AlarmClock, Check, Loader2, Trash2, X } from "lucide-react";
-import { actualizarRecordatorio, crearRecordatorio, eliminarRecordatorio, listarRecordatorios } from "@/app/actions/recordatorios";
+import {
+  actualizarRecordatorio,
+  crearRecordatorio,
+  eliminarRecordatorio,
+  googleListoParaRecordatorios,
+  listarRecordatorios,
+} from "@/app/actions/recordatorios";
 
 type Pendiente = { id: string; texto: string; recordar_en: string };
 
@@ -28,6 +34,9 @@ export function RecordatorioPicker({ conversationId, contactName }: { conversati
   const [pending, startTransition] = useTransition();
   const [pendientes, setPendientes] = useState<Pendiente[]>([]);
   const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [googleListo, setGoogleListo] = useState(false);
+  const [enGoogle, setEnGoogle] = useState(true);
+  const [aviso, setAviso] = useState<string | null>(null);
 
   function editar(r: Pendiente) {
     setEditandoId(r.id);
@@ -45,7 +54,10 @@ export function RecordatorioPicker({ conversationId, contactName }: { conversati
   function abrir() {
     const siguiente = !open;
     setOpen(siguiente);
-    if (siguiente) listarRecordatorios(conversationId).then(setPendientes);
+    if (siguiente) {
+      listarRecordatorios(conversationId).then(setPendientes);
+      googleListoParaRecordatorios().then(setGoogleListo);
+    }
   }
 
   function borrar(id: string) {
@@ -61,11 +73,13 @@ export function RecordatorioPicker({ conversationId, contactName }: { conversati
       const recordarEn = new Date(cuando).toISOString();
       const r = editandoId
         ? await actualizarRecordatorio({ id: editandoId, texto, recordarEn })
-        : await crearRecordatorio({ conversationId, texto, recordarEn });
+        : await crearRecordatorio({ conversationId, texto, recordarEn, enGoogle: googleListo && enGoogle });
       if (r?.error) {
         setError(r.error);
         return;
       }
+      const avisoGoogle = (r as { aviso?: string }).aviso ?? null;
+      setAviso(avisoGoogle);
       setListo(true);
       listarRecordatorios(conversationId).then(setPendientes);
       setTimeout(() => {
@@ -73,7 +87,8 @@ export function RecordatorioPicker({ conversationId, contactName }: { conversati
         setOpen(false);
         setEditandoId(null);
         setTexto("");
-      }, 1200);
+        setAviso(null);
+      }, avisoGoogle ? 3500 : 1200);
     });
   }
 
@@ -88,9 +103,12 @@ export function RecordatorioPicker({ conversationId, contactName }: { conversati
             </button>
           </div>
           {listo ? (
-            <p className="flex items-center gap-2 py-2 text-sm text-success">
-              <Check size={15} /> {editandoId ? "Recordatorio actualizado" : "Recordatorio programado"}
-            </p>
+            <div className="py-2">
+              <p className="flex items-center gap-2 text-sm text-success">
+                <Check size={15} /> {editandoId ? "Recordatorio actualizado" : "Recordatorio programado"}
+              </p>
+              {aviso && <p className="mt-1 text-xs text-warning">{aviso}</p>}
+            </div>
           ) : (
             <div className="flex flex-col gap-2">
               <label className="text-xs font-medium text-muted">
@@ -117,6 +135,12 @@ export function RecordatorioPicker({ conversationId, contactName }: { conversati
                   autoFocus
                 />
               </label>
+              {googleListo && !editandoId && (
+                <label className="flex items-center gap-2 text-xs text-foreground">
+                  <input type="checkbox" checked={enGoogle} onChange={(e) => setEnGoogle(e.target.checked)} className="h-3.5 w-3.5 accent-[var(--primary)]" />
+                  Agregar también a mi Google Calendar
+                </label>
+              )}
               {error && <p className="text-xs text-error">{error}</p>}
               <button
                 type="button"

@@ -27,9 +27,12 @@ type Contacto = { id: string; nombre: string; wa_id: string };
 export function FormularioRecordatorio({
   existente,
   fechaInicial,
+  googleListo = false,
   onClose,
   onGuardado,
 }: {
+  /** Puede agregarlo tambien a su Google Calendar (modulo y conexion). */
+  googleListo?: boolean;
   existente?: RecordatorioAgenda | null;
   /** Para "nuevo" desde un dia del calendario. */
   fechaInicial?: Date;
@@ -44,6 +47,7 @@ export function FormularioRecordatorio({
   const [resultados, setResultados] = useState<Contacto[]>([]);
   const [contacto, setContacto] = useState<Contacto | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [enGoogle, setEnGoogle] = useState(true);
   const [pending, startTransition] = useTransition();
 
   const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -77,10 +81,17 @@ export function FormularioRecordatorio({
       const r = existente
         ? await actualizarRecordatorio({ id: existente.id, texto, recordarEn })
         : contacto
-          ? await crearRecordatorioParaContacto({ contactId: contacto.id, texto, recordarEn })
+          ? await crearRecordatorioParaContacto({ contactId: contacto.id, texto, recordarEn, enGoogle: googleListo && enGoogle })
           : { error: "Elige el contacto." };
       if (r?.error) {
         setError(r.error);
+        return;
+      }
+      // Si Google fallo, el recordatorio ya quedo en el CRM: se dice y se cierra.
+      const aviso = (r as { aviso?: string }).aviso;
+      if (aviso) {
+        setError(aviso);
+        setTimeout(onGuardado, 3500);
         return;
       }
       onGuardado();
@@ -177,6 +188,13 @@ export function FormularioRecordatorio({
             className={`${INPUT_AGENDA} mt-1`}
           />
         </label>
+
+        {googleListo && !existente && (
+          <label className="flex items-center gap-2 text-xs text-foreground">
+            <input type="checkbox" checked={enGoogle} onChange={(e) => setEnGoogle(e.target.checked)} className="h-3.5 w-3.5 accent-[var(--primary)]" />
+            Agregar también a mi Google Calendar, con alarma
+          </label>
+        )}
 
         {existente?.avisado_en && (
           <p className="rounded-[9px] border border-border bg-background px-3 py-2 text-xs text-muted">
