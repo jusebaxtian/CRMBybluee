@@ -24,7 +24,7 @@ export default async function AdminNotificationsPage() {
   const { data: notifications } = await supabase
     .from("notifications")
     .select(
-      "id, title, body, scope, target_status, starts_at, ends_at, cta_label, cta_url, created_at"
+      "id, title, body, scope, target_status, starts_at, ends_at, cta_label, cta_url, created_at, excluir_demo"
     )
     .order("created_at", { ascending: false });
 
@@ -63,6 +63,9 @@ export default async function AdminNotificationsPage() {
               <span>
                 Hasta: {n.ends_at ? new Date(n.ends_at).toLocaleDateString("es-CO") : "Sin límite"}
               </span>
+              {n.excluir_demo && (
+                <span className="rounded-full border border-border px-2 py-0.5">Sin cuentas DEMO</span>
+              )}
               {n.cta_label && n.cta_url && (
                 <span className="rounded-full border border-primary px-2 py-0.5 text-primary">
                   Botón: {n.cta_label}

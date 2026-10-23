@@ -79,6 +79,26 @@ export default async function DashboardLayout({
 
   const workspaceName = workspace?.name ?? "Tu workspace";
 
+  // Cuenta DEMO: se avisa en el perfil, con los dias que le quedan.
+  const { data: planDelEspacio } = workspace?.plan_id
+    ? await supabase.from("plans").select("is_demo").eq("id", workspace.plan_id).maybeSingle()
+    : { data: null };
+  let demo: { diasRestantes: number | null } | null = null;
+  if (planDelEspacio?.is_demo && workspaceId) {
+    const { data: suscripcion } = await supabase
+      .from("subscriptions")
+      .select("current_period_end")
+      .eq("workspace_id", workspaceId)
+      .order("current_period_end", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    demo = {
+      diasRestantes: suscripcion?.current_period_end
+        ? Math.max(0, Math.ceil((new Date(suscripcion.current_period_end).getTime() - new Date().getTime()) / 86_400_000))
+        : null,
+    };
+  }
+
   const { data: planModules } = workspace?.plan_id
     ? await supabase
         .from("plan_modules")
@@ -102,14 +122,15 @@ export default async function DashboardLayout({
   const scopeFilter = scopeParts.join(",");
 
   const nowIso = new Date().toISOString();
-  const { data: notifications } = await supabase
+  let consultaDeAvisos = supabase
     .from("notifications")
     .select("id, title, body, created_at, cta_label, cta_url, modo")
     .or(scopeFilter)
     .lte("starts_at", nowIso)
-    .or(`ends_at.is.null,ends_at.gte.${nowIso}`)
-    .order("created_at", { ascending: false })
-    .limit(20);
+    .or(`ends_at.is.null,ends_at.gte.${nowIso}`);
+  // Una cuenta DEMO no recibe las notificaciones marcadas "no mostrar a demos".
+  if (demo) consultaDeAvisos = consultaDeAvisos.eq("excluir_demo", false);
+  const { data: notifications } = await consultaDeAvisos.order("created_at", { ascending: false }).limit(20);
 
   const { data: reads } = workspaceId
     ? await supabase
@@ -155,6 +176,7 @@ export default async function DashboardLayout({
   return (
     <DashboardChrome
       workspaceName={workspaceName}
+      demo={demo}
       workspaceRole={workspaceRole}
       billingLocked={billingLocked}
       isPlatformAdmin={isAdmin}

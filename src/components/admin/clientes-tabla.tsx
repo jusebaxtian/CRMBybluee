@@ -171,27 +171,27 @@ export function ClientesTabla({ rows, plans }: { rows: FilaCliente[]; plans: { i
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-border bg-surface">
-        <table className="w-full text-left text-sm">
+        <table className="w-full min-w-[820px] text-left text-sm">
           <thead>
             <tr className="border-b border-border text-muted">
-              <th className="px-5 py-3 font-medium">Cliente</th>
-              <th className="px-5 py-3 font-medium">Teléfono</th>
-              <th className="px-5 py-3 font-medium">Plan / Estado</th>
-              <th className="px-5 py-3 font-medium">IP de registro</th>
-              <th className="px-5 py-3 font-medium">Última conexión</th>
-              <th className="px-5 py-3 font-medium">Creado / Renovación</th>
-              <th className="px-5 py-3 font-medium"></th>
+              <th className="px-3 py-3 font-medium">Cliente</th>
+              <th className="px-3 py-3 font-medium">Teléfono</th>
+              <th className="px-3 py-3 font-medium">Plan / Estado</th>
+              <th className="px-3 py-3 font-medium">IP de registro</th>
+              <th className="px-3 py-3 font-medium">Última conexión</th>
+              <th className="px-3 py-3 font-medium">Creado / Renovación</th>
+              <th className="w-px px-3 py-3 font-medium">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {filas.map((r) => (
               <tr key={r.id} className="border-b border-border last:border-b-0">
-                <td className="px-5 py-3">
-                  <p className="text-foreground">{r.email}</p>
+                <td className="px-3 py-3">
+                  <p className="text-foreground [overflow-wrap:anywhere]">{r.email}</p>
                   {r.fullName && <p className="text-xs text-foreground/80">{r.fullName}</p>}
-                  <p className="text-xs text-muted">{r.name}</p>
+                  <p className="text-xs text-muted [overflow-wrap:anywhere]">{r.name}</p>
                 </td>
-                <td className="px-5 py-3 text-foreground">
+                <td className="whitespace-nowrap px-3 py-3 text-foreground">
                   <p>{r.phone ?? "—"}</p>
                   {r.cliente && (
                     <p className="text-xs text-muted" title="Contacto en tu bandeja">
@@ -205,7 +205,7 @@ export function ClientesTabla({ rows, plans }: { rows: FilaCliente[]; plans: { i
                     <WhatsAppIcon size={16} className={r.hasWhatsapp ? "text-success" : "text-muted opacity-50"} />
                   </span>
                 </td>
-                <td className="px-5 py-3">
+                <td className="px-3 py-3">
                   <PlanStatusInline
                     workspaceId={r.id}
                     planId={r.planId}
@@ -219,8 +219,8 @@ export function ClientesTabla({ rows, plans }: { rows: FilaCliente[]; plans: { i
                     </span>
                   )}
                 </td>
-                <td className="px-5 py-3">
-                  <p className="text-muted">{r.signupIp ?? "—"}</p>
+                <td className="px-3 py-3">
+                  <p className="text-muted [overflow-wrap:anywhere]">{r.signupIp ?? "—"}</p>
                   {r.sharedIp && (
                     <span
                       title="Otro workspace se registró desde esta misma IP"
@@ -230,7 +230,7 @@ export function ClientesTabla({ rows, plans }: { rows: FilaCliente[]; plans: { i
                     </span>
                   )}
                 </td>
-                <td className="px-5 py-3">
+                <td className="px-3 py-3">
                   {r.lastSignInAt ? (
                     <>
                       <p className="text-muted">
@@ -247,7 +247,7 @@ export function ClientesTabla({ rows, plans }: { rows: FilaCliente[]; plans: { i
                     <p className="text-muted">—</p>
                   )}
                 </td>
-                <td className="px-5 py-3 text-muted">
+                <td className="px-3 py-3 text-muted">
                   <p>{new Date(r.createdAt).toLocaleDateString("es-CO")}</p>
                   <div className="mt-1 flex items-center gap-1.5 text-xs">
                     <span>
@@ -256,14 +256,14 @@ export function ClientesTabla({ rows, plans }: { rows: FilaCliente[]; plans: { i
                     <EditRenewalDateButton workspaceId={r.id} currentDate={r.renewalDate} />
                   </div>
                 </td>
-                <td className="px-5 py-3">
+                <td className="w-px whitespace-nowrap px-3 py-3">
                   <WorkspaceRowActions workspaceId={r.id} workspaceName={r.name} accessDisabled={r.accessDisabled} />
                 </td>
               </tr>
             ))}
             {filas.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-5 py-6 text-center text-muted">
+                <td colSpan={7} className="px-3 py-6 text-center text-muted">
                   {hayFiltro ? "Sin resultados para ese filtro." : "Sin clientes registrados."}
                 </td>
               </tr>

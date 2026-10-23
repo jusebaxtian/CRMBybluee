@@ -125,6 +125,16 @@ export function CreateNotificationForm({
         </p>
       </div>
 
+      <label htmlFor="excluirDemo" className="flex cursor-pointer items-start gap-2.5 text-sm text-foreground">
+        <input id="excluirDemo" name="excluirDemo" type="checkbox" defaultChecked className="mt-0.5 h-4 w-4 accent-[var(--color-primary)]" />
+        <span>
+          No mostrar a cuentas DEMO
+          <span className="block text-[11px] text-muted">
+            Recomendado para invitaciones al canal de clientes y avisos de clientes. Si un demo paga, empieza a verla.
+          </span>
+        </span>
+      </label>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="startsAt" className="mb-1 block text-sm font-medium text-muted">

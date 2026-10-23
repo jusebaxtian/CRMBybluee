@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { LayoutDashboard, Bell, CreditCard, Package, ArrowLeftRight, Image as ImageIcon, LifeBuoy, MessageSquare, PlaySquare } from "lucide-react";
+import { LayoutDashboard, Bell, CreditCard, Package, ArrowLeftRight, Image as ImageIcon, LifeBuoy, MessageSquare, PlaySquare, HeartHandshake } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { isPlatformAdmin } from "@/lib/admin";
 import { logout } from "@/app/actions/auth";
@@ -69,6 +69,13 @@ export default async function AdminLayout({
             WhatsApp Admin
           </Link>
           <Link
+            href="/admin/fidelidad"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted hover:bg-surface-hover hover:text-foreground"
+          >
+            <HeartHandshake size={18} />
+            Plan de fidelidad
+          </Link>
+          <Link
             href="/admin/banner"
             className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted hover:bg-surface-hover hover:text-foreground"
           >
@@ -111,7 +118,8 @@ export default async function AdminLayout({
           </form>
         </div>
       </aside>
-      <main className="flex-1 p-8">{children}</main>
+      {/* min-w-0: sin esto una tabla ancha estira el panel mas alla de la pantalla y se corta a la derecha. */}
+      <main className="min-w-0 flex-1 p-8">{children}</main>
     </div>
   );
 }

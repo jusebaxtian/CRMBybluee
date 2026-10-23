@@ -52,12 +52,23 @@ export async function updateWorkspacePlan(workspaceId: string, planId: string) {
   const supabase = await createClient();
   if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
 
+  const { data: plan } = await supabase.from("plans").select("is_demo").eq("id", planId).maybeSingle();
+
   const { error } = await supabase
     .from("workspaces")
     .update({ plan_id: planId })
     .eq("id", workspaceId);
 
   if (error) return { error: error.message };
+
+  // Un demo sin fecha de fin duraria para siempre. Desde aqui no se elige la
+  // duracion; son 3 dias, y para otra se usa el enlace demo o "Fecha de renovacion".
+  if (plan?.is_demo) {
+    await createAdminClient()
+      .from("subscriptions")
+      .update({ current_period_end: new Date(Date.now() + 3 * 86_400_000).toISOString() })
+      .eq("workspace_id", workspaceId);
+  }
   revalidatePath(`/admin/workspaces/${workspaceId}`);
   revalidatePath("/admin");
   return { success: true };

@@ -63,7 +63,11 @@ function Campos({ c }: { c?: CursoAdmin }) {
         <textarea name="descripcion" rows={3} defaultValue={c?.descripcion ?? ""} className={`${INPUT} mt-1`} placeholder="Qué aprende, para quién es, qué incluye" />
       </label>
       <label className="text-sm font-medium text-muted">
-        Datos para transferencia (Nequi, banco…)
+        Datos para transferencia (ya no se muestran)
+        <span className="mt-0.5 block text-xs font-normal">
+          Todos los servicios usan ahora los mismos datos de Facturación (Nequi, Daviplata, Bre-B y QR). Este texto queda
+          guardado pero el cliente ya no lo ve.
+        </span>
         <textarea
           name="datosTransferencia"
           rows={2}
