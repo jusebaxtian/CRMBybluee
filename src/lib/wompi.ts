@@ -19,6 +19,20 @@ export function wompiConfigurado(): boolean {
   );
 }
 
+/**
+ * Wompi esta configurado y este espacio puede usarlo. Si WOMPI_ESPACIOS trae
+ * una lista de ids (separados por coma), solo esos espacios lo ven: sirve para
+ * probar con un cliente antes de abrirlo a todos. Vacia = todos.
+ */
+export function wompiPermitidoPara(espacioId: string | null | undefined): boolean {
+  if (!wompiConfigurado()) return false;
+  const lista = (process.env.WOMPI_ESPACIOS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return lista.length === 0 || (!!espacioId && lista.includes(espacioId));
+}
+
 export function wompiEsSandbox(): boolean {
   return (process.env.NEXT_PUBLIC_WOMPI_PUBLIC_KEY ?? "").startsWith("pub_test_");
 }

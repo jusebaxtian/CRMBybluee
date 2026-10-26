@@ -2,7 +2,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
-import { consultarTransaccionWompi, urlDeCheckoutWompi, wompiConfigurado } from "@/lib/wompi";
+import { consultarTransaccionWompi, urlDeCheckoutWompi, wompiConfigurado, wompiPermitidoPara } from "@/lib/wompi";
 import { aplicarTransaccionWompi } from "@/lib/billing/wompi-pago";
 
 /**
@@ -10,10 +10,10 @@ import { aplicarTransaccionWompi } from "@/lib/billing/wompi-pago";
  * El precio sale del plan en la base (nunca del navegador), como en Bold.
  */
 export async function crearPagoWompi(planId: string | null): Promise<{ error: string } | { url: string }> {
-  if (!wompiConfigurado()) return { error: "El pago con Wompi no está disponible." };
   const ctx = await requireWorkspace();
   if ("error" in ctx) return { error: ctx.error };
   const { supabase, workspaceId } = ctx;
+  if (!wompiPermitidoPara(workspaceId)) return { error: "El pago con Wompi no está disponible." };
 
   const { data: espacio } = await supabase.from("workspaces").select("plan_id").eq("id", workspaceId).maybeSingle();
   const planDelEspacio = (espacio?.plan_id as string | null) ?? null;

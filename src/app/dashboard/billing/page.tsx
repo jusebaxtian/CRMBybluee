@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
 import { createBoldOrder, confirmBoldPayment } from "@/app/actions/billing";
 import { confirmarPagoWompi } from "@/app/actions/wompi";
-import { wompiConfigurado } from "@/lib/wompi";
+import { wompiPermitidoPara } from "@/lib/wompi";
 import { PlanPicker } from "@/components/billing/plan-picker";
 import { OpcionesDePago } from "@/components/billing/opciones-de-pago";
 import { DatosLegales } from "@/components/billing/datos-legales";
@@ -35,11 +35,11 @@ export default async function BillingPage({
   if (wompiTxId) {
     await confirmarPagoWompi(wompiTxId);
   }
-  const wompiDisponible = wompiConfigurado();
   const planParam = typeof params.plan === "string" ? params.plan : null;
 
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
+  const wompiDisponible = wompiPermitidoPara(workspaceId);
 
   const { data: workspaceRow } = workspaceId
     ? await supabase
