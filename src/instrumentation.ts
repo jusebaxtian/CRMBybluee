@@ -35,6 +35,7 @@ export async function register() {
   const { processDueReminders } = await import("@/lib/recordatorios/scheduler");
   const { procesarEsperasDeFlujos } = await import("@/lib/flujos/scheduler");
 
+  const { avisarMesesGanados } = await import("@/lib/referidos/avisos");
   const { procesarFidelidad } = await import("@/lib/fidelidad/envio");
   const { procesarWebhooks } = await import("@/lib/api-publica/webhooks");
   const { sincronizarGoogleCalendar } = await import("@/lib/integraciones/google/sincronizar");
@@ -74,6 +75,8 @@ export async function register() {
     { nombre: "plan de fidelidad", cadaMs: 10 * MINUTO, correr: procesarFidelidad },
     // Cada 2 min: una cuenta demo nueva queda etiquetada DEMO en el chat del
     // administrador en cuanto se registra, sea cual sea el camino por el que se creo.
+    // Cada minuto: quien gana un mes por referido recibe la notificacion enseguida.
+    { nombre: "avisos de referidos", cadaMs: MINUTO, correr: avisarMesesGanados },
     { nombre: "etiqueta DEMO", cadaMs: 2 * MINUTO, correr: sincronizarEtiquetaDemo },
     { nombre: "limpieza de notificaciones", cadaMs: 60 * MINUTO, correr: cleanupOldNotifications },
     { nombre: "espacios sin activar", cadaMs: 60 * MINUTO, correr: deleteStaleUnactivatedWorkspaces },

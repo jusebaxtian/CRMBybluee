@@ -8,6 +8,7 @@ import { Aviso } from "@/components/dashboard/aviso";
 import { EstadoCuenta } from "@/components/dashboard/estado-cuenta";
 import { Conexiones } from "@/components/dashboard/conexiones";
 import { Kpis } from "@/components/dashboard/kpis";
+import { TarjetaReferidos } from "@/components/dashboard/tarjeta-referidos";
 import { LeadsPorDia } from "@/components/dashboard/leads-por-dia";
 import { Pendientes } from "@/components/dashboard/pendientes";
 import { Resumen } from "@/components/dashboard/resumen";
@@ -90,6 +91,11 @@ export default async function DashboardPage({
           </h1>
           <p className="mt-0.5 text-[13px] capitalize text-dash-text-2">{fecha}</p>
         </div>
+        <Bloque nombre="la invitación a referidos">
+          <Suspense fallback={null}>
+            <TarjetaReferidos />
+          </Suspense>
+        </Bloque>
       </header>
 
       {locked && (

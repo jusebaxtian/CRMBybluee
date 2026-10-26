@@ -5,6 +5,8 @@ import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
 import { createBoldOrder, confirmBoldPayment } from "@/app/actions/billing";
 import { confirmarPagoWompi } from "@/app/actions/wompi";
 import { wompiPermitidoPara } from "@/lib/wompi";
+import { cargarReferidos } from "@/lib/referidos/estado";
+import { UsarMesGratis } from "@/components/referidos/usar-mes-gratis";
 import { PlanPicker } from "@/components/billing/plan-picker";
 import { OpcionesDePago } from "@/components/billing/opciones-de-pago";
 import { DatosLegales } from "@/components/billing/datos-legales";
@@ -96,6 +98,10 @@ export default async function BillingPage({
         }
       : null;
 
+  const { disponibles: mesesGratis } = workspaceId
+    ? await cargarReferidos(supabase, workspaceId)
+    : { disponibles: 0 };
+
   const { data: payments } = await supabase
     .from("payments")
     .select("id, provider, amount_cents, status, created_at")
@@ -162,6 +168,10 @@ export default async function BillingPage({
           Estado: {workspace ? statusLabel[workspace.status] ?? workspace.status : "—"}
         </p>
       </div>
+
+      {mesesGratis > 0 && (rolEnElEspacio === "owner" || rolEnElEspacio === "admin") && (
+        <UsarMesGratis disponibles={mesesGratis} />
+      )}
 
       {(workspace?.status === "past_due" || workspace?.status === "canceled") && (
         <div className="flex items-center gap-3 rounded-xl border border-red-400/30 bg-red-400/10 p-5">

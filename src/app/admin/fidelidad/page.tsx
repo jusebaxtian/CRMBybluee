@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isPlatformAdmin } from "@/lib/admin";
 import { getWorkspaceId } from "@/lib/workspace";
 import { FidelidadConfigPanel } from "@/components/admin/fidelidad-config";
+import { ReferidosRevision } from "@/components/admin/referidos-revision";
 import { aplicarFrenos, calidadDeLaLinea, leerConfigFidelidad, planificar } from "@/lib/fidelidad/envio";
 import {
   DIAS_PARA_LA_BAJA,
@@ -102,6 +103,20 @@ export default async function FidelidadPage() {
       }
     }
   }
+
+  // Referidos: quien refirio a quien, y los que esperan decision del administrador.
+  const { data: referidos } = await admin
+    .from("referral_rewards")
+    .select("id, status, motivo_revision, created_at, referrer:workspaces!referral_rewards_referrer_id_fkey(name), referred:workspaces!referral_rewards_referred_id_fkey(name)")
+    .order("created_at", { ascending: false })
+    .limit(60);
+  const nombreDe = (v: unknown) => (v as { name?: string } | null)?.name ?? "—";
+  const ESTADO_REFERIDO: Record<string, string> = {
+    en_revision: "En revisión",
+    disponible: "Mes disponible",
+    usado: "Mes usado",
+    rechazado: "Rechazado",
+  };
 
   const aEnviar = decisiones.filter((d) => d.accion === "enviar");
   const omitidas = decisiones.filter((d) => d.accion !== "enviar");
@@ -210,6 +225,35 @@ export default async function FidelidadPage() {
                 </li>
               );
             })}
+          </ul>
+        )}
+      </section>
+
+      <section className="rounded-xl border border-border bg-surface p-5">
+        <p className="mb-1 text-sm font-medium text-foreground">Referidos</p>
+        <p className="mb-3 text-xs text-muted">
+          Cada cliente con licencia de pago tiene un enlace; cuando su referido hace su primer pago gana un mes (máximo 3). Si
+          comparten IP, teléfono o documento queda en revisión para que lo decidas.
+        </p>
+        {(referidos ?? []).length === 0 ? (
+          <p className="text-sm text-muted">Todavía no hay referidos con pago.</p>
+        ) : (
+          <ul className="flex flex-col divide-y divide-border text-sm">
+            {(referidos ?? []).map((r) => (
+              <li key={r.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+                <span className="font-medium text-foreground">{nombreDe(r.referrer)}</span>
+                <span className="text-muted">refirió a</span>
+                <span className="font-medium text-foreground">{nombreDe(r.referred)}</span>
+                <span className="rounded-full bg-border px-2 py-0.5 text-[11px] text-muted">{ESTADO_REFERIDO[r.status] ?? r.status}</span>
+                {r.status === "en_revision" && (
+                  <>
+                    <span className="text-xs text-warning">{r.motivo_revision}</span>
+                    <ReferidosRevision id={r.id} />
+                  </>
+                )}
+                <span className="ml-auto text-xs text-muted">{hora.format(new Date(r.created_at))}</span>
+              </li>
+            ))}
           </ul>
         )}
       </section>

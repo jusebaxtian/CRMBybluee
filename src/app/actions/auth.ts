@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { aplicarInvitacionRegistro } from "@/lib/billing/pagos-chat";
+import { registrarReferidoDeLaCookie } from "@/lib/referidos/registro";
 import { componerTelefono } from "@/lib/auth/telefono";
 import { leerInvitacionRegistro } from "@/app/actions/pagos-chat";
 
@@ -137,6 +138,9 @@ export async function signup(
     console.error("signup: create_workspace_with_owner:", rpcError.message, { email, companyName });
     return { ok: "completar", valores };
   }
+
+  // Referido: si llego por el enlace de alguien, queda anotado antes de cualquier pago.
+  if (nuevoWorkspaceId) await registrarReferidoDeLaCookie(createAdminClient(), String(nuevoWorkspaceId));
 
   // Registro por enlace de pago (soporte ya registro el pago desde el chat):
   // el espacio nace activo con el plan pagado. Ver migracion 0105.
@@ -276,7 +280,7 @@ export async function completarRegistro(
   if (membership) redirect("/dashboard");
 
   const signupIp = await getClientIp();
-  const { error: rpcError } = await supabase.rpc("create_workspace_with_owner", {
+  const { data: espacioNuevo, error: rpcError } = await supabase.rpc("create_workspace_with_owner", {
     workspace_name: companyName,
     signup_ip: signupIp,
     phone: telefono.digitos,
@@ -288,6 +292,8 @@ export async function completarRegistro(
     console.error("completar registro: create_workspace_with_owner:", rpcError.message);
     return { error: "No pudimos crear tu espacio. Intenta de nuevo o escríbenos a soporte.", valores };
   }
+
+  if (espacioNuevo) await registrarReferidoDeLaCookie(createAdminClient(), String(espacioNuevo));
 
   redirect("/dashboard");
 }
