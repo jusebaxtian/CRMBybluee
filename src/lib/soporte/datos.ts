@@ -92,7 +92,7 @@ export async function cargarDatosDeSoporte(
         // La fecha del pago es la de aprobacion; si se aprobo sola (Bold), la
         // de creacion. Es la misma regla de la pantalla de Pagos del Admin.
         fechaPago: new Date((pago.reviewed_at as string | null) ?? (pago.created_at as string)),
-        metodo: pago.provider === "bold" ? "Bold" : "Transferencia",
+        metodo: pago.provider === "bold" ? "Bold" : pago.provider === "wompi" ? "Wompi" : "Transferencia",
         referencia: (pago.bold_order_id as string | null) ?? null,
         montoCentavos: Number(pago.amount_cents),
         moneda: (pago.currency as string) || "COP",

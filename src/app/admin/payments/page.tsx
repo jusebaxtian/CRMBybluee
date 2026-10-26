@@ -147,7 +147,7 @@ export default async function AdminPaymentsPage({
                     <p className="text-xs text-muted">{p.ownerEmail}</p>
                   </td>
                   <td className="px-5 py-3 text-foreground">
-                    {p.provider === "bold" ? "Bold" : "Transferencia"}
+                    {p.provider === "bold" ? "Bold" : p.provider === "wompi" ? "Wompi" : "Transferencia"}
                   </td>
                   <td className="px-5 py-3 text-foreground">
                     ${(p.amount_cents / 100).toLocaleString("es-CO")}

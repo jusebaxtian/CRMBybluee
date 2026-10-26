@@ -64,7 +64,7 @@ export function PagosDelCliente({ pagos, sinDocumento = false }: { pagos: PagoDe
                     })}
                   </td>
                   <td className="px-4 py-2 font-medium text-foreground">{dinero(Number(p.amount_cents), p.currency)}</td>
-                  <td className="px-4 py-2 text-muted">{p.provider === "bold" ? "Bold" : "Transferencia"}</td>
+                  <td className="px-4 py-2 text-muted">{p.provider === "bold" ? "Bold" : p.provider === "wompi" ? "Wompi" : "Transferencia"}</td>
                   <td className="px-4 py-2">
                     {p.proofUrl ? (
                       <a

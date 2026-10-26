@@ -1,6 +1,7 @@
 import { CreditCard, Landmark } from "lucide-react";
 import { BoldCheckoutButton } from "@/components/billing/bold-checkout-button";
 import { ManualTransferForm } from "@/components/billing/manual-transfer-form";
+import { WompiCheckoutButton } from "@/components/billing/wompi-checkout-button";
 import { DatosDeTransferencia } from "@/components/billing/datos-de-transferencia";
 
 type OrdenBold =
@@ -20,15 +21,17 @@ export function OpcionesDePago({
   descripcion,
   planId,
   montoSugeridoCop,
+  wompiDisponible,
 }: {
   boldOrder: OrdenBold;
   descripcion: string;
   planId?: string;
   /** Precio del plan en pesos, ya escrito en el formulario de la transferencia. */
   montoSugeridoCop?: number;
+  wompiDisponible?: boolean;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div className={`grid grid-cols-1 gap-4 ${wompiDisponible ? "lg:grid-cols-3 sm:grid-cols-2" : "sm:grid-cols-2"}`}>
       <div className="rounded-[13px] border border-border bg-surface p-5">
         <div className="mb-3 flex items-center gap-2">
           <CreditCard size={18} className="text-primary" />
@@ -48,6 +51,17 @@ export function OpcionesDePago({
           <p className="text-sm text-red-400">No se pudo preparar el pago.</p>
         )}
       </div>
+
+      {wompiDisponible && (
+        <div className="rounded-[13px] border border-border bg-surface p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <CreditCard size={18} className="text-primary" />
+            <p className="font-medium text-foreground">Tarjeta, Nequi o PSE (Wompi)</p>
+          </div>
+          <p className="mb-4 text-sm text-muted">Pago inmediato, tu cuenta se activa automáticamente.</p>
+          <WompiCheckoutButton planId={planId} />
+        </div>
+      )}
 
       <div className="rounded-[13px] border border-border bg-surface p-5">
         <div className="mb-3 flex items-center gap-2">

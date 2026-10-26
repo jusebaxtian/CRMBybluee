@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
 import { createBoldOrder, confirmBoldPayment } from "@/app/actions/billing";
+import { confirmarPagoWompi } from "@/app/actions/wompi";
+import { wompiConfigurado } from "@/lib/wompi";
 import { PlanPicker } from "@/components/billing/plan-picker";
 import { OpcionesDePago } from "@/components/billing/opciones-de-pago";
 import { DatosLegales } from "@/components/billing/datos-legales";
@@ -28,6 +30,12 @@ export default async function BillingPage({
   if (boldOrderId) {
     await confirmBoldPayment(boldOrderId, boldTxStatus);
   }
+  // Wompi regresa al cliente con ?id=<transaccion>.
+  const wompiTxId = typeof params.id === "string" ? params.id : null;
+  if (wompiTxId) {
+    await confirmarPagoWompi(wompiTxId);
+  }
+  const wompiDisponible = wompiConfigurado();
   const planParam = typeof params.plan === "string" ? params.plan : null;
 
   const supabase = await createClient();
@@ -216,6 +224,7 @@ export default async function BillingPage({
             descripcion={`Cambio a ${planElegido.name}`}
             planId={planElegido.id}
             montoSugeridoCop={planElegido.price_cents / 100}
+            wompiDisponible={wompiDisponible}
           />
         </section>
       )}
@@ -228,6 +237,7 @@ export default async function BillingPage({
             descripcion={`Suscripción ${workspace?.plans?.name ?? "CRM Bybluee"}`}
             planId={workspace?.plan_id ?? undefined}
             montoSugeridoCop={precioActual / 100}
+            wompiDisponible={wompiDisponible}
           />
         </section>
       )}
@@ -246,6 +256,7 @@ export default async function BillingPage({
           descripcion={`Suscripción ${workspace?.plans?.name ?? "CRM Bybluee"}`}
           planId={workspace?.plan_id ?? undefined}
           montoSugeridoCop={precioActual > 0 ? precioActual / 100 : undefined}
+          wompiDisponible={wompiDisponible}
         />
       )}
 
@@ -271,7 +282,7 @@ export default async function BillingPage({
             {(payments ?? []).map((p) => (
               <tr key={p.id} className="border-b border-border last:border-b-0">
                 <td className="px-5 py-3 text-muted">{new Date(p.created_at).toLocaleDateString("es-CO")}</td>
-                <td className="px-5 py-3 text-foreground">{p.provider === "bold" ? "Bold" : "Transferencia"}</td>
+                <td className="px-5 py-3 text-foreground">{p.provider === "bold" ? "Bold" : p.provider === "wompi" ? "Wompi" : "Transferencia"}</td>
                 <td className="px-5 py-3 text-foreground">${(p.amount_cents / 100).toLocaleString("es-CO")}</td>
                 <td className="px-5 py-3 text-muted">{p.status}</td>
                 <td className="px-5 py-3">
