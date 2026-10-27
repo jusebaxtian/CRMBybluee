@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { MessageBubble } from "@/components/inbox/message-bubble";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
+import { reaccionesPorMensaje } from "@/lib/inbox/reacciones";
 
 type Message = {
   id: string;
@@ -84,6 +85,9 @@ export function MessagesScrollArea({
     return map;
   }, [messages]);
 
+  // Las reacciones se pintan sobre el mensaje reaccionado, no como filas aparte.
+  const reacciones = useMemo(() => reaccionesPorMensaje(messages), [messages]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });
      
@@ -104,16 +108,25 @@ export function MessagesScrollArea({
       {messages.map((m, i) => {
         // Un separador cada vez que cambia el dia respecto al mensaje anterior.
         const cambiaDeDia = i === 0 || diaDe(m.created_at) !== diaDe(messages[i - 1].created_at);
+        const reaccionYaPintada =
+          m.message_type === "reaction" && !!m.context_wa_message_id && byWaMessageId.has(m.context_wa_message_id);
+        // Sin fila ni separador que mostrar: no se deja un hueco vacio entre mensajes.
+        if (reaccionYaPintada && !cambiaDeDia) return null;
         return (
           <div key={m.id} className="space-y-3">
             {cambiaDeDia && <SeparadorDeFecha iso={m.created_at} />}
-            <MessageBubble
-              message={m}
-              quotedMessage={m.context_wa_message_id ? byWaMessageId.get(m.context_wa_message_id) ?? null : null}
-              onReply={onReply}
-              onForward={onForward}
-              onRegistrarPago={onRegistrarPago}
-            />
+            {/* Una reaccion cuyo mensaje esta en pantalla ya se ve como emoji sobre el; si el
+                mensaje es mas antiguo que lo cargado, se deja la fila de texto como respaldo. */}
+            {!reaccionYaPintada && (
+              <MessageBubble
+                message={m}
+                quotedMessage={m.context_wa_message_id ? byWaMessageId.get(m.context_wa_message_id) ?? null : null}
+                reacciones={m.wa_message_id ? reacciones.get(m.wa_message_id) : undefined}
+                onReply={onReply}
+                onForward={onForward}
+                onRegistrarPago={onRegistrarPago}
+              />
+            )}
           </div>
         );
       })}

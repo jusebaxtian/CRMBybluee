@@ -50,6 +50,44 @@ function summarize(m: Pick<Message, "message_type" | "body">): string {
   return m.body || "Mensaje";
 }
 
+/**
+ * Mensaje citado dentro de la burbuja, como en WhatsApp: quien lo escribio, un
+ * resumen y, si era una foto, un video o un sticker, su miniatura a la derecha
+ * (antes solo decia "Foto" y no se sabia a cual se referia).
+ */
+function CitaDelMensaje({ quoted, out }: { quoted: Message | null; out: boolean }) {
+  const caja = `mb-1.5 flex items-stretch overflow-hidden rounded border-l-2 text-xs ${
+    out ? "border-white/50 bg-white/10 text-white/80" : "border-primary/50 bg-background/60 text-muted"
+  }`;
+
+  // La respuesta cita un mensaje que ya no esta en pantalla (mas antiguo que lo cargado).
+  if (!quoted) {
+    return (
+      <div className={caja}>
+        <p className="px-2 py-1 italic">↩ Respuesta a un mensaje anterior</p>
+      </div>
+    );
+  }
+
+  const miniatura =
+    quoted.media_url && (quoted.message_type === "image" || quoted.message_type === "sticker") ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={quoted.media_url} alt="Imagen citada" className="h-12 w-12 shrink-0 object-cover" />
+    ) : quoted.media_url && quoted.message_type === "video" ? (
+      <video src={`${quoted.media_url}#t=0.1`} preload="metadata" muted playsInline className="h-12 w-12 shrink-0 object-cover" />
+    ) : null;
+
+  return (
+    <div className={caja}>
+      <div className="min-w-0 flex-1 px-2 py-1">
+        <p className="font-semibold">{quoted.direction === "out" ? "Tú" : "Cliente"}</p>
+        <p className="truncate">{summarize(quoted).slice(0, 80)}</p>
+      </div>
+      {miniatura}
+    </div>
+  );
+}
+
 const REENVIABLES = new Set(["text", "image", "video", "audio", "document"]);
 // Adjuntos con boton de descarga (el documento ya tiene su propio enlace).
 const DESCARGABLES = new Set(["image", "video", "audio", "sticker"]);
@@ -76,12 +114,15 @@ function urlDescarga(m: Pick<Message, "media_url" | "media_mime_type" | "message
 export function MessageBubble({
   message: m,
   quotedMessage,
+  reacciones,
   onReply,
   onForward,
   onRegistrarPago,
 }: {
   message: Message;
   quotedMessage?: Message | null;
+  /** Emojis con los que reaccionaron a ESTE mensaje (el del cliente primero). */
+  reacciones?: string[];
   onReply?: (target: { waMessageId: string; preview: string }) => void;
   onForward?: (target: { messageId: string; preview: string }) => void;
   /** Solo el administrador de la plataforma: registrar un comprobante recibido como pago. */
@@ -176,19 +217,11 @@ export function MessageBubble({
         </button>
       )}
       <div
-        className={`min-w-0 max-w-[85%] rounded-lg px-3 py-2 text-sm sm:max-w-[70%] ${
+        className={`relative min-w-0 max-w-[85%] rounded-lg px-3 py-2 text-sm sm:max-w-[70%] ${
           out ? "bg-primary text-white" : "bg-surface-hover text-foreground"
-        }`}
+        } ${reacciones?.length ? "mb-3" : ""}`}
       >
-        {quotedMessage && (
-          <div
-            className={`mb-1.5 rounded border-l-2 px-2 py-1 text-xs ${
-              out ? "border-white/50 bg-white/10 text-white/80" : "border-primary/50 bg-background/60 text-muted"
-            }`}
-          >
-            {summarize(quotedMessage).slice(0, 80)}
-          </div>
-        )}
+        {m.context_wa_message_id && <CitaDelMensaje quoted={quotedMessage ?? null} out={out} />}
 
         {m.message_type === "image" && m.media_url && (
           // El pie de foto ya se muestra como texto justo debajo, asi que
@@ -284,6 +317,18 @@ export function MessageBubble({
         {/* Tooltips don't work on touch devices — show the reason inline too. */}
         {out && m.status === "failed" && m.error_detail && (
           <p className="mt-1 text-[11px] text-red-200">{m.error_detail}</p>
+        )}
+
+        {/* Reacciones como en WhatsApp: el emoji queda pegado a la esquina inferior del mensaje. */}
+        {reacciones && reacciones.length > 0 && (
+          <span
+            className={`absolute -bottom-3 ${out ? "right-3" : "left-3"} flex items-center gap-0.5 rounded-full border border-border bg-surface px-1.5 py-0.5 text-sm leading-none shadow-sm`}
+            title="Reacciones a este mensaje"
+          >
+            {reacciones.map((e, i) => (
+              <span key={i}>{e}</span>
+            ))}
+          </span>
         )}
       </div>
       {canReply && !out && (
