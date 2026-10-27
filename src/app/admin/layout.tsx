@@ -4,6 +4,7 @@ import { LayoutDashboard, Bell, CreditCard, Package, ArrowLeftRight, Image as Im
 import { createClient } from "@/lib/supabase/server";
 import { isPlatformAdmin } from "@/lib/admin";
 import { logout } from "@/app/actions/auth";
+import { MenuMovilAdmin } from "@/components/admin/menu-movil";
 
 export default async function AdminLayout({
   children,
@@ -22,8 +23,10 @@ export default async function AdminLayout({
   if (!isAdmin) redirect("/dashboard");
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col overflow-y-auto border-r border-border bg-surface">
+    <div className="flex min-h-screen flex-col bg-background md:flex-row">
+      {/* Celular: barra superior con el menu completo. El menu lateral es solo de escritorio. */}
+      <MenuMovilAdmin correo={user.email ?? ""} />
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-y-auto border-r border-border bg-surface md:flex">
         <div className="flex items-center gap-2 px-6 py-6">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="ByBluee" className="h-8 w-8 rounded-lg" />
@@ -126,7 +129,7 @@ export default async function AdminLayout({
         </div>
       </aside>
       {/* min-w-0: sin esto una tabla ancha estira el panel mas alla de la pantalla y se corta a la derecha. */}
-      <main className="min-w-0 flex-1 p-8">{children}</main>
+      <main className="min-w-0 flex-1 p-4 md:p-8">{children}</main>
     </div>
   );
 }
