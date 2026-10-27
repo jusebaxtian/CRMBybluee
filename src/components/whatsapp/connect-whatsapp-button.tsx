@@ -25,19 +25,6 @@ type SignupData = { waba_id: string; phone_number_id: string };
 type Status = "idle" | "connecting" | "error" | "success";
 type Modo = "api" | "coexistencia";
 
-// Lo que Meta limita en un numero que sigue vivo en la app WhatsApp Business.
-// Se muestra ANTES de conectar: la persona tiene que saberlo y aceptarlo.
-const ADVERTENCIAS_COEXISTENCIA = [
-  "El envío masivo queda limitado a 20 mensajes por segundo.",
-  "Los grupos no se sincronizan con el CRM.",
-  "Se desactivan los mensajes temporales, los de «ver una vez», la ubicación en vivo y las listas de difusión de la app.",
-  "En la app Business dejan de funcionar las llamadas y los canales. WhatsApp para Windows no funciona, y los dispositivos vinculados se desvinculan: hay que volver a vincularlos.",
-  "Lo que escribas desde el celular no abre la ventana de 24 horas del CRM: solo la abren los mensajes enviados desde el CRM.",
-  "Se importan los contactos y los últimos 30 días de chats (en esa primera sincronización; no se repite).",
-  "Cuando respondas desde el celular, el agente de IA se pausa en ese chat; lo reanudas desde el CRM.",
-  "Para desconectar del todo, hazlo desde la app WhatsApp Business. Quitar el número en el CRM no libera la app.",
-  "Necesitas la app WhatsApp Business actualizada y el celular a mano para escanear un código QR.",
-];
 
 function detectarEntorno(ua: string): "normal" | "embebido" | "movil" {
   const embebido =
@@ -88,8 +75,7 @@ export function ConnectWhatsAppButton({
     }
   }
   const [channelLabel, setChannelLabel] = useState("");
-  const [paso, setPaso] = useState<"cerrado" | "elegir" | "advertencias">("cerrado");
-  const [acepto, setAcepto] = useState(false);
+  const [paso, setPaso] = useState<"cerrado" | "elegir">("cerrado");
   const signupDataRef = useRef<SignupData | null>(null);
 
   useEffect(() => {
@@ -259,7 +245,6 @@ export function ConnectWhatsAppButton({
       <button
         type="button"
         onClick={() => {
-          setAcepto(false);
           if (coexistencia) setPaso("elegir");
           else launchSignup("api");
         }}
@@ -294,8 +279,6 @@ export function ConnectWhatsAppButton({
             className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[14px] border border-border bg-surface p-5 text-foreground shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            {paso === "elegir" ? (
-              <>
                 <p className="text-base font-semibold">¿Cómo quieres conectar tu número?</p>
                 <div className="mt-4 flex flex-col gap-3">
                   <button
@@ -310,7 +293,7 @@ export function ConnectWhatsAppButton({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPaso("advertencias")}
+                    onClick={() => launchSignup("coexistencia")}
                     className="rounded-[12px] border border-border p-4 text-left hover:border-primary hover:bg-surface-hover"
                   >
                     <p className="text-sm font-semibold">Coexistencia: mi número de la app WhatsApp Business</p>
@@ -327,35 +310,6 @@ export function ConnectWhatsAppButton({
                 >
                   Cancelar
                 </button>
-              </>
-            ) : (
-              <>
-                <p className="text-base font-semibold">Antes de conectar en coexistencia</p>
-                <p className="mt-1 text-[13px] text-muted">Meta aplica estas condiciones a un número que sigue en la app WhatsApp Business:</p>
-                <ul className="mt-3 flex list-disc flex-col gap-1.5 pl-5 text-[13px]">
-                  {ADVERTENCIAS_COEXISTENCIA.map((a) => (
-                    <li key={a}>{a}</li>
-                  ))}
-                </ul>
-                <label className="mt-4 flex items-start gap-2 text-[13px]">
-                  <input type="checkbox" checked={acepto} onChange={(e) => setAcepto(e.target.checked)} className="mt-0.5" />
-                  Entiendo estas condiciones y quiero conectar en coexistencia.
-                </label>
-                <div className="mt-4 flex items-center gap-3">
-                  <button
-                    type="button"
-                    disabled={!acepto}
-                    onClick={() => launchSignup("coexistencia")}
-                    className="rounded-[10px] bg-primary px-4 py-2 text-[13px] font-bold text-white hover:bg-primary-hover disabled:opacity-50"
-                  >
-                    Continuar
-                  </button>
-                  <button type="button" onClick={() => setPaso("elegir")} className="text-[13px] text-muted underline hover:text-foreground">
-                    Volver
-                  </button>
-                </div>
-              </>
-            )}
           </div>
         </div>
       )}
