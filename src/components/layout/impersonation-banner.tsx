@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { MessageSquare, ShieldAlert } from "lucide-react";
-import { stopImpersonation } from "@/app/actions/admin";
+import { irAlChatDelCliente, stopImpersonation } from "@/app/actions/admin";
 
 export function ImpersonationBanner({ workspaceName }: { workspaceName: string }) {
   return (
@@ -15,14 +14,16 @@ export function ImpersonationBanner({ workspaceName }: { workspaceName: string }
         </span>
       </div>
       <div className="flex items-center gap-2">
-        {/* Con el modo soporte activo, la bandeja que se abre es la del espacio que se esta viendo. */}
-        <Link
-          href="/dashboard/inbox"
-          className="flex items-center gap-1.5 rounded-md border border-warning/40 px-3 py-1 text-xs font-medium text-warning hover:bg-warning/10"
-        >
-          <MessageSquare size={13} />
-          Ir al chat
-        </Link>
+        {/* Sale del modo soporte y abre MI chat con el cliente dueño de este espacio. */}
+        <form action={irAlChatDelCliente}>
+          <button
+            type="submit"
+            className="flex items-center gap-1.5 rounded-md border border-warning/40 px-3 py-1 text-xs font-medium text-warning hover:bg-warning/10"
+          >
+            <MessageSquare size={13} />
+            Ir al chat
+          </button>
+        </form>
         <form action={stopImpersonation}>
           <button
             type="submit"

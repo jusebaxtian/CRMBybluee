@@ -42,6 +42,30 @@ export async function startImpersonation(workspaceId: string) {
   redirect("/dashboard");
 }
 
+/**
+ * Sale del modo soporte y abre, en la bandeja del propio administrador, el chat
+ * del cliente dueño del espacio que se estaba viendo (el mismo cruce de la
+ * tarjeta "Cliente en mi chat": contacto vinculado a mano o por telefono).
+ * Si no hay chat con ese cliente, deja en la bandeja.
+ */
+export async function irAlChatDelCliente() {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) redirect("/dashboard");
+
+  const cookieStore = await cookies();
+  const espacioId = cookieStore.get(IMPERSONATION_COOKIE)?.value;
+
+  let destino = "/dashboard/inbox";
+  if (espacioId) {
+    const { data } = await supabase.rpc("admin_cliente_de_espacio", { p_workspace_id: espacioId });
+    const conversacion = ((data ?? []) as { conversation_id: string | null }[])[0]?.conversation_id;
+    if (conversacion) destino = `/dashboard/inbox/${conversacion}`;
+  }
+
+  cookieStore.delete(IMPERSONATION_COOKIE);
+  redirect(destino);
+}
+
 export async function stopImpersonation() {
   const cookieStore = await cookies();
   cookieStore.delete(IMPERSONATION_COOKIE);
