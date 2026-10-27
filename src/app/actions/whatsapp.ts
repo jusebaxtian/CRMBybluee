@@ -14,6 +14,9 @@ import {
   subscribeAppToWaba,
   registerPhoneNumber,
   getPhoneNumberDetails,
+  getPhoneNumberCoexistence,
+  listWabaPhoneNumbers,
+  requestSmbAppDataSync,
   sendTextMessage,
   sendMediaMessage,
   sendTemplateMessage,
@@ -28,6 +31,8 @@ import { crearPlantillaSaludoInicial } from "@/lib/templates/saludo-inicial";
 import { abrirConversacion } from "@/lib/whatsapp/conversacion";
 import { toPublicUrl } from "@/lib/supabase/config";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
+import { coexistenciaPermitidaPara } from "@/lib/whatsapp/coexistencia";
+import { actualizarSync } from "@/lib/whatsapp/coexistencia-ingest";
 import { recordOutboundMessage } from "@/lib/messaging/record";
 import { limiteDeNumeros } from "@/lib/whatsapp/limite-numeros";
 import { noSePuedeUsar, motivoDelExceso } from "@/lib/whatsapp/limite-plantilla";
@@ -99,10 +104,14 @@ function mediaTypeFromMime(mime: string): "image" | "audio" | "video" | "documen
 export async function connectWhatsApp(input: {
   code: string;
   wabaId: string;
+  /** Vacio en coexistencia: Meta solo avisa la cuenta (WABA) y el numero se busca en ella. */
   phoneNumberId: string;
   label?: string;
+  /** "api" (numero solo en la API, lo de siempre) o "coexistencia" (tambien sigue en la app del celular). */
+  modo?: "api" | "coexistencia";
 }) {
   const supabase = await createClient();
+  const modoPedido = input.modo === "coexistencia" ? "coexistencia" : "api";
 
   const {
     data: { user },
@@ -117,6 +126,10 @@ export async function connectWhatsApp(input: {
   if (!workspaceId) return { error: "No se encontró tu workspace." };
   const membership = { workspace_id: workspaceId };
 
+  if (modoPedido === "coexistencia" && !coexistenciaPermitidaPara(workspaceId)) {
+    return { error: "La coexistencia todavía no está disponible para tu cuenta." };
+  }
+
   // Plan + cupo extra concedido desde admin a este espacio.
   const { total: maxNumbers } = await limiteDeNumeros(supabase, membership.workspace_id);
 
@@ -126,38 +139,65 @@ export async function connectWhatsApp(input: {
     .eq("workspace_id", membership.workspace_id)
     .neq("status", "frozen");
 
-  // Reconnecting an already-connected number (same phone_number_id) isn't
-  // blocked by this — the upsert below finds and updates that row instead
-  // of adding a new one, so only a genuinely new number counts against
-  // the cap.
-  const { data: existingForThisNumber } = await supabase
-    .from("whatsapp_accounts")
-    .select("id, label")
-    .eq("workspace_id", membership.workspace_id)
-    .eq("phone_number_id", input.phoneNumberId)
-    .maybeSingle();
-
-  if (!existingForThisNumber && (currentCount ?? 0) >= maxNumbers) {
-    return {
-      error: `Tu plan permite hasta ${maxNumbers} número${maxNumbers === 1 ? "" : "s"} de WhatsApp. Mejora tu plan para conectar más.`,
-    };
-  }
-
   try {
     const accessToken = await exchangeCodeForToken(input.code);
+
+    // En coexistencia Meta no entrega el id del numero: se busca en la cuenta,
+    // y se prefiere el que sigue vivo en la app WhatsApp Business.
+    let phoneNumberId = input.phoneNumberId;
+    if (modoPedido === "coexistencia" && !phoneNumberId) {
+      const numeros = await listWabaPhoneNumbers(input.wabaId, accessToken);
+      phoneNumberId = (numeros.find((n) => n.is_on_biz_app) ?? numeros[0])?.id ?? "";
+      if (!phoneNumberId) return { error: "Meta no devolvió ningún número en esa cuenta de WhatsApp. Intenta de nuevo." };
+    }
+
+    // Reconnecting an already-connected number (same phone_number_id) isn't
+    // blocked by this — the upsert below finds and updates that row instead
+    // of adding a new one, so only a genuinely new number counts against
+    // the cap.
+    const { data: existingForThisNumber } = await supabase
+      .from("whatsapp_accounts")
+      .select("id, label")
+      .eq("workspace_id", membership.workspace_id)
+      .eq("phone_number_id", phoneNumberId)
+      .maybeSingle();
+
+    if (!existingForThisNumber && (currentCount ?? 0) >= maxNumbers) {
+      return {
+        error: `Tu plan permite hasta ${maxNumbers} número${maxNumbers === 1 ? "" : "s"} de WhatsApp. Mejora tu plan para conectar más.`,
+      };
+    }
+
+    // Meta confirma el uso doble con is_on_biz_app. Si se pidio coexistencia y
+    // no lo confirma, no se guarda como tal: seria una linea que se cree viva
+    // en el celular y no lo esta.
+    if (modoPedido === "coexistencia") {
+      const estado = await getPhoneNumberCoexistence(phoneNumberId, accessToken);
+      if (estado.is_on_biz_app !== true) {
+        console.error("connectWhatsApp: Meta no confirmo la coexistencia", { workspaceId, waba: input.wabaId, phoneNumberId, estado });
+        return {
+          error:
+            "Meta no confirmó que el número siga activo en tu app WhatsApp Business. Revisa que tengas la app actualizada e intenta de nuevo.",
+        };
+      }
+    }
+
     await subscribeAppToWaba(input.wabaId, accessToken);
     // Required for the number to actually send/receive via the Cloud API —
     // Embedded Signup's own verification alone isn't enough (see comment on
     // registerPhoneNumber). Best-effort: some numbers arrive already
     // registered and this call 4xxs on those; not worth failing the whole
     // connection over.
-    try {
-      await registerPhoneNumber(input.phoneNumberId, accessToken);
-    } catch (err) {
-      console.error("registerPhoneNumber failed (continuing):", err);
+    // En coexistencia NO se registra: Meta no lo permite en un numero de uso doble.
+    if (modoPedido === "api") {
+      try {
+        await registerPhoneNumber(phoneNumberId, accessToken);
+      } catch (err) {
+        console.error("registerPhoneNumber failed (continuing):", err);
+      }
     }
     const phoneDetails = await getPhoneNumberDetails(
-      input.phoneNumberId,
+      phoneNumberId,
       accessToken
     );
 
@@ -165,10 +205,17 @@ export async function connectWhatsApp(input: {
       {
         workspace_id: membership.workspace_id,
         waba_id: input.wabaId,
-        phone_number_id: input.phoneNumberId,
+        phone_number_id: phoneNumberId,
         display_phone_number: phoneDetails.display_phone_number,
         access_token: accessToken,
         status: "connected",
+        connection_mode: modoPedido,
+        ...(modoPedido === "coexistencia"
+          ? {
+              coex_onboarded_at: new Date().toISOString(),
+              coex_sync: { contactos: { estado: "pendiente" }, historial: { estado: "pendiente", progreso: 0 } },
+            }
+          : { coex_onboarded_at: null, coex_sync: null }),
         // Reconnecting (e.g. a token refresh) doesn't necessarily pass a
         // label again — keep whatever was already set instead of wiping it.
         label: input.label?.trim() || existingForThisNumber?.label || null,
@@ -183,8 +230,35 @@ export async function connectWhatsApp(input: {
     );
 
     if (error) {
-      console.error(`connectWhatsApp: no se pudo guardar (workspace ${workspaceId}, numero ${input.phoneNumberId}):`, error.message);
+      console.error(`connectWhatsApp: no se pudo guardar (workspace ${workspaceId}, numero ${phoneNumberId}):`, error.message);
       return { error: error.message };
+    }
+
+    // Coexistencia: Meta da UNA sola vez, y solo 24 horas, para pedir los
+    // contactos y el historial. Primero contactos, luego historial. Si alguno
+    // falla la linea queda conectada igual y el estado lo dice en la tarjeta.
+    if (modoPedido === "coexistencia") {
+      const { data: fila } = await supabase
+        .from("whatsapp_accounts")
+        .select("id")
+        .eq("workspace_id", membership.workspace_id)
+        .eq("phone_number_id", phoneNumberId)
+        .maybeSingle();
+      const admin = createAdminClient();
+      if (fila) {
+        try {
+          await requestSmbAppDataSync(phoneNumberId, accessToken, "smb_app_state_sync");
+        } catch (err) {
+          console.error("coexistencia: no se pudo pedir la sincronizacion de contactos:", err);
+          await actualizarSync(admin, fila.id, { contactos: { estado: "error" } });
+        }
+        try {
+          await requestSmbAppDataSync(phoneNumberId, accessToken, "history");
+        } catch (err) {
+          console.error("coexistencia: no se pudo pedir el historial:", err);
+          await actualizarSync(admin, fila.id, { historial: { estado: "error" } });
+        }
+      }
     }
 
     // Plantilla de arranque para todo espacio que conecta su API (una por WABA).
@@ -192,12 +266,12 @@ export async function connectWhatsApp(input: {
 
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/templates");
-    return { success: true, displayPhoneNumber: phoneDetails.display_phone_number };
+    return { success: true, displayPhoneNumber: phoneDetails.display_phone_number, modo: modoPedido };
   } catch (err) {
     // Queda en el log del servidor: hasta ahora el mensaje solo lo veia el
     // cliente en pantalla y soporte no tenia como saber que fallo.
     const mensaje = err instanceof Error ? err.message : "Error desconocido.";
-    console.error(`connectWhatsApp: fallo (workspace ${workspaceId}, waba ${input.wabaId}, numero ${input.phoneNumberId}): ${mensaje}`);
+    console.error(`connectWhatsApp: fallo (workspace ${workspaceId}, waba ${input.wabaId}, numero ${input.phoneNumberId || "(sin id)"}): ${mensaje}`);
     return { error: mensaje };
   }
 }

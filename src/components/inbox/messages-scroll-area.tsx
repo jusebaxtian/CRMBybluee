@@ -17,6 +17,7 @@ type Message = {
   error_detail?: string | null;
   wa_message_id?: string | null;
   context_wa_message_id?: string | null;
+  sent_from_app?: boolean | null;
   buttons?: ({ type: "QUICK_REPLY"; id: string; title: string } | { type: "URL"; title: string; url: string })[] | null;
   created_at: string;
 };

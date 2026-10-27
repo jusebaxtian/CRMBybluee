@@ -16,6 +16,7 @@ import { toPublicUrl } from "@/lib/supabase/config";
 import { recordInboundMessage } from "@/lib/messaging/record";
 import { iniciarPorBoton, iniciarPorMensaje, procesarEntrada } from "@/lib/flujos/motor";
 import { traducirErrorEnvio } from "@/lib/whatsapp/errores";
+import { ingestarCuentaActualizada, ingestarEcos, ingestarHistorial, ingestarSyncDeContactos } from "@/lib/whatsapp/coexistencia-ingest";
 
 // WhatsApp never tells a business when a customer has blocked them (privacy
 // by design) — the closest signal available is this error code, meaning
@@ -146,7 +147,7 @@ const extensionFromMime: Record<string, string> = {
 // between messages (e.g. a username-only contact vs. a phone number once
 // Contact Book links them). Falls back to the existing wa_id-based upsert,
 // which is still how virtually every contact resolves today.
-async function resolveContact(
+export async function resolveContact(
   supabase: ReturnType<typeof createAdminClient>,
   workspaceId: string,
   waId: string,
@@ -242,7 +243,7 @@ async function guardarMuestraDeUsuario(
   }
 }
 
-async function persistIncomingMedia(
+export async function persistIncomingMedia(
   supabase: ReturnType<typeof createAdminClient>,
   workspaceId: string,
   accessToken: string,
@@ -306,6 +307,23 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
 
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
+      // Avisos de la coexistencia: lo que el negocio hace desde su celular.
+      if (change.field === "smb_message_echoes") {
+        await ingestarEcos(supabase, change.value, { resolveContact, persistIncomingMedia });
+        continue;
+      }
+      if (change.field === "history") {
+        await ingestarHistorial(supabase, change.value, { resolveContact, persistIncomingMedia });
+        continue;
+      }
+      if (change.field === "smb_app_state_sync") {
+        await ingestarSyncDeContactos(supabase, change.value, { resolveContact, persistIncomingMedia });
+        continue;
+      }
+      if (change.field === "account_update") {
+        await ingestarCuentaActualizada(supabase, entry.id, change.value);
+        continue;
+      }
       if (change.field !== "messages") continue;
       const { value } = change;
       const phoneNumberId = value.metadata?.phone_number_id;

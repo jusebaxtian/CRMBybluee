@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { textoDeSincronizacion } from "@/lib/whatsapp/coexistencia";
 import { getPhoneNumberStatus, getPortafolioDeLaCuenta, getWabaStatus, tramoEfectivo } from "@/lib/whatsapp/graph";
 
 /**
@@ -132,6 +133,10 @@ export type ConexionApi = {
   negocioVerificado: "verificado" | "pendiente" | "sin_verificar" | null;
   /** Nombre del portafolio comercial dueño de la cuenta de WhatsApp, si Meta lo entrega. */
   portafolio: string | null;
+  /** "coexistencia": el numero tambien sigue vivo en la app WhatsApp Business del celular. */
+  modo: "api" | "coexistencia";
+  /** Avance de la sincronizacion inicial (contactos e historial), solo en coexistencia. */
+  sincronizacion: string | null;
 };
 
 /**
@@ -195,7 +200,7 @@ export async function cargarConexiones(supabase: SupabaseClient, workspaceId: st
   const [{ data: cuentas }, { data: ws }, { data: uso }] = await Promise.all([
     supabase
       .from("whatsapp_accounts")
-      .select("id, phone_number_id, waba_id, access_token, display_phone_number, label, status")
+      .select("id, phone_number_id, waba_id, access_token, display_phone_number, label, status, connection_mode, coex_sync")
       .eq("workspace_id", workspaceId)
       .order("connected_at", { ascending: true }),
     supabase
@@ -250,6 +255,8 @@ export async function cargarConexiones(supabase: SupabaseClient, workspaceId: st
         nombreParaMostrar: meta?.verified_name ?? null,
         negocioVerificado: estadoDeVerificacion(waba?.business_verification_status),
         portafolio,
+        modo: c.connection_mode === "coexistencia" ? "coexistencia" : "api",
+        sincronizacion: c.connection_mode === "coexistencia" ? textoDeSincronizacion(c.coex_sync) : null,
         cuentaRevision: !revision ? null : revision === "APPROVED" ? "aprobada" : revision === "REJECTED" ? "rechazada" : "pendiente",
       };
     })

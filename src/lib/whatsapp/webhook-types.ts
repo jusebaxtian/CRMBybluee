@@ -6,6 +6,24 @@ export type WhatsAppWebhookPayload = {
       field: string;
       value: {
         metadata?: { display_phone_number: string; phone_number_id: string };
+        // Coexistencia (numero en la app WhatsApp Business y en la API).
+        // Mensajes que el negocio escribio desde su celular.
+        message_echoes?: import("@/lib/whatsapp/coexistencia").MensajeDeLaApp[];
+        // Historial de chats (hasta 180 dias; el CRM usa 30) y sus errores.
+        history?: {
+          metadata?: { phase?: number; chunk_order?: number; progress?: number };
+          threads?: { id: string; messages?: import("@/lib/whatsapp/coexistencia").MensajeDeLaApp[] }[];
+          errors?: { code: number; title?: string; message?: string }[];
+        }[];
+        // Contactos de la app (altas, cambios y bajas).
+        state_sync?: {
+          type?: string;
+          contact?: { full_name?: string; first_name?: string; phone_number?: string };
+          action?: string;
+        }[];
+        // account_update: p. ej. PARTNER_REMOVED cuando la persona desvincula desde el celular.
+        event?: string;
+        waba_info?: { waba_id?: string };
         // "user_id" (BSUID) has been present alongside "wa_id" on every
         // inbound contact/message since 2026-03-31 — see BSUID migration
         // notes in the 0025_bsuid_support migration.

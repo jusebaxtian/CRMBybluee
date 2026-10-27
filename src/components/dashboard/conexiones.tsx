@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId } from "@/lib/workspace";
 import { cargarConexiones, type ConexionApi } from "@/lib/dashboard/datos";
 import { ConnectWhatsAppButton } from "@/components/whatsapp/connect-whatsapp-button";
+import { coexistenciaPermitidaPara } from "@/lib/whatsapp/coexistencia";
 
 const BOTON_PRIMARIO =
   "inline-flex items-center gap-1.5 rounded-[10px] bg-dash-green px-4 py-[10px] font-dash-ui text-[12.5px] font-bold text-dash-on-green transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:opacity-50";
@@ -102,6 +103,18 @@ function Tarjeta({ c }: { c: ConexionApi }) {
           </dd>
         </div>
 
+        {c.modo === "coexistencia" && (
+          <div className="flex items-center justify-between gap-3">
+            <dt className="whitespace-nowrap font-dash-ui text-[11.5px] font-medium text-dash-text-2">Modo</dt>
+            <dd
+              className="min-w-0 text-right font-dash-ui text-[11.5px] font-semibold text-dash-green-text"
+              title="El número sigue activo en la app WhatsApp Business del celular y también en el CRM."
+            >
+              Coexistencia{c.sincronizacion ? <span className="block font-medium text-dash-text-3">{c.sincronizacion}</span> : null}
+            </dd>
+          </div>
+        )}
+
         <div className="flex items-center justify-between gap-3">
           <dt className="whitespace-nowrap font-dash-ui text-[11.5px] font-medium text-dash-text-2">Portafolio comercial</dt>
           <dd
@@ -124,13 +137,13 @@ function Tarjeta({ c }: { c: ConexionApi }) {
   );
 }
 
-function SlotVacio({ n, plan }: { n: number; plan: string }) {
+function SlotVacio({ n, plan, coexistencia }: { n: number; plan: string; coexistencia: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center gap-[10px] rounded-[13px] border border-dashed border-[rgba(27,168,74,0.35)] bg-[rgba(27,168,74,0.04)] p-4 text-center">
       <span aria-hidden className="text-[22px]">➕</span>
       <p className="font-dash-ui text-[13px] font-semibold text-dash-text">Espacio {n} disponible</p>
       <p className="font-dash-ui text-[11.5px] leading-[1.45] text-dash-text-3">{plan}</p>
-      <ConnectWhatsAppButton label="💬 Conectar WhatsApp" askLabel className={BOTON_PRIMARIO} />
+      <ConnectWhatsAppButton label="💬 Conectar WhatsApp" askLabel coexistencia={coexistencia} className={BOTON_PRIMARIO} />
     </div>
   );
 }
@@ -144,6 +157,8 @@ export async function Conexiones() {
   const { data: ws } = await supabase.from("workspaces").select("plans(name)").eq("id", workspaceId).maybeSingle();
   const nombrePlan = (ws?.plans as unknown as { name: string } | null)?.name ?? "tu plan";
   const textoPlan = `Tu plan ${nombrePlan} permite hasta ${maxPermitidoPlan} ${maxPermitidoPlan === 1 ? "número" : "números"}`;
+
+  const coexistencia = coexistenciaPermitidaPara(workspaceId);
 
   const contenedor =
     "rounded-[15px] border border-dash-green-20 bg-[linear-gradient(180deg,var(--dash-green-7),rgba(27,168,74,0.02))] p-5";
@@ -161,6 +176,7 @@ export async function Conexiones() {
         </div>
         <ConnectWhatsAppButton
           label="💬 Conectar WhatsApp"
+          coexistencia={coexistencia}
           className="w-full flex-none rounded-[12px] bg-dash-green px-[22px] py-[14px] font-dash-ui text-[14px] font-bold text-dash-on-green transition-colors duration-150 hover:bg-[var(--primary-hover)] disabled:opacity-50 sm:w-auto"
         />
       </section>
@@ -192,7 +208,7 @@ export async function Conexiones() {
           <Tarjeta key={c.id} c={c} />
         ))}
         {Array.from({ length: libres }, (_, i) => (
-          <SlotVacio key={`libre-${i}`} n={conexiones.length + i + 1} plan={textoPlan} />
+          <SlotVacio key={`libre-${i}`} n={conexiones.length + i + 1} plan={textoPlan} coexistencia={coexistencia} />
         ))}
       </div>
     </section>

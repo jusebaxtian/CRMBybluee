@@ -88,6 +88,45 @@ export async function registerPhoneNumber(phoneNumberId: string, accessToken: st
   });
 }
 
+export type NumeroDeLaCuenta = {
+  id: string;
+  display_phone_number?: string;
+  is_on_biz_app?: boolean;
+  platform_type?: string;
+};
+
+/** Numeros de una cuenta de WhatsApp Business (WABA), con la marca de uso doble. */
+export async function listWabaPhoneNumbers(wabaId: string, accessToken: string): Promise<NumeroDeLaCuenta[]> {
+  const data = await graphFetch(`/${wabaId}/phone_numbers?fields=id,display_phone_number,is_on_biz_app,platform_type`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return (data.data ?? []) as NumeroDeLaCuenta[];
+}
+
+/** Si el numero sigue vivo en la app WhatsApp Business ademas de la API (coexistencia). */
+export async function getPhoneNumberCoexistence(phoneNumberId: string, accessToken: string): Promise<NumeroDeLaCuenta> {
+  return graphFetch(`/${phoneNumberId}?fields=id,display_phone_number,is_on_biz_app,platform_type`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+}
+
+/**
+ * Pide a Meta la sincronizacion inicial de un numero en coexistencia:
+ * "smb_app_state_sync" (contactos) o "history" (historial de chats). Meta solo
+ * deja pedir cada una UNA vez, dentro de las 24 horas siguientes a la conexion.
+ */
+export async function requestSmbAppDataSync(
+  phoneNumberId: string,
+  accessToken: string,
+  syncType: "smb_app_state_sync" | "history"
+) {
+  return graphFetch(`/${phoneNumberId}/smb_app_data`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ messaging_product: "whatsapp", sync_type: syncType }),
+  });
+}
+
 export async function getPhoneNumberDetails(
   phoneNumberId: string,
   accessToken: string

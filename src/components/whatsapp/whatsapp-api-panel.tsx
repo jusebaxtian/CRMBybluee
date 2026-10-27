@@ -133,10 +133,13 @@ export function WhatsAppApiPanel({
   accounts,
   phoneStatuses,
   maxNumbers,
+  coexistencia = false,
 }: {
   accounts: WhatsAppAccount[];
   phoneStatuses: Record<string, PhoneNumberStatus | null>;
   maxNumbers: number;
+  /** Ofrece conectar tambien en coexistencia (numero que sigue en la app WhatsApp Business). */
+  coexistencia?: boolean;
 }) {
   const activeCount = accounts.filter((a) => a.status !== "frozen").length;
   const atLimit = activeCount >= maxNumbers;
@@ -183,7 +186,7 @@ export function WhatsAppApiPanel({
         </ol>
 
         <div className="mt-5 flex justify-center">
-          <ConnectWhatsAppButton />
+          <ConnectWhatsAppButton coexistencia={coexistencia} />
         </div>
       </div>
     );
@@ -212,7 +215,7 @@ export function WhatsAppApiPanel({
             para conectar más.
           </p>
         ) : (
-          <ConnectWhatsAppButton label="Conectar otro número" askLabel />
+          <ConnectWhatsAppButton label="Conectar otro número" askLabel coexistencia={coexistencia} />
         )}
       </div>
     </div>

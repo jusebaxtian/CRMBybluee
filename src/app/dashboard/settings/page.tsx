@@ -1,3 +1,4 @@
+import { coexistenciaPermitidaPara } from "@/lib/whatsapp/coexistencia";
 import { redirect } from "next/navigation";
 import { Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -104,7 +105,7 @@ export default async function SettingsPage() {
 
   const whatsappSection = (
     <div className="flex flex-col gap-5">
-      <WhatsAppApiPanel accounts={accounts} phoneStatuses={phoneStatuses} maxNumbers={maxWhatsappNumbers} />
+      <WhatsAppApiPanel accounts={accounts} phoneStatuses={phoneStatuses} maxNumbers={maxWhatsappNumbers} coexistencia={coexistenciaPermitidaPara(workspaceId)} />
       {accounts
         .filter((a) => a.status !== "frozen")
         .map((a) => (

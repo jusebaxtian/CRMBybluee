@@ -19,6 +19,8 @@ type Message = {
   error_detail?: string | null;
   wa_message_id?: string | null;
   context_wa_message_id?: string | null;
+  /** Lo escribio la persona desde la app WhatsApp Business del celular (coexistencia). */
+  sent_from_app?: boolean | null;
   buttons?: MessageButton[] | null;
   created_at: string;
 };
@@ -310,6 +312,11 @@ export function MessageBubble({
         )}
 
         <p className="mt-1 flex items-center justify-end gap-1 text-[10px] opacity-70">
+          {m.sent_from_app && (
+            <span title="Enviado desde el celular" aria-label="Enviado desde el celular">
+              📱
+            </span>
+          )}
           {time}
           {out && <StatusTicks status={m.status} errorDetail={m.error_detail} />}
         </p>

@@ -77,7 +77,7 @@ export default async function ConversationPage({
     supabase
       .from("messages")
       .select(
-        "id, direction, body, caption, status, message_type, media_url, media_mime_type, error_detail, wa_message_id, context_wa_message_id, buttons, created_at"
+        "id, direction, body, caption, status, message_type, media_url, media_mime_type, error_detail, wa_message_id, context_wa_message_id, sent_from_app, buttons, created_at"
       )
       .eq("conversation_id", id)
       .order("created_at", { ascending: false })

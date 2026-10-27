@@ -53,6 +53,10 @@ export type OutboundMessage = {
   status?: "sent" | "failed";
   /** Motivo del fallo, cuando `status` es "failed". */
   errorDetail?: string | null;
+  /** Lo escribio la persona desde la app WhatsApp Business del celular (coexistencia). */
+  sentFromApp?: boolean;
+  /** Hora real del mensaje, cuando no es "ahora" (p. ej. un eco que Meta avisa despues). */
+  createdAt?: string;
 };
 
 /**
@@ -88,10 +92,12 @@ export async function recordOutboundMessage(
       exclude_from_followups: message.excludeFromFollowups ?? false,
       status: message.status ?? "sent",
       error_detail: message.errorDetail ?? null,
+      sent_from_app: message.sentFromApp ?? false,
+      ...(message.createdAt ? { created_at: message.createdAt } : {}),
     }),
     supabase
       .from("conversations")
-      .update({ last_message_at: new Date().toISOString() })
+      .update({ last_message_at: message.createdAt ?? new Date().toISOString() })
       .eq("id", message.conversationId),
   ]);
 
