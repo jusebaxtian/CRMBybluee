@@ -161,6 +161,23 @@ export async function getWabaStatus(wabaId: string, accessToken: string): Promis
   });
 }
 
+/**
+ * Nombre del portafolio comercial (Business Manager) dueño de la cuenta de
+ * WhatsApp. Va en una consulta aparte y nunca lanza: si el token del cliente no
+ * puede leer ese campo, solo falta este dato y el resto de la tarjeta (calidad,
+ * verificacion) no se ve afectado.
+ */
+export async function getPortafolioDeLaCuenta(wabaId: string, accessToken: string): Promise<string | null> {
+  try {
+    const r = (await graphFetch(`/${wabaId}?fields=owner_business_info`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })) as { owner_business_info?: { name?: string } };
+    return r.owner_business_info?.name?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function sendTextMessage(
   phoneNumberId: string,
   accessToken: string,

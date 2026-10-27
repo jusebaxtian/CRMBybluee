@@ -102,35 +102,13 @@ function Tarjeta({ c }: { c: ConexionApi }) {
           </dd>
         </div>
 
-        <div className="flex items-center justify-between">
-          <dt className="whitespace-nowrap font-dash-ui text-[11.5px] font-medium text-dash-text-2">Nombre en Meta</dt>
+        <div className="flex items-center justify-between gap-3">
+          <dt className="whitespace-nowrap font-dash-ui text-[11.5px] font-medium text-dash-text-2">Portafolio comercial</dt>
           <dd
-            className={`font-dash-ui text-[11.5px] font-semibold ${
-              c.nombreEstado === null
-                ? "text-dash-text-3"
-                : c.nombreEstado === "aprobado"
-                  ? "text-dash-green-text"
-                  : c.nombreEstado === "rechazado"
-                    ? "text-dash-red"
-                    : "text-dash-amber"
-            }`}
-            title={
-              c.nombreEstado === "sin_nombre"
-                ? "No hay un nombre para mostrar aprobado ni enviado a revisión. Envíalo desde WhatsApp Manager en Meta."
-                : c.nombreEstado === "rechazado"
-                  ? "Meta rechazó el nombre. Envía otro desde WhatsApp Manager."
-                  : undefined
-            }
+            className={`min-w-0 truncate text-right font-dash-ui text-[11.5px] font-semibold ${c.portafolio ? "text-dash-text" : "text-dash-text-3"}`}
+            title={c.portafolio ?? "Meta no entregó el nombre del portafolio de esta cuenta."}
           >
-            {c.nombreEstado === null
-              ? "—"
-              : c.nombreEstado === "aprobado"
-                ? "Aprobado"
-                : c.nombreEstado === "en_revision"
-                  ? "En revisión"
-                  : c.nombreEstado === "rechazado"
-                    ? "Rechazado"
-                    : "Sin nombre aprobado"}
+            {c.portafolio ?? "—"}
           </dd>
         </div>
       </dl>

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getPhoneNumberStatus, getWabaStatus, tramoEfectivo } from "@/lib/whatsapp/graph";
+import { getPhoneNumberStatus, getPortafolioDeLaCuenta, getWabaStatus, tramoEfectivo } from "@/lib/whatsapp/graph";
 
 /**
  * Datos del dashboard del cliente.
@@ -130,6 +130,8 @@ export type ConexionApi = {
   cuentaRevision: "aprobada" | "pendiente" | "rechazada" | null;
   /** business_verification_status del WABA: si el negocio dueño esta verificado en Meta. */
   negocioVerificado: "verificado" | "pendiente" | "sin_verificar" | null;
+  /** Nombre del portafolio comercial dueño de la cuenta de WhatsApp, si Meta lo entrega. */
+  portafolio: string | null;
 };
 
 /**
@@ -218,12 +220,14 @@ export async function cargarConexiones(supabase: SupabaseClient, workspaceId: st
     (cuentas ?? []).map(async (c): Promise<ConexionApi> => {
       let meta: Awaited<ReturnType<typeof getPhoneNumberStatus>> | null = null;
       let waba: Awaited<ReturnType<typeof getWabaStatus>> | null = null;
+      let portafolio: string | null = null;
       try {
-        [meta, waba] = await Promise.all([
+        [meta, waba, portafolio] = await Promise.all([
           getPhoneNumberStatus(c.phone_number_id, c.access_token),
           // Si la consulta de la cuenta falla, el numero se pinta igual: antes
           // un error aqui dejaba toda la tarjeta en blanco.
           c.waba_id ? getWabaStatus(c.waba_id, c.access_token).catch(() => null) : Promise.resolve(null),
+          c.waba_id ? getPortafolioDeLaCuenta(c.waba_id, c.access_token) : Promise.resolve(null),
         ]);
       } catch {
         // Meta caido o token vencido: la tarjeta se pinta con lo que hay en
@@ -245,6 +249,7 @@ export async function cargarConexiones(supabase: SupabaseClient, workspaceId: st
         nombreEstado: estadoDelNombre(meta?.name_status, meta?.new_name_status),
         nombreParaMostrar: meta?.verified_name ?? null,
         negocioVerificado: estadoDeVerificacion(waba?.business_verification_status),
+        portafolio,
         cuentaRevision: !revision ? null : revision === "APPROVED" ? "aprobada" : revision === "REJECTED" ? "rechazada" : "pendiente",
       };
     })
