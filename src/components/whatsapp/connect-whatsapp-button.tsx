@@ -177,7 +177,7 @@ export function ConnectWhatsAppButton({
         override_default_response_type: true,
         extras:
           modo === "coexistencia"
-            ? { sessionInfoVersion: "3", featureType: "whatsapp_business_app_onboarding" }
+            ? { setup: {}, featureType: "whatsapp_business_app_onboarding", sessionInfoVersion: "3" }
             : { sessionInfoVersion: "3" },
       }
     );
