@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
 import type { createClient } from "@/lib/supabase/server";
 import { textoDeConfirmacion } from "@/lib/agenda/mensaje-cita";
+import { notaDeCita, plantillaDeCitaPara } from "@/lib/agenda/nota-de-cita";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getEnabledModuleKeys } from "@/lib/entitlements";
 import { abrirConversacion } from "@/lib/whatsapp/conversacion";
@@ -26,7 +27,7 @@ import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { sendTemplateMessage } from "@/lib/whatsapp/graph";
 import { recordOutboundMessage } from "@/lib/messaging/record";
 import { rellenarPlantilla } from "@/lib/ai/seguimientos";
-import { IDIOMA_CITA, asegurarPlantillasDeCita, codigoDeMeet, elegirPlantillaGuardada, nombresDePlantilla, parametrosDeCita, plantillaDeCita } from "@/lib/agenda/plantillas-cita";
+import { IDIOMA_CITA, asegurarPlantillasDeCita, codigoDeMeet, elegirPlantillaGuardada, nombresDePlantilla, parametrosDeCita } from "@/lib/agenda/plantillas-cita";
 
 /**
  * Eventos de la Agenda (migracion 0146). Cada evento se crea tambien en el
@@ -394,7 +395,7 @@ async function prepararConfirmacionDeCita(supabase: Supabase, workspaceId: strin
 
   // Ventana abierta: texto libre.
   if (isWindowOpen((ultimoEntrante?.created_at as string | undefined) ?? null, Date.now())) {
-    return { modo: "texto", para, conversacionId: conversacion.id as string, texto: textoDeConfirmacion({ nombre, titulo, inicioIso, meetUrl }) };
+    return { modo: "texto", para, conversacionId: conversacion.id as string, texto: textoDeConfirmacion({ nombre, titulo, inicioIso, meetUrl, nota: notaDeCita(workspaceId, !!meetUrl) }) };
   }
 
   // Ventana cerrada: plantilla aprobada de ESTA WABA.
@@ -404,7 +405,7 @@ async function prepararConfirmacionDeCita(supabase: Supabase, workspaceId: strin
   const { data: espacio } = await supabase.from("workspaces").select("name").eq("id", workspaceId).maybeSingle();
 
   const codigo = codigoDeMeet(meetUrl);
-  const plantilla = plantillaDeCita(codigo !== null);
+  const plantilla = plantillaDeCitaPara(workspaceId, codigo !== null);
   // El nombre original o un reemplazo (si Meta bloqueo el original tras un borrado): se usa el aprobado.
   const { data: filas } = await supabase
     .from("templates")
