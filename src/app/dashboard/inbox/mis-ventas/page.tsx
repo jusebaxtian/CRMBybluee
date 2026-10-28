@@ -43,8 +43,8 @@ export default async function MisVentasPage() {
     { t: "Licencias en total", v: String(r.licenciasTotal), c: "text-foreground" },
     { t: "Total vendido", v: pesos(r.vendidoCents), c: "text-foreground" },
     { t: "Comisión ganada", v: pesos(r.ganadaCents), c: "text-success" },
-    { t: "Por cobrar", v: pesos(r.porCobrarCents), c: "text-primary" },
-    { t: "En revisión", v: pesos(r.pendienteCents), c: "text-warning" },
+    { t: "Por cobrar (ya aprobada)", v: pesos(r.porCobrarCents), c: "text-primary" },
+    { t: "En revisión del administrador", v: pesos(r.pendienteCents), c: "text-warning" },
   ];
 
   return (
@@ -54,8 +54,8 @@ export default async function MisVentasPage() {
       </Link>
       <h1 className="text-xl font-semibold text-foreground">Mis ventas</h1>
       <p className="mt-1 text-sm text-muted">
-        Tu comisión es del {Number(vendedor.comision_pct)}% de la primera venta de cada cliente. Queda «en revisión» hasta que el
-        administrador confirma el pago.
+        Tu comisión es del {Number(vendedor.comision_pct)}% de cada licencia nueva que vendes (las renovaciones no cuentan). Primero
+        queda «en revisión»; cuando el administrador confirma que el pago entró pasa a «por cobrar», y cuando te paga, a «pagada».
       </p>
 
       <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-3">

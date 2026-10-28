@@ -28,9 +28,9 @@ export async function nombreDeUsuario(admin: SupabaseClient, userId: string): Pr
 
 /**
  * Anota la venta de un vendedor, deja el chat del cliente a su nombre y le
- * avisa al administrador. Solo la PRIMERA venta de un cliente da comision: si
- * el contacto ya tiene una venta vigente, o el espacio ya habia pagado antes
- * (es una renovacion), no se anota nada.
+ * avisa al administrador. Da comision cada licencia NUEVA (cada enlace de
+ * registro crea un espacio nuevo: un cliente puede comprar varias). Lo que no
+ * da comision es renovar: pagar un espacio que ya habia pagado antes.
  */
 export async function registrarVentaDeVendedor(
   admin: SupabaseClient,
@@ -45,15 +45,6 @@ export async function registrarVentaDeVendedor(
     paymentId?: string | null;
   }
 ): Promise<{ anotada: boolean; motivo?: string }> {
-  const { data: previa } = await admin
-    .from("ventas_vendedor")
-    .select("id")
-    .eq("contact_id", venta.contactId)
-    .neq("estado", "anulada")
-    .limit(1)
-    .maybeSingle();
-  if (previa) return { anotada: false, motivo: "Este cliente ya tiene una venta registrada." };
-
   if (venta.clienteWorkspaceId) {
     let pagosPrevios = admin
       .from("payments")
@@ -103,26 +94,53 @@ export async function registrarVentaDeVendedor(
     .eq("workspace_id", v.workspace_id)
     .eq("contact_id", venta.contactId);
 
-  await avisarVentaAlAdministrador(admin, v.user_id, venta.planNombre, venta.montoCents, creada.id as string);
+  await avisarVentaAlAdministrador(admin, v, venta.contactId, venta.planNombre, venta.montoCents, creada.id as string);
   return { anotada: true };
 }
 
 const pesos = (cents: number) =>
   new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(cents / 100);
 
-/** Notificacion al celular de los administradores de la plataforma. Nunca lanza. */
-async function avisarVentaAlAdministrador(admin: SupabaseClient, vendedorId: string, planNombre: string, montoCents: number, ventaId: string) {
+/**
+ * Aviso de venta nueva: en la campana del espacio (solo dueño y administradores
+ * lo ven, no los vendedores) y al celular de los administradores de la
+ * plataforma, con boton directo a aprobarla. Nunca lanza.
+ */
+async function avisarVentaAlAdministrador(
+  admin: SupabaseClient,
+  v: Vendedor,
+  contactId: string,
+  planNombre: string,
+  montoCents: number,
+  ventaId: string
+) {
   try {
-    const { data: admins } = await admin.from("platform_admins").select("user_id");
-    const ids = (admins ?? []).map((a) => a.user_id as string);
-    if (!ids.length) return;
-    const nombre = await nombreDeUsuario(admin, vendedorId);
-    await sendPushToUsers(admin as Parameters<typeof sendPushToUsers>[0], ids, {
-      title: "💰 Nueva venta por aprobar",
-      body: `${nombre} vendió ${planNombre} por ${pesos(montoCents)}. Revisa el comprobante y apruébala.`,
-      url: "/admin/vendedores",
-      tag: `venta-${ventaId}`,
+    const [nombre, { data: contacto }, { data: admins }] = await Promise.all([
+      nombreDeUsuario(admin, v.user_id),
+      admin.from("contacts").select("name, wa_id").eq("id", contactId).maybeSingle(),
+      admin.from("platform_admins").select("user_id"),
+    ]);
+    const cliente = (contacto?.name as string | null)?.trim() || (contacto?.wa_id as string | undefined) || "un cliente";
+    const titulo = `💰 ${nombre} registró una venta`;
+    const cuerpo = `Venta de ${pesos(montoCents)} a ${cliente} (plan ${planNombre}). Revisa el comprobante y apruébala.`;
+    const url = `/admin/vendedores?venta=${ventaId}`;
+
+    const { error } = await admin.from("notifications").insert({
+      title: titulo,
+      body: cuerpo,
+      scope: "workspace",
+      target_workspace_id: v.workspace_id,
+      solo_admins: true,
+      cta_label: "Aprobar venta",
+      cta_url: url,
+      ends_at: new Date(Date.now() + 7 * 86_400_000).toISOString(),
     });
+    if (error) console.error("vendedores: no se pudo crear el aviso de la campana", error.message);
+
+    const ids = (admins ?? []).map((a) => a.user_id as string);
+    if (ids.length) {
+      await sendPushToUsers(admin as Parameters<typeof sendPushToUsers>[0], ids, { title: titulo, body: cuerpo, url, tag: `venta-${ventaId}` });
+    }
   } catch (err) {
     console.error("vendedores: no se pudo avisar la venta", err);
   }

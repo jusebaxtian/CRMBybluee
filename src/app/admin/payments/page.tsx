@@ -87,12 +87,35 @@ export default async function AdminPaymentsPage({
     })
   );
 
+  // Quien vendio (0158): los pagos y enlaces que registraron los vendedores se ven
+  // aqui junto con los tuyos, marcados con el nombre del vendedor.
+  const nombreVendedor = new Map<string, string>();
+  const { data: listaVendedores } = await admin.from("vendedores").select("user_id");
+  for (const v of listaVendedores ?? []) {
+    const { data: u } = await admin.auth.admin.getUserById(v.user_id as string);
+    const meta = u.user?.user_metadata as { full_name?: string } | undefined;
+    nombreVendedor.set(v.user_id as string, meta?.full_name?.trim() || u.user?.email || "Vendedor");
+  }
+  const vendedorPorPago = new Map<string, string>();
+  const idsPagos = (payments ?? []).map((p) => p.id as string);
+  if (nombreVendedor.size && idsPagos.length) {
+    const [{ data: ventasDirectas }, { data: invUsadas }] = await Promise.all([
+      admin.from("ventas_vendedor").select("vendedor_id, payment_id").in("payment_id", idsPagos).neq("estado", "anulada"),
+      admin.from("invitaciones_registro").select("payment_id, created_by").in("payment_id", idsPagos),
+    ]);
+    for (const v of ventasDirectas ?? []) if (v.payment_id) vendedorPorPago.set(v.payment_id as string, nombreVendedor.get(v.vendedor_id as string) ?? "Vendedor");
+    for (const i of invUsadas ?? []) {
+      const nombre = i.created_by ? nombreVendedor.get(i.created_by as string) : undefined;
+      if (i.payment_id && nombre) vendedorPorPago.set(i.payment_id as string, nombre);
+    }
+  }
+
   // Enlaces de registro con pago pendientes de usar (0105).
   const h = await headers();
   const origen = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("x-forwarded-host") ?? h.get("host") ?? "crmbybluee.blue"}`;
   const { data: invitaciones } = await admin
     .from("invitaciones_registro")
-    .select("id, token, phone, amount_cents, currency, created_at, tipo, dias_demo, nombre, plans(name), contacts(name)")
+    .select("id, token, phone, amount_cents, currency, created_at, tipo, dias_demo, nombre, created_by, plans(name), contacts(name)")
     .eq("status", "pending")
     .order("created_at", { ascending: false });
   const invitacionFilas: InvitacionFila[] = (invitaciones ?? []).map((i) => ({
@@ -106,13 +129,14 @@ export default async function AdminPaymentsPage({
     amount_cents: Number(i.amount_cents),
     currency: (i.currency as string) ?? "COP",
     created_at: i.created_at as string,
+    vendedor: i.created_by ? (nombreVendedor.get(i.created_by as string) ?? null) : null,
   }));
 
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Pagos</h1>
-        <p className="text-sm text-muted">Revisa y aprueba transferencias manuales</p>
+        <p className="text-sm text-muted">Todo lo que se vende: lo tuyo y lo de tus vendedores. Revisa y aprueba transferencias manuales.</p>
       </div>
 
       <ResumenVentas ventas={ventas} desde={desde ?? null} hasta={hasta ?? null} />
@@ -145,6 +169,11 @@ export default async function AdminPaymentsPage({
                   <td className="px-5 py-3">
                     <p className="text-foreground">{workspace?.name ?? "—"}</p>
                     <p className="text-xs text-muted">{p.ownerEmail}</p>
+                    {vendedorPorPago.get(p.id as string) && (
+                      <span className="mt-1 inline-block rounded-full border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-[10px] font-semibold text-warning">
+                        Vendió: {vendedorPorPago.get(p.id as string)}
+                      </span>
+                    )}
                   </td>
                   <td className="px-5 py-3 text-foreground">
                     {p.provider === "bold" ? "Bold" : p.provider === "wompi" ? "Wompi" : "Transferencia"}

@@ -48,9 +48,12 @@ export function EspacioDelClienteCard({
   espacios,
   invitaciones = [],
   contactId,
+  enlaceAlAdmin = true,
 }: {
   espacios: EspacioDelCliente[];
   invitaciones?: InvitacionPendiente[];
+  /** El nombre del espacio lleva al panel de admin; el vendedor no tiene panel de admin. */
+  enlaceAlAdmin?: boolean;
   /** Con contacto, muestra "Crear demo / Registrar pago" (solo llega para el admin). */
   contactId?: string;
 }) {
@@ -71,13 +74,17 @@ export function EspacioDelClienteCard({
                 : null;
               return (
                 <li key={e.workspace_id} className="text-xs">
-                  <Link
-                    href={`/admin/workspaces/${e.workspace_id}`}
-                    className="flex items-center gap-1 font-semibold text-foreground hover:underline"
-                  >
-                    <span className="truncate">{e.workspace_name}</span>
-                    <ExternalLink size={11} className="shrink-0 text-muted" />
-                  </Link>
+                  {enlaceAlAdmin ? (
+                    <Link
+                      href={`/admin/workspaces/${e.workspace_id}`}
+                      className="flex items-center gap-1 font-semibold text-foreground hover:underline"
+                    >
+                      <span className="truncate">{e.workspace_name}</span>
+                      <ExternalLink size={11} className="shrink-0 text-muted" />
+                    </Link>
+                  ) : (
+                    <p className="truncate font-semibold text-foreground">{e.workspace_name}</p>
+                  )}
                   <p className="text-muted">
                     {[
                       e.plan_name ?? "Sin plan",

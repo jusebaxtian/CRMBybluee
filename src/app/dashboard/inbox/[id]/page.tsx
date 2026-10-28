@@ -156,6 +156,16 @@ export default async function ConversationPage({
       conversation.assigned_agent_id === usuario.id &&
       !!(await vendedorActivo(createAdminClient(), usuario.id));
   }
+  // El vendedor ve, de SUS clientes, lo mismo que el administrador: el espacio
+  // que compro y los enlaces de registro pendientes (migraciones 0158 y 0159).
+  if (esVendedorDelChat) {
+    const [{ data }, invitaciones] = await Promise.all([
+      supabase.rpc("admin_espacio_de_contacto", { p_contact_id: conversation.contact_id }),
+      invitacionesPendientesDeContacto(supabase, conversation.contact_id),
+    ]);
+    espaciosDelCliente = (data ?? []) as EspacioDelCliente[];
+    invitacionesPendientes = invitaciones;
+  }
   if (esAdmin) {
     const [{ data }, invitaciones] = await Promise.all([
       supabase.rpc("admin_espacio_de_contacto", { p_contact_id: conversation.contact_id }),
@@ -312,7 +322,7 @@ export default async function ConversationPage({
             adBody={conversation.ad_body}
             espaciosDelCliente={espaciosDelCliente}
             invitacionesPendientes={invitacionesPendientes}
-            contactIdAdmin={esAdmin ? conversation.contact_id : undefined}
+            contactIdAdmin={esAdmin || esVendedorDelChat ? conversation.contact_id : undefined}
             ciclo={ciclo}
           />
         </div>
@@ -348,7 +358,12 @@ export default async function ConversationPage({
           </div>
         </div>
 
-        <EspacioDelClienteCard espacios={espaciosDelCliente} invitaciones={invitacionesPendientes} contactId={esAdmin ? conversation.contact_id : undefined} />
+        <EspacioDelClienteCard
+          espacios={espaciosDelCliente}
+          invitaciones={invitacionesPendientes}
+          contactId={esAdmin || esVendedorDelChat ? conversation.contact_id : undefined}
+          enlaceAlAdmin={esAdmin}
+        />
 
         {contact.likely_blocked && <ContactBlockedNotice contactId={conversation.contact_id} />}
         {(conversation.ai_handoff_requested || conversation.ai_manually_paused) && (

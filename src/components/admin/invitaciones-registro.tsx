@@ -16,6 +16,8 @@ export type InvitacionFila = {
   created_at: string;
   tipo: "pago" | "demo";
   dias_demo: number | null;
+  /** Vendedor que genero el enlace (vacio si lo genero el administrador). */
+  vendedor?: string | null;
 };
 
 /** Admin → Pagos: enlaces de registro con pago que aun nadie ha usado. */
@@ -54,6 +56,11 @@ export function InvitacionesRegistro({ filas }: { filas: InvitacionFila[] }) {
                 {f.tipo === "demo" && (
                   <span className="rounded-full border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
                     Demo · {f.dias_demo ?? 2} días
+                  </span>
+                )}
+                {f.vendedor && (
+                  <span className="rounded-full border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-[10px] font-semibold text-warning">
+                    Vendió: {f.vendedor}
                   </span>
                 )}
               </p>

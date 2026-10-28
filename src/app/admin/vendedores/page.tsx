@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPlatformAdmin } from "@/lib/admin";
 import { cargarVentas } from "@/lib/vendedores/datos";
+import { toPublicUrl } from "@/lib/supabase/config";
 import { ETIQUETA_ESTADO, resumirVentas } from "@/lib/vendedores/comision";
 import { AccionesVenta, ConvertirAsesor, EditarVendedor, FormNuevoVendedor } from "@/components/admin/vendedores";
 
@@ -20,7 +21,8 @@ const ESTILO_ESTADO: Record<string, string> = {
   anulada: "bg-border text-muted",
 };
 
-export default async function VendedoresPage() {
+export default async function VendedoresPage({ searchParams }: { searchParams: Promise<{ venta?: string }> }) {
+  const { venta: ventaResaltada } = await searchParams;
   const supabase = await createClient();
   if (!(await isPlatformAdmin(supabase))) return null;
   const {
@@ -41,7 +43,9 @@ export default async function VendedoresPage() {
       .filter((v) => v.comprobantePath && v.estado === "pendiente")
       .map(async (v) => {
         const { data } = await admin.storage.from("payment-proofs").createSignedUrl(v.comprobantePath as string, 60 * 10);
-        if (data?.signedUrl) firmados.set(v.id, data.signedUrl);
+        // La URL firmada sale con la base interna del servidor (localhost): hay que
+        // pasarla a la publica o el navegador del admin no la puede abrir.
+        if (data?.signedUrl) firmados.set(v.id, toPublicUrl(data.signedUrl));
       })
   );
 
@@ -88,14 +92,16 @@ export default async function VendedoresPage() {
         <h1 className="text-2xl font-semibold text-foreground">Vendedores</h1>
         <p className="mt-1 text-sm text-muted">
           Asesores de tu espacio que venden el CRM. Atienden solo los chats que les asignas y registran la venta con el comprobante.
-          Ganan comisión solo por la primera venta de cada cliente, y tú la apruebas cuando confirmas que el dinero entró.
+          Ganan comisión por cada licencia nueva que venden (un cliente puede comprar varias); las renovaciones no dan comisión.
+          Tú la apruebas cuando confirmas que el dinero entró: pasa de «Por aprobar» a «Aprobadas, por pagar» y, cuando le pagas al
+          vendedor, a «Pagada».
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
           { t: "Por aprobar", v: `${porAprobar} · ${pesos(total.pendienteCents)}`, c: "text-warning" },
-          { t: "Por pagar a vendedores", v: pesos(total.porCobrarCents), c: "text-primary" },
+          { t: "Aprobadas, por pagar a vendedores", v: pesos(total.porCobrarCents), c: "text-primary" },
           { t: "Comisiones pagadas", v: pesos(total.pagadaCents), c: "text-success" },
           { t: "Vendido por vendedores", v: pesos(total.vendidoCents), c: "text-foreground" },
         ].map((k) => (
@@ -126,7 +132,7 @@ export default async function VendedoresPage() {
               <th className="px-4 py-3 font-medium">Licencias</th>
               <th className="px-4 py-3 font-medium">Vendido</th>
               <th className="px-4 py-3 font-medium">Por aprobar</th>
-              <th className="px-4 py-3 font-medium">Por pagar</th>
+              <th className="px-4 py-3 font-medium" title="Comisiones que ya aprobaste y aún no le pagas">Por pagar (aprobado)</th>
               <th className="px-4 py-3 font-medium">Pagado</th>
             </tr>
           </thead>
@@ -178,7 +184,11 @@ export default async function VendedoresPage() {
           </thead>
           <tbody>
             {ventas.map((v) => (
-              <tr key={v.id} className="border-b border-border align-top last:border-b-0">
+              <tr
+                key={v.id}
+                id={`venta-${v.id}`}
+                className={`border-b border-border align-top last:border-b-0 ${v.id === ventaResaltada ? "bg-warning/10" : ""}`}
+              >
                 <td className="px-4 py-3 text-muted">{fecha(v.creadaEl)}</td>
                 <td className="px-4 py-3 text-foreground">{v.vendedorNombre}</td>
                 <td className="px-4 py-3">
