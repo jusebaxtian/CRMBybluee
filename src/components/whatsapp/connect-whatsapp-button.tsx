@@ -298,8 +298,8 @@ export function ConnectWhatsAppButton({
                   >
                     <p className="text-sm font-semibold">Coexistencia: mi número de la app WhatsApp Business</p>
                     <p className="mt-1 text-[13px] text-muted">
-                      Sigues usando el número en tu celular y también en el CRM. Trae tus contactos y los últimos 30 días
-                      de chats.
+                      Sigues usando el número en tu celular y también en el CRM. Trae tus chats de los últimos 30
+                      días.
                     </p>
                   </button>
                 </div>

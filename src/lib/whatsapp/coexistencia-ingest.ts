@@ -207,7 +207,15 @@ async function importarHilo(
   if (!waId || recientes.length === 0) return;
 
   const contacto = await ayudas.resolveContact(supabase, cuenta.workspace_id, waId, null, undefined);
-  if (!contacto) return;
+  if (!contacto) {
+    // Lo mas comun: el plan llego a su tope de contactos. Antes fallaba en silencio.
+    console.error("coexistencia: no se pudo crear el contacto de un chat del historial (¿tope de contactos del plan?)", {
+      cuenta: cuenta.id,
+      espacio: cuenta.workspace_id,
+      mensajes: recientes.length,
+    });
+    return;
+  }
 
   const ultimaMarca = Math.max(...recientes.map((m) => Number(m.timestamp)));
   const ultimoIso = new Date(ultimaMarca * 1000).toISOString();
@@ -304,22 +312,49 @@ async function importarHilo(
 
 // ---------------------------------------------------------------- contactos de la app
 
-export async function ingestarSyncDeContactos(supabase: Db, value: Valor, ayudas: Ayudas) {
+/**
+ * Contactos de la agenda de la app: SOLO le ponen nombre a contactos que ya
+ * estan en el CRM. No crean contactos nuevos.
+ *
+ * Antes los creaba todos, y la agenda del celular (cientos de personas que no
+ * son clientes) llenaba el tope de contactos del plan: desde ahi los mensajes
+ * de clientes nuevos se perdian porque no habia cupo para crearles contacto.
+ * Paso el 27 oct 2026 con la primera conexion real (plan DEMO, tope de 100).
+ * Los contactos de los chats SI se crean, pero desde el historial y los
+ * mensajes, que son conversaciones de verdad.
+ */
+export async function ingestarSyncDeContactos(supabase: Db, value: Valor) {
   const cuenta = await buscarCuenta(supabase, value.metadata?.phone_number_id);
   if (!cuenta) return;
 
-  const altas = (value.state_sync ?? []).filter((s) => s.type === "contact" && s.action !== "remove" && s.contact?.phone_number);
-  await enLotes(altas, 10, async (s) => {
+  const nombres = new Map<string, string>();
+  for (const s of value.state_sync ?? []) {
+    if (s.type !== "contact" || s.action === "remove") continue;
     const waId = soloDigitos(s.contact?.phone_number);
-    if (!waId) return;
-    try {
-      await ayudas.resolveContact(supabase, cuenta.workspace_id, waId, null, s.contact?.full_name || s.contact?.first_name || undefined);
-    } catch (err) {
-      console.error("coexistencia: no se pudo guardar un contacto de la app", { cuenta: cuenta.id, err });
-    }
-  });
+    const nombre = (s.contact?.full_name || s.contact?.first_name || "").trim();
+    if (waId && nombre) nombres.set(waId, nombre);
+  }
 
-  await actualizarSync(supabase, cuenta.id, { contactos: { estado: "listo", total: altas.length } });
+  let actualizados = 0;
+  const numeros = [...nombres.keys()];
+  for (let i = 0; i < numeros.length; i += 200) {
+    const { data: existentes } = await supabase
+      .from("contacts")
+      .select("id, wa_id, name, name_source")
+      .eq("workspace_id", cuenta.workspace_id)
+      .in("wa_id", numeros.slice(i, i + 200));
+    // Misma regla de nombres que la ingesta: el que escribio el equipo (manual o
+    // por Excel) manda; solo se rellena si no hay nombre o vino de WhatsApp.
+    const porActualizar = (existentes ?? []).filter((c) => !c.name || c.name_source === "whatsapp" || c.name_source === null);
+    await enLotes(porActualizar, 10, async (c) => {
+      const nombre = nombres.get(c.wa_id as string);
+      if (!nombre || nombre === c.name) return;
+      const { error } = await supabase.from("contacts").update({ name: nombre, name_source: "whatsapp" }).eq("id", c.id);
+      if (!error) actualizados++;
+    });
+  }
+
+  await actualizarSync(supabase, cuenta.id, { contactos: { estado: "listo", total: actualizados } });
 }
 
 // ---------------------------------------------------------------- la persona desvinculo desde el celular

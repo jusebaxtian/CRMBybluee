@@ -318,7 +318,7 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
         continue;
       }
       if (change.field === "smb_app_state_sync") {
-        await ingestarSyncDeContactos(supabase, change.value, { resolveContact, persistIncomingMedia });
+        await ingestarSyncDeContactos(supabase, change.value);
         continue;
       }
       if (change.field === "account_update") {
