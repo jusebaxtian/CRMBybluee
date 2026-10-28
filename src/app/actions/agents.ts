@@ -110,6 +110,21 @@ export async function assignConversationAgent(conversationId: string, agentId: s
   if ("error" in ctx) return { error: ctx.error };
   const { supabase, workspaceId } = ctx;
 
+  // Chat de un cliente vendido (migracion 0158): queda del vendedor. Solo el
+  // dueño o un administrador del espacio lo puede pasar a otra persona.
+  const { data: actual } = await supabase
+    .from("conversations")
+    .select("vendedor_id, assigned_agent_id")
+    .eq("id", conversationId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (actual?.vendedor_id && agentId !== actual.assigned_agent_id) {
+    const role = await getWorkspaceRole(supabase, workspaceId);
+    if (role !== "owner" && role !== "admin") {
+      return { error: "Este cliente ya lo vendió un vendedor: solo un administrador puede reasignar el chat." };
+    }
+  }
+
   const { error } = await supabase
     .from("conversations")
     .update({ assigned_agent_id: agentId })

@@ -40,6 +40,7 @@ export function ChatPane({
   automations = [],
   approvedTemplates = [],
   esAdmin = false,
+  puedeRegistrarVenta = false,
 }: {
   conversationId: string;
   contactId: string;
@@ -52,6 +53,8 @@ export function ChatPane({
   approvedTemplates?: ApprovedTemplate[];
   /** Administrador de la plataforma: habilita "Registrar pago" en los comprobantes recibidos. */
   esAdmin?: boolean;
+  /** Vendedor en un chat asignado a el: registra la venta con el comprobante. */
+  puedeRegistrarVenta?: boolean;
 }) {
   const [pending, setPending] = useState<OptimisticMessage[]>([]);
   const [replyingTo, setReplyingTo] = useState<{ waMessageId: string; preview: string } | null>(null);
@@ -134,7 +137,7 @@ export function ChatPane({
         hayMasAntiguos={hayMasAntiguos}
         onReply={setReplyingTo}
         onForward={setReenviando}
-        onRegistrarPago={esAdmin ? setPagoDe : undefined}
+        onRegistrarPago={esAdmin || puedeRegistrarVenta ? setPagoDe : undefined}
       />
       {pagoDe && <RegistrarPagoDialog messageId={pagoDe.messageId} preview={pagoDe.preview} onClose={() => setPagoDe(null)} />}
       {reenviando && (

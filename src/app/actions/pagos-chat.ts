@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPlatformAdmin } from "@/lib/admin";
 import { diasDemoValidos } from "@/lib/billing/demo";
+import { registrarVentaDeVendedor, vendedorActivo, type Vendedor } from "@/lib/vendedores/ventas";
 import {
   activarEspacioConPago,
   copiarComprobante,
@@ -27,6 +28,28 @@ async function soloAdmin(): Promise<{ error: string } | Admin> {
     data: { user },
   } = await supabase.auth.getUser();
   return { supabase, userId: user?.id ?? null };
+}
+
+type Actor = Admin & { vendedor: Vendedor | null };
+
+/**
+ * El administrador de la plataforma, o un vendedor activo SOLO sobre un contacto
+ * cuyo chat tiene asignado (ver migracion 0158, es_vendedor_del_contacto).
+ */
+async function adminOVendedor(input: { messageId?: string | null; contactId?: string | null }): Promise<{ error: string } | Actor> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (await isPlatformAdmin(supabase)) return { supabase, userId: user?.id ?? null, vendedor: null };
+
+  const vendedor = await vendedorActivo(createAdminClient(), user?.id);
+  if (!vendedor) return { error: "No autorizado." };
+  const r = await resolverContacto(supabase, input);
+  if (!r) return { error: "Contacto no encontrado." };
+  const { data: suyo } = await supabase.rpc("es_vendedor_del_contacto", { p_contact_id: r.contacto.id });
+  if (!suyo) return { error: "Solo puedes registrar ventas en los chats que tienes asignados." };
+  return { supabase, userId: user?.id ?? null, vendedor };
 }
 
 export type ContextoPago = {
@@ -74,7 +97,7 @@ export async function contextoPagoDesdeChat(input: {
   messageId?: string | null;
   contactId?: string | null;
 }): Promise<{ error: string } | ContextoPago> {
-  const a = await soloAdmin();
+  const a = await adminOVendedor(input);
   if ("error" in a) return { error: a.error };
   const { supabase } = a;
 
@@ -117,9 +140,9 @@ export async function registrarPagoDesdeChat(input: {
   /** Fecha de vencimiento (AAAA-MM-DD) elegida por soporte; vacio = ciclo del plan. */
   venceEl?: string;
 }): Promise<Resultado> {
-  const a = await soloAdmin();
+  const a = await adminOVendedor(input);
   if ("error" in a) return { error: a.error };
-  const { supabase, userId } = a;
+  const { supabase, userId, vendedor } = a;
   const admin = createAdminClient();
   const esDemo = input.modo === "demo";
 
@@ -158,12 +181,23 @@ export async function registrarPagoDesdeChat(input: {
       plan: plan as PlanBasico,
       amountCents,
       proofPath,
-      revisadoPor: userId,
+      revisadoPor: vendedor ? null : userId,
       contactId: r.contacto.id,
       venceEl,
       diasDemo,
     });
     if ("error" in res) return { error: res.error };
+    if (vendedor && !esDemo) {
+      await registrarVentaDeVendedor(admin, vendedor, {
+        contactId: r.contacto.id,
+        planId: plan.id as string,
+        planNombre: plan.name as string,
+        montoCents: amountCents,
+        clienteWorkspaceId: input.workspaceId,
+        paymentId: res.paymentId,
+      });
+      revalidatePath("/admin/vendedores");
+    }
     const { data: ws } = await admin.from("workspaces").select("name").eq("id", input.workspaceId).maybeSingle();
     revalidatePath("/admin");
     revalidatePath("/admin/payments");
@@ -171,7 +205,7 @@ export async function registrarPagoDesdeChat(input: {
   }
 
   const token = nuevoTokenInvitacion();
-  const { error } = await admin.from("invitaciones_registro").insert({
+  const { data: invitacion, error } = await admin.from("invitaciones_registro").insert({
     token,
     contact_id: r.contacto.id,
     phone: r.contacto.wa_id,
@@ -184,8 +218,18 @@ export async function registrarPagoDesdeChat(input: {
     tipo: esDemo ? "demo" : "pago",
     dias_demo: diasDemo,
     created_by: userId,
-  });
+  }).select("id").single();
   if (error) return { error: error.message };
+  if (vendedor && !esDemo && invitacion) {
+    await registrarVentaDeVendedor(admin, vendedor, {
+      contactId: r.contacto.id,
+      planId: plan.id as string,
+      planNombre: plan.name as string,
+      montoCents: amountCents,
+      invitacionId: invitacion.id as string,
+    });
+    revalidatePath("/admin/vendedores");
+  }
   revalidatePath("/admin/payments");
   return { tipo: "invitacion", enlace: `${await origenPublico()}/signup?i=${token}` };
 }

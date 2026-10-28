@@ -10,6 +10,10 @@ import { cookies } from "next/headers";
 import { isPlatformAdmin } from "@/lib/admin";
 import { IMPERSONATION_COOKIE } from "@/lib/workspace";
 import { cargarCiclos } from "@/lib/inbox/ciclo-de-plan";
+import Link from "next/link";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { vendedorActivo } from "@/lib/vendedores/ventas";
+import { resumirVentas } from "@/lib/vendedores/comision";
 
 export default async function InboxLayout({
   children,
@@ -58,6 +62,48 @@ export default async function InboxLayout({
   const enModoSoporte = !!(await cookies()).get(IMPERSONATION_COOKIE)?.value;
   const ciclos = !enModoSoporte && (await isPlatformAdmin(supabase)) ? await cargarCiclos(supabase) : {};
 
+  // Vendedor (migracion 0158): banda arriba de sus chats con lo que ha vendido.
+  let bandaVendedor: React.ReactNode = null;
+  if (!enModoSoporte) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const admin = createAdminClient();
+    if (user && (await vendedorActivo(admin, user.id))) {
+      const { data: ventas } = await admin
+        .from("ventas_vendedor")
+        .select("estado, monto_cents, comision_cents, created_at")
+        .eq("vendedor_id", user.id);
+      const r = resumirVentas((ventas ?? []) as Parameters<typeof resumirVentas>[0], new Date());
+      const pesos = (c: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(c / 100);
+      bandaVendedor = (
+        <Link
+          href="/dashboard/inbox/mis-ventas"
+          className="flex items-center justify-between gap-2 border-b border-border bg-primary/10 px-3 py-2 text-xs text-foreground hover:bg-primary/15"
+        >
+          <span>
+            💰 <strong>{r.licenciasTotal}</strong> {r.licenciasTotal === 1 ? "licencia" : "licencias"} · por cobrar{" "}
+            <strong>{pesos(r.porCobrarCents)}</strong>
+          </span>
+          <span className="font-semibold text-primary">Mis ventas →</span>
+        </Link>
+      );
+    }
+  }
+
+  const panel = (
+    <ConversationListPanel
+      conversations={conversations}
+      hayMas={hayMas}
+      unreadConversationsCount={Number(sinLeer ?? 0)}
+      contacts={contacts ?? []}
+      allTags={workspaceTags ?? []}
+      agents={agents}
+      channels={channels ?? []}
+      ciclos={ciclos}
+    />
+  );
+
   return (
     <div className="-m-4 sm:-m-5">
       {workspaceId && (
@@ -69,16 +115,15 @@ export default async function InboxLayout({
       )}
       <InboxShell
         list={
-          <ConversationListPanel
-            conversations={conversations}
-            hayMas={hayMas}
-            unreadConversationsCount={Number(sinLeer ?? 0)}
-            contacts={contacts ?? []}
-            allTags={workspaceTags ?? []}
-            agents={agents}
-            channels={channels ?? []}
-            ciclos={ciclos}
-          />
+          bandaVendedor ? (
+            // Solo para vendedores: la banda encima de la lista, sin cambiar la bandeja de los demas.
+            <div className="flex min-h-0 w-full flex-col lg:w-auto">
+              {bandaVendedor}
+              <div className="flex min-h-0 flex-1">{panel}</div>
+            </div>
+          ) : (
+            panel
+          )
         }
       >
         {children}

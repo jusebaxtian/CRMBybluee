@@ -9,6 +9,7 @@ import {
   PlaySquare,
   HeartHandshake,
   BellRing,
+  Handshake,
 } from "lucide-react";
 
 /** Opciones del panel admin. Las usan el menu lateral (escritorio) y el menu del celular. */
@@ -17,6 +18,7 @@ export const OPCIONES_ADMIN = [
   { href: "/admin/notifications", etiqueta: "Notificaciones", Icono: Bell },
   { href: "/admin/avisos-celular", etiqueta: "Avisos del celular", Icono: BellRing },
   { href: "/admin/payments", etiqueta: "Pagos", Icono: CreditCard },
+  { href: "/admin/vendedores", etiqueta: "Vendedores", Icono: Handshake },
   { href: "/admin/plans", etiqueta: "Planes", Icono: Package },
   { href: "/admin/whatsapp", etiqueta: "WhatsApp Admin", Icono: MessageSquare },
   { href: "/admin/fidelidad", etiqueta: "Plan de fidelidad", Icono: HeartHandshake },

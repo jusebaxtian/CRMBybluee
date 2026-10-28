@@ -22,6 +22,8 @@ import { cookies } from "next/headers";
 import { listWorkspaceAgents } from "@/lib/agents";
 import { isPhoneNumber } from "@/lib/whatsapp/identity";
 import { isPlatformAdmin } from "@/lib/admin";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { vendedorActivo } from "@/lib/vendedores/ventas";
 import { EspacioDelClienteCard, type EspacioDelCliente, type InvitacionPendiente } from "@/components/inbox/espacio-del-cliente";
 import { invitacionesPendientesDeContacto } from "@/lib/billing/invitaciones-pendientes";
 import { noSePuedeUsar } from "@/lib/whatsapp/limite-plantilla";
@@ -143,6 +145,17 @@ export default async function ConversationPage({
   // se ocultan para ver exactamente lo mismo que ve el cliente.
   const enModoSoporte = !!(await cookies()).get(IMPERSONATION_COOKIE)?.value;
   const esAdmin = !enModoSoporte && (await isPlatformAdmin(supabase));
+  // Vendedor (migracion 0158): registra la venta con el comprobante, solo si el chat es suyo.
+  let esVendedorDelChat = false;
+  if (!esAdmin && !enModoSoporte) {
+    const {
+      data: { user: usuario },
+    } = await supabase.auth.getUser();
+    esVendedorDelChat =
+      !!usuario &&
+      conversation.assigned_agent_id === usuario.id &&
+      !!(await vendedorActivo(createAdminClient(), usuario.id));
+  }
   if (esAdmin) {
     const [{ data }, invitaciones] = await Promise.all([
       supabase.rpc("admin_espacio_de_contacto", { p_contact_id: conversation.contact_id }),
@@ -314,6 +327,7 @@ export default async function ConversationPage({
           automations={allAutomations ?? []}
           approvedTemplates={plantillasDeLaLinea}
           esAdmin={esAdmin}
+          puedeRegistrarVenta={esVendedorDelChat}
         />
       </div>
 

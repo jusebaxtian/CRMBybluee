@@ -150,7 +150,9 @@ export async function executeAction(
       await supabase
         .from("conversations")
         .update({ assigned_agent_id: action.target_agent_id })
-        .eq("id", conversationId);
+        .eq("id", conversationId)
+        // Chat de un cliente vendido: queda con su vendedor (migracion 0158).
+        .is("vendedor_id", null);
     }
     return;
   }
@@ -163,7 +165,8 @@ export async function executeAction(
       await supabase
         .from("conversations")
         .update({ assigned_agent_id: chosenAgentId })
-        .eq("id", conversationId);
+        .eq("id", conversationId)
+        .is("vendedor_id", null);
     }
     return;
   }
