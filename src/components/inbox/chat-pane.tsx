@@ -10,6 +10,7 @@ import { RegistrarPagoDialog } from "@/components/inbox/registrar-pago-dialog";
 import { RecordatorioPicker } from "@/components/inbox/recordatorio-picker";
 import { CitaPicker } from "@/components/inbox/cita-picker";
 import { useMessageWindow } from "@/lib/use-message-window";
+import { cerrarAvisoDelChat } from "@/lib/push/cerrar-avisos";
 
 export type OptimisticMessage = {
   id: string;
@@ -67,6 +68,11 @@ export function ChatPane({
   // optimistically added is now included for real — drop the local copy.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => setPending([]), [messages.length]);
+
+  // Estoy leyendo este chat: su aviso del celular ya no tiene sentido (ni su "(N)").
+  useEffect(() => {
+    void cerrarAvisoDelChat(conversationId);
+  }, [conversationId, messages.length]);
 
   const combined = [...messages, ...pending];
 

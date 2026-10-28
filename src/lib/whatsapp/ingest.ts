@@ -10,6 +10,7 @@ import {
 } from "@/lib/automations/engine";
 import { getMediaUrl, downloadMedia } from "@/lib/whatsapp/graph";
 import { notifyNewMessage } from "@/lib/push/send";
+import { vistaPreviaDeMensaje } from "@/lib/push/aviso";
 import { maybeRespondWithAiAgent } from "@/lib/ai/agent";
 import { transcribeAudio } from "@/lib/ai/providers";
 import { toPublicUrl } from "@/lib/supabase/config";
@@ -555,7 +556,7 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
             : "Quitó una reacción"
           : isButtonTap
             ? `Tocó el botón "${tappedButtonTitle}"`
-            : messageBody || "Nuevo mensaje de WhatsApp";
+            : vistaPreviaDeMensaje(message.type, messageBody);
 
         await notifyNewMessage(
           supabase,

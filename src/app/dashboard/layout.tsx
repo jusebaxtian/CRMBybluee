@@ -151,7 +151,7 @@ export default async function DashboardLayout({
   // a un cliente le marcaba 99+ por chats viejos ya vistos. "Sin responder"
   // sigue en el dashboard y como filtro de la bandeja.
   const { data: noLeidos } = workspaceId
-    ? await supabase.rpc("inbox_unread_count", { p_workspace_id: workspaceId })
+    ? await supabase.rpc("chats_sin_leer_total", { p_workspace: workspaceId, p_user: user.id })
     : { data: 0 };
   const unreadMessagesCount = Number(noLeidos ?? 0);
 

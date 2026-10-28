@@ -17,7 +17,7 @@ function ensureConfigured() {
 export async function sendPushToUsers(
   supabase: ReturnType<typeof createAdminClient>,
   userIds: string[],
-  payload: { title: string; body: string; url?: string; conversationId?: string; tag?: string }
+  payload: { title: string; body: string; url?: string; conversationId?: string; tag?: string; unreadTotal?: number; unreadChat?: number }
 ): Promise<number> {
   if (!userIds.length) return 0;
   if (!process.env.VAPID_PRIVATE_KEY || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) return 0;
@@ -80,9 +80,34 @@ export async function notifyNewMessage(
     recipientIds = (members ?? []).map((m) => m.user_id as string);
   }
 
+  // Las cuentas reales, calculadas con la misma regla que la bandeja: asi el
+  // icono y el "(N)" no dependen de cuantos avisos viejos queden en el celular.
+  // Los duenos y administradores ven lo mismo; un agente, solo lo suyo.
+  let unreadTotal: number | undefined;
+  let unreadChat: number | undefined;
+  try {
+    if (recipientIds[0]) {
+      const [{ data: total }, { data: conv }] = await Promise.all([
+        supabase.rpc("chats_sin_leer_total", { p_workspace: workspaceId, p_user: recipientIds[0] }),
+        supabase.from("conversations").select("last_read_at").eq("id", conversationId).maybeSingle(),
+      ]);
+      if (total !== null && total !== undefined) unreadTotal = Number(total);
+      let consulta = supabase
+        .from("messages")
+        .select("id", { count: "exact", head: true })
+        .eq("conversation_id", conversationId)
+        .eq("direction", "in");
+      if (conv?.last_read_at) consulta = consulta.gt("created_at", conv.last_read_at);
+      const { count } = await consulta;
+      if (count !== null) unreadChat = Math.max(1, count);
+    }
+  } catch {
+    // Si no se pueden calcular, el aviso sale igual y el celular usa su cuenta de respaldo.
+  }
+
   await sendPushToUsers(
     supabase,
     recipientIds,
-    armarAvisoDeMensaje({ contactName, contactPhone, messagePreview, conversationId })
+    armarAvisoDeMensaje({ contactName, contactPhone, messagePreview, conversationId, unreadTotal, unreadChat })
   );
 }

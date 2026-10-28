@@ -4,6 +4,8 @@
 const CACHE_OFFLINE = "bybluee-offline-v1";
 const PAGINA_OFFLINE = "/sin-conexion.html";
 const PRECACHE = [PAGINA_OFFLINE, "/logo.png", "/manifest.json"];
+// Ultimo numero REAL de chats sin leer que dijo el servidor (ver mostrarAviso).
+const CACHE_ESTADO = "bybluee-estado-v1";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -19,7 +21,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_OFFLINE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_OFFLINE && k !== CACHE_ESTADO).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -43,30 +45,79 @@ self.addEventListener("fetch", (event) => {
 // Notificaciones de mensajes nuevos. Se comportan como una app de mensajes:
 // - Una notificacion por chat (mismo `tag`), y CADA mensaje nuevo vuelve a sonar y
 //   vibrar (`renotify`). Antes la siguiente reemplazaba a la anterior en silencio.
-// - Los mensajes seguidos del mismo chat se apilan (los ultimos tres) con su cuenta en el titulo.
-// - El icono de la app muestra cuantos chats tienen aviso pendiente.
+// - Los mensajes seguidos del mismo chat se apilan (los ultimos tres).
+// - El "(N)" del titulo y el numero del icono salen de lo REAL que calcula el
+//   servidor (mensajes sin leer de ese chat y chats sin leer en total), no de
+//   cuantos avisos hay en la bandeja del celular: esos se quedaban ahi para siempre
+//   y contaban mensajes que ya se habian leido (el icono decia 100 con la bandeja vacia).
+// - Si ya estas viendo ese chat con la app abierta, no se muestra el aviso.
 // ---------------------------------------------------------------------------
 const MAX_MENSAJES_APILADOS = 5;
 const MENSAJES_VISIBLES = 3;
 
-async function actualizarInsignia() {
+async function guardarConteo(n) {
   try {
-    const nav = self.navigator;
-    if (!nav || !nav.setAppBadge) return;
+    const cache = await caches.open(CACHE_ESTADO);
+    await cache.put("/__conteo", new Response(JSON.stringify({ n })));
+  } catch {
+    // Sin cache: el icono usa el conteo de respaldo.
+  }
+}
+
+async function leerConteo() {
+  try {
+    const cache = await caches.open(CACHE_ESTADO);
+    const r = await cache.match("/__conteo");
+    if (!r) return null;
+    const j = await r.json();
+    return typeof j.n === "number" ? j.n : null;
+  } catch {
+    return null;
+  }
+}
+
+async function ponerInsignia(n) {
+  const nav = self.navigator;
+  if (!nav || !nav.setAppBadge) return;
+  if (n > 0) await nav.setAppBadge(n);
+  else if (nav.clearAppBadge) await nav.clearAppBadge();
+}
+
+// `real` es el numero que manda el servidor con cada aviso. Sin el (avisos de versiones
+// anteriores) se usa el ultimo conocido, y solo si no hay ninguno, la cuenta de la bandeja.
+async function actualizarInsignia(real) {
+  try {
+    if (typeof real === "number") {
+      await guardarConteo(real);
+      return await ponerInsignia(real);
+    }
+    const guardado = await leerConteo();
+    if (guardado !== null) return await ponerInsignia(guardado);
     const pendientes = await self.registration.getNotifications();
-    if (pendientes.length > 0) await nav.setAppBadge(pendientes.length);
-    else if (nav.clearAppBadge) await nav.clearAppBadge();
+    await ponerInsignia(pendientes.length);
   } catch {
     // La insignia es un extra: si el sistema no la admite, no pasa nada.
   }
 }
 
 async function mostrarAviso(data) {
+  // Con la app abierta y a la vista en ESE chat, el mensaje ya se esta leyendo.
+  const destino = data.url || "";
+  const clientes = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  const leyendolo = clientes.some((c) => c.visibilityState === "visible" && destino && c.url.includes(destino));
+  if (leyendolo) {
+    await actualizarInsignia(data.unreadTotal);
+    return;
+  }
+
   const tag = data.tag || data.conversationId || "crm-bybluee-message";
   const previas = await self.registration.getNotifications({ tag });
   const anteriores = (previas[0] && previas[0].data && previas[0].data.mensajes) || [];
-  const total = ((previas[0] && previas[0].data && previas[0].data.total) || 0) + 1;
-  const mensajes = [...anteriores, data.body || "Tienes un nuevo mensaje"].slice(-MAX_MENSAJES_APILADOS);
+  const legado = ((previas[0] && previas[0].data && previas[0].data.total) || 0) + 1;
+  // Los mensajes sin leer de este chat, segun el servidor; si no lo manda, la cuenta de antes.
+  const total = typeof data.unreadChat === "number" ? data.unreadChat : legado;
+  const cuantos = Math.min(MAX_MENSAJES_APILADOS, Math.max(1, total));
+  const mensajes = [...anteriores, data.body || "Tienes un nuevo mensaje"].slice(-cuantos);
   const titulo = (data.title || "CRM ByBluee") + (total > 1 ? ` (${total})` : "");
 
   await self.registration.showNotification(titulo, {
@@ -80,7 +131,7 @@ async function mostrarAviso(data) {
     actions: [{ action: "abrir", title: "Abrir chat" }],
     data: { url: data.url || "/dashboard/inbox", mensajes, total },
   });
-  await actualizarInsignia();
+  await actualizarInsignia(data.unreadTotal);
 }
 
 self.addEventListener("push", (event) => {

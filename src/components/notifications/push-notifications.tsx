@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Bell, Download, Share, X } from "lucide-react";
 import { tocaMostrarAviso } from "@/lib/push/estado";
+import { cerrarAvisosObsoletos, ponerInsigniaDeLaApp } from "@/lib/push/cerrar-avisos";
 import { useNotificaciones } from "@/components/notifications/usar-notificaciones";
 
 const CLAVE_CERRADO = "crm-aviso-notificaciones-cerrado-el";
@@ -31,9 +32,38 @@ export function PushNotifications({ sinLeer = 0 }: { sinLeer?: number }) {
 
   // Numero de chats sin leer en el icono de la app instalada (donde el sistema lo permite).
   useEffect(() => {
-    const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
-    if (!nav.setAppBadge || !nav.clearAppBadge) return;
-    (sinLeer > 0 ? nav.setAppBadge(sinLeer) : nav.clearAppBadge()).catch(() => {});
+    void ponerInsigniaDeLaApp(sinLeer);
+  }, [sinLeer]);
+
+  // Cuadra el celular con lo real: al abrir la app, al volver a ella y cuando cambia el
+  // conteo, se pide la lista de chats que de verdad siguen sin leer y se cierran los
+  // avisos de los demas. Sin esto, un aviso viejo se quedaba en la bandeja del celular
+  // para siempre y el "(N)" y el icono seguian contando mensajes que ya se habian leido.
+  useEffect(() => {
+    let vivo = true;
+    async function cuadrar() {
+      try {
+        const r = await fetch("/api/push/pendientes", { cache: "no-store" });
+        if (!r.ok || !vivo) return;
+        const { total, chats } = (await r.json()) as { total: number; chats: string[] };
+        if (!vivo) return;
+        await ponerInsigniaDeLaApp(total);
+        await cerrarAvisosObsoletos(total > 0 ? chats : []);
+      } catch {
+        // Sin red: se cuadra la proxima vez.
+      }
+    }
+    void cuadrar();
+    const alVolver = () => {
+      if (document.visibilityState === "visible") void cuadrar();
+    };
+    document.addEventListener("visibilitychange", alVolver);
+    window.addEventListener("focus", alVolver);
+    return () => {
+      vivo = false;
+      document.removeEventListener("visibilitychange", alVolver);
+      window.removeEventListener("focus", alVolver);
+    };
   }, [sinLeer]);
 
   function cerrar() {

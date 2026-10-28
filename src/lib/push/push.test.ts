@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { calcularEstado, tocaMostrarAviso, etiquetaDelBoton } from "@/lib/push/estado";
-import { armarAvisoDeMensaje } from "@/lib/push/aviso";
+import { armarAvisoDeMensaje, vistaPreviaDeMensaje } from "@/lib/push/aviso";
 
 const base = { soportado: true, esIos: false, instalada: false, permiso: "default" as const, suscrito: false };
 
@@ -69,5 +69,38 @@ describe("aviso de mensaje nuevo", () => {
 
   it("mensaje sin texto (foto, audio) no deja la notificación vacía", () => {
     expect(armarAvisoDeMensaje({ contactName: null, contactPhone: "57300", messagePreview: "   ", conversationId: "c3" }).body).toBe("Nuevo mensaje de WhatsApp");
+  });
+});
+
+describe("vista previa de lo que no trae texto", () => {
+  it("usa el texto cuando hay", () => {
+    expect(vistaPreviaDeMensaje("image", "  Mira esto ")).toBe("Mira esto");
+  });
+  it("dice que es cuando no hay texto, en vez del mensaje generico", () => {
+    expect(vistaPreviaDeMensaje("image", null)).toBe("📷 Foto");
+    expect(vistaPreviaDeMensaje("audio", "")).toBe("🎤 Nota de voz");
+    expect(vistaPreviaDeMensaje("video", undefined)).toBe("🎥 Video");
+    expect(vistaPreviaDeMensaje("sticker", null)).toBe("🩹 Sticker");
+    expect(vistaPreviaDeMensaje("document", null)).toBe("📄 Documento");
+  });
+  it("un tipo desconocido sin texto queda con el generico", () => {
+    expect(vistaPreviaDeMensaje("algo-nuevo", null)).toBe("Nuevo mensaje de WhatsApp");
+  });
+});
+
+describe("cuentas reales dentro del aviso", () => {
+  const base = { contactName: "Ana", contactPhone: "57300", messagePreview: "Hola", conversationId: "c9" };
+  it("las lleva cuando se conocen", () => {
+    const a = armarAvisoDeMensaje({ ...base, unreadTotal: 3, unreadChat: 2 });
+    expect(a.unreadTotal).toBe(3);
+    expect(a.unreadChat).toBe(2);
+  });
+  it("un cero es un dato valido (el icono se limpia)", () => {
+    expect(armarAvisoDeMensaje({ ...base, unreadTotal: 0 }).unreadTotal).toBe(0);
+  });
+  it("si no se conocen, no se inventan", () => {
+    const a = armarAvisoDeMensaje(base);
+    expect("unreadTotal" in a).toBe(false);
+    expect("unreadChat" in a).toBe(false);
   });
 });
