@@ -117,9 +117,6 @@ export default async function FlujoPage({ params }: { params: Promise<{ id: stri
             <h1 className="truncate font-dash-display text-[22px] font-bold tracking-[-.4px] text-foreground">
               {flujo.nombre}
             </h1>
-            <span className="shrink-0 rounded-[20px] border border-warning/50 bg-warning/10 px-[7px] py-px text-[9.5px] font-bold uppercase tracking-wide text-warning">
-              Beta
-            </span>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-3">

@@ -8,10 +8,8 @@ const tabs = [
   { href: "/dashboard/campaigns", label: "Campañas", icon: Megaphone, moduleKey: "campaigns", beta: false },
   { href: "/dashboard/templates", label: "Plantillas", icon: FileText, moduleKey: "templates", beta: false },
   { href: "/dashboard/automations", label: "Automatizaciones", icon: Zap, moduleKey: "automations", beta: false },
-  // Flujos sigue en beta: el lienzo y el motor estan, pero el modulo es
-  // reciente y conviene que el cliente lo sepa antes de montar su operacion
-  // encima.
-  { href: "/dashboard/flujos", label: "Flujos", icon: Workflow, moduleKey: "flujos", beta: true },
+  // Flujos salio de beta el 29 oct 2026.
+  { href: "/dashboard/flujos", label: "Flujos", icon: Workflow, moduleKey: "flujos", beta: false },
   { href: "/dashboard/followups", label: "Seguimientos", icon: History, moduleKey: "followups", beta: false },
   { href: "/dashboard/tags", label: "Etiquetas", icon: Tag, moduleKey: "tags", beta: false },
 ];
