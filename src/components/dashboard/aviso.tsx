@@ -26,16 +26,13 @@ export async function Aviso() {
           Nuevo
         </span>
       </header>
-      {/* Escritorio: la imagen llena la tarjeta (recorte por los bordes).
-          Movil y tablet (<=900px, donde la fila pasa a una columna): la
-          imagen se ve completa, a su proporcion, para que el texto se lea. */}
-      <div className="relative min-[901px]:min-h-0 min-[901px]:flex-1">
+      {/* La imagen se ve SIEMPRE completa, a su proporcion (antes en escritorio
+          llenaba la tarjeta con object-cover y recortaba los bordes del banner).
+          Si la tarjeta queda mas alta que la imagen, esta va centrada sobre un
+          fondo oscuro para que el espacio sobrante no se note. */}
+      <div className="flex flex-1 items-center bg-[#06281d]">
         {/* eslint-disable-next-line @next/next/no-img-element -- URL externa administrada desde admin */}
-        <img
-          src={aviso.imagenUrl}
-          alt="Aviso del equipo ByBluee"
-          className="block h-auto w-full min-[901px]:absolute min-[901px]:inset-0 min-[901px]:h-full min-[901px]:object-cover"
-        />
+        <img src={aviso.imagenUrl} alt="Aviso del equipo ByBluee" className="block h-auto w-full" />
       </div>
     </section>
   );
