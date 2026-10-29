@@ -57,6 +57,7 @@ export function ContactsTable({
   plantillas,
   agentes = [],
   propias = [],
+  esVendedor = false,
 }: {
   contacts: Contact[];
   allTags: Tag[];
@@ -65,6 +66,8 @@ export function ContactsTable({
   agentes?: Agente[];
   /** Las variables 2, 3 y 4 con el nombre que les puso este espacio. */
   propias?: VariablePersonalizada[];
+  /** Vendedor (0160): sin borrar contactos ni configurar las variables del espacio. */
+  esVendedor?: boolean;
 }) {
   const agentesPorId = new Map(agentes.map((a) => [a.id, a]));
 
@@ -258,7 +261,7 @@ export function ContactsTable({
           />
         </div>
         <div className="relative">
-          <ConfigurarVariables propias={propias} />
+          {!esVendedor && <ConfigurarVariables propias={propias} />}
           <button
             type="button"
             onClick={() => setFiltersOpen((o) => !o)}
@@ -398,6 +401,7 @@ export function ContactsTable({
             Editar
           </button>
 
+          {!esVendedor && (
           <button
             type="button"
             onClick={() => setDeleteModalOpen(true)}
@@ -407,6 +411,7 @@ export function ContactsTable({
             <Trash2 size={13} />
             Eliminar
           </button>
+          )}
 
           <button
             type="button"

@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendPushToUsers } from "@/lib/push/send";
 
 const DIAS_VISIBLE_AVISO = 3;
 /** Los recordatorios cumplidos quedan como historial en la Agenda este tiempo. */
@@ -15,7 +16,7 @@ export async function processDueReminders() {
 
   const { data: vencidos } = await supabase
     .from("recordatorios")
-    .select("id, workspace_id, conversation_id, texto, contacts(name, wa_id)")
+    .select("id, workspace_id, conversation_id, texto, created_by, contacts(name, wa_id)")
     .is("avisado_en", null)
     .lte("recordar_en", ahora.toISOString())
     .order("recordar_en")
@@ -25,6 +26,19 @@ export async function processDueReminders() {
   for (const r of vencidos ?? []) {
     const contacto = r.contacts as unknown as { name: string | null; wa_id: string } | null;
     const quien = contacto?.name?.trim() || contacto?.wa_id || "contacto";
+    // El recordatorio de un vendedor es suyo: el aviso le llega solo a el
+    // (migracion 0160), con push al celular. Los demas, a todo el espacio como antes.
+    let paraVendedor: string | null = null;
+    if (r.created_by) {
+      const { data: v } = await supabase
+        .from("vendedores")
+        .select("user_id")
+        .eq("user_id", r.created_by)
+        .eq("workspace_id", r.workspace_id)
+        .eq("activo", true)
+        .maybeSingle();
+      paraVendedor = (v?.user_id as string | undefined) ?? null;
+    }
     const { error } = await supabase.from("notifications").insert({
       title: `Recordatorio del contacto ${quien}`,
       body: r.texto,
@@ -33,12 +47,21 @@ export async function processDueReminders() {
       cta_label: "Ir al chat",
       cta_url: `/dashboard/inbox/${r.conversation_id}`,
       ends_at: endsAt,
+      target_user_id: paraVendedor,
     });
     if (error) {
       console.error("recordatorio: no se pudo crear el aviso:", error.message);
       continue;
     }
     await supabase.from("recordatorios").update({ avisado_en: ahora.toISOString() }).eq("id", r.id);
+    if (paraVendedor) {
+      await sendPushToUsers(supabase, [paraVendedor], {
+        title: `⏰ Recordatorio: ${quien}`,
+        body: r.texto,
+        url: `/dashboard/inbox/${r.conversation_id}`,
+        tag: `recordatorio-${r.id}`,
+      }).catch(() => 0);
+    }
   }
 
   // Historial: pasados 60 dias de la fecha del recordatorio, se borra.

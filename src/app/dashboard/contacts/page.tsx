@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ImportContactsButton } from "@/components/contacts/import-contacts-button";
 import { AddContactForm } from "@/components/contacts/add-contact-form";
 import { ContactsTable } from "@/components/contacts/contacts-table";
-import { getWorkspaceId } from "@/lib/workspace";
+import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
 import { listWorkspaceAgents } from "@/lib/agents";
 import { noSePuedeUsar } from "@/lib/whatsapp/limite-plantilla";
@@ -13,6 +13,10 @@ export default async function ContactsPage() {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
   await requireModule(supabase, workspaceId, "contacts");
+  // Vendedor (0160): la base solo le devuelve sus contactos asignados; aqui se le
+  // quitan las acciones del espacio (crear, importar, borrar, configurar variables).
+  const esVendedor =
+    (await getWorkspaceRole(supabase, workspaceId)) === "agent" && !!(await supabase.rpc("soy_vendedor")).data;
 
   // PostgREST caps any single request at 1000 rows (PGRST_DB_MAX_ROWS) —
   // a plain .select() on a workspace with more contacts than that silently
@@ -84,16 +88,18 @@ export default async function ContactsPage() {
   if (!contacts || contacts.length === 0) {
     return (
       <div className="flex flex-col gap-6">
+        {!esVendedor && (
         <div className="flex items-center gap-3">
           <AddContactForm />
           <ImportContactsButton />
         </div>
+        )}
         <div className="flex flex-col items-center justify-center rounded-[13px] border border-border bg-surface p-16 text-center">
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-hover text-muted">
             <Users size={22} />
           </div>
           <h2 className="font-dash-ui text-[15px] font-semibold text-foreground">
-            Todavía no tienes contactos
+            {esVendedor ? "Todavía no tienes contactos asignados" : "Todavía no tienes contactos"}
           </h2>
           <p className="mt-1 max-w-md text-sm text-muted">
             Los contactos se crean automáticamente cuando alguien te escribe por WhatsApp,
@@ -129,10 +135,12 @@ export default async function ContactsPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      {!esVendedor && (
       <div className="flex items-center gap-3">
         <AddContactForm />
         <ImportContactsButton />
       </div>
+      )}
       <ContactsTable
         contacts={rows}
         allTags={allTags ?? []}
@@ -140,6 +148,7 @@ export default async function ContactsPage() {
         plantillas={(plantillas ?? []).filter((t) => !noSePuedeUsar(t.body_text))}
         agentes={agentes}
         propias={(propias ?? []) as VariablePersonalizada[]}
+        esVendedor={esVendedor}
       />
     </div>
   );

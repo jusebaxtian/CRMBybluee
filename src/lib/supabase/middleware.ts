@@ -87,10 +87,17 @@ export async function updateSession(request: NextRequest) {
       }
 
       // Agents only get the inbox — every other /dashboard/* route bounces back there.
+      // Los vendedores (0160) tambien entran a Dashboard, Contactos y Agenda,
+      // donde la base solo les deja ver lo suyo.
       if (membership?.role === "agent" && !pathname.startsWith("/dashboard/inbox")) {
-        const url = request.nextUrl.clone();
-        url.pathname = "/dashboard/inbox";
-        return NextResponse.redirect(url);
+        const rutaDeVendedor =
+          pathname === "/dashboard" || pathname.startsWith("/dashboard/contacts") || pathname.startsWith("/dashboard/agenda");
+        const esVendedor = rutaDeVendedor ? !!(await supabase.rpc("soy_vendedor")).data : false;
+        if (!esVendedor) {
+          const url = request.nextUrl.clone();
+          url.pathname = "/dashboard/inbox";
+          return NextResponse.redirect(url);
+        }
       }
     }
   }

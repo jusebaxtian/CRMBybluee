@@ -18,7 +18,8 @@ function fechaLarga(iso: string) {
   });
 }
 
-export async function EstadoCuenta() {
+/** soloLectura: el vendedor ve el estado pero no entra a Facturacion. */
+export async function EstadoCuenta({ soloLectura = false }: { soloLectura?: boolean } = {}) {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
   if (!workspaceId) return null;
@@ -79,6 +80,7 @@ export async function EstadoCuenta() {
         )}
       </div>
 
+      {!soloLectura && (
       <div className="mt-auto flex gap-2">
         <Link
           href="/dashboard/billing"
@@ -93,6 +95,7 @@ export async function EstadoCuenta() {
           Renovar ahora
         </Link>
       </div>
+      )}
     </section>
   );
 }

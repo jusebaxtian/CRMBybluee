@@ -13,11 +13,13 @@ const items = [
 
 export function MobileBottomNav({
   workspaceRole,
+  esVendedor = false,
   billingLocked = false,
   enabledModules = [],
   unreadMessagesCount = 0,
 }: {
   workspaceRole?: string | null;
+  esVendedor?: boolean;
   billingLocked?: boolean;
   enabledModules?: string[];
   unreadMessagesCount?: number;
@@ -33,7 +35,9 @@ export function MobileBottomNav({
   const visibleItems = items.filter((item) =>
     billingLocked
       ? item.href === "/dashboard/billing"
-      : workspaceRole !== "agent" || item.href === "/dashboard/inbox"
+      : workspaceRole !== "agent" ||
+        item.href === "/dashboard/inbox" ||
+        (esVendedor && (item.href === "/dashboard" || item.href === "/dashboard/contacts"))
   );
 
   return (

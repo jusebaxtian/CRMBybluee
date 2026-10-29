@@ -24,7 +24,7 @@ const CALIDAD: Record<NonNullable<ConexionApi["calidad"]>, { etiqueta: string; b
 const REJILLA =
   "grid grid-cols-[repeat(3,minmax(0,1fr))] gap-3 max-[1100px]:grid-cols-[repeat(2,minmax(0,1fr))] max-[700px]:grid-cols-[minmax(0,1fr)]";
 
-function Tarjeta({ c }: { c: ConexionApi }) {
+function Tarjeta({ c, soloLectura = false }: { c: ConexionApi; soloLectura?: boolean }) {
   const e = ESTADO[c.estado];
   const q = c.calidad ? CALIDAD[c.calidad] : null;
 
@@ -126,6 +126,7 @@ function Tarjeta({ c }: { c: ConexionApi }) {
         </div>
       </dl>
 
+      {!soloLectura && (
       <Link
         href="/dashboard/settings?tab=whatsapp"
         className="mt-3 flex items-center justify-center gap-1.5 rounded-[9px] border border-dash-border py-[7px] font-dash-ui text-[12px] font-semibold text-dash-green-text transition-colors hover:bg-dash-green-7"
@@ -133,6 +134,7 @@ function Tarjeta({ c }: { c: ConexionApi }) {
         <Pencil size={12} />
         Editar información de la API
       </Link>
+      )}
     </article>
   );
 }
@@ -148,7 +150,8 @@ function SlotVacio({ n, plan, coexistencia }: { n: number; plan: string; coexist
   );
 }
 
-export async function Conexiones() {
+/** soloLectura: el vendedor ve los numeros conectados pero no los administra ni conecta. */
+export async function Conexiones({ soloLectura = false }: { soloLectura?: boolean } = {}) {
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
   if (!workspaceId) return null;
@@ -163,6 +166,7 @@ export async function Conexiones() {
   const contenedor =
     "rounded-[15px] border border-dash-green-20 bg-[linear-gradient(180deg,var(--dash-green-7),rgba(27,168,74,0.02))] p-5";
 
+  if (conexiones.length === 0 && soloLectura) return null;
   if (conexiones.length === 0) {
     return (
       <section aria-label="Conexiones de WhatsApp API" className={`${contenedor} flex flex-wrap items-center gap-[18px]`}>
@@ -195,19 +199,21 @@ export async function Conexiones() {
             {conexiones.length} de {maxPermitidoPlan} {maxPermitidoPlan === 1 ? "número conectado" : "números conectados"} a la API oficial de Meta
           </p>
         </div>
+        {!soloLectura && (
         <Link
           href="/dashboard/settings"
           className="rounded-[10px] border border-[rgba(27,168,74,0.3)] px-[14px] py-2 font-dash-ui text-[12px] font-semibold text-dash-green-text transition-colors duration-150 hover:bg-dash-green-13"
         >
           Administrar
         </Link>
+        )}
       </header>
 
       <div className={REJILLA}>
         {conexiones.map((c) => (
-          <Tarjeta key={c.id} c={c} />
+          <Tarjeta key={c.id} c={c} soloLectura={soloLectura} />
         ))}
-        {Array.from({ length: libres }, (_, i) => (
+        {!soloLectura && Array.from({ length: libres }, (_, i) => (
           <SlotVacio key={`libre-${i}`} n={conexiones.length + i + 1} plan={textoPlan} coexistencia={coexistencia} />
         ))}
       </div>

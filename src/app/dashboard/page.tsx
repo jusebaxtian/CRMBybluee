@@ -13,6 +13,8 @@ import { LeadsPorDia } from "@/components/dashboard/leads-por-dia";
 import { Pendientes } from "@/components/dashboard/pendientes";
 import { Resumen } from "@/components/dashboard/resumen";
 import { Etiquetas } from "@/components/dashboard/etiquetas";
+import { ResumenVendedor } from "@/components/dashboard/resumen-vendedor";
+import { getWorkspaceRole } from "@/lib/workspace";
 import {
   EsqueletoTarjeta,
   EsqueletoKpis,
@@ -81,6 +83,45 @@ export default async function DashboardPage({
     month: "long",
     timeZone: "America/Bogota",
   });
+
+  // Vendedor (0160): su propio dashboard, solo con lo suyo. Los indicadores
+  // del espacio (de todos los chats) no se le muestran.
+  const esVendedor =
+    (await getWorkspaceRole(supabase, workspaceId)) === "agent" && !!(await supabase.rpc("soy_vendedor")).data;
+  if (esVendedor) {
+    return (
+      <div className="-m-4 flex flex-col gap-5 bg-dash-bg p-6 font-dash-ui text-dash-text sm:-m-5 sm:px-7">
+        <header>
+          <h1 className="font-dash-display text-[22px] font-bold tracking-[-.4px] text-dash-text">{saludo()}</h1>
+          <p className="mt-0.5 text-[13px] capitalize text-dash-text-2">{fecha}</p>
+        </header>
+        <div className={hayAviso ? "grid grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-4 max-[900px]:grid-cols-[minmax(0,1fr)]" : "grid"}>
+          {hayAviso && (
+            <Bloque nombre="los avisos">
+              <Suspense fallback={<EsqueletoTarjeta />}>
+                <Aviso />
+              </Suspense>
+            </Bloque>
+          )}
+          <Bloque nombre="el estado de cuenta">
+            <Suspense fallback={<EsqueletoTarjeta />}>
+              <EstadoCuenta soloLectura />
+            </Suspense>
+          </Bloque>
+        </div>
+        <Bloque nombre="tu resumen">
+          <Suspense fallback={<EsqueletoKpis />}>
+            <ResumenVendedor />
+          </Suspense>
+        </Bloque>
+        <Bloque nombre="las conexiones de WhatsApp">
+          <Suspense fallback={<EsqueletoConexiones />}>
+            <Conexiones soloLectura />
+          </Suspense>
+        </Bloque>
+      </div>
+    );
+  }
 
   return (
     <div className={`-m-4 flex flex-col gap-5 bg-dash-bg p-6 font-dash-ui text-dash-text sm:-m-5 sm:px-7`}>

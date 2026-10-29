@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardChrome } from "@/components/layout/dashboard-chrome";
 import { ImpersonationBanner } from "@/components/layout/impersonation-banner";
@@ -30,6 +31,8 @@ export default async function DashboardLayout({
   const isImpersonating = !!impersonatedWorkspaceId;
   const workspaceId = await getWorkspaceId(supabase);
   const workspaceRole = await getWorkspaceRole(supabase, workspaceId);
+  // Vendedor (0160): asesor que ademas ve Dashboard, Contactos y Agenda (solo lo suyo).
+  const esVendedor = workspaceRole === "agent" && !impersonatedWorkspaceId ? !!(await supabase.rpc("soy_vendedor")).data : false;
 
   // While impersonating, "Cambiar contraseña" must target the client being
   // viewed, not the admin's own login — otherwise an admin in modo soporte
@@ -127,7 +130,10 @@ export default async function DashboardLayout({
     .select("id, title, body, created_at, cta_label, cta_url, modo")
     .or(scopeFilter)
     .lte("starts_at", nowIso)
-    .or(`ends_at.is.null,ends_at.gte.${nowIso}`);
+    .or(`ends_at.is.null,ends_at.gte.${nowIso}`)
+    // Avisos personales (recordatorios de un vendedor): solo para esa persona.
+    // RLS ya lo filtra, pero el administrador de la plataforma lo salta.
+    .or(`target_user_id.is.null,target_user_id.eq.${user.id}`);
   // Una cuenta DEMO no recibe las notificaciones marcadas "no mostrar a demos".
   if (demo) consultaDeAvisos = consultaDeAvisos.eq("excluir_demo", false);
   const { data: notifications } = await consultaDeAvisos.order("created_at", { ascending: false }).limit(20);
@@ -173,11 +179,16 @@ export default async function DashboardLayout({
   const supportWhatsappMessage =
     supportSettings?.find((s) => s.key === "support_whatsapp_message")?.value ?? null;
 
+  // Menu lateral encogido: se recuerda en una cookie para pintarlo igual desde el servidor.
+  const menuEncogido = (await cookies()).get("menu_encogido")?.value === "1";
+
   return (
     <DashboardChrome
+      menuEncogido={menuEncogido}
       workspaceName={workspaceName}
       demo={demo}
       workspaceRole={workspaceRole}
+      esVendedor={esVendedor}
       billingLocked={billingLocked}
       isPlatformAdmin={isAdmin}
       enabledModules={enabledModules}

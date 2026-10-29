@@ -24,9 +24,11 @@ type Notification = {
 };
 
 export function DashboardChrome({
+  menuEncogido = false,
   workspaceName,
   demo = null,
   workspaceRole,
+  esVendedor = false,
   billingLocked = false,
   isPlatformAdmin,
   enabledModules,
@@ -44,10 +46,13 @@ export function DashboardChrome({
   banner,
   children,
 }: {
+  /** Menu lateral encogido (solo iconos) en pantallas grandes; viene de la cookie. */
+  menuEncogido?: boolean;
   workspaceName: string;
   /** Cuenta DEMO: dias que le quedan. null si no es demo. */
   demo?: { diasRestantes: number | null } | null;
   workspaceRole?: string | null;
+  esVendedor?: boolean;
   billingLocked?: boolean;
   isPlatformAdmin: boolean;
   enabledModules: string[];
@@ -66,6 +71,12 @@ export function DashboardChrome({
   children: React.ReactNode;
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [encogido, setEncogido] = useState(menuEncogido);
+  const alternarMenu = () => {
+    const nuevo = !encogido;
+    setEncogido(nuevo);
+    document.cookie = `menu_encogido=${nuevo ? "1" : "0"}; path=/; max-age=31536000; samesite=lax`;
+  };
   // Avisos emergentes pendientes (no se muestran en modo soporte para no
   // "leerselos" al cliente).
   const avisos = isImpersonating ? [] : notifications.filter((n) => n.modo === "pantalla" && !n.read);
@@ -102,6 +113,9 @@ export function DashboardChrome({
           workspaceName={workspaceName}
           demo={demo}
           workspaceRole={workspaceRole}
+          esVendedor={esVendedor}
+          encogido={encogido}
+          onAlternar={alternarMenu}
           billingLocked={billingLocked}
           isPlatformAdmin={isPlatformAdmin}
           enabledModules={enabledModules}
@@ -128,6 +142,7 @@ export function DashboardChrome({
         <main className="flex-1 p-4 pb-20 font-dash-ui sm:p-5 sm:pb-20 lg:pb-5">{children}</main>
         <MobileBottomNav
           workspaceRole={workspaceRole}
+          esVendedor={esVendedor}
           billingLocked={billingLocked}
           enabledModules={enabledModules}
           unreadMessagesCount={unreadMessagesCount}

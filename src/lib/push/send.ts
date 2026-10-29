@@ -41,7 +41,11 @@ export async function sendPushToUsers(
             endpoint: sub.endpoint,
             keys: { p256dh: sub.p256dh, auth: sub.auth_key },
           },
-          body
+          body,
+          // Android (FCM) entrega con prioridad "normal" en diferido cuando el
+          // celular esta en reposo (Doze): la prueba llegaba porque se manda con
+          // el celular en la mano, los mensajes reales no. "high" los entrega ya.
+          { urgency: "high", TTL: 60 * 60 * 24 }
         );
         entregados += 1;
       } catch (err) {
