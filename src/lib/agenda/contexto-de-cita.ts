@@ -15,26 +15,50 @@ import { IMPERSONATION_COOKIE } from "@/lib/workspace";
  * terminaria en el calendario del administrador. Por eso en modo soporte se muestra el correo
  * con el que el cliente registro su espacio y no se permite crear citas desde ahi.
  */
-export async function contextoDeCita(
+/**
+ * Modo soporte: el dueno del espacio que el administrador esta mirando. Todo lo
+ * que es "por usuario" (la conexion con Google, por ejemplo) se lee de el, no
+ * del administrador: en soporte se ve SOLO lo del cliente. Fuera de soporte, null.
+ */
+export async function duenoEnModoSoporte(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  workspaceId: string | null,
-  user: { email?: string | null }
-): Promise<{ correo: string | null; modoSoporte: boolean }> {
+  workspaceId: string | null
+): Promise<{ userId: string | null } | null> {
   const impersonado = (await cookies()).get(IMPERSONATION_COOKIE)?.value;
-  const modoSoporte = Boolean(workspaceId && impersonado && impersonado === workspaceId && (await isPlatformAdmin(supabase)));
-  if (!modoSoporte) return { correo: user.email ?? null, modoSoporte: false };
-
-  const admin = createAdminClient();
-  const { data: dueno } = await admin
+  if (!workspaceId || !impersonado || impersonado !== workspaceId || !(await isPlatformAdmin(supabase))) return null;
+  const { data: dueno } = await createAdminClient()
     .from("workspace_members")
     .select("user_id")
     .eq("workspace_id", workspaceId)
     .eq("role", "owner")
     .limit(1)
     .maybeSingle();
+  return { userId: (dueno?.user_id as string | undefined) ?? null };
+}
+
+/** La conexion con Google Calendar de un usuario (en soporte, la del dueno del espacio). */
+export async function conexionGoogleDe(userId: string | null): Promise<{ cuenta_email: string | null; estado: string } | null> {
+  if (!userId) return null;
+  const { data } = await createAdminClient()
+    .from("integraciones_conexiones")
+    .select("cuenta_email, estado")
+    .eq("user_id", userId)
+    .eq("proveedor", "google_calendar")
+    .maybeSingle();
+  return (data as { cuenta_email: string | null; estado: string } | null) ?? null;
+}
+
+export async function contextoDeCita(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  workspaceId: string | null,
+  user: { email?: string | null }
+): Promise<{ correo: string | null; modoSoporte: boolean }> {
+  const dueno = await duenoEnModoSoporte(supabase, workspaceId);
+  if (!dueno) return { correo: user.email ?? null, modoSoporte: false };
+
   let correo: string | null = null;
-  if (dueno?.user_id) {
-    const { data } = await admin.auth.admin.getUserById(dueno.user_id as string);
+  if (dueno.userId) {
+    const { data } = await createAdminClient().auth.admin.getUserById(dueno.userId);
     correo = data.user?.email ?? null;
   }
   return { correo, modoSoporte: true };

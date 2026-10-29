@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceId, getWorkspaceRole } from "@/lib/workspace";
+import { conexionGoogleDe, duenoEnModoSoporte } from "@/lib/agenda/contexto-de-cita";
 import { requireModule, getEnabledModuleKeys } from "@/lib/entitlements";
 import { listWorkspaceAgents } from "@/lib/agents";
 import { getPhoneNumberStatus, getWabaStatus, tramoEfectivo } from "@/lib/whatsapp/graph";
@@ -155,15 +156,10 @@ export default async function SettingsPage() {
   }
 
   // Integraciones: la conexion es PERSONAL (cada usuario su Google), asi que se lee la del usuario actual.
+  // En modo soporte, la del DUENO del espacio: el administrador ve lo del cliente, nunca lo suyo.
   const { data: { user: usuarioActual } } = await supabase.auth.getUser();
-  const { data: conexionGoogle } = usuarioActual
-    ? await supabase
-        .from("integraciones_conexiones")
-        .select("cuenta_email, estado")
-        .eq("user_id", usuarioActual.id)
-        .eq("proveedor", "google_calendar")
-        .maybeSingle()
-    : { data: null };
+  const duenoSoporte = await duenoEnModoSoporte(supabase, workspaceId);
+  const conexionGoogle = await conexionGoogleDe(duenoSoporte ? duenoSoporte.userId : (usuarioActual?.id ?? null));
   const { data: ajustesAgenda } = workspaceId
     ? await supabase.from("agenda_ajustes").select("whatsapp_account_id").eq("workspace_id", workspaceId).maybeSingle()
     : { data: null };
@@ -175,6 +171,7 @@ export default async function SettingsPage() {
         .filter((a) => a.status !== "frozen")
         .map((a) => ({ id: a.id, nombre: a.label ? `${a.label} · ${a.display_phone_number}` : a.display_phone_number }))}
       lineaDeCitas={(ajustesAgenda?.whatsapp_account_id as string | null | undefined) ?? null}
+      modoSoporte={!!duenoSoporte}
     />
   );
 

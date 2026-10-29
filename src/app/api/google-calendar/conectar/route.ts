@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { firmarEstado } from "@/lib/integraciones/cifrado";
 import { urlDeAutorizacion } from "@/lib/integraciones/google/oauth";
 import { espacioParaConectar, origenPublico, uriDeRetorno } from "@/lib/integraciones/google/contexto";
+import { duenoEnModoSoporte } from "@/lib/agenda/contexto-de-cita";
+import { getWorkspaceId } from "@/lib/workspace";
 
 /**
  * Empieza la conexion con Google: manda a la persona a la pantalla de permisos.
@@ -21,6 +23,8 @@ export async function GET(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.redirect(`${origen}/login`);
+  // En modo soporte se conectaria el Google del administrador, no el del cliente.
+  if (await duenoEnModoSoporte(supabase, await getWorkspaceId(supabase))) return volver("modo_soporte");
 
   const espacio = await espacioParaConectar(supabase, user.id);
   if ("error" in espacio) return volver(espacio.error);

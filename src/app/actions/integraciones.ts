@@ -7,6 +7,8 @@ import { descifrar } from "@/lib/integraciones/cifrado";
 import { revocarToken } from "@/lib/integraciones/google/oauth";
 import { requireWorkspaceRole } from "@/lib/auth/with-workspace";
 import { asegurarPlantillasDeCita } from "@/lib/agenda/plantillas-cita";
+import { duenoEnModoSoporte } from "@/lib/agenda/contexto-de-cita";
+import { getWorkspaceId } from "@/lib/workspace";
 
 /**
  * Desconecta el Google Calendar de quien lo pide: le avisa a Google que ya no
@@ -19,6 +21,9 @@ export async function desconectarGoogleCalendar() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "No autenticado." };
+  if (await duenoEnModoSoporte(supabase, await getWorkspaceId(supabase))) {
+    return { error: "En modo soporte no se puede desconectar: es la conexión del cliente." };
+  }
 
   const admin = createAdminClient();
   const { data: conexion } = await admin

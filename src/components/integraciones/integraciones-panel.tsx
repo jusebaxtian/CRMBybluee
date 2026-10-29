@@ -9,6 +9,7 @@ export type ConexionGoogle = { cuenta_email: string | null; estado: "conectado" 
 
 const MENSAJES: Record<string, { texto: string; bien?: boolean }> = {
   ok: { texto: "Google Calendar conectado.", bien: true },
+  modo_soporte: { texto: "En modo soporte no se conecta Google: se conectaría tu cuenta, no la del cliente." },
   cancelado: { texto: "Cancelaste la conexión en Google. No se guardó nada." },
   sin_permiso: {
     texto:
@@ -35,6 +36,8 @@ export function IntegracionesPanel(props: {
   google: ConexionGoogle;
   lineas: LineaWhatsApp[];
   lineaDeCitas: string | null;
+  /** Modo soporte: se muestra la conexion del cliente, sin conectar ni desconectar. */
+  modoSoporte?: boolean;
 }) {
   return (
     <Suspense fallback={null}>
@@ -48,11 +51,13 @@ function Contenido({
   google,
   lineas,
   lineaDeCitas,
+  modoSoporte = false,
 }: {
   moduloIncluido: boolean;
   google: ConexionGoogle;
   lineas: LineaWhatsApp[];
   lineaDeCitas: string | null;
+  modoSoporte?: boolean;
 }) {
   const router = useRouter();
   const resultado = useSearchParams().get("google");
@@ -116,9 +121,28 @@ function Contenido({
               pides. Cada persona conecta su propio calendario.
             </p>
 
+            {modoSoporte && moduloIncluido && (
+              <p className="mt-3 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-foreground">
+                Modo soporte: ves la conexión del cliente. Conectar o desconectar Google lo hace el cliente desde su cuenta.
+              </p>
+            )}
             {!moduloIncluido ? (
               <p className="mt-3 flex items-center gap-1.5 text-sm text-muted">
                 <Lock size={14} /> Disponible en planes superiores. Contacta a soporte para activarlo.
+              </p>
+            ) : modoSoporte ? (
+              <p className={`mt-3 flex items-center gap-1.5 text-sm ${conectado ? "text-success" : google?.estado === "requiere_reconexion" ? "text-warning" : "text-muted"}`}>
+                {conectado ? (
+                  <>
+                    <CheckCircle2 size={14} /> El cliente lo tiene conectado{google?.cuenta_email ? ` como ${google.cuenta_email}` : ""}
+                  </>
+                ) : google?.estado === "requiere_reconexion" ? (
+                  <>
+                    <TriangleAlert size={14} /> La conexión del cliente venció{google?.cuenta_email ? ` (${google.cuenta_email})` : ""}
+                  </>
+                ) : (
+                  "El cliente no tiene Google Calendar conectado."
+                )}
               </p>
             ) : conectado ? (
               <div className="mt-3 flex flex-wrap items-center gap-3">
