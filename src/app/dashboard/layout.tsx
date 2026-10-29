@@ -108,7 +108,11 @@ export default async function DashboardLayout({
         .select("module_key")
         .eq("plan_id", workspace.plan_id)
     : { data: [] };
-  const enabledModules = (planModules ?? []).map((pm) => pm.module_key);
+  // Mas los modulos que el administrador le habilito a este espacio aparte del plan (0162).
+  const { data: modulosExtra } = workspaceId
+    ? await supabase.from("workspace_modulos_extra").select("module_key").eq("workspace_id", workspaceId)
+    : { data: [] };
+  const enabledModules = [...new Set([...(planModules ?? []), ...(modulosExtra ?? [])].map((pm) => pm.module_key as string))];
 
   // Explicit scope filter — RLS also allows platform admins to read every notification,
   // which would otherwise leak other clients' targeted notifications into an admin's own dashboard.

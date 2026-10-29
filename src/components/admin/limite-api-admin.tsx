@@ -12,7 +12,7 @@ export function LimiteApiAdmin({ workspaceId, inicial }: { workspaceId: string; 
   return (
     <div className="mt-4 border-t border-border pt-4">
       <p className="text-sm font-medium text-foreground">Límite de la API</p>
-      <p className="mt-0.5 text-xs text-muted">Peticiones por minuto de todo el espacio (aplica solo si su plan incluye el módulo de API).</p>
+      <p className="mt-0.5 text-xs text-muted">Peticiones por minuto de todo el espacio (aplica si tiene el módulo de API, por plan o habilitado arriba).</p>
       <div className="mt-2 flex items-center gap-2">
         <input
           type="number"

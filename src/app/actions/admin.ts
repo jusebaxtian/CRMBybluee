@@ -261,6 +261,30 @@ export async function updateWorkspaceExtraAgents(workspaceId: string, extra: str
   return { success: true };
 }
 
+/**
+ * Habilita o quita a UN espacio un modulo que su plan no trae (0162). Primero
+ * se usa para API y webhooks. Solo el administrador de la plataforma.
+ */
+export async function cambiarModuloExtra(workspaceId: string, moduleKey: string, habilitado: boolean) {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
+  const admin = createAdminClient();
+  if (habilitado) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const { error } = await admin
+      .from("workspace_modulos_extra")
+      .upsert({ workspace_id: workspaceId, module_key: moduleKey, created_by: user?.id ?? null }, { onConflict: "workspace_id,module_key" });
+    if (error) return { error: error.message };
+  } else {
+    const { error } = await admin.from("workspace_modulos_extra").delete().eq("workspace_id", workspaceId).eq("module_key", moduleKey);
+    if (error) return { error: error.message };
+  }
+  revalidatePath(`/admin/workspaces/${workspaceId}`);
+  return { success: true };
+}
+
 // Edits the date that gates access for this workspace — trial_ends_at while
 // they're on a trial (so a trial can be extended or shortened and the
 // scheduler in src/lib/billing/scheduler.ts picks up the new date as-is,

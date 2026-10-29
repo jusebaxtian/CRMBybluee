@@ -53,7 +53,11 @@ export async function autenticar(
   const { data: modulo } = espacio.plan_id
     ? await admin.from("plan_modules").select("module_key").eq("plan_id", espacio.plan_id).eq("module_key", MODULO_API).maybeSingle()
     : { data: null };
-  if (!modulo) {
+  // O habilitado solo para este espacio desde Admin (0162), aunque su plan no lo traiga.
+  const { data: extra } = modulo
+    ? { data: modulo }
+    : await admin.from("workspace_modulos_extra").select("module_key").eq("workspace_id", workspaceId).eq("module_key", MODULO_API).maybeSingle();
+  if (!extra) {
     return { respuesta: error("modulo_no_incluido", "Tu plan no incluye el módulo de API. Contacta a soporte para activarlo.") };
   }
 

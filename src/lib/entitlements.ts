@@ -15,12 +15,13 @@ export async function getEnabledModuleKeys(
 
   if (!workspace?.plan_id) return [];
 
-  const { data: planModules } = await supabase
-    .from("plan_modules")
-    .select("module_key")
-    .eq("plan_id", workspace.plan_id);
+  // Los del plan + los que el administrador le habilito a este espacio (0162).
+  const [{ data: planModules }, { data: extra }] = await Promise.all([
+    supabase.from("plan_modules").select("module_key").eq("plan_id", workspace.plan_id),
+    supabase.from("workspace_modulos_extra").select("module_key").eq("workspace_id", workspaceId),
+  ]);
 
-  return (planModules ?? []).map((pm) => pm.module_key);
+  return [...new Set([...(planModules ?? []), ...(extra ?? [])].map((m) => m.module_key as string))];
 }
 
 /** Redirects to /dashboard if the workspace's plan doesn't include this module. */

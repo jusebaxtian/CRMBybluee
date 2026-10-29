@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { LimiteApiAdmin } from "@/components/admin/limite-api-admin";
+import { ModuloApiAdmin } from "@/components/admin/modulo-api-admin";
+import { MODULO_API } from "@/lib/api-publica/permisos";
 import { LIMITE_POR_DEFECTO } from "@/lib/api-publica/autenticar";
 import Link from "next/link";
 import { ArrowLeft, LogIn } from "lucide-react";
@@ -80,6 +82,14 @@ export default async function AdminWorkspaceDetailPage({
   const limiteNumeros = await limiteDeNumeros(supabase, id);
   const { data: ajusteApi } = await createAdminClient().from("api_ajustes").select("limite_por_minuto").eq("workspace_id", id).maybeSingle();
   const limiteApi = (ajusteApi?.limite_por_minuto as number | undefined) ?? LIMITE_POR_DEFECTO;
+
+  // Modulo de API: viene en el plan o se habilita solo para este espacio (0162).
+  const [{ data: apiEnPlan }, { data: apiAparte }] = await Promise.all([
+    workspace.plan_id
+      ? supabase.from("plan_modules").select("module_key").eq("plan_id", workspace.plan_id).eq("module_key", MODULO_API).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase.from("workspace_modulos_extra").select("module_key").eq("workspace_id", id).eq("module_key", MODULO_API).maybeSingle(),
+  ]);
 
   // Vencimiento actual para el formulario: prueba -> trial_ends_at; si no,
   // la suscripcion activa mas lejana.
@@ -203,6 +213,7 @@ export default async function AdminWorkspaceDetailPage({
             direccion: workspace.direccion ?? "",
           }}
         />
+        <ModuloApiAdmin workspaceId={workspace.id} incluidoEnPlan={!!apiEnPlan} habilitadoAparte={!!apiAparte} />
         <LimiteApiAdmin workspaceId={workspace.id} inicial={limiteApi} />
         <PagosDelCliente pagos={pagos} sinDocumento={!workspace.datos_legales_el} />
       </div>
