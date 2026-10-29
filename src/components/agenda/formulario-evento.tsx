@@ -10,6 +10,7 @@ import {
   crearPlantillasDeCitaDelEspacio,
   enviarEnlaceDeCita,
   ultimoCorreoDeContacto,
+  correoDelEspacioDelContacto,
   vistaPreviaDeConfirmacion,
   type EventoAgenda,
 } from "@/app/actions/agenda-eventos";
@@ -95,12 +96,22 @@ export function FormularioEvento({
     return () => document.removeEventListener("keydown", tecla);
   }, [cerrar]);
 
-  // Desde el chat el contacto ya viene elegido: se suma el correo que se uso con el la ultima vez.
+  // Suma un correo a los invitados, sin repetir.
+  const sumarCorreo = (e: string | null) => {
+    if (e && correoValido(e)) setCorreos((actual) => (actual.includes(e.toLowerCase()) ? actual : [...actual, e.toLowerCase()]));
+  };
+
+  // Correos del contacto: el que se uso con el la ultima vez y, si ya tiene un
+  // espacio en el CRM, el correo con el que lo creo (asi le llega la invitacion de Meet).
+  const sumarCorreosDelContacto = (contactId: string) => {
+    ultimoCorreoDeContacto(contactId).then(sumarCorreo);
+    correoDelEspacioDelContacto(contactId).then(sumarCorreo);
+  };
+
+  // Desde el chat el contacto ya viene elegido.
   useEffect(() => {
     if (!contactoInicial) return;
-    ultimoCorreoDeContacto(contactoInicial.id).then((e) => {
-      if (e && correoValido(e)) setCorreos((actual) => (actual.includes(e.toLowerCase()) ? actual : [...actual, e.toLowerCase()]));
-    });
+    sumarCorreosDelContacto(contactoInicial.id);
     // Solo al abrir.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -136,11 +147,8 @@ export function FormularioEvento({
   function elegirContacto(c: Contacto) {
     setContacto(c);
     setResultados([]);
-    // No se vuelve a pedir el correo si ya se uso con este contacto.
-    ultimoCorreoDeContacto(c.id).then((e) => {
-      // El correo ya usado con este contacto se suma a los invitados, sin repetir.
-      if (e && correoValido(e)) setCorreos((actual) => (actual.includes(e.toLowerCase()) ? actual : [...actual, e.toLowerCase()]));
-    });
+    // No se vuelve a pedir el correo si ya se uso con este contacto o si ya tiene espacio.
+    sumarCorreosDelContacto(c.id);
   }
 
   function guardar() {

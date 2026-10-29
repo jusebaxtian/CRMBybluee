@@ -135,6 +135,33 @@ export async function ultimoCorreoDeContacto(contactId: string): Promise<string 
   return (data?.invitado_email as string | null) ?? null;
 }
 
+/**
+ * Si el contacto ya tiene un espacio en el CRM (es cliente de Bybluee), el correo
+ * con el que se creo ese espacio (el del dueno), para sumarlo a los invitados de
+ * la cita y que le llegue la invitacion de Meet. Usa la misma busqueda del panel
+ * del chat (admin_espacio_de_contacto): solo responde al administrador de la
+ * plataforma o al vendedor de ese contacto; para los demas no hay espacio y
+ * devuelve null, igual que si el contacto no tiene espacio.
+ */
+export async function correoDelEspacioDelContacto(contactId: string): Promise<string | null> {
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return null;
+  const { data: espacios } = await ctx.supabase.rpc("admin_espacio_de_contacto", { p_contact_id: contactId });
+  const espacio = (espacios as { workspace_id: string }[] | null)?.[0];
+  if (!espacio) return null;
+  const admin = createAdminClient();
+  const { data: dueno } = await admin
+    .from("workspace_members")
+    .select("user_id")
+    .eq("workspace_id", espacio.workspace_id)
+    .eq("role", "owner")
+    .limit(1)
+    .maybeSingle();
+  if (!dueno?.user_id) return null;
+  const { data } = await admin.auth.admin.getUserById(dueno.user_id as string);
+  return data.user?.email ?? null;
+}
+
 export async function crearEventoAgenda(input: Entrada) {
   const v = validar(input);
   if ("error" in v) return { error: v.error };
