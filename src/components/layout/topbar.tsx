@@ -5,6 +5,7 @@ import { logout } from "@/app/actions/auth";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { CentroDeNotificaciones } from "@/components/notifications/centro-de-notificaciones";
 import { ChangePasswordButton } from "@/components/account/change-password-button";
+import { EtiquetaDeTemporada } from "@/components/layout/etiqueta-de-temporada";
 
 type Notification = {
   id: string;
@@ -45,7 +46,12 @@ export function Topbar({
           <Menu size={18} />
         </button>
         <div>
-          <h1 className="text-base font-semibold text-foreground sm:text-lg">Dashboard</h1>
+          {/* La etiqueta de temporada va junto al titulo: aqui se ve en PC, tablet y celular
+              (en el menu lateral se montaba sobre la marca). */}
+          <div className="flex items-center gap-2">
+            <h1 className="text-base font-semibold text-foreground sm:text-lg">Dashboard</h1>
+            <EtiquetaDeTemporada />
+          </div>
           <p className="hidden text-xs text-muted sm:block">Resumen general de tu cuenta</p>
         </div>
       </div>

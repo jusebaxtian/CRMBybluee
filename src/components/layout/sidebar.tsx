@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { EtiquetaDeTemporada } from "@/components/layout/etiqueta-de-temporada";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
@@ -107,9 +106,6 @@ export function Sidebar({
             CRM WhatsApp
           </span>
         </div>
-        <span className={soloAbierto}>
-          <EtiquetaDeTemporada />
-        </span>
         {onAlternar && (
           <button
             type="button"
