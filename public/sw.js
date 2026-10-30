@@ -102,9 +102,21 @@ async function actualizarInsignia(real) {
 
 async function mostrarAviso(data) {
   // Con la app abierta y a la vista en ESE chat, el mensaje ya se esta leyendo.
-  const destino = data.url || "";
+  // Solo cuenta el chat exacto: antes bastaba con que la direccion "contuviera" la
+  // del aviso, y la prueba (que apunta a /dashboard/inbox) se descartaba siempre
+  // que se pedia desde la bandeja. En Android eso la hacia desaparecer; en iPhone
+  // no, porque alli el sistema no informa que la pestana esta a la vista.
   const clientes = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-  const leyendolo = clientes.some((c) => c.visibilityState === "visible" && destino && c.url.includes(destino));
+  const chatDelAviso = data.conversationId ? `/dashboard/inbox/${data.conversationId}` : null;
+  const leyendolo =
+    !!chatDelAviso &&
+    clientes.some((c) => {
+      try {
+        return c.visibilityState === "visible" && new URL(c.url).pathname === chatDelAviso;
+      } catch {
+        return false;
+      }
+    });
   if (leyendolo) {
     await actualizarInsignia(data.unreadTotal);
     return;
