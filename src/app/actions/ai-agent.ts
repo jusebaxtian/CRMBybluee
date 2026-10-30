@@ -167,10 +167,14 @@ export async function testAiAgentMessage(
   ).maybeSingle();
   if (!agent) return { error: "Primero conecta y guarda tu agente." };
 
-  const { data: mediaLibrary } = await supabase
+  // Solo los adjuntos de este agente (0163).
+  const consultaMedios = supabase
     .from("ai_agent_media")
     .select("key, label, trigger_description, media_type, media_url, media_mime_type, filename")
     .eq("workspace_id", workspaceId);
+  const { data: mediaLibrary } = await (whatsappAccountId
+    ? consultaMedios.eq("whatsapp_account_id", whatsappAccountId)
+    : consultaMedios.is("whatsapp_account_id", null));
 
   if (customerRequestedHuman(message)) {
     return {
@@ -274,6 +278,8 @@ export async function addAiAgentMedia(_prevState: unknown, formData: FormData) {
   const label = String(formData.get("label") ?? "").trim();
   const triggerDescription = String(formData.get("triggerDescription") ?? "").trim();
   const file = formData.get("file") as File | null;
+  // Agente al que pertenece el adjunto (0163): su linea, o vacio = el general.
+  const whatsappAccountId = String(formData.get("whatsappAccountId") ?? "") || null;
 
   if (!key || !keySlugPattern.test(key)) {
     return { error: "La clave solo puede tener letras minúsculas, números, - y _ (ej: qr_pago)." };
@@ -306,6 +312,7 @@ export async function addAiAgentMedia(_prevState: unknown, formData: FormData) {
 
   const { error } = await supabase.from("ai_agent_media").insert({
     workspace_id: workspaceId,
+    whatsapp_account_id: whatsappAccountId,
     key,
     label,
     trigger_description: triggerDescription,
@@ -317,7 +324,7 @@ export async function addAiAgentMedia(_prevState: unknown, formData: FormData) {
   if (error) {
     return {
       error: error.message.includes("duplicate")
-        ? `Ya existe un medio con la clave "${key}" — usa otra.`
+        ? `Este agente ya tiene un medio con la clave "${key}" — usa otra.`
         : error.message,
     };
   }

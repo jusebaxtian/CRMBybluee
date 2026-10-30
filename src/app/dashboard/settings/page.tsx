@@ -130,7 +130,7 @@ export default async function SettingsPage() {
     const { data: aiAgentMedia } = workspaceId
       ? await supabase
           .from("ai_agent_media")
-          .select("id, key, label, trigger_description, media_type, media_url")
+          .select("id, key, label, trigger_description, media_type, media_url, whatsapp_account_id")
           .eq("workspace_id", workspaceId)
           .order("created_at")
       : { data: [] };

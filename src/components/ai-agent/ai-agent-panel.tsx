@@ -369,7 +369,7 @@ export function AiAgentPanel({
 
       {agent && (
         <div className="mt-5 border-t border-border pt-5">
-          <AiAgentMediaLibrary items={mediaItems} />
+          <AiAgentMediaLibrary items={mediaItems} whatsappAccountId={whatsappAccountId} />
         </div>
       )}
 

@@ -224,10 +224,14 @@ export async function maybeRespondWithAiAgent(
   const account = await resolveSendAccount(supabase, workspaceId, conversation.whatsapp_account_id);
   if (!contact || !account) return;
 
-  const { data: mediaLibrary } = await supabase
+  // Los adjuntos son de cada agente (0163): solo los del agente que responde.
+  const consultaMedios = supabase
     .from("ai_agent_media")
     .select("key, label, trigger_description, media_type, media_url, media_mime_type, filename")
     .eq("workspace_id", workspaceId);
+  const { data: mediaLibrary } = await (agent.whatsapp_account_id
+    ? consultaMedios.eq("whatsapp_account_id", agent.whatsapp_account_id)
+    : consultaMedios.is("whatsapp_account_id", null));
 
   const { data: pastMessages } = await supabase
     .from("messages")

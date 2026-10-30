@@ -128,7 +128,14 @@ function EditMediaButton({ item }: { item: MediaItem }) {
   );
 }
 
-export function AiAgentMediaLibrary({ items }: { items: MediaItem[] }) {
+export function AiAgentMediaLibrary({
+  items,
+  whatsappAccountId = null,
+}: {
+  items: MediaItem[];
+  /** Agente al que se suben los adjuntos nuevos: su linea, o null = el general (0163). */
+  whatsappAccountId?: string | null;
+}) {
   const [state, action, pending] = useActionState(addAiAgentMedia, undefined);
 
   return (
@@ -170,6 +177,7 @@ export function AiAgentMediaLibrary({ items }: { items: MediaItem[] }) {
       )}
 
       <form action={action} className="flex flex-col gap-3 border-t border-border pt-4">
+        <input type="hidden" name="whatsappAccountId" value={whatsappAccountId ?? ""} />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-xs font-medium text-muted">

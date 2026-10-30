@@ -27,6 +27,8 @@ type MediaItem = {
   trigger_description: string;
   media_type: "image" | "video" | "audio" | "document";
   media_url: string;
+  /** Agente dueno del adjunto (0163): su linea, o null = el general. */
+  whatsapp_account_id?: string | null;
 };
 
 type TemplateOption = { id: string; meta_template_name: string; language: string };
@@ -63,12 +65,14 @@ export function AgentesPorLinea({
     agentes.find((a) => (a.whatsapp_account_id ?? null) === lineaId) ?? null;
 
   const hayLlave = agentes.length > 0;
+  // Cada agente ve y usa solo sus propios adjuntos (0163).
+  const mediosDe = (lineaId: string | null) => mediaItems.filter((m) => (m.whatsapp_account_id ?? null) === lineaId);
 
   if (lineas.length < 2) {
     return (
       <AiAgentPanel
         agent={agenteDe(null)}
-        mediaItems={mediaItems}
+        mediaItems={mediosDe(null)}
         templates={templates}
         whatsappAccountId={null}
         hayLlaveEnElEspacio={hayLlave}
@@ -89,8 +93,8 @@ export function AgentesPorLinea({
           Un agente por línea
         </div>
         <p className="mb-3 text-xs text-muted">
-          Cada línea puede tener su propio agente, con su personalidad y sus seguimientos, y todos comparten la misma
-          API key. Si una línea no tiene agente propio, responde el de <strong>Otras líneas</strong>; si tampoco existe,
+          Cada línea tiene su propio agente, independiente: nombre, prompt, adjuntos y seguimientos. Lo único que
+          comparten es la API key. Si una línea no tiene agente propio, responde el de <strong>Otras líneas</strong>; si tampoco existe,
           la IA no responde en esa línea.
         </p>
         <div className="flex flex-wrap gap-2">
@@ -130,7 +134,7 @@ export function AgentesPorLinea({
         // Al cambiar de línea se vuelve a montar el formulario con sus datos.
         key={seleccion ?? "general"}
         agent={agenteDe(seleccion ?? null)}
-        mediaItems={mediaItems}
+        mediaItems={mediosDe(seleccion ?? null)}
         templates={templates}
         whatsappAccountId={seleccion ?? null}
         hayLlaveEnElEspacio={hayLlave}
