@@ -180,6 +180,11 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(
     (async () => {
       await actualizarInsignia();
+      // Enlace externo (el link de Meet de un aviso de cita): se abre aparte.
+      if (/^https?:\/\//.test(targetUrl) && !targetUrl.startsWith(self.location.origin)) {
+        if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
+        return;
+      }
       const clientList = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
       for (const client of clientList) {
         if (client.url.includes(targetUrl) && "focus" in client) return client.focus();

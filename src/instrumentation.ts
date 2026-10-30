@@ -33,6 +33,7 @@ export async function register() {
   const { processDueCampaigns } = await import("@/lib/campaigns/scheduler");
   const { deleteStaleUnactivatedWorkspaces } = await import("@/lib/billing/cleanup");
   const { processDueReminders } = await import("@/lib/recordatorios/scheduler");
+  const { avisarCitasProximas } = await import("@/lib/agenda/aviso-de-cita");
   const { procesarEsperasDeFlujos } = await import("@/lib/flujos/scheduler");
 
   const { avisarMesesGanados } = await import("@/lib/referidos/avisos");
@@ -63,6 +64,7 @@ export async function register() {
     { nombre: "campañas", cadaMs: 30_000, correr: processDueCampaigns },
     { nombre: "seguimientos IA", cadaMs: MINUTO, correr: processAiFollowups },
     { nombre: "recordatorios", cadaMs: MINUTO, correr: processDueReminders },
+    { nombre: "avisos de citas", cadaMs: MINUTO, correr: avisarCitasProximas },
     // Cada 30 s y no cada minuto: una espera de "5 minutos" que se dispara a
     // los 5:59 se siente rota, y el trabajo no cuesta nada cuando no hay nada
     // vencido -- es una consulta sobre un indice parcial.
