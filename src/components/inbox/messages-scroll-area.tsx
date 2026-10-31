@@ -58,6 +58,68 @@ function tituloDelDia(iso: string): string {
 /** Cuanto queda visible la fecha fija despues de dejar de mover el chat. */
 const FECHA_FIJA_MS = 3000;
 
+/** El primer mensaje cuya parte de abajo queda por debajo de `arriba` (busqueda binaria: pocas mediciones aunque haya cientos). */
+function primeroVisible(filas: HTMLElement[], arriba: number): HTMLElement | null {
+  let bajo = 0;
+  let alto = filas.length - 1;
+  let encontrado: HTMLElement | null = null;
+  while (bajo <= alto) {
+    const medio = (bajo + alto) >> 1;
+    if (filas[medio].getBoundingClientRect().bottom > arriba) {
+      encontrado = filas[medio];
+      alto = medio - 1;
+    } else {
+      bajo = medio + 1;
+    }
+  }
+  return encontrado;
+}
+
+/**
+ * Fecha fija arriba, como WhatsApp: al mover el chat muestra el dia de los
+ * mensajes que estan arriba en pantalla y se esconde a los 3 s sin moverlo.
+ * Tiene su propio estado para que mostrarla o cambiarla no vuelva a pintar los
+ * mensajes, y mide como mucho una vez por cuadro de pantalla.
+ */
+function FechaFija({ suscribir }: { suscribir: (alMover: (contenedor: HTMLDivElement) => void) => () => void }) {
+  const [texto, setTexto] = useState<string | null>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    let cuadro = 0;
+    let ocultar: ReturnType<typeof setTimeout> | null = null;
+    const quitar = suscribir((contenedor) => {
+      if (cuadro) return;
+      cuadro = requestAnimationFrame(() => {
+        cuadro = 0;
+        const filas = Array.from(contenedor.querySelectorAll<HTMLElement>("[data-dia]"));
+        const el = primeroVisible(filas, contenedor.getBoundingClientRect().top + 8);
+        if (el?.dataset.dia) setTexto(tituloDelDia(el.dataset.dia));
+        setVisible(true);
+        if (ocultar) clearTimeout(ocultar);
+        ocultar = setTimeout(() => setVisible(false), FECHA_FIJA_MS);
+      });
+    });
+    return () => {
+      quitar();
+      if (cuadro) cancelAnimationFrame(cuadro);
+      if (ocultar) clearTimeout(ocultar);
+    };
+  }, [suscribir]);
+
+  if (!texto) return null;
+  return (
+    <div
+      aria-hidden
+      className={`pointer-events-none absolute left-1/2 top-2 z-10 rounded-[8px] border border-border bg-surface px-3 py-1 text-[11.5px] font-semibold text-foreground shadow-[0_2px_8px_rgba(0,0,0,0.45)] transition-all duration-200 sm:top-3 ${
+        visible ? "-translate-x-1/2 translate-y-0 opacity-100" : "-translate-x-1/2 -translate-y-1.5 opacity-0"
+      }`}
+    >
+      {texto}
+    </div>
+  );
+}
+
 function SeparadorDeFecha({ iso }: { iso: string }) {
   return (
     <div className="flex items-center justify-center py-1">
@@ -102,39 +164,24 @@ export function MessagesScrollArea({
      
   }, [lastMessageId]);
 
-  // Fecha fija arriba, como WhatsApp: al mover el chat muestra el dia de los
-  // mensajes que estan arriba en pantalla y se esconde a los 3 s sin moverlo.
-  const [fechaFija, setFechaFija] = useState<string | null>(null);
-  const [fechaVisible, setFechaVisible] = useState(false);
-  const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const alMover = useCallback((contenedor: HTMLDivElement) => {
-    const arriba = contenedor.getBoundingClientRect().top + 8;
-    for (const el of contenedor.querySelectorAll<HTMLElement>("[data-dia]")) {
-      if (el.getBoundingClientRect().bottom > arriba) {
-        setFechaFija(tituloDelDia(el.dataset.dia as string));
-        break;
-      }
-    }
-    setFechaVisible(true);
-    if (temporizador.current) clearTimeout(temporizador.current);
-    temporizador.current = setTimeout(() => setFechaVisible(false), FECHA_FIJA_MS);
+  // El scroll solo le avisa a la fecha fija: este componente no guarda estado
+  // del scroll. Antes si lo guardaba y cada movimiento volvia a pintar TODOS los
+  // mensajes; en el celular, al escribir (el campo crece, el teclado mueve la
+  // pantalla) eso pasaba muchas veces por segundo y el chat se ponia lento.
+  const oyentes = useRef(new Set<(contenedor: HTMLDivElement) => void>());
+  const suscribir = useCallback((fn: (contenedor: HTMLDivElement) => void) => {
+    oyentes.current.add(fn);
+    return () => {
+      oyentes.current.delete(fn);
+    };
   }, []);
-  useEffect(() => () => {
-    if (temporizador.current) clearTimeout(temporizador.current);
+  const alMover = useCallback((contenedor: HTMLDivElement) => {
+    for (const fn of oyentes.current) fn(contenedor);
   }, []);
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
-    {fechaFija && (
-      <div
-        aria-hidden
-        className={`pointer-events-none absolute left-1/2 top-2 z-10 rounded-[8px] border border-border bg-surface px-3 py-1 text-[11.5px] font-semibold text-foreground shadow-[0_2px_8px_rgba(0,0,0,0.45)] transition-all duration-200 sm:top-3 ${
-          fechaVisible ? "-translate-x-1/2 translate-y-0 opacity-100" : "-translate-x-1/2 -translate-y-1.5 opacity-0"
-        }`}
-      >
-        {fechaFija}
-      </div>
-    )}
+    <FechaFija suscribir={suscribir} />
     {/* pl-16 reserves a gutter for the floating attach/quick-reply/mic cluster
         pinned to the left edge (see MessageComposer), so message bubbles never
         render underneath it. */}
