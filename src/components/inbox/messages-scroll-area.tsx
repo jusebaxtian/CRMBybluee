@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MessageBubble } from "@/components/inbox/message-bubble";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 import { reaccionesPorMensaje } from "@/lib/inbox/reacciones";
@@ -29,31 +29,39 @@ function diaDe(iso: string): string {
 }
 
 /**
- * Titulo del separador: "Hoy", "Ayer" o la fecha escrita. Asi se sabe de
- * cuando es cada parte de la conversacion sin abrir cada mensaje.
+ * Titulo del dia, como en WhatsApp (decision del 31 oct 2026): "Hoy", "Ayer",
+ * el dia de la semana si fue hace menos de una semana ("Miércoles"), y si no
+ * la fecha ("15 de octubre"; con el año si es de otro año). Se usa en los
+ * separadores y en la fecha fija de arriba.
  */
 function tituloDelDia(iso: string): string {
   const dia = diaDe(iso);
   const hoy = diaDe(new Date().toISOString());
-  const ayer = diaDe(new Date(Date.now() - 86_400_000).toISOString());
-  if (dia === hoy) return "Hoy";
-  if (dia === ayer) return "Ayer";
+  const dias = Math.round((Date.parse(`${hoy}T00:00:00Z`) - Date.parse(`${dia}T00:00:00Z`)) / 86_400_000);
+  if (dias <= 0) return "Hoy";
+  if (dias === 1) return "Ayer";
 
   const fecha = new Date(iso);
-  const mismoAno = fecha.getFullYear() === new Date().getFullYear();
+  if (dias < 7) {
+    const nombre = fecha.toLocaleDateString("es-CO", { timeZone: "America/Bogota", weekday: "long" });
+    return nombre.charAt(0).toUpperCase() + nombre.slice(1);
+  }
+  const mismoAno = dia.slice(0, 4) === hoy.slice(0, 4);
   return fecha.toLocaleDateString("es-CO", {
     timeZone: "America/Bogota",
-    weekday: "long",
     day: "numeric",
     month: "long",
     ...(mismoAno ? {} : { year: "numeric" }),
   });
 }
 
+/** Cuanto queda visible la fecha fija despues de dejar de mover el chat. */
+const FECHA_FIJA_MS = 3000;
+
 function SeparadorDeFecha({ iso }: { iso: string }) {
   return (
     <div className="flex items-center justify-center py-1">
-      <span className="rounded-full border border-border bg-surface px-3 py-1 text-[11px] font-semibold capitalize text-muted shadow-sm">
+      <span className="rounded-full border border-border bg-surface px-3 py-1 text-[11px] font-semibold text-muted shadow-sm">
         {tituloDelDia(iso)}
       </span>
     </div>
@@ -94,11 +102,43 @@ export function MessagesScrollArea({
      
   }, [lastMessageId]);
 
+  // Fecha fija arriba, como WhatsApp: al mover el chat muestra el dia de los
+  // mensajes que estan arriba en pantalla y se esconde a los 3 s sin moverlo.
+  const [fechaFija, setFechaFija] = useState<string | null>(null);
+  const [fechaVisible, setFechaVisible] = useState(false);
+  const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const alMover = useCallback((contenedor: HTMLDivElement) => {
+    const arriba = contenedor.getBoundingClientRect().top + 8;
+    for (const el of contenedor.querySelectorAll<HTMLElement>("[data-dia]")) {
+      if (el.getBoundingClientRect().bottom > arriba) {
+        setFechaFija(tituloDelDia(el.dataset.dia as string));
+        break;
+      }
+    }
+    setFechaVisible(true);
+    if (temporizador.current) clearTimeout(temporizador.current);
+    temporizador.current = setTimeout(() => setFechaVisible(false), FECHA_FIJA_MS);
+  }, []);
+  useEffect(() => () => {
+    if (temporizador.current) clearTimeout(temporizador.current);
+  }, []);
+
   return (
-    // pl-16 reserves a gutter for the floating attach/quick-reply/mic cluster
-    // pinned to the left edge (see MessageComposer), so message bubbles never
-    // render underneath it.
-    <PullToRefresh className="flex-1 space-y-3 py-3 pl-16 pr-3 sm:py-5 sm:pl-16 sm:pr-5">
+    <div className="relative flex min-h-0 flex-1 flex-col">
+    {fechaFija && (
+      <div
+        aria-hidden
+        className={`pointer-events-none absolute left-1/2 top-2 z-10 rounded-[8px] border border-border bg-surface px-3 py-1 text-[11.5px] font-semibold text-foreground shadow-[0_2px_8px_rgba(0,0,0,0.45)] transition-all duration-200 sm:top-3 ${
+          fechaVisible ? "-translate-x-1/2 translate-y-0 opacity-100" : "-translate-x-1/2 -translate-y-1.5 opacity-0"
+        }`}
+      >
+        {fechaFija}
+      </div>
+    )}
+    {/* pl-16 reserves a gutter for the floating attach/quick-reply/mic cluster
+        pinned to the left edge (see MessageComposer), so message bubbles never
+        render underneath it. */}
+    <PullToRefresh onScroll={alMover} className="flex-1 space-y-3 py-3 pl-16 pr-3 sm:py-5 sm:pl-16 sm:pr-5">
       {/* Se dice en pantalla en vez de recortar en silencio: antes la
           conversacion simplemente se quedaba quieta y nadie sabia por que. */}
       {hayMasAntiguos && (
@@ -114,7 +154,7 @@ export function MessagesScrollArea({
         // Sin fila ni separador que mostrar: no se deja un hueco vacio entre mensajes.
         if (reaccionYaPintada && !cambiaDeDia) return null;
         return (
-          <div key={m.id} className="space-y-3">
+          <div key={m.id} data-dia={m.created_at} className="space-y-3">
             {cambiaDeDia && <SeparadorDeFecha iso={m.created_at} />}
             {/* Una reaccion cuyo mensaje esta en pantalla ya se ve como emoji sobre el; si el
                 mensaje es mas antiguo que lo cargado, se deja la fila de texto como respaldo. */}
@@ -133,5 +173,6 @@ export function MessagesScrollArea({
       })}
       <div ref={bottomRef} />
     </PullToRefresh>
+    </div>
   );
 }

@@ -15,9 +15,12 @@ const MAX_PULL = 90;
 export function PullToRefresh({
   children,
   className = "",
+  onScroll,
 }: {
   children: React.ReactNode;
   className?: string;
+  /** Recibe el contenedor que hace scroll (para la fecha fija del chat). */
+  onScroll?: (contenedor: HTMLDivElement) => void;
 }) {
   const router = useRouter();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -70,6 +73,7 @@ export function PullToRefresh({
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
+      onScroll={onScroll ? (e) => onScroll(e.currentTarget) : undefined}
       className={`overflow-y-auto ${className}`}
     >
       <div
