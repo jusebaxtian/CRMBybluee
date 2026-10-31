@@ -25,13 +25,21 @@ export type InvitacionPendiente = {
   dias_demo?: number | null;
 };
 
-const ESTADOS: Record<string, string> = {
-  active: "Activo",
-  trial: "En prueba",
-  past_due: "Pago pendiente",
-  suspended: "Suspendido",
-  cancelled: "Cancelado",
-};
+/**
+ * Como se ve el estado del espacio: verde si esta al dia, rojo si vencio o se
+ * cancelo, ambar en prueba. Un espacio "active" cuya fecha ya paso tambien sale
+ * en rojo: el cobro aun no lo ha pasado a vencido, pero ya no pago.
+ */
+function estadoVisible(status: string, vence: string | null): { texto: string; clase: string; vencido: boolean } {
+  const pasada = !!vence && new Date(vence).getTime() < Date.now();
+  if (status === "past_due") return { texto: "Vencido · pago pendiente", clase: "bg-red-500/15 text-red-400", vencido: true };
+  if (status === "canceled" || status === "cancelled") return { texto: "Cancelado", clase: "bg-red-500/15 text-red-400", vencido: true };
+  if (status === "suspended") return { texto: "Suspendido", clase: "bg-red-500/15 text-red-400", vencido: true };
+  if (pasada) return { texto: "Vencido", clase: "bg-red-500/15 text-red-400", vencido: true };
+  if (status === "trial") return { texto: "En prueba", clase: "bg-warning/15 text-warning", vencido: false };
+  if (status === "active") return { texto: "Activo", clase: "bg-success/15 text-success", vencido: false };
+  return { texto: status, clase: "bg-border text-muted", vencido: false };
+}
 
 function formatoMonto(cents: number, currency: string) {
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: currency || "COP", maximumFractionDigits: 0 }).format(
@@ -62,8 +70,18 @@ export function EspacioDelClienteCard({
   return (
     <div className="mt-6 flex flex-col gap-3">
       {espacios.length > 0 && (
-        <div className="rounded-[13px] border border-primary/30 bg-primary/5 p-3">
-          <p className="flex items-center gap-1.5 text-xs font-medium text-primary">
+        <div
+          className={`rounded-[13px] border p-3 ${
+            espacios.every((e) => estadoVisible(e.status, e.vence).vencido)
+              ? "border-red-500/40 bg-red-500/5"
+              : "border-primary/30 bg-primary/5"
+          }`}
+        >
+          <p
+            className={`flex items-center gap-1.5 text-xs font-medium ${
+              espacios.every((e) => estadoVisible(e.status, e.vence).vencido) ? "text-red-400" : "text-primary"
+            }`}
+          >
             <Building2 size={13} />
             {espacios.length === 1 ? "Espacio de este cliente" : "Espacios de este cliente"}
           </p>
@@ -72,6 +90,7 @@ export function EspacioDelClienteCard({
               const vence = e.vence
                 ? new Date(e.vence).toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric", timeZone: "America/Bogota" })
                 : null;
+              const estado = estadoVisible(e.status, e.vence);
               return (
                 <li key={e.workspace_id} className="text-xs">
                   {enlaceAlAdmin ? (
@@ -85,11 +104,13 @@ export function EspacioDelClienteCard({
                   ) : (
                     <p className="truncate font-semibold text-foreground">{e.workspace_name}</p>
                   )}
-                  <p className="text-muted">
+                  <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${estado.clase}`}>
+                    {estado.texto}
+                  </span>
+                  <p className="mt-1 text-muted">
                     {[
                       e.plan_name ?? "Sin plan",
-                      ESTADOS[e.status] ?? e.status,
-                      vence ? `vence ${vence}` : null,
+                      vence ? `${estado.vencido ? "venció" : "vence"} ${vence}` : null,
                       `${e.apis_conectadas} API${Number(e.apis_conectadas) === 1 ? "" : "s"}`,
                     ]
                       .filter(Boolean)
