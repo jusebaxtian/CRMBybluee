@@ -38,6 +38,11 @@ export type Etapa = {
   botones: Boton[];
   /** Sale en cuanto corresponde, de dia o de noche: es la respuesta inmediata a algo que el cliente acaba de hacer. */
   sinHorario?: boolean;
+  /**
+   * Plantilla anterior de esta etapa. Mientras Meta no apruebe la nueva (`plantilla`),
+   * se envia esta, para que el cliente no se quede sin su aviso.
+   */
+  respaldo?: { plantilla: string; cuerpo: string; botones: Boton[] };
 };
 
 const RENOVAR = "https://crmbybluee.blue/dashboard/billing";
@@ -48,6 +53,8 @@ const EJ_SALUDO = "Carlos (Tienda Angelita)";
 const btnRenovar: Boton = { type: "URL", text: "Renovar mi plan", url: RENOVAR };
 const btnActivar: Boton = { type: "URL", text: "Activar mi plan", url: RENOVAR };
 const btnConectar: Boton = { type: "URL", text: "Conectar mi número", url: CONECTAR };
+/** Agenda de Sebastian (Google Calendar, programacion de citas) para la hora de asesoria gratis. */
+export const AGENDAR_ASESORIA = "https://calendar.app.google/A5zv2JgqPNjwFrYi6";
 
 export const ETAPAS: Etapa[] = [
   {
@@ -218,34 +225,63 @@ Renuévalo hoy para no perder el acceso a tu cuenta. Tus contactos, chats y auto
     botones: [btnRenovar],
   },
   {
+    // Decision del 1 nov 2026: al dia siguiente de vencer se le pregunta por que no
+    // renovo y se le regala 1 hora de asesoria. Solo sale si sigue vencido.
     clave: "vencio_ayer",
-    plantilla: "fidelidad_vencio_ayer",
-    titulo: "1 día después de vencer",
+    plantilla: "fidelidad_vencio_motivo",
+    titulo: "1 día después de vencer: por qué no renovó + 1 hora de asesoría gratis",
     dia: 1,
     ancla: "vencimiento",
     aplica: "normal",
     prio: 1,
-    categoria: "UTILITY",
+    categoria: "MARKETING",
     ejemplos: [EJ_SALUDO],
-    cuerpo: `Hola {{1}}, tu plan de Bybluee CRM venció ayer y tu cuenta quedó bloqueada.
+    cuerpo: `Hola {{1}}, tu plan de Bybluee CRM venció ayer y queremos entender qué pasó.
+
+¿Nos cuentas por qué no renovaste? Tu respuesta nos ayuda a mejorar.
+
+Y para que nos des otra oportunidad, te regalamos 1 hora de asesoría totalmente gratis para ajustar tu cuenta y resolver todas tus dudas.`,
+    botones: [
+      { type: "QUICK_REPLY", text: "Por el precio" },
+      { type: "QUICK_REPLY", text: "No supe configurarlo" },
+      { type: "QUICK_REPLY", text: "Otro motivo" },
+      btnRenovar,
+    ],
+    respaldo: {
+      plantilla: "fidelidad_vencio_ayer",
+      cuerpo: `Hola {{1}}, tu plan de Bybluee CRM venció ayer y tu cuenta quedó bloqueada.
 
 Actívalo ahora y recuperas el acceso al instante: tus contactos, chats y automatizaciones siguen como los dejaste.`,
-    botones: [btnActivar],
+      botones: [btnActivar],
+    },
   },
   {
+    // 3 dias despues del anterior: si sigue vencido, ¿agenda su hora gratis?
     clave: "sin_plan_4_dias",
-    plantilla: "fidelidad_sin_plan_4_dias",
-    titulo: "4 días después de vencer",
+    plantilla: "fidelidad_hora_gratis",
+    titulo: "4 días después de vencer: agendar la hora de asesoría gratis",
     dia: 4,
     ancla: "vencimiento",
     aplica: "normal",
     prio: 1,
     categoria: "MARKETING",
     ejemplos: [EJ_SALUDO],
-    cuerpo: `Hola {{1}}, llevas 4 días sin activar tu plan de Bybluee CRM.
+    cuerpo: `Hola {{1}}, tu hora de asesoría gratis en Bybluee CRM sigue disponible.
+
+En una videollamada de 1 hora configuramos contigo tu cuenta y resolvemos tus dudas, sin ningún costo.
+
+¿Quieres agendarla?`,
+    botones: [
+      { type: "QUICK_REPLY", text: "Sí, quiero agendar" },
+      { type: "URL", text: "Agendar mi hora gratis", url: AGENDAR_ASESORIA },
+    ],
+    respaldo: {
+      plantilla: "fidelidad_sin_plan_4_dias",
+      cuerpo: `Hola {{1}}, llevas 4 días sin activar tu plan de Bybluee CRM.
 
 Mientras tanto, tus clientes siguen escribiendo y nadie les responde de forma automática. Queremos que vuelvas: reactiva tu plan y todo sigue como lo dejaste.`,
-    botones: [btnActivar],
+      botones: [btnActivar],
+    },
   },
   {
     clave: "sin_plan_7_dias",

@@ -427,13 +427,14 @@ async function correr(ahora: Date, pausaMs: number): Promise<ResumenDeCorrida | 
 
   const { data: cuenta } = await admin
     .from("whatsapp_accounts")
-    .select("id, workspace_id, phone_number_id, access_token, status")
+    .select("id, workspace_id, phone_number_id, waba_id, access_token, status")
     .eq("id", config.whatsappAccountId)
     .maybeSingle();
   if (!cuenta || cuenta.status === "frozen") {
     console.error("fidelidad: la línea elegida no está disponible");
     return null;
   }
+  const aprobada = consultorDePlantillas(cuenta.waba_id as string, cuenta.access_token as string);
 
   const plan = await planificar(admin, ahora, config);
   // Fuera del horario solo salen las etapas inmediatas; el resto espera a las 9:00.
@@ -482,6 +483,10 @@ async function correr(ahora: Date, pausaMs: number): Promise<ResumenDeCorrida | 
     }
 
     const destino = config.modo === "prueba" ? digitos(config.telefonoPrueba) : d.telefono;
+    // Plantilla nueva aun sin aprobar en Meta: sale la anterior de la etapa.
+    if (d.etapa.respaldo && !(await aprobada(d.etapa.plantilla))) {
+      d.etapa = { ...d.etapa, ...d.etapa.respaldo };
+    }
     try {
       const r = await sendTemplateMessage(cuenta.phone_number_id, cuenta.access_token, destino, d.etapa.plantilla, "es", d.parametros);
       const waMessageId = r.messages[0]?.id ?? null;
@@ -508,6 +513,31 @@ async function correr(ahora: Date, pausaMs: number): Promise<ResumenDeCorrida | 
     );
   }
   return resumen;
+}
+
+/**
+ * ¿Esta aprobada en Meta esta plantilla? Se pregunta una vez por plantilla en
+ * cada corrida. Si Meta no responde, se asume que no, y sale el respaldo.
+ */
+function consultorDePlantillas(wabaId: string, token: string) {
+  const cache = new Map<string, Promise<boolean>>();
+  return (nombre: string) => {
+    if (!cache.has(nombre)) {
+      cache.set(
+        nombre,
+        fetch(`https://graph.facebook.com/v21.0/${wabaId}/message_templates?name=${encodeURIComponent(nombre)}&fields=name,status,language`, {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        })
+          .then((r) => (r.ok ? r.json() : { data: [] }))
+          .then((j: { data?: { name: string; status: string; language: string }[] }) =>
+            (j.data ?? []).some((t) => t.name === nombre && t.language === "es" && t.status === "APPROVED")
+          )
+          .catch(() => false)
+      );
+    }
+    return cache.get(nombre)!;
+  };
 }
 
 async function guardarEnElChat(
