@@ -53,8 +53,6 @@ const EJ_SALUDO = "Carlos (Tienda Angelita)";
 const btnRenovar: Boton = { type: "URL", text: "Renovar mi plan", url: RENOVAR };
 const btnActivar: Boton = { type: "URL", text: "Activar mi plan", url: RENOVAR };
 const btnConectar: Boton = { type: "URL", text: "Conectar mi número", url: CONECTAR };
-/** Agenda de Sebastian (Google Calendar, programacion de citas) para la hora de asesoria gratis. */
-export const AGENDAR_ASESORIA = "https://calendar.app.google/A5zv2JgqPNjwFrYi6";
 
 export const ETAPAS: Etapa[] = [
   {
@@ -258,7 +256,9 @@ Actívalo ahora y recuperas el acceso al instante: tus contactos, chats y automa
   {
     // 3 dias despues del anterior: si sigue vencido, ¿agenda su hora gratis?
     clave: "sin_plan_4_dias",
-    plantilla: "fidelidad_hora_gratis",
+    // Sin enlace (decision del 1 nov 2026): la hora se agenda a mano por el chat.
+    // La v1 llevaba un boton a una pagina de citas de Google que ya no existia.
+    plantilla: "fidelidad_hora_gratis_v2",
     titulo: "4 días después de vencer: agendar la hora de asesoría gratis",
     dia: 4,
     ancla: "vencimiento",
@@ -270,11 +270,8 @@ Actívalo ahora y recuperas el acceso al instante: tus contactos, chats y automa
 
 En una videollamada de 1 hora configuramos contigo tu cuenta y resolvemos tus dudas, sin ningún costo.
 
-¿Quieres agendarla?`,
-    botones: [
-      { type: "QUICK_REPLY", text: "Sí, quiero agendar" },
-      { type: "URL", text: "Agendar mi hora gratis", url: AGENDAR_ASESORIA },
-    ],
+¿Quieres agendarla? Responde este mensaje y te asignamos el día y la hora.`,
+    botones: [{ type: "QUICK_REPLY", text: "Sí, quiero agendar" }],
     respaldo: {
       plantilla: "fidelidad_sin_plan_4_dias",
       cuerpo: `Hola {{1}}, llevas 4 días sin activar tu plan de Bybluee CRM.
