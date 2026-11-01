@@ -5,6 +5,8 @@ import { isPlatformAdmin } from "@/lib/admin";
 import { getWorkspaceId } from "@/lib/workspace";
 import { FidelidadConfigPanel } from "@/components/admin/fidelidad-config";
 import { ReferidosRevision } from "@/components/admin/referidos-revision";
+import { ClientesPorEstadoPanel } from "@/components/admin/clientes-por-estado";
+import { cargarClientesPorEstado } from "@/lib/fidelidad/clientes-por-estado";
 import { aplicarFrenos, calidadDeLaLinea, leerConfigFidelidad, planificar } from "@/lib/fidelidad/envio";
 import {
   DIAS_PARA_LA_BAJA,
@@ -118,11 +120,16 @@ export default async function FidelidadPage() {
     rechazado: "Rechazado",
   };
 
+  // Resumen de arriba: clientes activos, por vencer y vencidos, con su chat y su espacio.
+  const grupos = await cargarClientesPorEstado(supabase, admin, espacioPropio, ahora);
+
   const aEnviar = decisiones.filter((d) => d.accion === "enviar");
   const omitidas = decisiones.filter((d) => d.accion !== "enviar");
 
   return (
     <div className="flex flex-col gap-6">
+      <ClientesPorEstadoPanel grupos={grupos} />
+
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Plan de fidelidad</h1>
         <p className="mt-1 text-sm text-muted">
