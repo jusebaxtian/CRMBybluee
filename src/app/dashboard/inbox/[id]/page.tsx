@@ -214,16 +214,17 @@ export default async function ConversationPage({
   const yo = quienMira?.id ?? null;
   const idsRemitentes = [...new Set((messages ?? []).map((m) => m.sent_by_user_id as string | null).filter((x): x is string => !!x))];
   const nombresRemitentes = new Map<string, string>();
-  // Quien envio y no es del espacio: el administrador de la plataforma en modo soporte.
+  // El administrador de la plataforma sale como "💎 Team Bybluee" (en su espacio y en
+  // modo soporte); quien escribio sin ser del espacio, tambien.
   const deSoporte = new Set<string>();
   if (idsRemitentes.length) {
-    const { data: miembrosDelEspacio } = await createAdminClient()
-      .from("workspace_members")
-      .select("user_id")
-      .eq("workspace_id", workspaceId ?? "")
-      .in("user_id", idsRemitentes);
+    const [{ data: miembrosDelEspacio }, { data: adminsPlataforma }] = await Promise.all([
+      createAdminClient().from("workspace_members").select("user_id").eq("workspace_id", workspaceId ?? "").in("user_id", idsRemitentes),
+      createAdminClient().from("platform_admins").select("user_id").in("user_id", idsRemitentes),
+    ]);
     const miembros = new Set((miembrosDelEspacio ?? []).map((x) => x.user_id as string));
     for (const uid of idsRemitentes) if (!miembros.has(uid)) deSoporte.add(uid);
+    for (const a of adminsPlataforma ?? []) deSoporte.add(a.user_id as string);
     const adminRemitentes = createAdminClient();
     await Promise.all(
       idsRemitentes.map(async (uid) => {

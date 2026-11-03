@@ -20,7 +20,8 @@ const FIJOS: Record<string, { texto: string; tono: string }> = {
   sistema: { texto: "🔔 Aviso del sistema", tono: "text-slate-200" },
   automatizacion: { texto: "⚡ Automatización", tono: "text-violet-200" },
   app: { texto: "📱 Desde la app", tono: "text-rose-200" },
-  soporte: { texto: "🛟 Soporte Bybluee", tono: "text-cyan-200" },
+  // El administrador de la plataforma, en su espacio o en modo soporte (decision del 3 nov 2026).
+  soporte: { texto: "💎 Team Bybluee", tono: "text-cyan-200" },
 };
 
 /** Colores para las personas del equipo: cada una conserva el suyo (sale de su id). */
@@ -34,8 +35,8 @@ function tonoDe(id: string): string {
 
 /**
  * Prioridad: lo escrito desde la app del celular, lo que no es una persona (IA,
- * campaña…), una automatizacion y por ultimo la persona. Si la persona no es del
- * espacio (el administrador de la plataforma en modo soporte), "Soporte Bybluee".
+ * campaña…), una automatizacion y por ultimo la persona. El administrador de la
+ * plataforma (en su espacio o en modo soporte) sale siempre como "💎 Team Bybluee".
  * Sin ningun dato (mensajes de antes de la 0165) no se muestra nada.
  *
  * Ojo: messages.sent_by_support NO sirve para esto: se marca en todo mensaje
