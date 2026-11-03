@@ -80,7 +80,7 @@ export default async function ConversationPage({
     supabase
       .from("messages")
       .select(
-        "id, direction, body, caption, status, message_type, media_url, media_mime_type, error_detail, wa_message_id, context_wa_message_id, sent_from_app, buttons, created_at, sent_by_user_id, origen, via_automation_id, sent_by_support"
+        "id, direction, body, caption, status, message_type, media_url, media_mime_type, error_detail, wa_message_id, context_wa_message_id, sent_from_app, buttons, created_at, sent_by_user_id, origen, via_automation_id"
       )
       .eq("conversation_id", id)
       .order("created_at", { ascending: false })
@@ -214,7 +214,16 @@ export default async function ConversationPage({
   const yo = quienMira?.id ?? null;
   const idsRemitentes = [...new Set((messages ?? []).map((m) => m.sent_by_user_id as string | null).filter((x): x is string => !!x))];
   const nombresRemitentes = new Map<string, string>();
+  // Quien envio y no es del espacio: el administrador de la plataforma en modo soporte.
+  const deSoporte = new Set<string>();
   if (idsRemitentes.length) {
+    const { data: miembrosDelEspacio } = await createAdminClient()
+      .from("workspace_members")
+      .select("user_id")
+      .eq("workspace_id", workspaceId ?? "")
+      .in("user_id", idsRemitentes);
+    const miembros = new Set((miembrosDelEspacio ?? []).map((x) => x.user_id as string));
+    for (const uid of idsRemitentes) if (!miembros.has(uid)) deSoporte.add(uid);
     const adminRemitentes = createAdminClient();
     await Promise.all(
       idsRemitentes.map(async (uid) => {
@@ -226,7 +235,7 @@ export default async function ConversationPage({
   }
   const mensajesEnOrden = [...(messages ?? [])]
     .reverse()
-    .map((m) => ({ ...m, remitente: remitenteDe(m, nombresRemitentes, yo) }));
+    .map((m) => ({ ...m, remitente: remitenteDe(m, nombresRemitentes, yo, deSoporte) }));
   const hayMasAntiguos = (messages?.length ?? 0) >= MENSAJES_EN_PANTALLA;
 
   const lastMessage = mensajesEnOrden[mensajesEnOrden.length - 1];

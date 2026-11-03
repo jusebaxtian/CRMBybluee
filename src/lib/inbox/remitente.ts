@@ -9,7 +9,6 @@ type MensajeConOrigen = {
   sent_from_app?: boolean | null;
   origen?: string | null;
   via_automation_id?: string | null;
-  sent_by_support?: boolean | null;
   sent_by_user_id?: string | null;
 };
 
@@ -35,16 +34,25 @@ function tonoDe(id: string): string {
 
 /**
  * Prioridad: lo escrito desde la app del celular, lo que no es una persona (IA,
- * campaña…), una automatizacion, soporte y por ultimo la persona del equipo.
+ * campaña…), una automatizacion y por ultimo la persona. Si la persona no es del
+ * espacio (el administrador de la plataforma en modo soporte), "Soporte Bybluee".
  * Sin ningun dato (mensajes de antes de la 0165) no se muestra nada.
+ *
+ * Ojo: messages.sent_by_support NO sirve para esto: se marca en todo mensaje
+ * escrito por una persona (lo usan las campañas para no interrumpir un chat vivo).
  */
-export function remitenteDe(m: MensajeConOrigen, nombres: Map<string, string>, yo: string | null): Remitente | null {
+export function remitenteDe(
+  m: MensajeConOrigen,
+  nombres: Map<string, string>,
+  yo: string | null,
+  deSoporte: Set<string> = new Set()
+): Remitente | null {
   if (m.direction !== "out") return null;
   const fijo = (clave: string): Remitente => ({ clave, ...FIJOS[clave] });
   if (m.sent_from_app) return fijo("app");
   if (m.origen && FIJOS[m.origen]) return fijo(m.origen);
   if (m.via_automation_id) return fijo("automatizacion");
-  if (m.sent_by_support) return fijo("soporte");
+  if (m.sent_by_user_id && deSoporte.has(m.sent_by_user_id)) return fijo("soporte");
   if (m.sent_by_user_id) {
     const nombre = nombres.get(m.sent_by_user_id) ?? "Equipo";
     return {
