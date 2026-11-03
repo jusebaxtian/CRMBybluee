@@ -1,3 +1,4 @@
+import { remitenteDe } from "@/lib/inbox/remitente";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Zap, Megaphone } from "lucide-react";
@@ -79,7 +80,7 @@ export default async function ConversationPage({
     supabase
       .from("messages")
       .select(
-        "id, direction, body, caption, status, message_type, media_url, media_mime_type, error_detail, wa_message_id, context_wa_message_id, sent_from_app, buttons, created_at"
+        "id, direction, body, caption, status, message_type, media_url, media_mime_type, error_detail, wa_message_id, context_wa_message_id, sent_from_app, buttons, created_at, sent_by_user_id, origen, via_automation_id, sent_by_support"
       )
       .eq("conversation_id", id)
       .order("created_at", { ascending: false })
@@ -206,7 +207,26 @@ export default async function ConversationPage({
   // update on every render would re-trigger the conversations-table realtime
   // subscription that refreshes this same page, looping forever.
   // Vienen del mas nuevo al mas viejo; el chat los pinta al reves.
-  const mensajesEnOrden = [...(messages ?? [])].reverse();
+  // Quien envio cada mensaje (0165): nombre de cada persona del equipo que aparece.
+  const {
+    data: { user: quienMira },
+  } = await supabase.auth.getUser();
+  const yo = quienMira?.id ?? null;
+  const idsRemitentes = [...new Set((messages ?? []).map((m) => m.sent_by_user_id as string | null).filter((x): x is string => !!x))];
+  const nombresRemitentes = new Map<string, string>();
+  if (idsRemitentes.length) {
+    const adminRemitentes = createAdminClient();
+    await Promise.all(
+      idsRemitentes.map(async (uid) => {
+        const { data: u } = await adminRemitentes.auth.admin.getUserById(uid);
+        const meta = u.user?.user_metadata as { full_name?: string } | undefined;
+        nombresRemitentes.set(uid, meta?.full_name?.trim() || u.user?.email?.split("@")[0] || "Equipo");
+      })
+    );
+  }
+  const mensajesEnOrden = [...(messages ?? [])]
+    .reverse()
+    .map((m) => ({ ...m, remitente: remitenteDe(m, nombresRemitentes, yo) }));
   const hayMasAntiguos = (messages?.length ?? 0) >= MENSAJES_EN_PANTALLA;
 
   const lastMessage = mensajesEnOrden[mensajesEnOrden.length - 1];

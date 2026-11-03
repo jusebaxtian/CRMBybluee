@@ -227,6 +227,7 @@ export async function avanzar(supabase: Supabase, ejecucionId: string): Promise<
         );
         if (ejecucion.conversation_id) {
           await recordOutboundMessage(supabase, {
+            origen: "flujo",
             conversationId: ejecucion.conversation_id as string,
             messageType: "text",
             body: datos.texto.trim(),
@@ -262,6 +263,7 @@ export async function avanzar(supabase: Supabase, ejecucionId: string): Promise<
       );
       if (ejecucion.conversation_id) {
         await recordOutboundMessage(supabase, {
+          origen: "flujo",
           conversationId: ejecucion.conversation_id as string,
           messageType: "text",
           body: datos.texto.trim(),

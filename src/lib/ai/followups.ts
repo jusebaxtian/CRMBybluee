@@ -325,6 +325,7 @@ async function sendFollowup(
 
     const result = await sendTextMessage(account.phone_number_id, account.access_token, contact.wa_id, text);
     await recordOutboundMessage(supabase, {
+      origen: "ia",
       conversationId,
       messageType: "text",
       body: text,
@@ -358,6 +359,7 @@ async function sendFollowup(
       buttonUrlParam
     );
     await recordOutboundMessage(supabase, {
+      origen: "ia",
       conversationId,
       messageType: headerMedia ? headerMedia.type : "template",
       // El texto que de verdad recibio el cliente, con su nombre; no el cuerpo con {{1}}.

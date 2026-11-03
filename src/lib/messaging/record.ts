@@ -55,6 +55,11 @@ export type OutboundMessage = {
   errorDetail?: string | null;
   /** Lo escribio la persona desde la app WhatsApp Business del celular (coexistencia). */
   sentFromApp?: boolean;
+  /**
+   * Lo que envio el mensaje cuando no es una persona: ia, campana, flujo, api o
+   * sistema (0165). La persona (sent_by_user_id) la pone la base con la sesion.
+   */
+  origen?: "ia" | "campana" | "flujo" | "api" | "sistema";
   /** Hora real del mensaje, cuando no es "ahora" (p. ej. un eco que Meta avisa despues). */
   createdAt?: string;
 };
@@ -93,6 +98,7 @@ export async function recordOutboundMessage(
       status: message.status ?? "sent",
       error_detail: message.errorDetail ?? null,
       sent_from_app: message.sentFromApp ?? false,
+      origen: message.origen ?? null,
       ...(message.createdAt ? { created_at: message.createdAt } : {}),
     }),
     supabase

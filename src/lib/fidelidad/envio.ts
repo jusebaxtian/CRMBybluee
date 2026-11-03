@@ -554,6 +554,7 @@ async function guardarEnElChat(
     const conversacion = await abrirConversacion(admin, cuenta.workspace_id, contactoId, cuenta.id);
     if (!conversacion) return;
     await recordOutboundMessage(admin, {
+      origen: "sistema",
       conversationId: conversacion.id,
       messageType: "template",
       body: cuerpoRenderizado(d.etapa, d.parametros),

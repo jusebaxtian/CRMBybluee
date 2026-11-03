@@ -262,6 +262,7 @@ export async function maybeRespondWithAiAgent(
       fallback
     );
     await recordOutboundMessage(supabase, {
+      origen: "ia",
       conversationId,
       messageType: "text",
       body: fallback,
@@ -311,6 +312,7 @@ export async function maybeRespondWithAiAgent(
         item.filename ?? undefined
       );
       await recordOutboundMessage(supabase, {
+        origen: "ia",
         conversationId,
         messageType: item.media_type,
         mediaUrl: item.media_url,
@@ -332,6 +334,7 @@ export async function maybeRespondWithAiAgent(
   );
 
   await recordOutboundMessage(supabase, {
+    origen: "ia",
     conversationId,
     messageType: "text",
     body: customerReply,

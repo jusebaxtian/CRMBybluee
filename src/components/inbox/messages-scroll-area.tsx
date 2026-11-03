@@ -18,6 +18,8 @@ type Message = {
   wa_message_id?: string | null;
   context_wa_message_id?: string | null;
   sent_from_app?: boolean | null;
+  /** Quien lo envio (0165); arriba de la burbuja solo cuando cambia quien escribe. */
+  remitente?: { clave: string; texto: string; tono: string } | null;
   buttons?: ({ type: "QUICK_REPLY"; id: string; title: string } | { type: "URL"; title: string; url: string })[] | null;
   created_at: string;
 };
@@ -196,6 +198,11 @@ export function MessagesScrollArea({
       {messages.map((m, i) => {
         // Un separador cada vez que cambia el dia respecto al mensaje anterior.
         const cambiaDeDia = i === 0 || diaDe(m.created_at) !== diaDe(messages[i - 1].created_at);
+        // El nombre de quien escribe sale en el primer mensaje de cada tanda, como en
+        // los grupos de WhatsApp: si el anterior es suyo, no se repite.
+        const anterior = i > 0 ? messages[i - 1] : null;
+        const mostrarRemitente =
+          !!m.remitente && (cambiaDeDia || !anterior || anterior.direction !== "out" || anterior.remitente?.clave !== m.remitente.clave);
         const reaccionYaPintada =
           m.message_type === "reaction" && !!m.context_wa_message_id && byWaMessageId.has(m.context_wa_message_id);
         // Sin fila ni separador que mostrar: no se deja un hueco vacio entre mensajes.
@@ -208,6 +215,7 @@ export function MessagesScrollArea({
             {!reaccionYaPintada && (
               <MessageBubble
                 message={m}
+                remitente={mostrarRemitente ? m.remitente : null}
                 quotedMessage={m.context_wa_message_id ? byWaMessageId.get(m.context_wa_message_id) ?? null : null}
                 reacciones={m.wa_message_id ? reacciones.get(m.wa_message_id) : undefined}
                 onReply={onReply}

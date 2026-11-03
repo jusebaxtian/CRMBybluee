@@ -432,6 +432,7 @@ async function runCampaignSendLoop(
         const conversationId = await getOrCreateConversation(supabase, workspaceId, recipient.contact_id, account.id);
         if (conversationId) {
           await recordOutboundMessage(supabase, {
+            origen: "campana",
             conversationId,
             messageType: templateHeaderMedia ? templateHeaderMedia.type : "template",
             body: template.body_text,
@@ -512,6 +513,7 @@ async function runCampaignSendLoop(
 
         if (conversationId) {
           await recordOutboundMessage(supabase, {
+            origen: "campana",
             conversationId,
             messageType: mediaKind ?? "text",
             body: personalizedBody,

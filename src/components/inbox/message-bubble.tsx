@@ -120,8 +120,11 @@ export function MessageBubble({
   onReply,
   onForward,
   onRegistrarPago,
+  remitente = null,
 }: {
   message: Message;
+  /** Quien lo envio, arriba de la burbuja (solo en el primer mensaje de cada tanda). */
+  remitente?: { texto: string; tono: string } | null;
   quotedMessage?: Message | null;
   /** Emojis con los que reaccionaron a ESTE mensaje (el del cliente primero). */
   reacciones?: string[];
@@ -223,6 +226,7 @@ export function MessageBubble({
           out ? "bg-primary text-white" : "bg-surface-hover text-foreground"
         } ${reacciones?.length ? "mb-3" : ""}`}
       >
+        {remitente && <span className={`mb-0.5 block text-[11.5px] font-bold leading-tight ${remitente.tono}`}>{remitente.texto}</span>}
         {m.context_wa_message_id && <CitaDelMensaje quoted={quotedMessage ?? null} out={out} />}
 
         {m.message_type === "image" && m.media_url && (

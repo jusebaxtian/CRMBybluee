@@ -227,6 +227,7 @@ export async function enviarMensajeApi(admin: SupabaseClient, workspaceId: strin
     const waId = r.messages[0]?.id ?? null;
     const cuerpo = (plantilla.body_text ?? `[Plantilla: ${plantilla.meta_template_name}]`).replace(/\{\{(\d+)\}\}/g, (_, n: string) => bodyParams?.[Number(n) - 1] ?? "");
     await recordOutboundMessage(admin, {
+      origen: "api",
       conversationId: conversacion.id,
       messageType: encabezado ? encabezado.type : "template",
       body: cuerpo,
