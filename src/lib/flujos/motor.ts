@@ -4,6 +4,7 @@ import { sendInteractiveButtonsMessage, sendTextMessage } from "@/lib/whatsapp/g
 import { recordOutboundMessage } from "@/lib/messaging/record";
 import { ACCION_DE_MEDIA, MEDIA_SIN_PIE, salidasDe, type DatosBloque, type TipoBloque } from "@/lib/flujos/bloques";
 import { executeAction, type AutomationAction } from "@/lib/automations/engine";
+import { maybeRespondWithAiAgent } from "@/lib/ai/agent";
 
 type Supabase = ReturnType<typeof createAdminClient>;
 
@@ -116,7 +117,7 @@ async function cerrar(
 export async function avanzar(supabase: Supabase, ejecucionId: string): Promise<void> {
   const { data: ejecucion } = await supabase
     .from("flujo_ejecuciones")
-    .select("id, flujo_id, workspace_id, contact_id, conversation_id, nodo_id, estado, pasos, vence_el")
+    .select("id, flujo_id, workspace_id, contact_id, conversation_id, nodo_id, estado, pasos, vence_el, iniciado_el")
     .eq("id", ejecucionId)
     .maybeSingle();
   if (!ejecucion || !["corriendo", "esperando"].includes(ejecucion.estado as string)) return;
@@ -200,6 +201,7 @@ export async function avanzar(supabase: Supabase, ejecucionId: string): Promise<
           .eq("id", ejecucion.conversation_id as string);
       }
       await cerrar(supabase, ejecucionId, "entregado");
+      await responderAlEntregar(supabase, ejecucion);
       return;
     }
 
@@ -597,6 +599,40 @@ export async function cerrarEjecucionesVencidas(supabase: Supabase): Promise<num
  * flujos coinciden gana el mas reciente: es el que el cliente acaba de armar,
  * y casi siempre el que quiere probar.
  */
+/** Margen para contar un mensaje como "el que activo el flujo" (se guarda justo antes de arrancarlo). */
+const MARGEN_MENSAJE_QUE_ACTIVO_MS = 2 * 60_000;
+
+/**
+ * Al entregarle el chat a la IA, ella contesta el mensaje del cliente que esta
+ * pendiente (antes solo se le quitaba el freno y se quedaba callada hasta el
+ * siguiente mensaje). Solo si el cliente escribio durante el flujo o justo al
+ * activarlo: un flujo que llega aqui por una etiqueta, o despues de una espera
+ * sin respuesta, no debe hacer que la IA le escriba de la nada.
+ */
+async function responderAlEntregar(
+  supabase: Supabase,
+  ejecucion: { workspace_id: unknown; contact_id: unknown; conversation_id: unknown; iniciado_el?: unknown }
+) {
+  const conversacion = ejecucion.conversation_id as string | null;
+  if (!conversacion) return;
+  try {
+    const { data: ultimo } = await supabase
+      .from("messages")
+      .select("created_at")
+      .eq("conversation_id", conversacion)
+      .eq("direction", "in")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const inicio = new Date((ejecucion.iniciado_el as string | null) ?? Date.now()).getTime();
+    if (!ultimo || new Date(ultimo.created_at as string).getTime() < inicio - MARGEN_MENSAJE_QUE_ACTIVO_MS) return;
+    await maybeRespondWithAiAgent(supabase, ejecucion.workspace_id as string, conversacion, ejecucion.contact_id as string);
+  } catch (err) {
+    // El flujo ya quedo entregado; que la IA falle no debe tumbar nada mas.
+    console.error("flujo: la IA no pudo responder al recibir el chat:", err);
+  }
+}
+
 export async function iniciarPorMensaje(
   supabase: Supabase,
   workspaceId: string,

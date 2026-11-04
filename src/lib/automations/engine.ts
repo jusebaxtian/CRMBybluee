@@ -729,10 +729,11 @@ export async function runKeywordAutomations(
     .select("automation_id");
   const claimedIds = new Set((claimed ?? []).map((c) => c.automation_id));
 
+  const leResponde = await automatizacionesQueResponden(supabase, candidates.map((a) => a.id));
   let matched = false;
   for (const automation of candidates) {
     if (!claimedIds.has(automation.id)) continue;
-    matched = true;
+    if (leResponde.has(automation.id)) matched = true;
     await runActionsForAutomation(supabase, automation, contactId);
   }
 
@@ -742,6 +743,21 @@ export async function runKeywordAutomations(
 // Fires on ANY inbound message from the contact, no keyword needed — a
 // catch-all "whatever they write" welcome/handoff trigger. Once per
 // contact, ever (same automation_starts claim as tag/keyword/button_tap).
+/**
+ * Cuales de estas automatizaciones le responden algo al cliente. Las que solo
+ * ordenan el chat (poner o quitar etiquetas, asignar asesor) no cuentan: el
+ * 4 nov 2026, en Mazzari, "Etiqueta: Nuevo (primer mensaje)" dejaba sin respuesta
+ * de la IA el primer mensaje de cada cliente, porque el aviso de "ya hubo
+ * automatizacion" le decia a la IA que no contestara.
+ */
+const ACCIONES_SILENCIOSAS = new Set(["add_tag", "remove_tag", "assign_agent", "assign_agent_random"]);
+
+async function automatizacionesQueResponden(supabase: SupabaseClient, ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const { data } = await supabase.from("automation_actions").select("automation_id, action_type").in("automation_id", ids);
+  return new Set((data ?? []).filter((a) => !ACCIONES_SILENCIOSAS.has(a.action_type as string)).map((a) => a.automation_id as string));
+}
+
 export async function runAnyMessageAutomations(
   supabase: SupabaseClient,
   workspaceId: string,
@@ -768,10 +784,11 @@ export async function runAnyMessageAutomations(
     .select("automation_id");
   const claimedIds = new Set((claimed ?? []).map((c) => c.automation_id));
 
+  const leResponde = await automatizacionesQueResponden(supabase, automations.map((a) => a.id));
   let matched = false;
   for (const automation of automations) {
     if (!claimedIds.has(automation.id)) continue;
-    matched = true;
+    if (leResponde.has(automation.id)) matched = true;
     await runActionsForAutomation(supabase, automation, contactId);
   }
   return matched;
@@ -807,10 +824,11 @@ export async function runFirstMessageOfDayAutomations(
     .select("automation_id");
   const claimedIds = new Set((claimed ?? []).map((c) => c.automation_id));
 
+  const leResponde = await automatizacionesQueResponden(supabase, automations.map((a) => a.id));
   let matched = false;
   for (const automation of automations) {
     if (!claimedIds.has(automation.id)) continue;
-    matched = true;
+    if (leResponde.has(automation.id)) matched = true;
     await runActionsForAutomation(supabase, automation, contactId);
   }
   return matched;
