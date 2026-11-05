@@ -1,3 +1,4 @@
+import { leerImagenEntrante, responderImagenCuandoSeLea } from "@/lib/ai/imagenes";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { esContactoSinNumero, usuarioDeAviso } from "@/lib/whatsapp/usuario";
 import type { WhatsAppWebhookPayload } from "@/lib/whatsapp/webhook-types";
@@ -550,6 +551,21 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           continue;
         }
 
+        // Arranca ya y no se espera aqui: los flujos y las automatizaciones de
+        // abajo no tienen por que demorarse lo que tarde la IA en leer la foto.
+        const lecturaEnCurso =
+          message.type === "image" && mediaUrl
+            ? leerImagenEntrante(supabase, {
+                workspaceId,
+                conversationId: conversation.id,
+                whatsappAccountId,
+                waMessageId: message.id,
+                mediaUrl,
+                mimeType: mediaMimeType,
+                cliente: profileName?.trim() || waId,
+              })
+            : null;
+
         const notificationPreview = isReaction
           ? reactionEmoji
             ? `Reaccionó ${reactionEmoji} a un mensaje`
@@ -642,6 +658,15 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
 
         if (!matchedAutomation && textForAutomations) {
           await maybeRespondWithAiAgent(supabase, workspaceId, conversation.id, contact.id);
+        }
+
+        if (!matchedAutomation && lecturaEnCurso) {
+          void responderImagenCuandoSeLea(supabase, lecturaEnCurso, {
+            workspaceId,
+            conversationId: conversation.id,
+            contactId: contact.id,
+            waMessageId: message.id,
+          });
         }
       }
 
