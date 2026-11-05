@@ -8,8 +8,9 @@ import { loadInboxPage, type InboxCursor, type InboxFilters } from "@/lib/inbox/
 /**
  * Fija o quita una conversación de la parte de arriba de la bandeja.
  *
- * El fijado es del espacio de trabajo, no de quien lo pulsa: si el dueño fija
- * un chat, sus agentes también lo ven arriba.
+ * Por defecto el fijado es del espacio de trabajo: si el dueño fija un chat, sus
+ * agentes también lo ven arriba. En un espacio con `trabajo_individual` (hoy solo
+ * Bybluee, migracion 0166) cada persona tiene sus propios fijados.
  */
 export async function setConversationPinned(conversationId: string, pinned: boolean) {
   const ctx = await requireWorkspace();
@@ -18,6 +19,57 @@ export async function setConversationPinned(conversationId: string, pinned: bool
   // `result?.error` dejan de compilar.
   if ("error" in ctx) return { error: ctx.error };
   const { supabase, workspaceId } = ctx;
+
+  const { data: espacio } = await supabase
+    .from("workspaces")
+    .select("trabajo_individual")
+    .eq("id", workspaceId)
+    .maybeSingle();
+
+  if (espacio?.trabajo_individual) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { error: "Tu sesión expiró. Vuelve a entrar." };
+
+    if (!pinned) {
+      const { error } = await supabase
+        .from("conversaciones_fijadas")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("conversation_id", conversationId);
+      if (error) return { error: error.message };
+      revalidatePath("/dashboard/inbox");
+      return { success: true as const };
+    }
+
+    const { data: conversacion } = await supabase
+      .from("conversations")
+      .select("id")
+      .eq("id", conversationId)
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+    if (!conversacion) return { error: "Conversación no encontrada." };
+
+    const { count } = await supabase
+      .from("conversaciones_fijadas")
+      .select("conversation_id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("workspace_id", workspaceId)
+      .neq("conversation_id", conversationId);
+    if ((count ?? 0) >= MAX_PINNED_CONVERSATIONS) {
+      return {
+        error: `Solo puedes fijar ${MAX_PINNED_CONVERSATIONS} chats. Quita uno para fijar este.`,
+      };
+    }
+
+    const { error } = await supabase
+      .from("conversaciones_fijadas")
+      .upsert({ user_id: user.id, conversation_id: conversationId, workspace_id: workspaceId });
+    if (error) return { error: error.message };
+    revalidatePath("/dashboard/inbox");
+    return { success: true as const };
+  }
 
   if (pinned) {
     // Se cuenta antes de escribir. No es a prueba de dos personas fijando en

@@ -224,9 +224,9 @@ export function ConversationListPanel({
   const [, startTransition] = useTransition();
   const [pinError, setPinError] = useState<string | null>(null);
 
-  // El fijado es del espacio, no de quien lo pulsa: si el dueno fija un chat,
-  // sus agentes tambien lo ven arriba. El orden ya viene del servidor
-  // (pinned_at primero), asi que aqui solo se dispara la accion.
+  // El fijado es del espacio o, con trabajo_individual, de cada persona: lo
+  // decide el servidor. El orden ya viene de alli (fijados primero), asi que
+  // aqui solo se dispara la accion.
   function handleTogglePin(conversationId: string, pinned: boolean) {
     setPinError(null);
     startTransition(async () => {

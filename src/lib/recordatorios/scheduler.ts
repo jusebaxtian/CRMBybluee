@@ -16,7 +16,7 @@ export async function processDueReminders() {
 
   const { data: vencidos } = await supabase
     .from("recordatorios")
-    .select("id, workspace_id, conversation_id, texto, created_by, contacts(name, wa_id)")
+    .select("id, workspace_id, conversation_id, texto, created_by, contacts(name, wa_id), workspaces(trabajo_individual)")
     .is("avisado_en", null)
     .lte("recordar_en", ahora.toISOString())
     .order("recordar_en")
@@ -27,9 +27,11 @@ export async function processDueReminders() {
     const contacto = r.contacts as unknown as { name: string | null; wa_id: string } | null;
     const quien = contacto?.name?.trim() || contacto?.wa_id || "contacto";
     // El recordatorio de un vendedor es suyo: el aviso le llega solo a el
-    // (migracion 0160), con push al celular. Los demas, a todo el espacio como antes.
-    let paraVendedor: string | null = null;
-    if (r.created_by) {
+    // (migracion 0160), con push al celular. En un espacio con trabajo_individual
+    // (0166) pasa lo mismo con todos. Los demas, a todo el espacio como antes.
+    const espacio = r.workspaces as unknown as { trabajo_individual: boolean } | null;
+    let paraVendedor: string | null = espacio?.trabajo_individual ? ((r.created_by as string | null) ?? null) : null;
+    if (!paraVendedor && r.created_by) {
       const { data: v } = await supabase
         .from("vendedores")
         .select("user_id")
