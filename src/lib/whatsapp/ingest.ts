@@ -1,3 +1,4 @@
+import { vendedorDelEspacio } from "@/lib/ai/vendedor";
 import { leerImagenEntrante, responderImagenCuandoSeLea } from "@/lib/ai/imagenes";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { esContactoSinNumero, usuarioDeAviso } from "@/lib/whatsapp/usuario";
@@ -289,7 +290,9 @@ async function transcribeIncomingAudio(
     .eq("is_active", true)
     .eq("provider", "openai")
     .limit(1);
-  const agent = agentes?.[0];
+  // El agente vendedor (0169) usa la llave conectada aunque los agentes por linea esten apagados.
+  const vendedor = await vendedorDelEspacio(supabase, workspaceId);
+  const agent = agentes?.[0] ?? (vendedor?.activo && vendedor.provider === "openai" ? vendedor : null);
   if (!agent) return null;
 
   try {

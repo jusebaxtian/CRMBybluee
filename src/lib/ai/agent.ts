@@ -6,6 +6,7 @@ import { isContactExcludedFromAutomations } from "@/lib/automations/engine";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { recordOutboundMessage } from "@/lib/messaging/record";
 import { turnoDeImagen, type LecturaDeImagen } from "@/lib/ai/lectura-imagen";
+import { contextoDelCliente, seccionDeVenta, vendedorDelEspacio } from "@/lib/ai/vendedor";
 
 // The AI ends its reply with this marker on its own line when it decides the
 // conversation needs a human — stripped before the text reaches the
@@ -184,6 +185,24 @@ export async function agenteDeLaLinea(
   workspaceId: string,
   whatsappAccountId: string | null
 ) {
+  // El agente vendedor (0169), si esta encendido, atiende todos los chats del
+  // espacio con la llave ya conectada. Los adjuntos siguen siendo los de la linea.
+  const vendedor = await vendedorDelEspacio(supabase, workspaceId);
+  if (vendedor?.activo) {
+    return {
+      id: "vendedor",
+      provider: vendedor.provider,
+      api_key: vendedor.api_key,
+      model: vendedor.model,
+      agent_name: vendedor.nombre as string,
+      persona: vendedor.instrucciones as string,
+      is_active: true,
+      whatsapp_account_id: whatsappAccountId,
+      lee_imagenes: true,
+      esVendedor: true,
+    };
+  }
+
   const { data: agentes } = await supabase
     .from("ai_agents")
     .select("id, provider, api_key, model, agent_name, persona, is_active, whatsapp_account_id, lee_imagenes")
@@ -283,11 +302,12 @@ export async function maybeRespondWithAiAgent(
 
   let reply: string;
   try {
+    const seccionVendedor = "esVendedor" in agent ? seccionDeVenta(await contextoDelCliente(supabase, contactId)) : "";
     reply = await callAiProvider(
       agent.provider,
       agent.api_key,
       agent.model,
-      buildSystemPrompt(agent.agent_name, agent.persona, mediaLibrary ?? []),
+      buildSystemPrompt(agent.agent_name, agent.persona, mediaLibrary ?? []) + seccionVendedor,
       history
     );
   } catch (err) {

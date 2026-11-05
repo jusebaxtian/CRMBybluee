@@ -198,7 +198,10 @@ export default async function ConversationPage({
     (aiAgents ?? []).find((a) => a.whatsapp_account_id === conversation.whatsapp_account_id) ??
     (aiAgents ?? []).find((a) => !a.whatsapp_account_id) ??
     null;
-  const hasActiveAiAgent = !!agenteDeEsteChat?.is_active;
+  // Con agente vendedor (0169) cada chat tiene su interruptor, aunque este apagado:
+  // asi se puede dejar un chat por fuera antes de encenderlo.
+  const { data: agenteVendedor } = await createAdminClient().from("agente_vendedor").select("workspace_id").eq("workspace_id", workspaceId ?? "").maybeSingle();
+  const hasActiveAiAgent = !!agenteDeEsteChat?.is_active || !!agenteVendedor;
 
   // Solo las plantillas de la WABA de la linea por la que va esta
   // conversacion (migracion 0106); con una sola WABA son todas.

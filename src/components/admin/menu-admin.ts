@@ -11,6 +11,7 @@ import {
   BellRing,
   Handshake,
   Flame,
+  Bot,
 } from "lucide-react";
 
 /** Opciones del panel admin. Las usan el menu lateral (escritorio) y el menu del celular. */
@@ -19,6 +20,7 @@ export const OPCIONES_ADMIN = [
   { href: "/admin/notifications", etiqueta: "Notificaciones", Icono: Bell },
   { href: "/admin/avisos-celular", etiqueta: "Avisos del celular", Icono: BellRing },
   { href: "/admin/leads", etiqueta: "Leads", Icono: Flame },
+  { href: "/admin/agente-juanes", etiqueta: "Agente Juanes", Icono: Bot },
   { href: "/admin/payments", etiqueta: "Pagos", Icono: CreditCard },
   { href: "/admin/vendedores", etiqueta: "Vendedores", Icono: Handshake },
   { href: "/admin/plans", etiqueta: "Planes", Icono: Package },
