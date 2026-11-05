@@ -6,6 +6,8 @@ export type AudienceParams = {
   createdFromRaw: string | null; // "YYYY-MM-DD"
   createdToRaw: string | null; // "YYYY-MM-DD"
   audienceWindow: "all" | "open";
+  /** Solo los contactos en estas etapas (migracion 0168). Vacio o ausente = sin filtrar. */
+  etapas?: string[];
 };
 
 type ResolvedRecipientRow = { contact_id: string; has_open_window: boolean };
@@ -27,7 +29,7 @@ export async function resolveCampaignAudience(
   workspaceId: string,
   params: AudienceParams
 ): Promise<{ contactIds: string[]; matchedBeforeWindow: number }> {
-  const { includeTagIds, excludeTagIds, createdFromRaw, createdToRaw, audienceWindow } = params;
+  const { includeTagIds, excludeTagIds, createdFromRaw, createdToRaw, audienceWindow, etapas } = params;
 
   // PostgREST hard-caps ANY single response (including an RPC that returns
   // a table, like this one) at 1000 rows — a tag matching more than that
@@ -44,6 +46,7 @@ export async function resolveCampaignAudience(
         p_exclude_tag_ids: excludeTagIds.length > 0 ? excludeTagIds : null,
         p_created_from: createdFromRaw ? new Date(createdFromRaw).toISOString() : null,
         p_created_to: createdToRaw ? new Date(`${createdToRaw}T23:59:59.999`).toISOString() : null,
+        p_etapas: etapas && etapas.length > 0 ? etapas : null,
       })
       .range(offset, offset + PAGE_SIZE - 1);
 

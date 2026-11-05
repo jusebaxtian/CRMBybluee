@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Info, X, Zap, Megaphone } from "lucide-react";
 import { ContactTagPicker } from "@/components/tags/contact-tag-picker";
 import { claseAvatar, EtiquetaCiclo } from "@/components/inbox/etiqueta-ciclo";
+import { EtapaDelLead } from "@/components/inbox/etapa-del-lead";
+import type { Etapa } from "@/lib/leads/etapas";
 import type { Ciclo } from "@/lib/inbox/ciclo-de-plan";
 import { NotesEditor } from "@/components/inbox/notes-editor";
 import { ConversationAssignmentControl } from "@/components/inbox/conversation-assignment-control";
@@ -43,6 +45,7 @@ export function ConversationDetailsSheet({
   invitacionesPendientes = [],
   contactIdAdmin,
   ciclo,
+  etapa,
 }: {
   contactName: string | null;
   contactWaId: string;
@@ -72,6 +75,8 @@ export function ConversationDetailsSheet({
   contactIdAdmin?: string;
   /** Mensual / semestral / anual. Solo llega para el administrador de la plataforma. */
   ciclo?: Ciclo | null;
+  /** Frio, tibio, caliente o pago; sin dato, el espacio no usa etapas. */
+  etapa?: Etapa | null;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -117,6 +122,7 @@ export function ConversationDetailsSheet({
                   <EtiquetaCiclo ciclo={ciclo} />
                 </p>
                 <p className="truncate text-xs text-muted">{contactWaId}</p>
+                {etapa && <EtapaDelLead contactId={contactId} etapa={etapa} />}
               </div>
             </div>
 

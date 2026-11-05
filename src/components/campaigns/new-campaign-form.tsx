@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { VistaPreviaPlantilla, type PlantillaParaVista } from "@/components/templates/vista-previa-plantilla";
 import { Info, Users } from "lucide-react";
 import { createCampaign, updateCampaign, uploadCampaignMedia, previewAudienceCount } from "@/app/actions/campaigns";
+import { ESTILO_ETAPA, ETAPAS } from "@/lib/leads/etapas";
 
 type Template = PlantillaParaVista & { status: string; waba_id?: string };
 type Tag = { id: string; name: string; excludes_followups: boolean };
@@ -27,6 +28,7 @@ export type CampaignInitialValues = {
   mediaFilename: string | null;
   includeTagIds: string[];
   excludeTagIds: string[];
+  etapas?: string[];
   createdFrom: string | null;
   createdTo: string | null;
   scheduledAt: string | null; // ISO
@@ -48,6 +50,8 @@ export function NewCampaignForm({
   mode = "create",
   campaignId,
   initialValues,
+  usaEtapas = false,
+  etapasIniciales = [],
 }: {
   templates: Template[];
   tags: Tag[];
@@ -55,6 +59,10 @@ export function NewCampaignForm({
   mode?: "create" | "edit";
   campaignId?: string;
   initialValues?: CampaignInitialValues;
+  /** Solo en los espacios con etapas de leads (migracion 0168). */
+  usaEtapas?: boolean;
+  /** Etapa ya elegida al venir desde Admin > Leads. */
+  etapasIniciales?: string[];
 }) {
   const boundAction = mode === "edit" && campaignId ? updateCampaign.bind(null, campaignId) : createCampaign;
   const [state, action, pending] = useActionState(boundAction, undefined);
@@ -86,6 +94,7 @@ export function NewCampaignForm({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [includeTagIds, setIncludeTagIds] = useState<string[]>(initialValues?.includeTagIds ?? []);
   const [excludeTagIds, setExcludeTagIds] = useState<string[]>(initialValues?.excludeTagIds ?? []);
+  const [etapas, setEtapas] = useState<string[]>(initialValues?.etapas ?? etapasIniciales);
   const [createdFrom, setCreatedFrom] = useState(initialValues?.createdFrom ?? "");
   const [createdTo, setCreatedTo] = useState(initialValues?.createdTo ?? "");
   const [sendMode, setSendMode] = useState<"now" | "schedule">(initialValues?.scheduledAt ? "schedule" : "now");
@@ -105,6 +114,7 @@ export function NewCampaignForm({
     formData.set("sendType", sendType);
     includeTagIds.forEach((id) => formData.append("includeTagIds", id));
     excludeTagIds.forEach((id) => formData.append("excludeTagIds", id));
+    etapas.forEach((e) => formData.append("etapas", e));
     if (createdFrom) formData.set("createdFrom", createdFrom);
     if (createdTo) formData.set("createdTo", createdTo);
 
@@ -115,7 +125,7 @@ export function NewCampaignForm({
         .finally(() => setCountLoading(false));
     }, 350);
     return () => clearTimeout(timeout);
-  }, [sendType, includeTagIds, excludeTagIds, createdFrom, createdTo]);
+  }, [sendType, includeTagIds, excludeTagIds, etapas, createdFrom, createdTo]);
 
   async function handleFile(file: File, kind: Exclude<MediaKind, "">) {
     setUploading(true);
@@ -301,6 +311,35 @@ export function NewCampaignForm({
             <input key={id} type="hidden" name="includeTagIds" value={id} />
           ))}
         </div>
+
+        {usaEtapas && (
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">
+              Etapa del lead (sin elegir ninguna, la campaña no filtra por etapa)
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {ETAPAS.map((e) => {
+                const active = etapas.includes(e);
+                return (
+                  <button
+                    key={e}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => toggleTag(etapas, setEtapas, e)}
+                    className={`rounded-full border px-2.5 py-1 text-xs ${
+                      active ? "border-primary bg-primary/10 text-primary" : "border-border text-muted hover:bg-surface-hover"
+                    }`}
+                  >
+                    {ESTILO_ETAPA[e].texto}
+                  </button>
+                );
+              })}
+            </div>
+            {etapas.map((e) => (
+              <input key={e} type="hidden" name="etapas" value={e} />
+            ))}
+          </div>
+        )}
 
         <div>
           <label className="mb-1 block text-xs font-medium text-muted">

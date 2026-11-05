@@ -3,8 +3,10 @@ import { NewCampaignForm } from "@/components/campaigns/new-campaign-form";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
 import { noSePuedeUsar } from "@/lib/whatsapp/limite-plantilla";
+import { esEtapa } from "@/lib/leads/etapas";
 
-export default async function NewCampaignPage() {
+export default async function NewCampaignPage({ searchParams }: { searchParams: Promise<{ etapa?: string }> }) {
+  const { etapa } = await searchParams;
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
   await requireModule(supabase, workspaceId, "campaigns");
@@ -35,6 +37,9 @@ export default async function NewCampaignPage() {
     .neq("status", "frozen")
     .order("connected_at");
 
+  const { data: espacio } = await supabase.from("workspaces").select("usa_etapas").eq("id", workspaceId ?? "").maybeSingle();
+  const usaEtapas = !!espacio?.usa_etapas;
+
   return (
     <div className="mx-auto max-w-lg">
       <div className="rounded-[13px] border border-border bg-surface p-6">
@@ -43,6 +48,8 @@ export default async function NewCampaignPage() {
           templates={plantillasUsables}
           tags={tags ?? []}
           whatsappAccounts={whatsappAccounts ?? []}
+          usaEtapas={usaEtapas}
+          etapasIniciales={usaEtapas && esEtapa(etapa) ? [etapa] : []}
         />
       </div>
     </div>

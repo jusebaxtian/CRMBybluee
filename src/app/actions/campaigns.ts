@@ -9,6 +9,7 @@ import { resolveCampaignAudience, type AudienceParams } from "@/lib/campaigns/au
 import { startCampaignSend } from "@/lib/campaigns/send";
 import { toPublicUrl } from "@/lib/supabase/config";
 import { requireWorkspace } from "@/lib/auth/with-workspace";
+import { esEtapa } from "@/lib/leads/etapas";
 
 function readAudienceParams(formData: FormData, sendType: "template" | "free_text"): AudienceParams {
   return {
@@ -16,6 +17,7 @@ function readAudienceParams(formData: FormData, sendType: "template" | "free_tex
     excludeTagIds: formData.getAll("excludeTagIds").map(String).filter(Boolean),
     createdFromRaw: String(formData.get("createdFrom") ?? "") || null,
     createdToRaw: String(formData.get("createdTo") ?? "") || null,
+    etapas: formData.getAll("etapas").map(String).filter(esEtapa),
     // Free-form messages only work within the 24h window — forcing this
     // avoids creating a campaign that would fail on every single recipient.
     // Una plantilla, en cambio, llega con la ventana abierta o cerrada: para
@@ -152,6 +154,7 @@ export async function createCampaign(_prevState: unknown, formData: FormData) {
       whatsapp_account_id: whatsappAccountId,
       audience_tag_ids: audienceParams.includeTagIds.length > 0 ? audienceParams.includeTagIds : null,
       audience_exclude_tag_ids: audienceParams.excludeTagIds.length > 0 ? audienceParams.excludeTagIds : null,
+      audience_etapas: audienceParams.etapas?.length ? audienceParams.etapas : null,
       audience_created_from: audienceParams.createdFromRaw
         ? new Date(audienceParams.createdFromRaw).toISOString()
         : null,
@@ -273,6 +276,7 @@ export async function updateCampaign(campaignId: string, _prevState: unknown, fo
       media_filename: sendType === "free_text" ? mediaFilename : null,
       audience_tag_ids: audienceParams.includeTagIds.length > 0 ? audienceParams.includeTagIds : null,
       audience_exclude_tag_ids: audienceParams.excludeTagIds.length > 0 ? audienceParams.excludeTagIds : null,
+      audience_etapas: audienceParams.etapas?.length ? audienceParams.etapas : null,
       audience_created_from: audienceParams.createdFromRaw
         ? new Date(audienceParams.createdFromRaw).toISOString()
         : null,

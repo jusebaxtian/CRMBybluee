@@ -5,6 +5,8 @@ import { ArrowLeft, Zap, Megaphone } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { cargarCiclos } from "@/lib/inbox/ciclo-de-plan";
 import { claseAvatar, EtiquetaCiclo } from "@/components/inbox/etiqueta-ciclo";
+import { EtapaDelLead } from "@/components/inbox/etapa-del-lead";
+import { esEtapa } from "@/lib/leads/etapas";
 import { ContactTagPicker } from "@/components/tags/contact-tag-picker";
 import { MeterEnFlujo } from "@/components/flujos/meter-en-flujo";
 import { BloquearContacto } from "@/components/contacts/bloquear-contacto";
@@ -178,6 +180,10 @@ export default async function ConversationPage({
 
   // Mensual / semestral / anual, solo para el administrador en su propio espacio.
   const ciclo = esAdmin ? ((await cargarCiclos(supabase))[contact.wa_id] ?? null) : null;
+
+  // Frio, tibio, caliente o pago (migracion 0168). Sin fila, el espacio no usa etapas.
+  const { data: lead } = await supabase.from("lead_etapas").select("etapa").eq("contact_id", conversation.contact_id).maybeSingle();
+  const etapaDelLead = esEtapa(lead?.etapa) ? lead.etapa : null;
 
   const assignedTagIds = contact.contact_tags.map((ct) => ct.tag_id);
   const excludedFromFollowupsByTag = contact.contact_tags.some((ct) => ct.tags?.excludes_followups);
@@ -354,6 +360,7 @@ export default async function ConversationPage({
             invitacionesPendientes={invitacionesPendientes}
             contactIdAdmin={esAdmin || esVendedorDelChat ? conversation.contact_id : undefined}
             ciclo={ciclo}
+            etapa={etapaDelLead}
           />
         </div>
 
@@ -385,6 +392,7 @@ export default async function ConversationPage({
             <p className="truncate text-xs text-muted">
               {isPhoneNumber(contact.wa_id) ? contact.wa_id : contact.username ? `@${contact.username} (sin número)` : "Usuario (sin número)"}
             </p>
+            {etapaDelLead && <EtapaDelLead contactId={conversation.contact_id} etapa={etapaDelLead} />}
           </div>
         </div>
 
