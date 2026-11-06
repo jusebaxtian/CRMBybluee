@@ -184,9 +184,12 @@ export function Sidebar({
             );
 
             return ready ? (
+              // Sin precarga: el menu esta en todas las pantallas y precargaba cada
+              // modulo en cada refresco del chat (~150 peticiones por minuto, nov 2026).
               <Link
                 key={href}
                 href={href}
+                prefetch={false}
                 className="block"
                 onClick={onNavigate}
                 title={e ? label : undefined}
@@ -204,6 +207,7 @@ export function Sidebar({
         {isPlatformAdmin && (
           <Link
             href="/admin"
+            prefetch={false}
             onClick={onNavigate}
             title={e ? "Panel admin" : undefined}
             className={`mt-1 flex items-center gap-[11px] rounded-[9px] px-3 py-[10px] text-[13.5px] font-medium text-primary transition-all duration-200 hover:bg-[rgba(255,255,255,0.04)] ${filaEncogida}`}
@@ -236,6 +240,7 @@ export function Sidebar({
         {demo && (
           <Link
             href="/dashboard/billing"
+            prefetch={false}
             onClick={onNavigate}
             title={e ? "Cuenta DEMO" : undefined}
             className={`flex items-start gap-2 rounded-[11px] border border-pink-500/30 bg-pink-500/10 p-[10px] transition-colors duration-150 hover:bg-pink-500/15 ${

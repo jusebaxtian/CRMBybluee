@@ -73,7 +73,7 @@ export function MobileBottomNav({
             {content}
           </div>
         ) : (
-          <Link key={href} href={href} className="flex flex-1">
+          <Link key={href} href={href} prefetch={false} className="flex flex-1">
             {content}
           </Link>
         );
