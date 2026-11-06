@@ -5,6 +5,7 @@ import { recordOutboundMessage } from "@/lib/messaging/record";
 import {
   ACCION_DE_MEDIA,
   MEDIA_SIN_PIE,
+  limitesIa,
   puedeReingresar,
   reingresosDeFin,
   salidasDe,
@@ -12,7 +13,27 @@ import {
   type TipoBloque,
 } from "@/lib/flujos/bloques";
 import { executeAction, type AutomationAction } from "@/lib/automations/engine";
-import { maybeRespondWithAiAgent } from "@/lib/ai/agent";
+import {
+  adjuntosDelAgente,
+  agenteParaBloque,
+  buildSystemPrompt,
+  customerRequestedHuman,
+  enviarRespuestaDeIa,
+  formatoWhatsApp,
+  historialDelChat,
+  interpretAiReply,
+} from "@/lib/ai/agent";
+import { callAiProvider } from "@/lib/ai/providers";
+import { contextoDelCliente, seccionDeVenta } from "@/lib/ai/vendedor";
+import {
+  instruccionDeEvaluacion,
+  interpretarEvaluacion,
+  salidaTrasTurno,
+  seccionDeObjetivo,
+  transcripcion,
+  turnosParaObjetivo,
+  type SalidaIa,
+} from "@/lib/flujos/ia-objetivo";
 
 type Supabase = ReturnType<typeof createAdminClient>;
 
@@ -49,6 +70,19 @@ export async function contactoEnFlujo(supabase: Supabase, contactId: string): Pr
     .limit(1)
     .maybeSingle();
   return Boolean(data);
+}
+
+/** ¿Este contacto esta ahora conversando con la IA dentro de un flujo? */
+export async function contactoEnBloqueDeIa(supabase: Supabase, contactId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from("flujo_ejecuciones")
+    .select("flujo_nodos!flujo_ejecuciones_nodo_id_fkey(tipo)")
+    .eq("contact_id", contactId)
+    .in("estado", ["corriendo", "esperando"])
+    .limit(1)
+    .maybeSingle();
+  const nodo = data?.flujo_nodos as unknown as { tipo: string } | null | undefined;
+  return nodo?.tipo === "ia";
 }
 
 async function grafoDelFlujo(supabase: Supabase, flujoId: string) {
@@ -258,16 +292,19 @@ export async function avanzar(supabase: Supabase, ejecucionId: string): Promise<
     }
 
     if (tipo === "ia") {
-      // Entregar a la IA es terminar el flujo y quitarle el freno al agente:
-      // el historial del chat ya lo lee el solo.
+      // La IA se reactiva en este chat, aunque un bloque anterior la haya dejado
+      // pausada, y conversa aqui hasta salir por una de sus cuatro salidas.
       if (ejecucion.conversation_id) {
         await supabase
           .from("conversations")
           .update({ ai_manually_paused: false, ai_handoff_requested: false })
           .eq("id", ejecucion.conversation_id as string);
       }
-      await cerrar(supabase, ejecucionId, "entregado");
-      await responderAlEntregar(supabase, ejecucion);
+      await supabase
+        .from("flujo_ejecuciones")
+        .update({ estado: "esperando", nodo_id: nodoActual.id, pasos, ia_respuestas: 0, actualizado_el: new Date().toISOString() })
+        .eq("id", ejecucionId);
+      await turnoDeIa(supabase, ejecucionId, nodoActual, conexiones, { texto: null, esPrimero: true });
       return;
     }
 
@@ -500,6 +537,163 @@ async function irANodo(supabase: Supabase, ejecucionId: string, nodoId: string) 
 }
 
 /**
+ * Sale del bloque de IA: la IA queda pausada en este chat, para que no siga
+ * respondiendo sin fin, y el flujo sigue por la salida. Solo otro bloque de IA la
+ * vuelve a activar.
+ */
+async function salirDeIa(
+  supabase: Supabase,
+  ejecucionId: string,
+  nodoId: string,
+  conexiones: ConexionFila[],
+  conversationId: string | null,
+  salida: SalidaIa
+) {
+  await supabase
+    .from("flujo_esperas")
+    .update({ procesada_el: new Date().toISOString() })
+    .eq("ejecucion_id", ejecucionId)
+    .is("procesada_el", null);
+  if (conversationId) {
+    await supabase
+      .from("conversations")
+      .update({ ai_manually_paused: true, ...(salida === "humano" ? { ai_handoff_requested: true } : {}) })
+      .eq("id", conversationId);
+  }
+  const destino = destinoDe(conexiones, nodoId, salida);
+  if (!destino) {
+    await cerrar(supabase, ejecucionId, "terminado");
+    return;
+  }
+  await irANodo(supabase, ejecucionId, destino);
+}
+
+/**
+ * Un turno de la IA dentro del bloque: responde y decide si sigue esperando al
+ * cliente o sale. Si la IA o el envio fallan, sale por "No cumplió": un contacto
+ * no puede quedarse esperando a una IA que no va a contestar.
+ */
+async function turnoDeIa(
+  supabase: Supabase,
+  ejecucionId: string,
+  nodo: NodoFila,
+  conexiones: ConexionFila[],
+  entrada: { texto: string | null; esPrimero: boolean }
+) {
+  const { data: ejecucion } = await supabase
+    .from("flujo_ejecuciones")
+    .select("flujo_id, workspace_id, contact_id, conversation_id, ia_respuestas")
+    .eq("id", ejecucionId)
+    .maybeSingle();
+  if (!ejecucion) return;
+  const conversationId = (ejecucion.conversation_id as string | null) ?? null;
+  const workspaceId = ejecucion.workspace_id as string;
+  const contactId = ejecucion.contact_id as string;
+  const salir = (salida: SalidaIa) => salirDeIa(supabase, ejecucionId, nodo.id, conexiones, conversationId, salida);
+
+  if (!conversationId) return salir("no_cumplio");
+
+  const [{ data: chat }, { data: contacto }, { data: flujo }] = await Promise.all([
+    supabase.from("conversations").select("whatsapp_account_id, ai_manually_paused, ai_handoff_requested").eq("id", conversationId).maybeSingle(),
+    supabase.from("contacts").select("wa_id").eq("id", contactId).maybeSingle(),
+    supabase.from("flujos").select("whatsapp_account_id").eq("id", ejecucion.flujo_id as string).maybeSingle(),
+  ]);
+  if (!chat || !contacto) return salir("no_cumplio");
+
+  // Alguien del equipo tomo el chat mientras la IA conversaba: ella se retira.
+  if (!entrada.esPrimero && (chat.ai_manually_paused || chat.ai_handoff_requested)) return salir("humano");
+
+  const linea = (flujo?.whatsapp_account_id as string | null) ?? (chat.whatsapp_account_id as string | null);
+  const [cuenta, agente] = await Promise.all([
+    resolveSendAccount(supabase, workspaceId, linea),
+    agenteParaBloque(supabase, workspaceId, linea),
+  ]);
+  if (!cuenta || !agente) {
+    console.error(`flujo ${ejecucion.flujo_id}: el bloque de IA no tiene ${cuenta ? "llave de IA" : "línea"} para responder`);
+    return salir("no_cumplio");
+  }
+
+  const datos = (nodo.datos ?? {}) as DatosBloque;
+  const { maxRespuestas, minutosEspera } = limitesIa(datos);
+  const usadas = (ejecucion.ia_respuestas as number) ?? 0;
+
+  try {
+    if (entrada.texto && customerRequestedHuman(entrada.texto)) {
+      await enviarRespuestaDeIa(supabase, {
+        workspaceId,
+        conversationId,
+        cuenta,
+        waId: contacto.wa_id as string,
+        texto: "¡Claro que sí! Ya te conecto con nuestro equipo, en un momento te contactan 🙌",
+        mediaKeys: [],
+        adjuntos: [],
+      });
+      return salir("humano");
+    }
+
+    const [adjuntos, historial, seccionVendedor] = await Promise.all([
+      adjuntosDelAgente(supabase, workspaceId, agente.whatsapp_account_id),
+      historialDelChat(supabase, conversationId),
+      "esVendedor" in agente ? contextoDelCliente(supabase, contactId).then(seccionDeVenta) : Promise.resolve(""),
+    ]);
+
+    // Primero se evalua, aparte: asi la respuesta ya sabe si debe seguir o despedirse.
+    // Si la evaluacion falla, la IA sigue conversando y el tope de respuestas la frena.
+    const evaluacion = await callAiProvider(agente.provider, agente.api_key, agente.model, instruccionDeEvaluacion(datos.objetivo), [
+      { role: "user", content: transcripcion(historial) || "(todavía no hay conversación)" },
+    ]).catch((err) => {
+      console.error(`flujo ${ejecucion.flujo_id}: falló la evaluación del objetivo:`, err);
+      return "";
+    });
+    const cumplido = interpretarEvaluacion(evaluacion);
+
+    const crudo = await callAiProvider(
+      agente.provider,
+      agente.api_key,
+      agente.model,
+      buildSystemPrompt(datos.nombreAgente?.trim() || agente.agent_name, agente.persona, adjuntos) +
+        seccionVendedor +
+        seccionDeObjetivo(datos.objetivo, usadas, maxRespuestas, cumplido),
+      turnosParaObjetivo(historial)
+    );
+    if (!crudo) return salir(cumplido ? "cumplio" : "no_cumplio");
+
+    const { customerReply, handoff, mediaKeys } = interpretAiReply(crudo);
+
+    await enviarRespuestaDeIa(supabase, {
+      workspaceId,
+      conversationId,
+      cuenta,
+      waId: contacto.wa_id as string,
+      texto: formatoWhatsApp(customerReply),
+      mediaKeys,
+      adjuntos,
+    });
+
+    const respuestas = usadas + 1;
+    await supabase.from("flujo_ejecuciones").update({ ia_respuestas: respuestas, actualizado_el: new Date().toISOString() }).eq("id", ejecucionId);
+
+    const salida = salidaTrasTurno({ cumplido, handoff, respuestas, maximo: maxRespuestas });
+    if (salida) return salir(salida);
+
+    // Sigue conversando: el tiempo de espera vuelve a empezar con cada respuesta.
+    await supabase
+      .from("flujo_esperas")
+      .update({ procesada_el: new Date().toISOString() })
+      .eq("ejecucion_id", ejecucionId)
+      .is("procesada_el", null);
+    await supabase.from("flujo_esperas").insert({
+      ejecucion_id: ejecucionId,
+      nodo_id: nodo.id,
+      vence_el: new Date(Date.now() + minutosEspera * 60_000).toISOString(),
+    });
+  } catch (err) {
+    console.error(`flujo ${ejecucion.flujo_id}: falló el turno de la IA:`, err);
+    return salir("no_cumplio");
+  }
+}
+
+/**
  * Llego algo del contacto mientras estaba dentro de un flujo.
  *
  * Devuelve true si el flujo se hizo cargo: quien llama usa eso para no correr
@@ -508,7 +702,7 @@ async function irANodo(supabase: Supabase, ejecucionId: string, nodoId: string) 
 export async function procesarEntrada(
   supabase: Supabase,
   contactId: string,
-  entrada: { botonId: string | null; texto: string | null }
+  entrada: { botonId: string | null; texto: string | null; lecturaEnCurso?: Promise<unknown> | null }
 ): Promise<boolean> {
   const { data: ejecucion } = await supabase
     .from("flujo_ejecuciones")
@@ -542,6 +736,13 @@ export async function procesarEntrada(
       return true;
     }
     await irANodo(supabase, ejecucion.id as string, destino);
+    return true;
+  }
+
+  if (nodo.tipo === "ia") {
+    // Si mando una foto, la IA debe verla antes de responder.
+    await entrada.lecturaEnCurso;
+    await turnoDeIa(supabase, ejecucion.id as string, nodo, conexiones, { texto: entrada.texto, esPrimero: false });
     return true;
   }
 
@@ -639,12 +840,25 @@ export async function procesarEsperasVencidas(supabase: Supabase): Promise<numbe
 
     const { data: ejecucion } = await supabase
       .from("flujo_ejecuciones")
-      .select("id, flujo_id, estado")
+      .select("id, flujo_id, estado, conversation_id")
       .eq("id", espera.ejecucion_id as string)
       .maybeSingle();
     if (!ejecucion || !["corriendo", "esperando"].includes(ejecucion.estado as string)) continue;
 
-    const { conexiones } = await grafoDelFlujo(supabase, ejecucion.flujo_id as string);
+    const { nodos, conexiones } = await grafoDelFlujo(supabase, ejecucion.flujo_id as string);
+    if (nodos.find((n) => n.id === espera.nodo_id)?.tipo === "ia") {
+      await salirDeIa(
+        supabase,
+        ejecucion.id as string,
+        espera.nodo_id as string,
+        conexiones,
+        (ejecucion.conversation_id as string | null) ?? null,
+        "no_respondio"
+      );
+      procesadas += 1;
+      continue;
+    }
+
     const destino = destinoDe(conexiones, espera.nodo_id as string, "no_respondio");
     if (!destino) {
       await cerrar(supabase, ejecucion.id as string, "terminado");
@@ -677,40 +891,6 @@ export async function cerrarEjecucionesVencidas(supabase: Supabase): Promise<num
  * flujos coinciden gana el mas reciente: es el que el cliente acaba de armar,
  * y casi siempre el que quiere probar.
  */
-/** Margen para contar un mensaje como "el que activo el flujo" (se guarda justo antes de arrancarlo). */
-const MARGEN_MENSAJE_QUE_ACTIVO_MS = 2 * 60_000;
-
-/**
- * Al entregarle el chat a la IA, ella contesta el mensaje del cliente que esta
- * pendiente (antes solo se le quitaba el freno y se quedaba callada hasta el
- * siguiente mensaje). Solo si el cliente escribio durante el flujo o justo al
- * activarlo: un flujo que llega aqui por una etiqueta, o despues de una espera
- * sin respuesta, no debe hacer que la IA le escriba de la nada.
- */
-async function responderAlEntregar(
-  supabase: Supabase,
-  ejecucion: { workspace_id: unknown; contact_id: unknown; conversation_id: unknown; iniciado_el?: unknown }
-) {
-  const conversacion = ejecucion.conversation_id as string | null;
-  if (!conversacion) return;
-  try {
-    const { data: ultimo } = await supabase
-      .from("messages")
-      .select("created_at")
-      .eq("conversation_id", conversacion)
-      .eq("direction", "in")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const inicio = new Date((ejecucion.iniciado_el as string | null) ?? Date.now()).getTime();
-    if (!ultimo || new Date(ultimo.created_at as string).getTime() < inicio - MARGEN_MENSAJE_QUE_ACTIVO_MS) return;
-    await maybeRespondWithAiAgent(supabase, ejecucion.workspace_id as string, conversacion, ejecucion.contact_id as string);
-  } catch (err) {
-    // El flujo ya quedo entregado; que la IA falle no debe tumbar nada mas.
-    console.error("flujo: la IA no pudo responder al recibir el chat:", err);
-  }
-}
-
 export async function iniciarPorMensaje(
   supabase: Supabase,
   workspaceId: string,

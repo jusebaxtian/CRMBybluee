@@ -169,12 +169,17 @@ export const BLOQUES: Record<TipoBloque, DefinicionBloque> = {
   },
   ia: {
     tipo: "ia",
-    nombre: "Entregar a la IA",
-    descripcion: "Termina el flujo y el agente sigue la conversación",
+    nombre: "IA con objetivo",
+    descripcion: "La IA conversa hasta cumplir un objetivo y sigue por otro bloque",
     color: "var(--success)",
     maximo: null,
     aceptaEntrada: true,
-    salidasFijas: null,
+    salidasFijas: [
+      { id: "cumplio", etiqueta: "Cumplió" },
+      { id: "no_cumplio", etiqueta: "No cumplió" },
+      { id: "no_respondio", etiqueta: "No respondió" },
+      { id: "humano", etiqueta: "Pidió una persona" },
+    ],
   },
   fin: {
     tipo: "fin",
@@ -276,9 +281,12 @@ export type DatosBloque = {
   botones?: string[];
   /** esperar */
   minutos?: number;
-  /** ia: objetivo propio de este flujo; vacio = usa el agente de la linea */
+  /** ia: lo que debe lograr antes de soltar el chat */
   objetivo?: string;
   nombreAgente?: string;
+  /** ia: tope de respuestas y minutos de espera. Sin datos, los valores por defecto. */
+  iaMaxRespuestas?: number;
+  iaMinutosEspera?: number;
   /** plantilla */
   plantillaId?: string;
   plantillaNombre?: string;
@@ -307,6 +315,17 @@ export type DatosBloque = {
   flujoDestinoId?: string;
   flujoDestinoNombre?: string;
 };
+
+export const IA_MAX_RESPUESTAS = 10;
+export const IA_MINUTOS_ESPERA = 60;
+
+/** Los limites del bloque de IA. Los bloques viejos no los tienen: reciben los de defecto. */
+export function limitesIa(datos: DatosBloque): { maxRespuestas: number; minutosEspera: number } {
+  return {
+    maxRespuestas: Math.max(1, Math.floor(datos.iaMaxRespuestas ?? IA_MAX_RESPUESTAS)),
+    minutosEspera: Math.max(1, Math.floor(datos.iaMinutosEspera ?? IA_MINUTOS_ESPERA)),
+  };
+}
 
 /** Cuantas veces mas puede volver quien sale por este Fin. null = sin limite. */
 export function reingresosDeFin(datos: DatosBloque): number | null {
@@ -392,7 +411,7 @@ ${texto}` : adjunto;
   if (tipo === "respuesta_rapida") return datos.respuestaRapidaNombre || "Sin respuesta rápida elegida";
   if (tipo === "automatizacion") return datos.automatizacionNombre || "Sin automatización elegida";
   if (tipo === "saltar") return datos.flujoDestinoNombre ? `Va a "${datos.flujoDestinoNombre}"` : "Sin flujo elegido";
-  if (tipo === "ia") return datos.nombreAgente?.trim() || "El agente de IA toma la conversación";
+  if (tipo === "ia") return datos.objetivo?.trim() || "Sin objetivo: atiende hasta resolver";
   if (tipo === "fin") {
     if (datos.reingreso === "no") return "Sale y no puede volver a este flujo";
     if (datos.reingreso === "veces") {

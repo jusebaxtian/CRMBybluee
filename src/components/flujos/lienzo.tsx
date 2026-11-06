@@ -16,7 +16,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { AlertTriangle, Check, Loader2, Save } from "lucide-react";
-import { BLOQUES, BLOQUES_ARRASTRABLES, type DatosBloque, type TipoBloque } from "@/lib/flujos/bloques";
+import { BLOQUES, BLOQUES_ARRASTRABLES, IA_MAX_RESPUESTAS, IA_MINUTOS_ESPERA, type DatosBloque, type TipoBloque } from "@/lib/flujos/bloques";
 import { revisarFlujo, type Aviso } from "@/lib/flujos/validar";
 import { BloqueNodo, type DatosNodo } from "@/components/flujos/bloque-nodo";
 import { ConexionBorrable } from "@/components/flujos/conexion-borrable";
@@ -121,7 +121,9 @@ function Lienzo({
             ? { botones: ["", ""] }
             : tipo === "fin"
               ? { reingreso: "no" }
-              : {};
+              : tipo === "ia"
+                ? { iaMaxRespuestas: IA_MAX_RESPUESTAS, iaMinutosEspera: IA_MINUTOS_ESPERA }
+                : {};
       setNodes((prev) => [
         ...prev,
         { id: nuevoId(), type: "bloque", position, data: { tipo, datos } satisfies DatosNodo },

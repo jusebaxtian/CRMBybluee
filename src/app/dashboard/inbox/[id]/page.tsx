@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { cargarCiclos } from "@/lib/inbox/ciclo-de-plan";
 import { claseAvatar, EtiquetaCiclo } from "@/components/inbox/etiqueta-ciclo";
 import { EtapaDelLead } from "@/components/inbox/etapa-del-lead";
+import { contactoEnBloqueDeIa } from "@/lib/flujos/motor";
 import { esEtapa } from "@/lib/leads/etapas";
 import { ContactTagPicker } from "@/components/tags/contact-tag-picker";
 import { MeterEnFlujo } from "@/components/flujos/meter-en-flujo";
@@ -201,7 +202,10 @@ export default async function ConversationPage({
   // Con agente vendedor (0169) cada chat tiene su interruptor, aunque este apagado:
   // asi se puede dejar un chat por fuera antes de encenderlo.
   const { data: agenteVendedor } = await createAdminClient().from("agente_vendedor").select("workspace_id").eq("workspace_id", workspaceId ?? "").maybeSingle();
-  const hasActiveAiAgent = !!agenteDeEsteChat?.is_active || !!agenteVendedor;
+  // Tambien si la IA esta conversando en un bloque de un flujo, que no depende del
+  // boton del agente: el equipo tiene que poder apagarla en este chat.
+  const hasActiveAiAgent =
+    !!agenteDeEsteChat?.is_active || !!agenteVendedor || (await contactoEnBloqueDeIa(createAdminClient(), conversation.contact_id));
 
   // Solo las plantillas de la WABA de la linea por la que va esta
   // conversacion (migracion 0106); con una sola WABA son todas.

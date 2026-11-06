@@ -6,7 +6,7 @@ import { isContactExcludedFromAutomations } from "@/lib/automations/engine";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { recordOutboundMessage } from "@/lib/messaging/record";
 import { turnoDeImagen, type LecturaDeImagen } from "@/lib/ai/lectura-imagen";
-import { contextoDelCliente, seccionDeVenta, vendedorDelEspacio } from "@/lib/ai/vendedor";
+import { conexionDeIa, contextoDelCliente, seccionDeVenta, vendedorDelEspacio } from "@/lib/ai/vendedor";
 
 // The AI ends its reply with this marker on its own line when it decides the
 // conversation needs a human — stripped before the text reaches the
@@ -215,6 +215,113 @@ export async function agenteDeLaLinea(
   );
 }
 
+/**
+ * El agente para un bloque de IA de un flujo. A diferencia de la respuesta normal,
+ * funciona aunque el agente de la linea este apagado: quien arma el flujo decidio
+ * que la IA hable en ese punto. Sin agente en la linea, usa la llave del espacio.
+ */
+export async function agenteParaBloque(
+  supabase: ReturnType<typeof createAdminClient>,
+  workspaceId: string,
+  whatsappAccountId: string | null
+) {
+  const agente = await agenteDeLaLinea(supabase, workspaceId, whatsappAccountId);
+  if (agente?.api_key) return agente;
+  const conexion = await conexionDeIa(supabase, workspaceId);
+  if (!conexion) return null;
+  return { ...conexion, agent_name: "Asesor", persona: "", is_active: false, whatsapp_account_id: whatsappAccountId, lee_imagenes: false };
+}
+
+export async function adjuntosDelAgente(
+  supabase: ReturnType<typeof createAdminClient>,
+  workspaceId: string,
+  whatsappAccountId: string | null
+): Promise<MediaItem[]> {
+  // Los adjuntos son de cada agente (0163): solo los del agente que responde.
+  const consultaMedios = supabase
+    .from("ai_agent_media")
+    .select("key, label, trigger_description, media_type, media_url, media_mime_type, filename")
+    .eq("workspace_id", workspaceId);
+  const { data } = await (whatsappAccountId
+    ? consultaMedios.eq("whatsapp_account_id", whatsappAccountId)
+    : consultaMedios.is("whatsapp_account_id", null));
+  return (data ?? []) as MediaItem[];
+}
+
+/** La conversacion como la lee el modelo, del mensaje mas viejo al mas nuevo. */
+export async function historialDelChat(
+  supabase: ReturnType<typeof createAdminClient>,
+  conversationId: string
+): Promise<ChatTurn[]> {
+  const { data } = await supabase
+    .from("messages")
+    .select("direction, body, message_type, lectura_imagen")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: false })
+    .limit(HISTORY_LIMIT);
+  return (data ?? [])
+    .slice()
+    .reverse()
+    .filter((m) => (m.body || m.lectura_imagen) && m.message_type !== "document")
+    .map((m) => ({
+      role: m.direction === "in" ? "user" : "assistant",
+      content: m.lectura_imagen ? turnoDeImagen(m.lectura_imagen as LecturaDeImagen, m.body as string | null) : (m.body as string),
+    }));
+}
+
+/** Manda lo que respondio la IA: primero los adjuntos que pidio y luego el texto. */
+export async function enviarRespuestaDeIa(
+  supabase: ReturnType<typeof createAdminClient>,
+  d: {
+    workspaceId: string;
+    conversationId: string;
+    cuenta: { phone_number_id: string; access_token: string };
+    waId: string;
+    texto: string;
+    mediaKeys: string[];
+    adjuntos: MediaItem[];
+  }
+) {
+  const mediaByKey = new Map(d.adjuntos.map((m) => [m.key, m]));
+
+  for (const key of d.mediaKeys) {
+    const item = mediaByKey.get(key);
+    if (!item) continue;
+
+    try {
+      const result = await sendMediaMessage(
+        d.cuenta.phone_number_id,
+        d.cuenta.access_token,
+        d.waId,
+        item.media_type,
+        { link: item.media_url },
+        item.filename ?? undefined
+      );
+      await recordOutboundMessage(supabase, {
+        origen: "ia",
+        conversationId: d.conversationId,
+        messageType: item.media_type,
+        mediaUrl: item.media_url,
+        mediaMimeType: item.media_mime_type,
+        waMessageId: result.messages[0]?.id,
+      });
+    } catch (err) {
+      console.error(`AI agent media send failed (key=${key}) for workspace=${d.workspaceId}:`, err);
+    }
+  }
+
+  if (!d.texto) return;
+
+  const result = await sendTextMessage(d.cuenta.phone_number_id, d.cuenta.access_token, d.waId, d.texto);
+  await recordOutboundMessage(supabase, {
+    origen: "ia",
+    conversationId: d.conversationId,
+    messageType: "text",
+    body: d.texto,
+    waMessageId: result.messages[0]?.id,
+  });
+}
+
 export async function maybeRespondWithAiAgent(
   supabase: ReturnType<typeof createAdminClient>,
   workspaceId: string,
@@ -247,30 +354,16 @@ export async function maybeRespondWithAiAgent(
   const account = await resolveSendAccount(supabase, workspaceId, conversation.whatsapp_account_id);
   if (!contact || !account) return;
 
-  // Los adjuntos son de cada agente (0163): solo los del agente que responde.
-  const consultaMedios = supabase
-    .from("ai_agent_media")
-    .select("key, label, trigger_description, media_type, media_url, media_mime_type, filename")
-    .eq("workspace_id", workspaceId);
-  const { data: mediaLibrary } = await (agent.whatsapp_account_id
-    ? consultaMedios.eq("whatsapp_account_id", agent.whatsapp_account_id)
-    : consultaMedios.is("whatsapp_account_id", null));
+  const mediaLibrary = await adjuntosDelAgente(supabase, workspaceId, agent.whatsapp_account_id);
 
   const { data: pastMessages } = await supabase
     .from("messages")
-    .select("direction, body, message_type, lectura_imagen")
+    .select("direction, body, message_type")
     .eq("conversation_id", conversationId)
     .order("created_at", { ascending: false })
     .limit(HISTORY_LIMIT);
 
-  const history: ChatTurn[] = (pastMessages ?? [])
-    .slice()
-    .reverse()
-    .filter((m) => (m.body || m.lectura_imagen) && m.message_type !== "document")
-    .map((m) => ({
-      role: m.direction === "in" ? "user" : "assistant",
-      content: m.lectura_imagen ? turnoDeImagen(m.lectura_imagen as LecturaDeImagen, m.body as string | null) : (m.body as string),
-    }));
+  const history = await historialDelChat(supabase, conversationId);
 
   if (history.length === 0) return;
 
@@ -307,7 +400,7 @@ export async function maybeRespondWithAiAgent(
       agent.provider,
       agent.api_key,
       agent.model,
-      buildSystemPrompt(agent.agent_name, agent.persona, mediaLibrary ?? []) + seccionVendedor,
+      buildSystemPrompt(agent.agent_name, agent.persona, mediaLibrary) + seccionVendedor,
       history
     );
   } catch (err) {
@@ -326,48 +419,13 @@ export async function maybeRespondWithAiAgent(
       .eq("id", conversationId);
   }
 
-  const mediaByKey = new Map((mediaLibrary ?? []).map((m) => [m.key, m]));
-
-  for (const key of requestedKeys) {
-    const item = mediaByKey.get(key);
-    if (!item) continue;
-
-    try {
-      const result = await sendMediaMessage(
-        account.phone_number_id,
-        account.access_token,
-        contact.wa_id,
-        item.media_type,
-        { link: item.media_url },
-        item.filename ?? undefined
-      );
-      await recordOutboundMessage(supabase, {
-        origen: "ia",
-        conversationId,
-        messageType: item.media_type,
-        mediaUrl: item.media_url,
-        mediaMimeType: item.media_mime_type,
-        waMessageId: result.messages[0]?.id,
-      });
-    } catch (err) {
-      console.error(`AI agent media send failed (key=${key}) for workspace=${workspaceId}:`, err);
-    }
-  }
-
-  if (!customerReply) return;
-
-  const result = await sendTextMessage(
-    account.phone_number_id,
-    account.access_token,
-    contact.wa_id,
-    customerReply
-  );
-
-  await recordOutboundMessage(supabase, {
-    origen: "ia",
+  await enviarRespuestaDeIa(supabase, {
+    workspaceId,
     conversationId,
-    messageType: "text",
-    body: customerReply,
-    waMessageId: result.messages[0]?.id,
+    cuenta: account,
+    waId: contact.wa_id,
+    texto: customerReply,
+    mediaKeys: requestedKeys,
+    adjuntos: mediaLibrary,
   });
 }

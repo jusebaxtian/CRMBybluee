@@ -190,6 +190,18 @@ export function revisarFlujo(
       avisos.push({ nivel: "error", nodoId: nodo.id, texto: "En el bloque Fin, las veces que puede volver tienen que ser al menos 1." });
     }
 
+    if (nodo.tipo === "ia") {
+      if (!nodo.datos.objetivo?.trim()) {
+        avisos.push({ nivel: "aviso", nodoId: nodo.id, texto: "La IA no tiene objetivo: atenderá hasta resolver o llegar a su tope de respuestas." });
+      }
+      if (nodo.datos.iaMaxRespuestas !== undefined && !(nodo.datos.iaMaxRespuestas >= 1)) {
+        avisos.push({ nivel: "error", nodoId: nodo.id, texto: "El máximo de respuestas de la IA tiene que ser al menos 1." });
+      }
+      if (nodo.datos.iaMinutosEspera !== undefined && !(nodo.datos.iaMinutosEspera >= 1)) {
+        avisos.push({ nivel: "error", nodoId: nodo.id, texto: "La espera de la IA tiene que ser de al menos 1 minuto." });
+      }
+    }
+
     if (nodo.tipo === "saltar" && !nodo.datos.flujoDestinoId) {
       avisos.push({ nivel: "error", nodoId: nodo.id, texto: "Elige a qué flujo salta el contacto." });
     }

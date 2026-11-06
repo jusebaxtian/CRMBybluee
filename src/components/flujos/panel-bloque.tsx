@@ -6,6 +6,7 @@ import { VistaPreviaPlantilla, type PlantillaParaVista } from "@/components/temp
 import {
   BLOQUES,
   DISPARADORES,
+  limitesIa,
   MAX_BOTONES,
   repartoParejo,
   type DatosBloque,
@@ -267,19 +268,48 @@ export function PanelBloque({
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-muted">Objetivo en este flujo (opcional)</label>
+            <label className="mb-1 block text-xs font-medium text-muted">Objetivo</label>
             <textarea
               rows={5}
               value={datos.objetivo ?? ""}
               onChange={(e) => onCambiar({ ...datos, objetivo: e.target.value })}
-              placeholder="Qué debe lograr al tomar la conversación…"
+              placeholder="Consigue el nombre, la ciudad y qué plan le interesa"
               className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
             />
             <p className="mt-2 text-[11px] leading-relaxed text-muted">
-              Si lo dejas vacío responde el agente de la línea, con su configuración de siempre. La IA recibe el
-              historial del chat, así que llega sabiendo qué botones tocó el contacto.
+              Escríbelo concreto: la IA decide cuándo se cumplió. Funciona con la llave de IA conectada, aunque el agente esté apagado.
+              Responde con lo que sabe el agente de la línea y lee el historial del chat, así que llega sabiendo qué botones tocó el contacto.
             </p>
           </div>
+          <div className="flex gap-3">
+            <div>
+              <label htmlFor="iaMaxRespuestas" className="mb-1 block text-xs font-medium text-muted">Máximo de respuestas</label>
+              <input
+                id="iaMaxRespuestas"
+                type="number"
+                min={1}
+                step={1}
+                value={datos.iaMaxRespuestas ?? limitesIa(datos).maxRespuestas}
+                onChange={(e) => onCambiar({ ...datos, iaMaxRespuestas: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
+                className="w-full rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary"
+              />
+            </div>
+            <div>
+              <label htmlFor="iaMinutosEspera" className="mb-1 block text-xs font-medium text-muted">Minutos de espera</label>
+              <input
+                id="iaMinutosEspera"
+                type="number"
+                min={1}
+                step={1}
+                value={datos.iaMinutosEspera ?? limitesIa(datos).minutosEspera}
+                onChange={(e) => onCambiar({ ...datos, iaMinutosEspera: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
+                className="w-full rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary"
+              />
+            </div>
+          </div>
+          <p className="rounded-[9px] border border-border bg-background px-3 py-2 text-[11.5px] leading-relaxed text-muted">
+            Al salir por cualquier camino, la IA queda pausada en este chat, salvo que el contacto llegue a otro bloque de IA. Conecta las salidas: una sin conectar termina el flujo y el chat queda esperando a una persona.
+          </p>
         </>
       )}
 

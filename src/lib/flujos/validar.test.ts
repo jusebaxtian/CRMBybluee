@@ -24,7 +24,7 @@ describe("salidas de un bloque", () => {
 
   it("los bloques finales no tienen salida", () => {
     expect(salidasDe("fin", {})).toHaveLength(0);
-    expect(salidasDe("ia", {})).toHaveLength(0);
+    expect(salidasDe("ia", {})).toHaveLength(4);
   });
 });
 

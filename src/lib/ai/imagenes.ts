@@ -1,5 +1,6 @@
 import type { createAdminClient } from "@/lib/supabase/admin";
-import { agenteDeLaLinea, maybeRespondWithAiAgent } from "@/lib/ai/agent";
+import { agenteDeLaLinea, agenteParaBloque, maybeRespondWithAiAgent } from "@/lib/ai/agent";
+import { contactoEnBloqueDeIa } from "@/lib/flujos/motor";
 import { leerImagenConIa, type MimeDeImagen } from "@/lib/ai/providers";
 import { avisoDeComprobante, INSTRUCCION_LECTURA, interpretarLectura, type LecturaDeImagen } from "@/lib/ai/lectura-imagen";
 
@@ -18,11 +19,17 @@ const DIAS_VISIBLE_AVISO = 3;
  */
 export async function leerImagenEntrante(
   supabase: Supabase,
-  d: { workspaceId: string; conversationId: string; whatsappAccountId: string; waMessageId: string; mediaUrl: string; mimeType: string | null; cliente: string }
+  d: { workspaceId: string; conversationId: string; contactId: string; whatsappAccountId: string; waMessageId: string; mediaUrl: string; mimeType: string | null; cliente: string }
 ): Promise<LecturaDeImagen | null> {
   try {
-    const agente = await agenteDeLaLinea(supabase, d.workspaceId, d.whatsappAccountId);
-    if (!agente?.is_active || !agente.lee_imagenes) return null;
+    // En un bloque de IA de un flujo basta la llave: no depende del boton del
+    // agente ni de la lectura de imagenes. Fuera de el, se activa agente por agente.
+    const enBloque = await contactoEnBloqueDeIa(supabase, d.contactId);
+    const agente = enBloque
+      ? await agenteParaBloque(supabase, d.workspaceId, d.whatsappAccountId)
+      : await agenteDeLaLinea(supabase, d.workspaceId, d.whatsappAccountId);
+    if (!agente) return null;
+    if (!enBloque && (!agente.is_active || !agente.lee_imagenes)) return null;
 
     const mime = (d.mimeType ?? "").split(";")[0].trim() as MimeDeImagen;
     if (!MIMES.includes(mime)) return null;
