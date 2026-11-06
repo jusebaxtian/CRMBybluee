@@ -153,6 +153,15 @@ function Lienzo({
       setError(resultado.error);
       return;
     }
+    // Los bloques nuevos ya tienen id en la base: si el lienzo siguiera con el del
+    // navegador, el proximo guardado los crearia otra vez.
+    const creados = "idsCreados" in resultado ? resultado.idsCreados : undefined;
+    if (creados && Object.keys(creados).length > 0) {
+      const real = (id: string) => creados[id] ?? id;
+      setNodes((prev) => prev.map((n) => ({ ...n, id: real(n.id) })));
+      setEdges((prev) => prev.map((e) => ({ ...e, source: real(e.source), target: real(e.target) })));
+      setSeleccionado((s) => (s ? real(s) : s));
+    }
     setGuardado(true);
     setTimeout(() => setGuardado(false), 2500);
   }

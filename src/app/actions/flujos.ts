@@ -6,14 +6,15 @@ import { getWorkspaceId } from "@/lib/workspace";
 import { revisarFlujo } from "@/lib/flujos/validar";
 import type { DatosBloque, TipoBloque } from "@/lib/flujos/bloques";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { planDeGuardado } from "@/lib/flujos/plan-de-guardado";
 
 /**
  * Guardado del lienzo.
  *
- * El dibujo se guarda entero de una vez --se borran los bloques y conexiones
- * y se vuelven a escribir-- en vez de ir anotando cada movimiento. Un flujo
- * son decenas de filas, no miles, y asi no hay forma de que queden conexiones
- * apuntando a bloques que el usuario ya borro.
+ * El dibujo se guarda entero de una vez en vez de ir anotando cada movimiento. Las
+ * conexiones se borran y se vuelven a escribir, asi no quedan apuntando a bloques
+ * que ya no existen. Los bloques que siguen conservan su id: de ese id dependen los
+ * contactos que estan dentro del flujo (ver plan-de-guardado.ts).
  */
 
 export type NodoGuardar = { id: string; tipo: TipoBloque; datos: DatosBloque; x: number; y: number };
@@ -102,30 +103,53 @@ export async function guardarLienzo(
     return { error: "El flujo se quedó sin bloque de inicio." };
   }
 
-  await supabase.from("flujo_conexiones").delete().eq("flujo_id", flujoId);
-  await supabase.from("flujo_nodos").delete().eq("flujo_id", flujoId);
+  const { data: enLaBase, error: errorLectura } = await supabase.from("flujo_nodos").select("id").eq("flujo_id", flujoId);
+  if (errorLectura) return { error: errorLectura.message };
+  const plan = planDeGuardado((enLaBase ?? []).map((n) => n.id as string), nodos);
 
-  const { data: insertados, error: errorNodos } = await supabase
-    .from("flujo_nodos")
-    .insert(
-      nodos.map((n) => ({
-        flujo_id: flujoId,
-        tipo: n.tipo,
-        datos: n.datos,
-        pos_x: n.x,
-        pos_y: n.y,
-      }))
-    )
-    .select("id");
-  if (errorNodos) return { error: errorNodos.message };
+  for (const n of plan.actualizar) {
+    const { error } = await supabase
+      .from("flujo_nodos")
+      .update({ tipo: n.tipo, datos: n.datos, pos_x: n.x, pos_y: n.y })
+      .eq("id", n.id)
+      .eq("flujo_id", flujoId);
+    if (error) return { error: error.message };
+  }
 
   // Los ids del lienzo son del navegador; los de la base son nuevos. Se
   // emparejan por orden, que es el mismo en el que se insertaron.
-  const idNuevo = new Map<string, string>();
-  nodos.forEach((n, i) => {
-    const fila = (insertados ?? [])[i];
-    if (fila) idNuevo.set(n.id, fila.id as string);
-  });
+  const idNuevo = new Map<string, string>(plan.actualizar.map((n) => [n.id, n.id]));
+  const idsCreados: Record<string, string> = {};
+  if (plan.crear.length > 0) {
+    const { data: insertados, error: errorNodos } = await supabase
+      .from("flujo_nodos")
+      .insert(plan.crear.map((n) => ({ flujo_id: flujoId, tipo: n.tipo, datos: n.datos, pos_x: n.x, pos_y: n.y })))
+      .select("id");
+    if (errorNodos) return { error: errorNodos.message };
+    plan.crear.forEach((n, i) => {
+      const fila = (insertados ?? [])[i];
+      if (!fila) return;
+      idNuevo.set(n.id, fila.id as string);
+      idsCreados[n.id] = fila.id as string;
+    });
+  }
+
+  await supabase.from("flujo_conexiones").delete().eq("flujo_id", flujoId);
+
+  // Quien estaba parado en un bloque que se borro sale del flujo y vuelve a lo
+  // normal, en vez de quedarse atascado hasta que le venza el plazo.
+  if (plan.borrar.length > 0) {
+    const ahora = new Date().toISOString();
+    const { error: errorSalida } = await createAdminClient()
+      .from("flujo_ejecuciones")
+      .update({ estado: "cancelado", terminado_el: ahora, actualizado_el: ahora })
+      .eq("flujo_id", flujoId)
+      .in("nodo_id", plan.borrar)
+      .in("estado", ["corriendo", "esperando"]);
+    if (errorSalida) return { error: errorSalida.message };
+    const { error: errorBorrado } = await supabase.from("flujo_nodos").delete().eq("flujo_id", flujoId).in("id", plan.borrar);
+    if (errorBorrado) return { error: errorBorrado.message };
+  }
 
   const filasConexion = conexiones
     .map((c) => ({
@@ -174,7 +198,7 @@ export async function guardarLienzo(
     nodos.map((n) => ({ id: n.id, tipo: n.tipo, datos: n.datos })),
     conexiones.map((c) => ({ origen_id: c.origen, destino_id: c.destino, salida: c.salida }))
   );
-  return { ok: true as const, avisos };
+  return { ok: true as const, avisos, idsCreados };
 }
 
 /**
