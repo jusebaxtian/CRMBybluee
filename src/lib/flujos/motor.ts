@@ -527,6 +527,43 @@ export async function avanzar(supabase: Supabase, ejecucionId: string): Promise<
   await cerrar(supabase, ejecucionId, "terminado");
 }
 
+/** Las esperas pendientes de este recorrido ya no aplican. */
+async function cancelarEsperas(supabase: Supabase, ejecucionId: string) {
+  await supabase
+    .from("flujo_esperas")
+    .update({ procesada_el: new Date().toISOString() })
+    .eq("ejecucion_id", ejecucionId)
+    .is("procesada_el", null);
+}
+
+/**
+ * Lo saca del flujo a mano: no se le envia nada y vuelve a lo normal. Cuenta como
+ * cancelado y no como un Fin, asi que despues puede volver a entrar.
+ */
+export async function sacarDelFlujo(supabase: Supabase, ejecucionId: string) {
+  await cancelarEsperas(supabase, ejecucionId);
+  await cerrar(supabase, ejecucionId, "cancelado");
+}
+
+/**
+ * Lo mueve a mano a otro bloque y lo corre desde ahi. Si estaba conversando con la
+ * IA, sale igual que por cualquiera de sus salidas: la IA queda pausada en el chat.
+ */
+export async function forzarAvance(supabase: Supabase, ejecucionId: string, destinoId: string) {
+  const { data: ejecucion } = await supabase
+    .from("flujo_ejecuciones")
+    .select("flujo_id, nodo_id, conversation_id")
+    .eq("id", ejecucionId)
+    .maybeSingle();
+  if (!ejecucion) return;
+  const { nodos } = await grafoDelFlujo(supabase, ejecucion.flujo_id as string);
+  if (nodos.find((n) => n.id === ejecucion.nodo_id)?.tipo === "ia" && ejecucion.conversation_id) {
+    await supabase.from("conversations").update({ ai_manually_paused: true }).eq("id", ejecucion.conversation_id as string);
+  }
+  await cancelarEsperas(supabase, ejecucionId);
+  await irANodo(supabase, ejecucionId, destinoId);
+}
+
 /** Mueve la ejecucion a un bloque y la corre. */
 async function irANodo(supabase: Supabase, ejecucionId: string, nodoId: string) {
   await supabase

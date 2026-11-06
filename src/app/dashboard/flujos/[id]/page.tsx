@@ -8,6 +8,7 @@ import { listWorkspaceAgents } from "@/lib/agents";
 import { noSePuedeUsar } from "@/lib/whatsapp/limite-plantilla";
 import { LienzoFlujo, type ConexionInicial, type NodoInicial } from "@/components/flujos/lienzo";
 import { ActivarFlujo } from "@/components/flujos/activar-flujo";
+import { ContactosDelFlujo } from "@/components/flujos/contactos-del-flujo";
 import { LineaDelFlujo } from "@/components/flujos/linea-del-flujo";
 import type { DatosBloque, TipoBloque } from "@/lib/flujos/bloques";
 
@@ -36,6 +37,7 @@ export default async function FlujoPage({ params }: { params: Promise<{ id: stri
     { data: respuestasRapidas },
     { data: automatizaciones },
     { data: otrosFlujos },
+    { count: contactosDentro },
   ] = await Promise.all([
     supabase.from("flujo_nodos").select("id, tipo, datos, pos_x, pos_y").eq("flujo_id", id),
     supabase.from("flujo_conexiones").select("origen_id, destino_id, salida").eq("flujo_id", id),
@@ -65,6 +67,11 @@ export default async function FlujoPage({ params }: { params: Promise<{ id: stri
       .eq("workspace_id", workspaceId ?? "")
       .neq("id", id)
       .order("nombre"),
+    supabase
+      .from("flujo_ejecuciones")
+      .select("id", { count: "exact", head: true })
+      .eq("flujo_id", id)
+      .in("estado", ["corriendo", "esperando"]),
   ]);
 
   const agentes = await listWorkspaceAgents(supabase, workspaceId);
@@ -120,6 +127,7 @@ export default async function FlujoPage({ params }: { params: Promise<{ id: stri
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-3">
+          <ContactosDelFlujo flujoId={id} dentro={contactosDentro ?? 0} />
           <LineaDelFlujo
             flujoId={id}
             lineaActual={(flujo.whatsapp_account_id as string | null) ?? null}

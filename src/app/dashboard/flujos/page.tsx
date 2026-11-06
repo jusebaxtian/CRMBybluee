@@ -16,6 +16,15 @@ export default async function FlujosPage() {
     .eq("workspace_id", workspaceId ?? "")
     .order("updated_at", { ascending: false });
 
+  const { data: dentro } = await supabase
+    .from("flujo_ejecuciones")
+    .select("flujo_id")
+    .eq("workspace_id", workspaceId ?? "")
+    .in("estado", ["corriendo", "esperando"])
+    .limit(1000);
+  const contactosDentro = new Map<string, number>();
+  for (const e of dentro ?? []) contactosDentro.set(e.flujo_id as string, (contactosDentro.get(e.flujo_id as string) ?? 0) + 1);
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
@@ -56,13 +65,20 @@ export default async function FlujosPage() {
                   })}
                 </p>
               </div>
-              <span
-                className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium ${
-                  f.activo ? "border-success text-success" : "border-border text-muted"
-                }`}
-              >
-                {f.activo ? "Activo" : "Borrador"}
-              </span>
+              <div className="flex shrink-0 items-center gap-3">
+                {(contactosDentro.get(f.id as string) ?? 0) > 0 && (
+                  <span className="text-xs text-muted">
+                    {contactosDentro.get(f.id as string)} {contactosDentro.get(f.id as string) === 1 ? "contacto dentro" : "contactos dentro"}
+                  </span>
+                )}
+                <span
+                  className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+                    f.activo ? "border-success text-success" : "border-border text-muted"
+                  }`}
+                >
+                  {f.activo ? "Activo" : "Borrador"}
+                </span>
+              </div>
             </Link>
           ))}
         </div>
