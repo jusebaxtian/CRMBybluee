@@ -6,10 +6,10 @@ import { isContactExcludedFromAutomations } from "@/lib/automations/engine";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { recordOutboundMessage } from "@/lib/messaging/record";
 import { turnoDeImagen, type LecturaDeImagen } from "@/lib/ai/lectura-imagen";
-import { conexionDeIa, contextoDelCliente, seccionDeVenta, vendedorDelEspacio } from "@/lib/ai/vendedor";
+import { conexionDeIa, contextoDelCliente, seccionDeVenta, vendedorAtiende, vendedorDelEspacio } from "@/lib/ai/vendedor";
 import { enviarNotaDeVoz, vozDisponible } from "@/lib/ai/voz";
 import { decidirAudio } from "@/lib/ai/voz-texto";
-import { quitarNumerosInventados } from "@/lib/ai/numeros-inventados";
+import { entregaMediosDePago, quitarNumerosInventados } from "@/lib/ai/numeros-inventados";
 
 // The AI ends its reply with this marker on its own line when it decides the
 // conversation needs a human — stripped before the text reaches the
@@ -164,8 +164,9 @@ export function followupFinalInstruction(numero: number, focus: string, contexto
 
 /** WhatsApp no entiende Markdown: **negrita** se ve con asteriscos literales. */
 export function formatoWhatsApp(texto: string): string {
+  // No toca los asteriscos pegados a una palabra: "Jua** Tol**" es un nombre enmascarado.
   return texto
-    .replace(/\*\*(.+?)\*\*/g, "*$1*")
+    .replace(/(?<![\p{L}\p{N}])\*\*(\S(?:[^\n]*?\S)?)\*\*/gu, "*$1*")
     .replace(/^#{1,6}\s+/gm, "")
     .replace(/^\s*[-•]\s+/gm, "• ");
 }
@@ -186,12 +187,14 @@ export function interpretAiReply(
 export async function agenteDeLaLinea(
   supabase: ReturnType<typeof createAdminClient>,
   workspaceId: string,
-  whatsappAccountId: string | null
+  whatsappAccountId: string | null,
+  waIdDelContacto?: string | null
 ) {
   // El agente vendedor (0169), si esta encendido, atiende todos los chats del
-  // espacio con la llave ya conectada. Los adjuntos siguen siendo los de la linea.
+  // espacio con la llave ya conectada. Apagado, solo sus numeros de prueba (0175).
+  // Los adjuntos siguen siendo los de la linea.
   const vendedor = await vendedorDelEspacio(supabase, workspaceId);
-  if (vendedor?.activo) {
+  if (vendedor && vendedorAtiende(vendedor, waIdDelContacto)) {
     return {
       id: "vendedor",
       provider: vendedor.provider,
@@ -301,7 +304,9 @@ export async function enviarRespuestaDeIa(
     const revisada = quitarNumerosInventados(respuesta, d.fuentesDeNumeros);
     respuesta = revisada.texto;
     if (revisada.quito) {
-      console.error(`agente: se quitó un número inventado de una respuesta, workspace=${d.workspaceId} conversacion=${d.conversationId}`);
+      console.error(`agente: se quitó un dato de pago falso de una respuesta, workspace=${d.workspaceId} conversacion=${d.conversationId}`);
+    }
+    if (revisada.quito || entregaMediosDePago(respuesta)) {
       const dePago = d.adjuntos.find((m) => /pago/i.test(`${m.key} ${m.label}`));
       if (dePago && !mediaKeys.includes(dePago.key)) mediaKeys.push(dePago.key);
     }
@@ -402,18 +407,18 @@ export async function maybeRespondWithAiAgent(
   // Un agente por linea (migracion 0118): responde el de la linea por la que
   // entro el mensaje; si esa linea no tiene agente propio, el general del
   // espacio (whatsapp_account_id null). Si no hay ninguno, la IA no responde.
-  const agent = await agenteDeLaLinea(supabase, workspaceId, conversation.whatsapp_account_id);
-  if (!agent || !agent.is_active) return;
-
-  // A contact tagged "excluir de automatizaciones" (ej: "Ya compró") skips
-  // the AI too — same rule as keyword/tag automations and follow-ups.
-  if (await isContactExcludedFromAutomations(supabase, contactId)) return;
-
   const { data: contact } = await supabase
     .from("contacts")
     .select("wa_id")
     .eq("id", contactId)
     .single();
+
+  const agent = await agenteDeLaLinea(supabase, workspaceId, conversation.whatsapp_account_id, contact?.wa_id as string | undefined);
+  if (!agent || !agent.is_active) return;
+
+  // A contact tagged "excluir de automatizaciones" (ej: "Ya compró") skips
+  // the AI too — same rule as keyword/tag automations and follow-ups.
+  if (await isContactExcludedFromAutomations(supabase, contactId)) return;
 
   const account = await resolveSendAccount(supabase, workspaceId, conversation.whatsapp_account_id);
   if (!contact || !account) return;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { cambiarVendedorActivo, guardarInstruccionesDelVendedor, guardarVozDelVendedor, probarVendedor } from "@/app/actions/agente-vendedor";
+import { cambiarVendedorActivo, guardarInstruccionesDelVendedor, guardarNumerosDePrueba, guardarVozDelVendedor, probarVendedor } from "@/app/actions/agente-vendedor";
 import { ESTILO_ETAPA, ETAPAS, type Etapa } from "@/lib/leads/etapas";
 
 type Turno = { role: "user" | "assistant"; content: string; nota?: string; audioTexto?: string | null; audioBase64?: string | null };
@@ -15,6 +15,7 @@ export function AgenteVendedorPanel({
   vozActiva,
   vozId,
   hayLlaveDeVoz,
+  numerosPrueba,
 }: {
   nombre: string;
   activo: boolean;
@@ -26,7 +27,9 @@ export function AgenteVendedorPanel({
   vozId: string;
   /** La llave de ElevenLabs esta en el servidor. */
   hayLlaveDeVoz: boolean;
+  numerosPrueba: string[];
 }) {
+  const [numeros, setNumeros] = useState(numerosPrueba.join(", "));
   const [conVoz, setConVoz] = useState(vozActiva);
   const [idDeVoz, setIdDeVoz] = useState(vozId);
   const [encendido, setEncendido] = useState(activo);
@@ -58,6 +61,19 @@ export function AgenteVendedorPanel({
       }
       setEncendido(nuevo);
       setAviso({ error: false, texto: nuevo ? `${nombre} está atendiendo tus chats.` : `${nombre} está apagado y tus automatizaciones volvieron.` });
+    });
+  }
+
+  function guardarNumeros() {
+    setAviso(null);
+    startTransition(async () => {
+      const r = await guardarNumerosDePrueba(numeros);
+      if (r.error) {
+        setAviso({ error: true, texto: r.error });
+        return;
+      }
+      setNumeros((r.numeros ?? []).join(", "));
+      setAviso({ error: false, texto: r.numeros?.length ? "Números de prueba guardados." : "Ya no hay números de prueba." });
     });
   }
 
@@ -103,7 +119,7 @@ export function AgenteVendedorPanel({
     const notas = [
       r.adjuntos.length > 0 ? `Enviaría: ${r.adjuntos.join(", ")}` : null,
       r.pasaAPersona ? "Aquí pasaría el chat a una persona" : null,
-      r.quitoNumero ? "Se quitó un número que la IA inventó" : null,
+      r.quitoNumero ? "Se quitó un dato de pago falso" : null,
     ].filter(Boolean);
     setTurnos((t) => [
       ...t,
@@ -137,6 +153,23 @@ export function AgenteVendedorPanel({
             </p>
           )}
           {aviso && <p className={`mt-3 text-xs ${aviso.error ? "text-red-400" : "text-success"}`}>{aviso.texto}</p>}
+        </div>
+
+        <div className="rounded-[13px] border border-border bg-surface p-4">
+          <label htmlFor="numerosPrueba" className="text-sm font-semibold text-foreground">Números de prueba</label>
+          <p className="mt-0.5 text-xs text-muted">Aunque esté apagado, {nombre} les responde a estos números por WhatsApp real. A nadie más.</p>
+          <div className="mt-2 flex gap-2">
+            <input
+              id="numerosPrueba"
+              value={numeros}
+              onChange={(e) => setNumeros(e.target.value)}
+              placeholder="3001234567, 3109876543"
+              className="min-w-0 flex-1 rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
+            />
+            <button type="button" onClick={guardarNumeros} disabled={ocupado} className="rounded-[9px] border border-border px-4 py-2 text-[13px] font-medium text-foreground hover:bg-surface-hover disabled:opacity-50">
+              Guardar
+            </button>
+          </div>
         </div>
 
         <div className="rounded-[13px] border border-border bg-surface p-4">

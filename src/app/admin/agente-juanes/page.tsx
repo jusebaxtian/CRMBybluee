@@ -12,7 +12,7 @@ export default async function AgenteJuanesPage() {
   if (!(await isPlatformAdmin(supabase))) return null;
 
   const admin = createAdminClient();
-  const { data: vendedor } = await admin.from("agente_vendedor").select("workspace_id, nombre, activo, instrucciones, voz_activa, voz_id").limit(1).maybeSingle();
+  const { data: vendedor } = await admin.from("agente_vendedor").select("workspace_id, nombre, activo, instrucciones, voz_activa, voz_id, numeros_prueba").limit(1).maybeSingle();
   if (!vendedor) return <p className="p-6 text-sm text-muted">El agente todavía no está creado.</p>;
 
   const [conexion, { data: automatizaciones }] = await Promise.all([
@@ -39,6 +39,7 @@ export default async function AgenteJuanesPage() {
         vozActiva={vendedor.voz_activa as boolean}
         vozId={vendedor.voz_id as string}
         hayLlaveDeVoz={vozDisponible()}
+        numerosPrueba={(vendedor.numeros_prueba as string[] | null) ?? []}
       />
     </div>
   );

@@ -6,10 +6,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isPlatformAdmin } from "@/lib/admin";
 import { buildSystemPrompt, customerRequestedHuman, interpretAiReply } from "@/lib/ai/agent";
 import { callAiProvider, type ChatTurn } from "@/lib/ai/providers";
-import { seccionDeVenta, vendedorDelEspacio } from "@/lib/ai/vendedor";
+import { limpiarNumerosDePrueba, seccionDeVenta, vendedorDelEspacio } from "@/lib/ai/vendedor";
 import { generarAudioMp3, vozDisponible } from "@/lib/ai/voz";
 import { decidirAudio } from "@/lib/ai/voz-texto";
-import { quitarNumerosInventados } from "@/lib/ai/numeros-inventados";
+import { entregaMediosDePago, quitarNumerosInventados } from "@/lib/ai/numeros-inventados";
 import { esEtapa } from "@/lib/leads/etapas";
 
 /** Solo el administrador de la plataforma, y sobre el espacio que tiene agente vendedor. */
@@ -87,6 +87,19 @@ export async function guardarVozDelVendedor(vozActiva: boolean, vozId: string) {
   return { success: true as const };
 }
 
+export async function guardarNumerosDePrueba(entrada: string) {
+  const workspaceId = await espacioDelVendedor();
+  if (!workspaceId) return { error: "No tienes permiso." };
+  const numeros = limpiarNumerosDePrueba(entrada);
+  const { error } = await createAdminClient()
+    .from("agente_vendedor")
+    .update({ numeros_prueba: numeros, actualizado_el: new Date().toISOString() })
+    .eq("workspace_id", workspaceId);
+  if (error) return { error: "No se pudieron guardar los números." };
+  revalidatePath("/admin/agente-juanes");
+  return { success: true as const, numeros };
+}
+
 /** Chat de prueba: usa las instrucciones escritas en pantalla y no le envia nada a nadie. */
 export async function probarVendedor(input: { instrucciones: string; etapa: string; historial: ChatTurn[]; mensaje: string; audioReciente?: boolean }) {
   const workspaceId = await espacioDelVendedor();
@@ -125,7 +138,7 @@ export async function probarVendedor(input: { instrucciones: string; etapa: stri
   const { customerReply, handoff, mediaKeys } = interpretAiReply(crudo);
   // La prueba pasa por los mismos filtros que un chat real.
   const revisada = quitarNumerosInventados(customerReply, `${instrucciones}\n${turnos.map((t) => t.content).join("\n")}`);
-  const dePago = revisada.quito ? biblioteca.find((m) => /pago/i.test(`${m.key} ${m.label}`)) : undefined;
+  const dePago = revisada.quito || entregaMediosDePago(revisada.texto) ? biblioteca.find((m) => /pago/i.test(`${m.key} ${m.label}`)) : undefined;
   if (dePago && !mediaKeys.includes(dePago.key as string)) mediaKeys.push(dePago.key as string);
   const decision = conVoz
     ? decidirAudio(revisada.texto, { clienteMandoAudio: false, audioReciente: !!input.audioReciente, llevaAdjunto: mediaKeys.length > 0 })

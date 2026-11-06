@@ -1,4 +1,4 @@
-import { conexionDeIa, vendedorDelEspacio } from "@/lib/ai/vendedor";
+import { conexionDeIa, vendedorAtiende, vendedorDelEspacio } from "@/lib/ai/vendedor";
 import { leerImagenEntrante, responderImagenCuandoSeLea } from "@/lib/ai/imagenes";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { esContactoSinNumero, usuarioDeAviso } from "@/lib/whatsapp/usuario";
@@ -281,7 +281,8 @@ async function transcribeIncomingAudio(
   supabase: ReturnType<typeof createAdminClient>,
   workspaceId: string,
   mediaUrl: string,
-  contactId: string
+  contactId: string,
+  waId: string
 ): Promise<string | null> {
   // Basta con que el espacio tenga un agente de OpenAI activo (cualquier linea).
   const { data: agentes } = await supabase
@@ -293,7 +294,7 @@ async function transcribeIncomingAudio(
     .limit(1);
   // El agente vendedor (0169) usa la llave conectada aunque los agentes por linea esten apagados.
   const vendedor = await vendedorDelEspacio(supabase, workspaceId);
-  let agent: { api_key: string } | null = agentes?.[0] ?? (vendedor?.activo && vendedor.provider === "openai" ? vendedor : null);
+  let agent: { api_key: string } | null = agentes?.[0] ?? (vendedor && vendedorAtiende(vendedor, waId) && vendedor.provider === "openai" ? vendedor : null);
   // En un bloque de IA de un flujo basta la llave: no depende del boton del agente.
   if (!agent && (await contactoEnBloqueDeIa(supabase, contactId))) {
     const conexion = await conexionDeIa(supabase, workspaceId);
@@ -484,7 +485,7 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
 
         let audioTranscript: string | null = null;
         if (message.type === "audio" && mediaUrl) {
-          audioTranscript = await transcribeIncomingAudio(supabase, workspaceId, mediaUrl, contact.id);
+          audioTranscript = await transcribeIncomingAudio(supabase, workspaceId, mediaUrl, contact.id, waId);
         }
 
         // A tap-and-hold reaction has no text body of its own — the emoji
@@ -568,6 +569,7 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
                 workspaceId,
                 conversationId: conversation.id,
                 contactId: contact.id,
+                waId,
                 whatsappAccountId,
                 waMessageId: message.id,
                 mediaUrl,

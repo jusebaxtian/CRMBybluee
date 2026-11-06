@@ -19,7 +19,7 @@ const DIAS_VISIBLE_AVISO = 3;
  */
 export async function leerImagenEntrante(
   supabase: Supabase,
-  d: { workspaceId: string; conversationId: string; contactId: string; whatsappAccountId: string; waMessageId: string; mediaUrl: string; mimeType: string | null; cliente: string }
+  d: { workspaceId: string; conversationId: string; contactId: string; waId: string; whatsappAccountId: string; waMessageId: string; mediaUrl: string; mimeType: string | null; cliente: string }
 ): Promise<LecturaDeImagen | null> {
   try {
     // En un bloque de IA de un flujo basta la llave: no depende del boton del
@@ -27,7 +27,7 @@ export async function leerImagenEntrante(
     const enBloque = await contactoEnBloqueDeIa(supabase, d.contactId);
     const agente = enBloque
       ? await agenteParaBloque(supabase, d.workspaceId, d.whatsappAccountId)
-      : await agenteDeLaLinea(supabase, d.workspaceId, d.whatsappAccountId);
+      : await agenteDeLaLinea(supabase, d.workspaceId, d.whatsappAccountId, d.waId);
     if (!agente) return null;
     if (!enBloque && (!agente.is_active || !agente.lee_imagenes)) return null;
 

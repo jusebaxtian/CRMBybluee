@@ -58,11 +58,30 @@ ${datos.length > 0 ? datos.join("\n") : "- Todavía no hay datos de este cliente
 Si el cliente ya tiene cuenta y necesita soporte, ayúdalo con lo que sepas de ella. No inventes datos de su cuenta ni prometas cambios: si no puedes resolverlo, pásalo a una persona con la regla obligatoria de arriba.`;
 }
 
+/** Encendido atiende a todos; apagado, solo los numeros de prueba. */
+export function vendedorAtiende(
+  vendedor: { activo: boolean; numeros_prueba?: string[] | null } | null | undefined,
+  waId: string | null | undefined
+): boolean {
+  if (!vendedor) return false;
+  return vendedor.activo || (!!waId && (vendedor.numeros_prueba ?? []).includes(waId));
+}
+
+/** Los numeros tal como se guardan en WhatsApp: solo digitos y con el 57 de Colombia. */
+export function limpiarNumerosDePrueba(entrada: string): string[] {
+  const numeros = entrada
+    .split(/[,;\n]+/)
+    .map((n) => n.replace(/\D/g, ""))
+    .map((n) => (n.length === 10 ? `57${n}` : n))
+    .filter((n) => n.length >= 11);
+  return [...new Set(numeros)];
+}
+
 /** El agente vendedor del espacio, con la llave ya conectada. Null si no hay o no tiene llave. */
 export async function vendedorDelEspacio(supabase: Supabase, workspaceId: string) {
   const { data: vendedor } = await supabase
     .from("agente_vendedor")
-    .select("nombre, activo, instrucciones, voz_activa, voz_id")
+    .select("nombre, activo, instrucciones, voz_activa, voz_id, numeros_prueba")
     .eq("workspace_id", workspaceId)
     .maybeSingle();
   if (!vendedor) return null;
