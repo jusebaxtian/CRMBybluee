@@ -62,7 +62,7 @@ Si el cliente ya tiene cuenta y necesita soporte, ayúdalo con lo que sepas de e
 export async function vendedorDelEspacio(supabase: Supabase, workspaceId: string) {
   const { data: vendedor } = await supabase
     .from("agente_vendedor")
-    .select("nombre, activo, instrucciones")
+    .select("nombre, activo, instrucciones, voz_activa, voz_id")
     .eq("workspace_id", workspaceId)
     .maybeSingle();
   if (!vendedor) return null;

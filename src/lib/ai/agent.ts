@@ -7,6 +7,9 @@ import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { recordOutboundMessage } from "@/lib/messaging/record";
 import { turnoDeImagen, type LecturaDeImagen } from "@/lib/ai/lectura-imagen";
 import { conexionDeIa, contextoDelCliente, seccionDeVenta, vendedorDelEspacio } from "@/lib/ai/vendedor";
+import { enviarNotaDeVoz, vozDisponible } from "@/lib/ai/voz";
+import { decidirAudio } from "@/lib/ai/voz-texto";
+import { quitarNumerosInventados } from "@/lib/ai/numeros-inventados";
 
 // The AI ends its reply with this marker on its own line when it decides the
 // conversation needs a human — stripped before the text reaches the
@@ -200,6 +203,8 @@ export async function agenteDeLaLinea(
       whatsapp_account_id: whatsappAccountId,
       lee_imagenes: true,
       esVendedor: true,
+      // Solo si esta activada y hay llave: si no, ni se le habla de audios.
+      vozId: vendedor.voz_activa && vozDisponible() ? (vendedor.voz_id as string) : null,
     };
   }
 
@@ -280,11 +285,29 @@ export async function enviarRespuestaDeIa(
     texto: string;
     mediaKeys: string[];
     adjuntos: MediaItem[];
+    /** Voz con la que puede hablar. Sin ella, todo sale escrito. */
+    vozId?: string | null;
+    /** De donde puede salir un numero largo. Si viene, se quitan los inventados. */
+    fuentesDeNumeros?: string;
   }
 ) {
   const mediaByKey = new Map(d.adjuntos.map((m) => [m.key, m]));
 
-  for (const key of d.mediaKeys) {
+  // Un numero de pago inventado no puede llegarle al cliente: se quita y, si hay un
+  // adjunto de medios de pago, se manda ese, que es el dato real.
+  let respuesta = d.texto;
+  const mediaKeys = [...d.mediaKeys];
+  if (d.fuentesDeNumeros !== undefined) {
+    const revisada = quitarNumerosInventados(respuesta, d.fuentesDeNumeros);
+    respuesta = revisada.texto;
+    if (revisada.quito) {
+      console.error(`agente: se quitó un número inventado de una respuesta, workspace=${d.workspaceId} conversacion=${d.conversationId}`);
+      const dePago = d.adjuntos.find((m) => /pago/i.test(`${m.key} ${m.label}`));
+      if (dePago && !mediaKeys.includes(dePago.key)) mediaKeys.push(dePago.key);
+    }
+  }
+
+  for (const key of mediaKeys) {
     const item = mediaByKey.get(key);
     if (!item) continue;
 
@@ -310,16 +333,57 @@ export async function enviarRespuestaDeIa(
     }
   }
 
-  if (!d.texto) return;
+  let texto = respuesta;
+  if (d.vozId && respuesta) {
+    const { data: recientes } = await supabase
+      .from("messages")
+      .select("direction, message_type")
+      .eq("conversation_id", d.conversationId)
+      .order("created_at", { ascending: false })
+      .limit(4);
+    const decision = decidirAudio(respuesta, {
+      clienteMandoAudio: (recientes ?? []).find((m) => m.direction === "in")?.message_type === "audio",
+      audioReciente: (recientes ?? []).some((m) => m.direction === "out" && m.message_type === "audio"),
+      llevaAdjunto: mediaKeys.length > 0,
+    });
+    if (decision.audio) {
+      const enviado = await enviarNotaDeVoz(supabase, {
+        workspaceId: d.workspaceId,
+        conversationId: d.conversationId,
+        cuenta: d.cuenta,
+        waId: d.waId,
+        audio: decision.audio,
+        vozId: d.vozId,
+      });
+      // Si el audio no salio, el cliente recibe la respuesta completa por escrito.
+      if (enviado) texto = decision.texto;
+    }
+  }
+  if (!texto) return;
 
-  const result = await sendTextMessage(d.cuenta.phone_number_id, d.cuenta.access_token, d.waId, d.texto);
+  const result = await sendTextMessage(d.cuenta.phone_number_id, d.cuenta.access_token, d.waId, texto);
   await recordOutboundMessage(supabase, {
     origen: "ia",
     conversationId: d.conversationId,
     messageType: "text",
-    body: d.texto,
+    body: texto,
     waMessageId: result.messages[0]?.id,
   });
+}
+
+/** Lo que aprende el agente vendedor para este chat: la venta, el cliente y, si puede, la voz. */
+export async function seccionesDelVendedor(
+  supabase: ReturnType<typeof createAdminClient>,
+  agente: object,
+  contactId: string
+): Promise<string> {
+  if (!("esVendedor" in agente)) return "";
+  return seccionDeVenta(await contextoDelCliente(supabase, contactId));
+}
+
+/** La voz con la que puede hablar este agente. Hoy solo el vendedor tiene voz. */
+export function vozDelAgente(agente: object): string | null {
+  return "vozId" in agente ? (agente.vozId as string | null) : null;
 }
 
 export async function maybeRespondWithAiAgent(
@@ -394,15 +458,11 @@ export async function maybeRespondWithAiAgent(
   }
 
   let reply: string;
+  let instrucciones = "";
   try {
-    const seccionVendedor = "esVendedor" in agent ? seccionDeVenta(await contextoDelCliente(supabase, contactId)) : "";
-    reply = await callAiProvider(
-      agent.provider,
-      agent.api_key,
-      agent.model,
-      buildSystemPrompt(agent.agent_name, agent.persona, mediaLibrary) + seccionVendedor,
-      history
-    );
+    const seccionVendedor = await seccionesDelVendedor(supabase, agent, contactId);
+    instrucciones = buildSystemPrompt(agent.agent_name, agent.persona, mediaLibrary) + seccionVendedor;
+    reply = await callAiProvider(agent.provider, agent.api_key, agent.model, instrucciones, history);
   } catch (err) {
     console.error(`AI agent call failed for workspace=${workspaceId}:`, err);
     return;
@@ -427,5 +487,7 @@ export async function maybeRespondWithAiAgent(
     texto: customerReply,
     mediaKeys: requestedKeys,
     adjuntos: mediaLibrary,
+    vozId: vozDelAgente(agent),
+    fuentesDeNumeros: "esVendedor" in agent ? `${instrucciones}\n${history.map((t) => t.content).join("\n")}` : undefined,
   });
 }

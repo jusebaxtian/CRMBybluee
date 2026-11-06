@@ -22,9 +22,10 @@ import {
   formatoWhatsApp,
   historialDelChat,
   interpretAiReply,
+  seccionesDelVendedor,
+  vozDelAgente,
 } from "@/lib/ai/agent";
 import { callAiProvider } from "@/lib/ai/providers";
-import { contextoDelCliente, seccionDeVenta } from "@/lib/ai/vendedor";
 import {
   instruccionDeEvaluacion,
   interpretarEvaluacion,
@@ -671,7 +672,7 @@ async function turnoDeIa(
     const [adjuntos, historial, seccionVendedor] = await Promise.all([
       adjuntosDelAgente(supabase, workspaceId, agente.whatsapp_account_id),
       historialDelChat(supabase, conversationId),
-      "esVendedor" in agente ? contextoDelCliente(supabase, contactId).then(seccionDeVenta) : Promise.resolve(""),
+      seccionesDelVendedor(supabase, agente, contactId),
     ]);
 
     // Primero se evalua, aparte: asi la respuesta ya sabe si debe seguir o despedirse.
@@ -684,15 +685,11 @@ async function turnoDeIa(
     });
     const cumplido = interpretarEvaluacion(evaluacion);
 
-    const crudo = await callAiProvider(
-      agente.provider,
-      agente.api_key,
-      agente.model,
+    const instrucciones =
       buildSystemPrompt(datos.nombreAgente?.trim() || agente.agent_name, agente.persona, adjuntos) +
-        seccionVendedor +
-        seccionDeObjetivo(datos.objetivo, usadas, maxRespuestas, cumplido),
-      turnosParaObjetivo(historial)
-    );
+      seccionVendedor +
+      seccionDeObjetivo(datos.objetivo, usadas, maxRespuestas, cumplido);
+    const crudo = await callAiProvider(agente.provider, agente.api_key, agente.model, instrucciones, turnosParaObjetivo(historial));
     if (!crudo) return salir(cumplido ? "cumplio" : "no_cumplio");
 
     const { customerReply, handoff, mediaKeys } = interpretAiReply(crudo);
@@ -705,6 +702,8 @@ async function turnoDeIa(
       texto: formatoWhatsApp(customerReply),
       mediaKeys,
       adjuntos,
+      vozId: vozDelAgente(agente),
+      fuentesDeNumeros: "esVendedor" in agente ? `${instrucciones}\n${historial.map((t) => t.content).join("\n")}` : undefined,
     });
 
     const respuestas = usadas + 1;

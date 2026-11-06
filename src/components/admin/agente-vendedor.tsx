@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { cambiarVendedorActivo, guardarInstruccionesDelVendedor, probarVendedor } from "@/app/actions/agente-vendedor";
+import { cambiarVendedorActivo, guardarInstruccionesDelVendedor, guardarVozDelVendedor, probarVendedor } from "@/app/actions/agente-vendedor";
 import { ESTILO_ETAPA, ETAPAS, type Etapa } from "@/lib/leads/etapas";
 
-type Turno = { role: "user" | "assistant"; content: string; nota?: string };
+type Turno = { role: "user" | "assistant"; content: string; nota?: string; audioTexto?: string | null; audioBase64?: string | null };
 
 export function AgenteVendedorPanel({
   nombre,
@@ -12,6 +12,9 @@ export function AgenteVendedorPanel({
   instrucciones,
   conexion,
   automatizacionesAPausar,
+  vozActiva,
+  vozId,
+  hayLlaveDeVoz,
 }: {
   nombre: string;
   activo: boolean;
@@ -19,7 +22,13 @@ export function AgenteVendedorPanel({
   /** Proveedor y modelo de la llave conectada. Null si no hay ninguna. */
   conexion: string | null;
   automatizacionesAPausar: string[];
+  vozActiva: boolean;
+  vozId: string;
+  /** La llave de ElevenLabs esta en el servidor. */
+  hayLlaveDeVoz: boolean;
 }) {
+  const [conVoz, setConVoz] = useState(vozActiva);
+  const [idDeVoz, setIdDeVoz] = useState(vozId);
   const [encendido, setEncendido] = useState(activo);
   const [texto, setTexto] = useState(instrucciones);
   const [guardado, setGuardado] = useState(instrucciones);
@@ -52,6 +61,14 @@ export function AgenteVendedorPanel({
     });
   }
 
+  function guardarVoz() {
+    setAviso(null);
+    startTransition(async () => {
+      const r = await guardarVozDelVendedor(conVoz, idDeVoz);
+      setAviso(r.error ? { error: true, texto: r.error } : { error: false, texto: "Voz guardada." });
+    });
+  }
+
   function guardar() {
     setAviso(null);
     startTransition(async () => {
@@ -72,9 +89,12 @@ export function AgenteVendedorPanel({
     setProbando(true);
     setErrorPrueba(null);
     setMensaje("");
-    const historial = turnos.map(({ role, content }) => ({ role, content }));
+    const historial = turnos.map(({ role, content, audioTexto }) => ({
+      role,
+      content: [audioTexto, content].filter(Boolean).join("\n\n"),
+    }));
     setTurnos((t) => [...t, { role: "user", content: m }]);
-    const r = await probarVendedor({ instrucciones: texto, etapa, historial, mensaje: m });
+    const r = await probarVendedor({ instrucciones: texto, etapa, historial, mensaje: m, audioReciente: turnos.slice(-2).some((t) => t.audioTexto) });
     setProbando(false);
     if ("error" in r) {
       setErrorPrueba(r.error ?? "No se pudo probar.");
@@ -83,8 +103,12 @@ export function AgenteVendedorPanel({
     const notas = [
       r.adjuntos.length > 0 ? `Enviaría: ${r.adjuntos.join(", ")}` : null,
       r.pasaAPersona ? "Aquí pasaría el chat a una persona" : null,
+      r.quitoNumero ? "Se quitó un número que la IA inventó" : null,
     ].filter(Boolean);
-    setTurnos((t) => [...t, { role: "assistant", content: r.respuesta, nota: notas.join(" · ") || undefined }]);
+    setTurnos((t) => [
+      ...t,
+      { role: "assistant", content: r.respuesta, nota: notas.join(" · ") || undefined, audioTexto: r.audioTexto, audioBase64: r.audioBase64 },
+    ]);
   }
 
   return (
@@ -113,6 +137,29 @@ export function AgenteVendedorPanel({
             </p>
           )}
           {aviso && <p className={`mt-3 text-xs ${aviso.error ? "text-red-400" : "text-success"}`}>{aviso.texto}</p>}
+        </div>
+
+        <div className="rounded-[13px] border border-border bg-surface p-4">
+          <label className="flex items-center justify-between gap-3 text-sm font-semibold text-foreground">
+            Notas de voz
+            <input type="checkbox" checked={conVoz} onChange={(e) => setConVoz(e.target.checked)} aria-label="Activar notas de voz" />
+          </label>
+          <p className="mt-0.5 text-xs text-muted">
+            {hayLlaveDeVoz
+              ? `Responde con audio cuando el cliente manda uno o cuando la explicación es larga, sin mandar dos seguidos. Las cifras y enlaces van escritos, y si el audio falla sale todo por escrito.`
+              : "Falta la llave de ElevenLabs en el servidor: mientras tanto solo escribe."}
+          </p>
+          <div className="mt-2 flex gap-2">
+            <input
+              value={idDeVoz}
+              onChange={(e) => setIdDeVoz(e.target.value)}
+              aria-label="ID de la voz en ElevenLabs"
+              className="min-w-0 flex-1 rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
+            />
+            <button type="button" onClick={guardarVoz} disabled={ocupado} className="rounded-[9px] border border-border px-4 py-2 text-[13px] font-medium text-foreground hover:bg-surface-hover disabled:opacity-50">
+              Guardar
+            </button>
+          </div>
         </div>
 
         <div className="rounded-[13px] border border-border bg-surface p-4">
@@ -163,7 +210,13 @@ export function AgenteVendedorPanel({
           {turnos.length === 0 && <p className="m-auto text-center text-xs text-muted">Escribe como si fueras un cliente.</p>}
           {turnos.map((t, i) => (
             <div key={i} className={`max-w-[85%] ${t.role === "user" ? "self-end" : "self-start"}`}>
-              <p className={`whitespace-pre-wrap rounded-lg px-3 py-2 text-[13px] ${t.role === "user" ? "bg-primary/15 text-foreground" : "bg-surface text-foreground"}`}>{t.content}</p>
+              {t.audioTexto && (
+                <div className="mb-1 rounded-lg bg-surface px-3 py-2 text-[13px] text-foreground">
+                  {t.audioBase64 && <audio controls src={`data:audio/mpeg;base64,${t.audioBase64}`} className="mb-1 h-9 w-full" />}
+                  <p className="whitespace-pre-wrap text-xs text-muted">🎤 {t.audioTexto}</p>
+                </div>
+              )}
+              {t.content && <p className={`whitespace-pre-wrap rounded-lg px-3 py-2 text-[13px] ${t.role === "user" ? "bg-primary/15 text-foreground" : "bg-surface text-foreground"}`}>{t.content}</p>}
               {t.nota && <p className="mt-1 text-[11px] text-muted">{t.nota}</p>}
             </div>
           ))}

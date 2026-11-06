@@ -7,6 +7,9 @@ import { isPlatformAdmin } from "@/lib/admin";
 import { buildSystemPrompt, customerRequestedHuman, interpretAiReply } from "@/lib/ai/agent";
 import { callAiProvider, type ChatTurn } from "@/lib/ai/providers";
 import { seccionDeVenta, vendedorDelEspacio } from "@/lib/ai/vendedor";
+import { generarAudioMp3, vozDisponible } from "@/lib/ai/voz";
+import { decidirAudio } from "@/lib/ai/voz-texto";
+import { quitarNumerosInventados } from "@/lib/ai/numeros-inventados";
 import { esEtapa } from "@/lib/leads/etapas";
 
 /** Solo el administrador de la plataforma, y sobre el espacio que tiene agente vendedor. */
@@ -70,8 +73,22 @@ export async function cambiarVendedorActivo(activo: boolean) {
   return { success: true as const };
 }
 
+export async function guardarVozDelVendedor(vozActiva: boolean, vozId: string) {
+  const workspaceId = await espacioDelVendedor();
+  if (!workspaceId) return { error: "No tienes permiso." };
+  const id = vozId.trim();
+  if (!/^[A-Za-z0-9]{10,40}$/.test(id)) return { error: "Ese ID de voz no es válido." };
+  const { error } = await createAdminClient()
+    .from("agente_vendedor")
+    .update({ voz_activa: vozActiva, voz_id: id, actualizado_el: new Date().toISOString() })
+    .eq("workspace_id", workspaceId);
+  if (error) return { error: "No se pudo guardar la voz." };
+  revalidatePath("/admin/agente-juanes");
+  return { success: true as const };
+}
+
 /** Chat de prueba: usa las instrucciones escritas en pantalla y no le envia nada a nadie. */
-export async function probarVendedor(input: { instrucciones: string; etapa: string; historial: ChatTurn[]; mensaje: string }) {
+export async function probarVendedor(input: { instrucciones: string; etapa: string; historial: ChatTurn[]; mensaje: string; audioReciente?: boolean }) {
   const workspaceId = await espacioDelVendedor();
   if (!workspaceId) return { error: "No tienes permiso." };
   const admin = createAdminClient();
@@ -79,8 +96,10 @@ export async function probarVendedor(input: { instrucciones: string; etapa: stri
   if (!vendedor) return { error: "No hay una llave de IA conectada en tu espacio." };
 
   if (customerRequestedHuman(input.mensaje)) {
-    return { success: true as const, respuesta: "¡Claro que sí! Ya te conecto con nuestro equipo, en un momento te contactan 🙌", pasaAPersona: true, adjuntos: [] as string[] };
+    return { success: true as const, respuesta: "¡Claro que sí! Ya te conecto con nuestro equipo, en un momento te contactan 🙌", pasaAPersona: true, adjuntos: [] as string[], audioTexto: null, audioBase64: null, quitoNumero: false };
   }
+
+  const conVoz = vendedor.voz_activa && vozDisponible();
 
   const { data: adjuntos } = await admin
     .from("ai_agent_media")
@@ -90,25 +109,46 @@ export async function probarVendedor(input: { instrucciones: string; etapa: stri
   const porClave = new Map((adjuntos ?? []).map((m) => [m.key as string, m]));
   const biblioteca = [...porClave.values()];
 
+  const instrucciones =
+    buildSystemPrompt(vendedor.nombre, input.instrucciones, biblioteca) +
+    seccionDeVenta({ nombre: null, etapa: esEtapa(input.etapa) ? input.etapa : "frio", notas: null, etiquetas: [], espacios: [] });
+  const turnos: ChatTurn[] = [...input.historial, { role: "user", content: input.mensaje }];
+
   let crudo: string;
   try {
-    crudo = await callAiProvider(
-      vendedor.provider,
-      vendedor.api_key,
-      vendedor.model,
-      buildSystemPrompt(vendedor.nombre, input.instrucciones, biblioteca) +
-        seccionDeVenta({ nombre: null, etapa: esEtapa(input.etapa) ? input.etapa : "frio", notas: null, etiquetas: [], espacios: [] }),
-      [...input.historial, { role: "user", content: input.mensaje }]
-    );
+    crudo = await callAiProvider(vendedor.provider, vendedor.api_key, vendedor.model, instrucciones, turnos);
   } catch {
     return { error: "No se pudo consultar la IA. Revisa la llave conectada en tu espacio." };
   }
   if (!crudo) return { error: "La IA no devolvió ninguna respuesta." };
 
   const { customerReply, handoff, mediaKeys } = interpretAiReply(crudo);
+  // La prueba pasa por los mismos filtros que un chat real.
+  const revisada = quitarNumerosInventados(customerReply, `${instrucciones}\n${turnos.map((t) => t.content).join("\n")}`);
+  const dePago = revisada.quito ? biblioteca.find((m) => /pago/i.test(`${m.key} ${m.label}`)) : undefined;
+  if (dePago && !mediaKeys.includes(dePago.key as string)) mediaKeys.push(dePago.key as string);
+  const decision = conVoz
+    ? decidirAudio(revisada.texto, { clienteMandoAudio: false, audioReciente: !!input.audioReciente, llevaAdjunto: mediaKeys.length > 0 })
+    : { audio: null, texto: revisada.texto };
+
+  // El audio de la prueba se genera de verdad, para oir como queda.
+  let audioBase64: string | null = null;
+  let texto = decision.texto;
+  if (decision.audio) {
+    try {
+      audioBase64 = (await generarAudioMp3(decision.audio, vendedor.voz_id as string)).toString("base64");
+    } catch (err) {
+      console.error("probar vendedor: no se pudo generar el audio:", err);
+      texto = revisada.texto;
+    }
+  }
+
   return {
     success: true as const,
-    respuesta: customerReply,
+    respuesta: texto,
+    audioTexto: audioBase64 ? decision.audio : null,
+    audioBase64,
+    quitoNumero: revisada.quito,
     pasaAPersona: handoff,
     adjuntos: mediaKeys.map((k) => (porClave.get(k)?.label as string | undefined) ?? k),
   };

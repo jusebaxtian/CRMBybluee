@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPlatformAdmin } from "@/lib/admin";
 import { conexionDeIa } from "@/lib/ai/vendedor";
+import { vozDisponible } from "@/lib/ai/voz";
 import { AgenteVendedorPanel } from "@/components/admin/agente-vendedor";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +12,7 @@ export default async function AgenteJuanesPage() {
   if (!(await isPlatformAdmin(supabase))) return null;
 
   const admin = createAdminClient();
-  const { data: vendedor } = await admin.from("agente_vendedor").select("workspace_id, nombre, activo, instrucciones").limit(1).maybeSingle();
+  const { data: vendedor } = await admin.from("agente_vendedor").select("workspace_id, nombre, activo, instrucciones, voz_activa, voz_id").limit(1).maybeSingle();
   if (!vendedor) return <p className="p-6 text-sm text-muted">El agente todavía no está creado.</p>;
 
   const [conexion, { data: automatizaciones }] = await Promise.all([
@@ -35,6 +36,9 @@ export default async function AgenteJuanesPage() {
         instrucciones={vendedor.instrucciones as string}
         conexion={conexion ? `${conexion.provider === "openai" ? "OpenAI" : "Anthropic"} · ${conexion.model}` : null}
         automatizacionesAPausar={(automatizaciones ?? []).map((a) => a.name as string)}
+        vozActiva={vendedor.voz_activa as boolean}
+        vozId={vendedor.voz_id as string}
+        hayLlaveDeVoz={vozDisponible()}
       />
     </div>
   );
