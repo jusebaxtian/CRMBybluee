@@ -2,7 +2,15 @@ import type { createAdminClient } from "@/lib/supabase/admin";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { sendInteractiveButtonsMessage, sendTextMessage } from "@/lib/whatsapp/graph";
 import { recordOutboundMessage } from "@/lib/messaging/record";
-import { ACCION_DE_MEDIA, MEDIA_SIN_PIE, salidasDe, type DatosBloque, type TipoBloque } from "@/lib/flujos/bloques";
+import {
+  ACCION_DE_MEDIA,
+  MEDIA_SIN_PIE,
+  puedeReingresar,
+  reingresosDeFin,
+  salidasDe,
+  type DatosBloque,
+  type TipoBloque,
+} from "@/lib/flujos/bloques";
 import { executeAction, type AutomationAction } from "@/lib/automations/engine";
 import { maybeRespondWithAiAgent } from "@/lib/ai/agent";
 
@@ -97,6 +105,58 @@ async function ejecutarComoAccion(
   await executeAction(supabase, { id: "flujo", workspace_id: workspaceId }, contactId, completa);
 }
 
+/**
+ * Reparte el chat por porcentaje (migracion 0170). Solo chats sin asesor y que no
+ * sean de un cliente vendido. Un fallo no detiene el flujo: el contacto sigue
+ * recibiendo sus mensajes aunque el chat quede sin asignar.
+ */
+async function repartirChat(
+  flujoId: string,
+  contactId: string,
+  conversationId: string | null,
+  reparto: DatosBloque["repartoAgentes"]
+) {
+  try {
+    // Con la llave de servicio: el flujo tambien arranca desde acciones con la
+    // sesion de un asesor, que no puede ver ni asignar todos los chats.
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const admin = createAdminClient();
+    const consulta = admin.from("conversations").select("id, assigned_agent_id, vendedor_id");
+    const { data: chat } = await (conversationId
+      ? consulta.eq("id", conversationId)
+      : consulta.eq("contact_id", contactId).order("last_message_at", { ascending: false, nullsFirst: false }).limit(1)
+    ).maybeSingle();
+    if (!chat || chat.assigned_agent_id || chat.vendedor_id) return;
+
+    const { data: agente, error } = await admin.rpc("flujo_elegir_agente", { p_flujo: flujoId, p_reparto: reparto ?? null });
+    if (error) throw new Error(error.message);
+    if (!agente) return;
+
+    await admin
+      .from("conversations")
+      .update({ assigned_agent_id: agente })
+      .eq("id", chat.id)
+      .is("assigned_agent_id", null)
+      .is("vendedor_id", null);
+  } catch (err) {
+    console.error(`flujo ${flujoId}: no se pudo repartir el chat:`, err);
+  }
+}
+
+/** Si ya paso por este flujo, ¿el Fin por el que salio la ultima vez lo deja volver? */
+async function reingresoPermitido(supabase: Supabase, flujoId: string, contactId: string): Promise<boolean> {
+  const { data: anteriores, count } = await supabase
+    .from("flujo_ejecuciones")
+    .select("reingresos_permitidos", { count: "exact" })
+    .eq("flujo_id", flujoId)
+    .eq("contact_id", contactId)
+    .order("iniciado_el", { ascending: false })
+    .limit(1);
+  const ultima = anteriores?.[0];
+  if (!ultima) return true;
+  return puedeReingresar((ultima.reingresos_permitidos as number | null) ?? null, count ?? 0);
+}
+
 async function cerrar(
   supabase: Supabase,
   ejecucionId: string,
@@ -187,6 +247,12 @@ export async function avanzar(supabase: Supabase, ejecucionId: string): Promise<
     const datos = (nodoActual.datos ?? {}) as DatosBloque;
 
     if (tipo === "fin") {
+      // Se guarda la regla en el recorrido y no el id del bloque: guardar el
+      // lienzo le cambia el id a todos los bloques.
+      await supabase
+        .from("flujo_ejecuciones")
+        .update({ reingresos_permitidos: reingresosDeFin(datos) })
+        .eq("id", ejecucionId);
       await cerrar(supabase, ejecucionId, "terminado");
       return;
     }
@@ -332,12 +398,21 @@ export async function avanzar(supabase: Supabase, ejecucionId: string): Promise<
             ? { action_type: "assign_agent", target_agent_id: datos.agenteId ?? null }
             : { action_type: "send_quick_reply", quick_reply_id: datos.respuestaRapidaId ?? null };
 
-      await ejecutarComoAccion(
-        supabase,
-        ejecucion.workspace_id as string,
-        ejecucion.contact_id as string,
-        accion
-      );
+      if (tipo === "agente" && !datos.agenteId) {
+        await repartirChat(
+          ejecucion.flujo_id as string,
+          ejecucion.contact_id as string,
+          (ejecucion.conversation_id as string | null) ?? null,
+          datos.repartoAgentes
+        );
+      } else {
+        await ejecutarComoAccion(
+          supabase,
+          ejecucion.workspace_id as string,
+          ejecucion.contact_id as string,
+          accion
+        );
+      }
 
       const siguiente = destinoDe(conexiones, nodoActual.id, "sig");
       if (!siguiente) {
@@ -508,6 +583,9 @@ export async function iniciarFlujo(
 
   // Un contacto, un flujo. Si ya esta en otro, este no arranca.
   if (await contactoEnFlujo(supabase, contactId)) return null;
+
+  // Aqui pasan todas las entradas: disparadores, a mano y "Saltar a otro flujo".
+  if (!(await reingresoPermitido(supabase, flujoId, contactId))) return null;
 
   const { nodos, conexiones } = await grafoDelFlujo(supabase, flujoId);
   const inicio = nodos.find((n) => n.tipo === "inicio");
@@ -752,6 +830,10 @@ export async function iniciarAMano(
 
   if (await contactoEnFlujo(supabase, contactId)) {
     return { ok: false, motivo: "Este contacto ya está dentro de un flujo. Espera a que termine." };
+  }
+
+  if (!(await reingresoPermitido(supabase, flujoId, contactId))) {
+    return { ok: false, motivo: "Este contacto ya pasó por este flujo y no puede volver a entrar." };
   }
 
   const ejecucion = await iniciarFlujo(supabase, flujoId, contactId, conversationId);

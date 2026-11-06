@@ -7,6 +7,7 @@ import {
   BLOQUES,
   DISPARADORES,
   MAX_BOTONES,
+  repartoParejo,
   type DatosBloque,
   type Disparador,
   type TipoBloque,
@@ -46,6 +47,23 @@ export function PanelBloque({
   onCerrar: () => void;
 }) {
   const def = BLOQUES[tipo];
+  const nombreAgente = (x: { name: string | null; email: string }) => x.name || x.email;
+  // Sin porcentajes guardados se muestra el reparto parejo, que es lo que hara el bloque.
+  const parejo = repartoParejo(catalogos.agentes.map((x) => x.id));
+  const porcentajeDe = (agenteId: string) =>
+    datos.repartoAgentes
+      ? datos.repartoAgentes.find((p) => p.agenteId === agenteId)?.porcentaje ?? 0
+      : parejo.find((p) => p.agenteId === agenteId)?.porcentaje ?? 0;
+  const sumaReparto = catalogos.agentes.reduce((s, x) => s + porcentajeDe(x.id), 0);
+  const cambiarPorcentaje = (agenteId: string, valor: number) =>
+    onCambiar({
+      ...datos,
+      repartoAgentes: catalogos.agentes.map((x) => ({
+        agenteId: x.id,
+        nombre: nombreAgente(x),
+        porcentaje: x.id === agenteId ? valor : porcentajeDe(x.id),
+      })),
+    });
   const botones = datos.botones ?? [];
   const disparadores = datos.disparadores ?? [];
 
@@ -359,19 +377,57 @@ export function PanelBloque({
             value={datos.agenteId ?? ""}
             onChange={(e) => {
               const elegido = catalogos.agentes.find((x) => x.id === e.target.value);
-              onCambiar({ ...datos, agenteId: e.target.value || undefined, agenteNombre: elegido ? elegido.name || elegido.email : undefined });
+              onCambiar({ ...datos, agenteId: e.target.value || undefined, agenteNombre: elegido ? nombreAgente(elegido) : undefined });
             }}
             className="w-full rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary"
           >
-            <option value="">Reparto automático entre el equipo</option>
+            <option value="">Reparto por porcentaje</option>
             {catalogos.agentes.map((x) => (
               <option key={x.id} value={x.id}>
-                {x.name || x.email}
+                {nombreAgente(x)}
               </option>
             ))}
           </select>
+
+          {!datos.agenteId && catalogos.agentes.length === 0 && (
+            <p className="mt-2 rounded-[9px] border border-warning/40 bg-warning/10 px-3 py-2 text-[11.5px] leading-relaxed text-foreground">
+              Tu equipo no tiene asesores: este bloque no asignará a nadie hasta que agregues uno.
+            </p>
+          )}
+
+          {!datos.agenteId && catalogos.agentes.length > 0 && (
+            <div className="mt-3 flex flex-col gap-2">
+              {catalogos.agentes.map((x) => (
+                <label key={x.id} className="flex items-center justify-between gap-2 text-[13px] text-foreground">
+                  <span className="min-w-0 truncate">{nombreAgente(x)}</span>
+                  <span className="flex shrink-0 items-center gap-1 text-muted">
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={porcentajeDe(x.id)}
+                      onChange={(e) => cambiarPorcentaje(x.id, Math.min(100, Math.max(0, Math.floor(Number(e.target.value) || 0))))}
+                      aria-label={`Porcentaje de ${nombreAgente(x)}`}
+                      className="w-16 rounded-[9px] border border-border bg-background px-2 py-1 text-right text-[13px] text-foreground outline-none focus:border-primary"
+                    />
+                    %
+                  </span>
+                </label>
+              ))}
+              <div className="flex items-center justify-between text-[11.5px]">
+                <span className={sumaReparto === 100 ? "text-muted" : "text-red-400"}>Suman {sumaReparto}%{sumaReparto === 100 ? "" : ": tienen que sumar 100%"}</span>
+                <button type="button" onClick={() => onCambiar({ ...datos, repartoAgentes: undefined })} className="text-muted hover:text-foreground">
+                  Repartir parejo
+                </button>
+              </div>
+            </div>
+          )}
+
           <p className="mt-2 text-[11px] leading-relaxed text-muted">
-            El chat le queda asignado y aparece en su bandeja. El flujo sigue de largo.
+            {datos.agenteId
+              ? "El chat le queda asignado y aparece en su bandeja. El flujo sigue de largo."
+              : "Reparte los chats sin asesor para acercarse a estos porcentajes. No le quita el chat a quien ya lo tiene. El flujo sigue de largo."}
           </p>
         </div>
       )}
@@ -449,9 +505,44 @@ export function PanelBloque({
       )}
 
       {tipo === "fin" && (
-        <p className="rounded-[9px] border border-border bg-background px-3 py-2 text-[11.5px] leading-relaxed text-muted">
-          El contacto sale del flujo y vuelve a lo de siempre: palabras clave, seguimientos y agente de IA.
-        </p>
+        <div className="flex flex-col gap-3">
+          <p className="rounded-[9px] border border-border bg-background px-3 py-2 text-[11.5px] leading-relaxed text-muted">
+            El contacto sale del flujo y vuelve a lo de siempre: palabras clave, seguimientos y agente de IA.
+          </p>
+          <div>
+            <label htmlFor="reingreso" className="mb-1 block text-xs font-medium text-muted">¿Puede volver a este flujo?</label>
+            <select
+              id="reingreso"
+              value={datos.reingreso ?? "siempre"}
+              onChange={(e) => {
+                const reingreso = e.target.value as "no" | "veces" | "siempre";
+                onCambiar({ ...datos, reingreso, reingresoVeces: reingreso === "veces" ? datos.reingresoVeces ?? 1 : undefined });
+              }}
+              className="w-full rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary"
+            >
+              <option value="no">No puede volver</option>
+              <option value="veces">Sí, un número de veces</option>
+              <option value="siempre">Sí, sin límite</option>
+            </select>
+          </div>
+          {datos.reingreso === "veces" && (
+            <div>
+              <label htmlFor="reingresoVeces" className="mb-1 block text-xs font-medium text-muted">¿Cuántas veces más?</label>
+              <input
+                id="reingresoVeces"
+                type="number"
+                min={1}
+                step={1}
+                value={datos.reingresoVeces ?? 1}
+                onChange={(e) => onCambiar({ ...datos, reingresoVeces: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
+                className="w-24 rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary"
+              />
+            </div>
+          )}
+          <p className="text-[11px] leading-relaxed text-muted">
+            Aplica a toda entrada: disparadores, otro flujo o un agente a mano. Cuentan también las veces que ya pasó por este flujo.
+          </p>
+        </div>
       )}
 
       {tipo !== "inicio" && (

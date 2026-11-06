@@ -260,6 +260,9 @@ export const DISPARADORES: { tipo: TipoDisparador; nombre: string; ayuda: string
   },
 ];
 
+/** Un agente y su parte en el reparto del bloque "Asignar a un agente". */
+export type ParteDeReparto = { agenteId: string; nombre: string; porcentaje: number };
+
 export type DatosBloque = {
   /** inicio: uno o varios disparadores */
   disparadores?: Disparador[];
@@ -289,6 +292,11 @@ export type DatosBloque = {
   /** agente */
   agenteId?: string;
   agenteNombre?: string;
+  /** agente: reparto por porcentaje. Sin esto ni agenteId, parejo entre el equipo. */
+  repartoAgentes?: ParteDeReparto[];
+  /** fin: si el contacto puede volver a este flujo. Sin esto, sin limite (bloques viejos). */
+  reingreso?: "no" | "veces" | "siempre";
+  reingresoVeces?: number;
   /** respuesta_rapida */
   respuestaRapidaId?: string;
   respuestaRapidaNombre?: string;
@@ -299,6 +307,26 @@ export type DatosBloque = {
   flujoDestinoId?: string;
   flujoDestinoNombre?: string;
 };
+
+/** Cuantas veces mas puede volver quien sale por este Fin. null = sin limite. */
+export function reingresosDeFin(datos: DatosBloque): number | null {
+  if (datos.reingreso === "no") return 0;
+  if (datos.reingreso === "veces") return Math.max(1, Math.floor(datos.reingresoVeces ?? 1));
+  return null;
+}
+
+/** La primera entrada no cuenta como reingreso: con 2 veces, entra 3 en total. */
+export function puedeReingresar(reingresosPermitidos: number | null, entradasPrevias: number): boolean {
+  return reingresosPermitidos === null || entradasPrevias <= reingresosPermitidos;
+}
+
+/** Porcentajes iguales que siempre suman 100; el sobrante va a los primeros. */
+export function repartoParejo(agenteIds: string[]): { agenteId: string; porcentaje: number }[] {
+  if (agenteIds.length === 0) return [];
+  const base = Math.floor(100 / agenteIds.length);
+  const sobrante = 100 - base * agenteIds.length;
+  return agenteIds.map((agenteId, i) => ({ agenteId, porcentaje: base + (i < sobrante ? 1 : 0) }));
+}
 
 /** Las salidas reales de un bloque, ya contando sus datos. */
 export function salidasDe(tipo: TipoBloque, datos: DatosBloque): Salida[] {
@@ -354,10 +382,23 @@ ${texto}` : adjunto;
     if (!datos.etiquetaNombre) return "Sin etiqueta elegida";
     return `${datos.etiquetaAccion === "quitar" ? "Quitar" : "Poner"} "${datos.etiquetaNombre}"`;
   }
-  if (tipo === "agente") return datos.agenteNombre ? `Para ${datos.agenteNombre}` : "Reparto automático";
+  if (tipo === "agente") {
+    if (datos.agenteId) return `Para ${datos.agenteNombre ?? "un agente"}`;
+    const partes = (datos.repartoAgentes ?? []).filter((p) => p.porcentaje > 0);
+    return partes.length > 0
+      ? partes.map((p) => `${p.nombre} ${p.porcentaje}%`).join(" · ")
+      : "Reparto parejo entre el equipo";
+  }
   if (tipo === "respuesta_rapida") return datos.respuestaRapidaNombre || "Sin respuesta rápida elegida";
   if (tipo === "automatizacion") return datos.automatizacionNombre || "Sin automatización elegida";
   if (tipo === "saltar") return datos.flujoDestinoNombre ? `Va a "${datos.flujoDestinoNombre}"` : "Sin flujo elegido";
   if (tipo === "ia") return datos.nombreAgente?.trim() || "El agente de IA toma la conversación";
+  if (tipo === "fin") {
+    if (datos.reingreso === "no") return "Sale y no puede volver a este flujo";
+    if (datos.reingreso === "veces") {
+      const v = reingresosDeFin(datos) ?? 1;
+      return `Sale y puede volver ${v} ${v === 1 ? "vez" : "veces"}`;
+    }
+  }
   return "El contacto sale del flujo";
 }

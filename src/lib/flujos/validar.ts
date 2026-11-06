@@ -179,6 +179,17 @@ export function revisarFlujo(
       avisos.push({ nivel: "error", nodoId: nodo.id, texto: "Elige la automatización que se va a disparar." });
     }
 
+    if (nodo.tipo === "agente" && !nodo.datos.agenteId && (nodo.datos.repartoAgentes ?? []).length > 0) {
+      const suma = (nodo.datos.repartoAgentes ?? []).reduce((s, p) => s + (p.porcentaje || 0), 0);
+      if (suma !== 100) {
+        avisos.push({ nivel: "error", nodoId: nodo.id, texto: `Los porcentajes del reparto suman ${suma}%: tienen que sumar 100%.` });
+      }
+    }
+
+    if (nodo.tipo === "fin" && nodo.datos.reingreso === "veces" && !((nodo.datos.reingresoVeces ?? 0) >= 1)) {
+      avisos.push({ nivel: "error", nodoId: nodo.id, texto: "En el bloque Fin, las veces que puede volver tienen que ser al menos 1." });
+    }
+
     if (nodo.tipo === "saltar" && !nodo.datos.flujoDestinoId) {
       avisos.push({ nivel: "error", nodoId: nodo.id, texto: "Elige a qué flujo salta el contacto." });
     }

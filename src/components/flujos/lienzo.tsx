@@ -115,7 +115,13 @@ function Lienzo({
       };
       const position = screenToFlowPosition(pantalla);
       const datos: DatosBloque =
-        tipo === "esperar" ? { minutos: 5 } : tipo === "botones" ? { botones: ["", ""] } : {};
+        tipo === "esperar"
+          ? { minutos: 5 }
+          : tipo === "botones"
+            ? { botones: ["", ""] }
+            : tipo === "fin"
+              ? { reingreso: "no" }
+              : {};
       setNodes((prev) => [
         ...prev,
         { id: nuevoId(), type: "bloque", position, data: { tipo, datos } satisfies DatosNodo },
