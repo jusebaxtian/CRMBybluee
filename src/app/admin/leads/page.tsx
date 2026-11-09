@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { isPlatformAdmin } from "@/lib/admin";
-import { listWorkspaceAgents } from "@/lib/agents";
+import { personasConChats } from "@/lib/agents";
 import { isPhoneNumber } from "@/lib/whatsapp/identity";
 import { esEtapa, ESTILO_ETAPA, ETAPAS, fechaDeEtapa, type Etapa } from "@/lib/leads/etapas";
 
@@ -60,18 +60,11 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   const hasta = diaValido(f.hasta);
   const pagina = Math.max(1, Number(f.pagina) || 1);
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const [asesores, { data: lineas }] = await Promise.all([
-    listWorkspaceAgents(supabase, workspaceId),
+  // Dueño, administradores y asesores: todos pueden tener chats asignados.
+  const [agentes, { data: lineas }] = await Promise.all([
+    personasConChats(supabase, workspaceId),
     supabase.from("whatsapp_accounts").select("id, label, display_phone_number").eq("workspace_id", workspaceId).order("connected_at"),
   ]);
-  // Los asesores no incluyen al dueño, y el dueño también tiene chats asignados.
-  const agentes = [
-    ...(user ? [{ id: user.id, nombre: (user.user_metadata?.full_name as string | undefined) || user.email || "Yo" }] : []),
-    ...asesores.filter((a) => a.id !== user?.id).map((a) => ({ id: a.id, nombre: a.name || a.email })),
-  ];
   const asignado = f.asignado === "sin" || agentes.some((a) => a.id === f.asignado) ? (f.asignado as string) : "";
   const linea = (lineas ?? []).some((l) => l.id === f.linea) ? (f.linea as string) : "";
 
@@ -84,9 +77,13 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
     p_desde: desde ? inicioDelDia(desde) : null,
     p_hasta: hasta ? finDelDia(hasta) : null,
   };
-  const [{ data: filas, error }, { data: totales }] = await Promise.all([
+  const { p_asignado: _sinAsignado, ...sinAsignado } = comunes;
+  void _sinAsignado;
+  const [{ data: filas, error }, { data: totales }, { data: porAsignado }] = await Promise.all([
     supabase.rpc("leads_pagina", { ...comunes, p_etapa: etapa || null, p_limit: POR_PAGINA, p_offset: (pagina - 1) * POR_PAGINA }),
     supabase.rpc("leads_totales", comunes),
+    // Cuantos clientes tiene cada asesor por etapa (0179), con los demas filtros.
+    supabase.rpc("leads_por_asignado", sinAsignado),
   ]);
   if (error) console.error("leads_pagina:", error.message);
 
@@ -95,6 +92,29 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   const totalPaginas = Math.max(1, Math.ceil(total / POR_PAGINA));
   const porEtapa = new Map(((totales ?? []) as { etapa: string; total: number }[]).map((t) => [t.etapa, Number(t.total)]));
   const nombreDe = new Map(agentes.map((a) => [a.id, a.nombre]));
+
+  // Tabla de asesores: asesor -> etapa -> clientes. La clave "sin" son los sin asignar.
+  const conteo = new Map<string, Map<string, number>>();
+  for (const r of (porAsignado ?? []) as { asignado: string | null; etapa: string; total: number }[]) {
+    const clave = r.asignado ?? "sin";
+    if (!conteo.has(clave)) conteo.set(clave, new Map());
+    conteo.get(clave)!.set(r.etapa, Number(r.total));
+  }
+  const filasAsesores = [
+    ...agentes.map((a) => ({ id: a.id, nombre: a.nombre })),
+    // Quien ya no esta en el espacio pero conserva chats asignados.
+    ...[...conteo.keys()].filter((k) => k !== "sin" && !nombreDe.has(k)).map((k) => ({ id: k, nombre: "Otro usuario" })),
+    { id: "sin", nombre: "Sin asignar" },
+  ].filter((a) => conteo.has(a.id) || a.id !== "sin");
+  const asesorElegido = asignado && asignado !== "sin" ? nombreDe.get(asignado) ?? "Otro usuario" : null;
+  const enlaceCampana = (() => {
+    const p = new URLSearchParams();
+    if (etapa) p.set("etapa", etapa);
+    if (asignado && asignado !== "sin") p.set("asignado", asignado);
+    const q = p.toString();
+    return q ? `/dashboard/campaigns/new?${q}` : "/dashboard/campaigns/new";
+  })();
+  const textoCampana = [asesorElegido, etapa ? ESTILO_ETAPA[etapa].texto : null].filter(Boolean).join(" · ");
 
   const enlace = (cambios: Partial<Filtros>) => {
     const p = new URLSearchParams();
@@ -112,10 +132,10 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-dash-display text-[22px] font-bold tracking-[-.4px] text-foreground">Leads</h1>
         <Link
-          href={etapa ? `/dashboard/campaigns/new?etapa=${etapa}` : "/dashboard/campaigns/new"}
+          href={enlaceCampana}
           className="rounded-lg border border-border px-3 py-2 text-[13px] font-medium text-foreground hover:bg-surface-hover"
         >
-          {etapa ? `Crear campaña para ${ESTILO_ETAPA[etapa].texto}` : "Crear campaña"}
+          {textoCampana ? `Crear campaña para ${textoCampana}` : "Crear campaña"}
         </Link>
       </div>
 
@@ -131,6 +151,60 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
             <p className="mt-1 text-xl font-semibold text-foreground">{(porEtapa.get(e) ?? 0).toLocaleString("es-CO")}</p>
           </Link>
         ))}
+      </div>
+
+      <div className="mt-4 overflow-x-auto rounded-[13px] border border-border bg-surface">
+        <table className="w-full min-w-[640px] text-left text-[13px]">
+          <thead>
+            <tr className="border-b border-border text-xs text-muted">
+              <th className="p-3 font-medium">Asesor</th>
+              {ETAPAS.map((e) => (
+                <th key={e} className="p-3 text-center font-medium">{ESTILO_ETAPA[e].texto}</th>
+              ))}
+              <th className="p-3 text-center font-medium">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filasAsesores.map((a) => {
+              const suyo = conteo.get(a.id);
+              const total = [...(suyo?.values() ?? [])].reduce((s, n) => s + n, 0);
+              const elegido = asignado === a.id;
+              return (
+                <tr key={a.id} className={`border-b border-border last:border-0 ${elegido ? "bg-primary/10" : ""}`}>
+                  <td className="p-3">
+                    <Link
+                      href={enlace({ asignado: elegido ? "" : a.id, etapa: elegido ? etapa : "", pagina: "" })}
+                      aria-current={elegido ? "true" : undefined}
+                      className="font-semibold text-foreground hover:text-primary"
+                    >
+                      {a.nombre}
+                    </Link>
+                  </td>
+                  {ETAPAS.map((e) => {
+                    const n = suyo?.get(e) ?? 0;
+                    const esta = elegido && etapa === e;
+                    return (
+                      <td key={e} className="p-3 text-center">
+                        {n > 0 ? (
+                          <Link
+                            href={enlace({ asignado: a.id, etapa: esta ? "" : e, pagina: "" })}
+                            title={`Ver los clientes de ${a.nombre} en ${ESTILO_ETAPA[e].texto}`}
+                            className={`inline-block min-w-8 rounded-full px-2 py-0.5 text-[12px] font-semibold ${ESTILO_ETAPA[e].clase} ${esta ? "ring-2 ring-primary" : ""}`}
+                          >
+                            {n.toLocaleString("es-CO")}
+                          </Link>
+                        ) : (
+                          <span className="text-xs text-muted">0</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td className="p-3 text-center font-semibold text-foreground">{total.toLocaleString("es-CO")}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
       <form method="get" action="/admin/leads" className="mt-4 flex flex-wrap items-end gap-2">

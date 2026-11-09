@@ -18,6 +18,7 @@ function readAudienceParams(formData: FormData, sendType: "template" | "free_tex
     createdFromRaw: String(formData.get("createdFrom") ?? "") || null,
     createdToRaw: String(formData.get("createdTo") ?? "") || null,
     etapas: formData.getAll("etapas").map(String).filter(esEtapa),
+    asignadoId: /^[0-9a-f-]{36}$/i.test(String(formData.get("asignadoId") ?? "")) ? String(formData.get("asignadoId")) : null,
     // Free-form messages only work within the 24h window — forcing this
     // avoids creating a campaign that would fail on every single recipient.
     // Una plantilla, en cambio, llega con la ventana abierta o cerrada: para
@@ -155,6 +156,7 @@ export async function createCampaign(_prevState: unknown, formData: FormData) {
       audience_tag_ids: audienceParams.includeTagIds.length > 0 ? audienceParams.includeTagIds : null,
       audience_exclude_tag_ids: audienceParams.excludeTagIds.length > 0 ? audienceParams.excludeTagIds : null,
       audience_etapas: audienceParams.etapas?.length ? audienceParams.etapas : null,
+      audience_asignado_id: audienceParams.asignadoId ?? null,
       audience_created_from: audienceParams.createdFromRaw
         ? new Date(audienceParams.createdFromRaw).toISOString()
         : null,
@@ -277,6 +279,7 @@ export async function updateCampaign(campaignId: string, _prevState: unknown, fo
       audience_tag_ids: audienceParams.includeTagIds.length > 0 ? audienceParams.includeTagIds : null,
       audience_exclude_tag_ids: audienceParams.excludeTagIds.length > 0 ? audienceParams.excludeTagIds : null,
       audience_etapas: audienceParams.etapas?.length ? audienceParams.etapas : null,
+      audience_asignado_id: audienceParams.asignadoId ?? null,
       audience_created_from: audienceParams.createdFromRaw
         ? new Date(audienceParams.createdFromRaw).toISOString()
         : null,

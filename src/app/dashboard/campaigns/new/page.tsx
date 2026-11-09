@@ -4,9 +4,10 @@ import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
 import { noSePuedeUsar } from "@/lib/whatsapp/limite-plantilla";
 import { esEtapa } from "@/lib/leads/etapas";
+import { personasConChats } from "@/lib/agents";
 
-export default async function NewCampaignPage({ searchParams }: { searchParams: Promise<{ etapa?: string }> }) {
-  const { etapa } = await searchParams;
+export default async function NewCampaignPage({ searchParams }: { searchParams: Promise<{ etapa?: string; asignado?: string }> }) {
+  const { etapa, asignado } = await searchParams;
   const supabase = await createClient();
   const workspaceId = await getWorkspaceId(supabase);
   await requireModule(supabase, workspaceId, "campaigns");
@@ -39,6 +40,7 @@ export default async function NewCampaignPage({ searchParams }: { searchParams: 
 
   const { data: espacio } = await supabase.from("workspaces").select("usa_etapas").eq("id", workspaceId ?? "").maybeSingle();
   const usaEtapas = !!espacio?.usa_etapas;
+  const asesores = usaEtapas ? await personasConChats(supabase, workspaceId) : [];
 
   return (
     <div className="mx-auto max-w-lg">
@@ -50,6 +52,8 @@ export default async function NewCampaignPage({ searchParams }: { searchParams: 
           whatsappAccounts={whatsappAccounts ?? []}
           usaEtapas={usaEtapas}
           etapasIniciales={usaEtapas && esEtapa(etapa) ? [etapa] : []}
+          asesores={asesores}
+          asignadoInicial={asesores.some((a) => a.id === asignado) ? (asignado as string) : ""}
         />
       </div>
     </div>

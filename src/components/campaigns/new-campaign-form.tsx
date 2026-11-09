@@ -29,6 +29,7 @@ export type CampaignInitialValues = {
   includeTagIds: string[];
   excludeTagIds: string[];
   etapas?: string[];
+  asignadoId?: string | null;
   createdFrom: string | null;
   createdTo: string | null;
   scheduledAt: string | null; // ISO
@@ -52,6 +53,8 @@ export function NewCampaignForm({
   initialValues,
   usaEtapas = false,
   etapasIniciales = [],
+  asesores = [],
+  asignadoInicial = "",
 }: {
   templates: Template[];
   tags: Tag[];
@@ -63,6 +66,10 @@ export function NewCampaignForm({
   usaEtapas?: boolean;
   /** Etapa ya elegida al venir desde Admin > Leads. */
   etapasIniciales?: string[];
+  /** Asesores del espacio, para enviar solo a los asignados de uno (0179). */
+  asesores?: { id: string; nombre: string }[];
+  /** Asesor ya elegido al venir desde Admin > Leads. */
+  asignadoInicial?: string;
 }) {
   const boundAction = mode === "edit" && campaignId ? updateCampaign.bind(null, campaignId) : createCampaign;
   const [state, action, pending] = useActionState(boundAction, undefined);
@@ -95,6 +102,7 @@ export function NewCampaignForm({
   const [includeTagIds, setIncludeTagIds] = useState<string[]>(initialValues?.includeTagIds ?? []);
   const [excludeTagIds, setExcludeTagIds] = useState<string[]>(initialValues?.excludeTagIds ?? []);
   const [etapas, setEtapas] = useState<string[]>(initialValues?.etapas ?? etapasIniciales);
+  const [asignadoId, setAsignadoId] = useState<string>(initialValues?.asignadoId ?? asignadoInicial);
   const [createdFrom, setCreatedFrom] = useState(initialValues?.createdFrom ?? "");
   const [createdTo, setCreatedTo] = useState(initialValues?.createdTo ?? "");
   const [sendMode, setSendMode] = useState<"now" | "schedule">(initialValues?.scheduledAt ? "schedule" : "now");
@@ -115,6 +123,7 @@ export function NewCampaignForm({
     includeTagIds.forEach((id) => formData.append("includeTagIds", id));
     excludeTagIds.forEach((id) => formData.append("excludeTagIds", id));
     etapas.forEach((e) => formData.append("etapas", e));
+    if (asignadoId) formData.set("asignadoId", asignadoId);
     if (createdFrom) formData.set("createdFrom", createdFrom);
     if (createdTo) formData.set("createdTo", createdTo);
 
@@ -125,7 +134,7 @@ export function NewCampaignForm({
         .finally(() => setCountLoading(false));
     }, 350);
     return () => clearTimeout(timeout);
-  }, [sendType, includeTagIds, excludeTagIds, etapas, createdFrom, createdTo]);
+  }, [sendType, includeTagIds, excludeTagIds, etapas, asignadoId, createdFrom, createdTo]);
 
   async function handleFile(file: File, kind: Exclude<MediaKind, "">) {
     setUploading(true);
@@ -338,6 +347,25 @@ export function NewCampaignForm({
             {etapas.map((e) => (
               <input key={e} type="hidden" name="etapas" value={e} />
             ))}
+          </div>
+        )}
+
+        {usaEtapas && asesores.length > 0 && (
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">Asignados a</label>
+            <select
+              name="asignadoId"
+              value={asignadoId}
+              onChange={(e) => setAsignadoId(e.target.value)}
+              className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
+            >
+              <option value="">Todos (sin filtrar por asesor)</option>
+              {asesores.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.nombre}
+                </option>
+              ))}
+            </select>
           </div>
         )}
 

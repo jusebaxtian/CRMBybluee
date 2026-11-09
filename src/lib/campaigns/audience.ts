@@ -8,6 +8,8 @@ export type AudienceParams = {
   audienceWindow: "all" | "open";
   /** Solo los contactos en estas etapas (migracion 0168). Vacio o ausente = sin filtrar. */
   etapas?: string[];
+  /** Solo los contactos con una conversacion asignada a este asesor (0179). */
+  asignadoId?: string | null;
 };
 
 type ResolvedRecipientRow = { contact_id: string; has_open_window: boolean };
@@ -29,7 +31,7 @@ export async function resolveCampaignAudience(
   workspaceId: string,
   params: AudienceParams
 ): Promise<{ contactIds: string[]; matchedBeforeWindow: number }> {
-  const { includeTagIds, excludeTagIds, createdFromRaw, createdToRaw, audienceWindow, etapas } = params;
+  const { includeTagIds, excludeTagIds, createdFromRaw, createdToRaw, audienceWindow, etapas, asignadoId } = params;
 
   // PostgREST hard-caps ANY single response (including an RPC that returns
   // a table, like this one) at 1000 rows — a tag matching more than that
@@ -68,6 +70,28 @@ export async function resolveCampaignAudience(
   for (const r of rows) {
     ventanaPorContacto.set(r.contact_id, (ventanaPorContacto.get(r.contact_id) ?? false) || r.has_open_window);
   }
+  // Solo los asignados a un asesor: se cruza con sus conversaciones.
+  if (asignadoId) {
+    const suyos = new Set<string>();
+    for (let offset = 0; ; offset += PAGE_SIZE) {
+      const { data, error } = await supabase
+        .from("conversations")
+        .select("contact_id")
+        .eq("workspace_id", workspaceId)
+        .eq("assigned_agent_id", asignadoId)
+        .order("id")
+        .range(offset, offset + PAGE_SIZE - 1);
+      if (error) {
+        console.error("audiencia por asesor:", error.message);
+        // Sin poder filtrar no se manda a nadie: mejor cero que a todos.
+        return { contactIds: [], matchedBeforeWindow: 0 };
+      }
+      for (const c of data ?? []) suyos.add(c.contact_id as string);
+      if ((data ?? []).length < PAGE_SIZE) break;
+    }
+    for (const id of [...ventanaPorContacto.keys()]) if (!suyos.has(id)) ventanaPorContacto.delete(id);
+  }
+
   const matchedBeforeWindow = ventanaPorContacto.size;
   const contactIds = [...ventanaPorContacto]
     .filter(([, abierta]) => audienceWindow !== "open" || abierta)

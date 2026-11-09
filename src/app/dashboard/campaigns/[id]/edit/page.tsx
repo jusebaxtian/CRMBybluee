@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { personasConChats } from "@/lib/agents";
 import { NewCampaignForm, type CampaignInitialValues } from "@/components/campaigns/new-campaign-form";
 import { getWorkspaceId } from "@/lib/workspace";
 import { requireModule } from "@/lib/entitlements";
@@ -18,7 +19,7 @@ export default async function EditCampaignPage({
   const { data: campaign } = await supabase
     .from("campaigns")
     .select(
-      "id, name, status, send_type, template_id, message_body, media_url, media_filename, audience_tag_ids, audience_exclude_tag_ids, audience_etapas, audience_created_from, audience_created_to, audience_window, scheduled_at, whatsapp_account_id"
+      "id, name, status, send_type, template_id, message_body, media_url, media_filename, audience_tag_ids, audience_exclude_tag_ids, audience_etapas, audience_asignado_id, audience_created_from, audience_created_to, audience_window, scheduled_at, whatsapp_account_id"
     )
     .eq("id", id)
     .eq("workspace_id", workspaceId ?? "")
@@ -65,6 +66,7 @@ export default async function EditCampaignPage({
     includeTagIds: campaign.audience_tag_ids ?? [],
     excludeTagIds: campaign.audience_exclude_tag_ids ?? [],
     etapas: campaign.audience_etapas ?? [],
+    asignadoId: campaign.audience_asignado_id ?? null,
     createdFrom: campaign.audience_created_from ? campaign.audience_created_from.slice(0, 10) : null,
     createdTo: campaign.audience_created_to ? campaign.audience_created_to.slice(0, 10) : null,
     scheduledAt: campaign.scheduled_at,
@@ -83,6 +85,7 @@ export default async function EditCampaignPage({
           campaignId={campaign.id}
           initialValues={initialValues}
           usaEtapas={!!espacio?.usa_etapas}
+          asesores={espacio?.usa_etapas ? await personasConChats(supabase, workspaceId ?? null) : []}
         />
       </div>
     </div>
