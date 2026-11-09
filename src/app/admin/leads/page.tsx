@@ -18,6 +18,7 @@ type Fila = {
   tibio_el: string | null;
   caliente_el: string | null;
   pago_el: string | null;
+  no_interesado_el: string | null;
   asignados: string[];
   conversation_id: string | null;
   total: number;
@@ -118,7 +119,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         </Link>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-5">
         {ETAPAS.map((e) => (
           <Link
             key={e}
@@ -201,7 +202,13 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
           <tbody>
             {lista.map((l) => {
               const nombres = l.asignados.map((id) => nombreDe.get(id) ?? "Otro usuario");
-              const fechas: Record<Etapa, string | null> = { frio: l.frio_el, tibio: l.tibio_el, caliente: l.caliente_el, pago: l.pago_el };
+              const fechas: Record<Etapa, string | null> = {
+                frio: l.frio_el,
+                tibio: l.tibio_el,
+                caliente: l.caliente_el,
+                pago: l.pago_el,
+                no_interesado: l.no_interesado_el,
+              };
               return (
                 <tr key={l.contact_id} className="border-b border-border last:border-0">
                   <td className="p-3">
@@ -239,7 +246,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
             })}
             {lista.length === 0 && (
               <tr>
-                <td colSpan={6} className="p-8 text-center text-sm text-muted">
+                <td colSpan={ETAPAS.length + 2} className="p-8 text-center text-sm text-muted">
                   {error ? "No se pudieron cargar los leads." : "Ningún contacto coincide con estos filtros."}
                 </td>
               </tr>

@@ -668,6 +668,11 @@ export async function isContactExcludedFromAutomations(
 
   if (opciones.ignorarEtiquetaQueExcluye) return false;
 
+  // "No interesado" en Leads (0176) pesa como la etiqueta "NO interesados": ni IA
+  // ni seguimientos. Vuelve solo cuando el cliente muestra interes.
+  const { data: lead } = await supabase.from("lead_etapas").select("etapa").eq("contact_id", contactId).maybeSingle();
+  if (lead?.etapa === "no_interesado") return true;
+
   const { data: tags } = await supabase
     .from("contact_tags")
     .select("tags(excludes_followups)")
