@@ -368,6 +368,7 @@ export default async function Home() {
             <span className="flex flex-wrap gap-x-3">
               <Link href="/privacidad" className="hover:text-foreground">Privacidad</Link>
               <Link href="/terminos" className="hover:text-foreground">Términos</Link>
+              <Link href="/politica-de-devoluciones" className="hover:text-foreground">Devoluciones</Link>
               <Link href="/eliminar-datos" className="hover:text-foreground">Eliminar datos</Link>
               <a href={waHref} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">Soporte por WhatsApp</a>
             </span>

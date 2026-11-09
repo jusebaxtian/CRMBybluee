@@ -67,7 +67,11 @@ export default function TermsPage() {
           <p>
             Los pagos se procesan mensual o anualmente según el plan elegido. Puedes cancelar tu
             suscripción en cualquier momento desde Facturación; el acceso se mantiene hasta el
-            final del período ya pagado.
+            final del período ya pagado. Las devoluciones de dinero se rigen por nuestra{" "}
+            <Link href="/politica-de-devoluciones" className="text-primary hover:underline">
+              Política de devoluciones
+            </Link>
+            .
           </p>
         </section>
 
