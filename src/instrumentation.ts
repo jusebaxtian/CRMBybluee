@@ -33,6 +33,7 @@ export async function register() {
   const { processDueCampaigns } = await import("@/lib/campaigns/scheduler");
   const { deleteStaleUnactivatedWorkspaces } = await import("@/lib/billing/cleanup");
   const { processDueReminders } = await import("@/lib/recordatorios/scheduler");
+  const { procesarMensajesProgramados } = await import("@/lib/mensajes-programados/envio");
   const { avisarCitasProximas } = await import("@/lib/agenda/aviso-de-cita");
   const { procesarEsperasDeFlujos } = await import("@/lib/flujos/scheduler");
 
@@ -64,6 +65,8 @@ export async function register() {
     { nombre: "campañas", cadaMs: 30_000, correr: processDueCampaigns },
     { nombre: "seguimientos IA", cadaMs: MINUTO, correr: processAiFollowups },
     { nombre: "recordatorios", cadaMs: MINUTO, correr: processDueReminders },
+    // Cada 30 s: el mensaje programado para las 3:00 debe salir a las 3:00, no a las 3:01.
+    { nombre: "mensajes programados", cadaMs: 30_000, correr: procesarMensajesProgramados },
     { nombre: "avisos de citas", cadaMs: MINUTO, correr: avisarCitasProximas },
     // Cada 30 s y no cada minuto: una espera de "5 minutos" que se dispara a
     // los 5:59 se siente rota, y el trabajo no cuesta nada cuando no hay nada

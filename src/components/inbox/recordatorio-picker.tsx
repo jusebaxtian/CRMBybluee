@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { AlarmClock, Check, Loader2, Trash2, X } from "lucide-react";
+import { AlarmClock, Bell, Check, Loader2, Send, Trash2, X } from "lucide-react";
+import { ProgramarMensajePanel, type PlantillaParaProgramar } from "@/components/inbox/programar-mensaje";
 import {
   actualizarRecordatorio,
   crearRecordatorio,
@@ -22,11 +23,24 @@ function aLocal(d: Date): string {
 }
 
 /**
- * Boton del grupo flotante del chat: programa un recordatorio para este
- * contacto. Al vencer llega a la campana con "Ir al chat" y se borra.
+ * Boton del reloj en el grupo flotante del chat. Abre un menu con dos opciones:
+ * - Crear recordatorio: al vencer llega a la campana con "Ir al chat".
+ * - Programar mensaje (0177): sale solo a la hora elegida.
  */
-export function RecordatorioPicker({ conversationId, contactName }: { conversationId: string; contactName: string }) {
-  const [open, setOpen] = useState(false);
+export function RecordatorioPicker({
+  conversationId,
+  contactName,
+  plantillas = [],
+  lastInboundAt = null,
+}: {
+  conversationId: string;
+  contactName: string;
+  plantillas?: PlantillaParaProgramar[];
+  lastInboundAt?: string | null;
+}) {
+  const [modo, setModo] = useState<"menu" | "recordatorio" | "mensaje" | null>(null);
+  const open = modo === "recordatorio";
+  const setOpen = (abierto: boolean) => setModo(abierto ? "recordatorio" : null);
   const [texto, setTexto] = useState("");
   const [cuando, setCuando] = useState(() => aLocal(new Date(Date.now() + 60 * 60 * 1000)));
   const [error, setError] = useState<string | null>(null);
@@ -51,13 +65,10 @@ export function RecordatorioPicker({ conversationId, contactName }: { conversati
     setCuando(aLocal(new Date(Date.now() + 60 * 60 * 1000)));
   }
 
-  function abrir() {
-    const siguiente = !open;
-    setOpen(siguiente);
-    if (siguiente) {
-      listarRecordatorios(conversationId).then(setPendientes);
-      googleListoParaRecordatorios().then(setGoogleListo);
-    }
+  function abrirRecordatorio() {
+    setOpen(true);
+    listarRecordatorios(conversationId).then(setPendientes);
+    googleListoParaRecordatorios().then(setGoogleListo);
   }
 
   function borrar(id: string) {
@@ -94,6 +105,35 @@ export function RecordatorioPicker({ conversationId, contactName }: { conversati
 
   return (
     <div className="relative">
+      {modo === "menu" && (
+        <div role="menu" className="absolute left-full top-1/2 z-20 ml-2 w-52 -translate-y-1/2 rounded-[13px] border border-border bg-surface p-1.5 shadow-xl">
+          <button
+            type="button"
+            role="menuitem"
+            onClick={abrirRecordatorio}
+            className="flex w-full items-center gap-2 rounded-[9px] px-2.5 py-2 text-left text-[13px] text-foreground hover:bg-surface-hover"
+          >
+            <Bell size={15} className="text-muted" /> Crear recordatorio
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => setModo("mensaje")}
+            className="flex w-full items-center gap-2 rounded-[9px] px-2.5 py-2 text-left text-[13px] text-foreground hover:bg-surface-hover"
+          >
+            <Send size={15} className="text-muted" /> Programar mensaje
+          </button>
+        </div>
+      )}
+      {modo === "mensaje" && (
+        <ProgramarMensajePanel
+          conversationId={conversationId}
+          contactName={contactName}
+          plantillas={plantillas}
+          lastInboundAt={lastInboundAt}
+          onClose={() => setModo(null)}
+        />
+      )}
       {open && (
         <div className="absolute left-full top-1/2 z-20 ml-2 w-72 -translate-y-1/2 rounded-[13px] border border-border bg-surface p-3 shadow-xl">
           <div className="mb-2 flex items-center justify-between">
@@ -186,11 +226,13 @@ export function RecordatorioPicker({ conversationId, contactName }: { conversati
 
       <button
         type="button"
-        onClick={abrir}
-        title="Crear recordatorio"
-        aria-label="Crear recordatorio"
+        onClick={() => setModo(modo ? null : "menu")}
+        title="Recordatorio o mensaje programado"
+        aria-label="Recordatorio o mensaje programado"
+        aria-haspopup="menu"
+        aria-expanded={modo !== null}
         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-          open ? "bg-primary text-white" : "text-muted hover:bg-surface-hover hover:text-foreground"
+          modo ? "bg-primary text-white" : "text-muted hover:bg-surface-hover hover:text-foreground"
         }`}
       >
         <AlarmClock size={18} />

@@ -8,6 +8,7 @@ import { QuickReplyPicker } from "@/components/quick-replies/quick-reply-picker"
 import { AutomationPicker } from "@/components/automations/automation-picker";
 import { RecordatorioPicker } from "@/components/inbox/recordatorio-picker";
 import { CitaPicker } from "@/components/inbox/cita-picker";
+import type { PlantillaParaProgramar } from "@/components/inbox/programar-mensaje";
 import { ResetAutomationsButton } from "@/components/automations/reset-automations-button";
 import { mediaKindFromMime, validateMediaSize } from "@/lib/whatsapp/media-limits";
 import { LARGO_MAXIMO_DEL_TEXTO, extensionDe, pesoLegible, revisarAdjunto } from "@/lib/whatsapp/revisar-adjunto";
@@ -33,6 +34,9 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
   replyingTo?: { waMessageId: string; preview: string } | null;
   onClearReply?: () => void;
   onOptimisticSend?: (message: OptimisticMessage) => void;
+  /** Para programar mensajes: las plantillas de la linea y cuando escribio el cliente. */
+  plantillas?: PlantillaParaProgramar[];
+  lastInboundAt?: string | null;
 }>(function MessageComposer({
   conversationId,
   contactId,
@@ -42,6 +46,8 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
   replyingTo,
   onClearReply,
   onOptimisticSend,
+  plantillas = [],
+  lastInboundAt = null,
 }, ref) {
   const formRef = useRef<HTMLFormElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
@@ -540,7 +546,7 @@ export const MessageComposer = forwardRef<MessageComposerHandle, {
         <AutomationPicker contactId={contactId} automations={automations} />
         <ResetAutomationsButton contactId={contactId} />
         <CitaPicker contactId={contactId} contactName={contactName} />
-        <RecordatorioPicker conversationId={conversationId} contactName={contactName} />
+        <RecordatorioPicker conversationId={conversationId} contactName={contactName} plantillas={plantillas} lastInboundAt={lastInboundAt} />
         <button
           type="button"
           onClick={startRecording}

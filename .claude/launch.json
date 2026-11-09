@@ -4,8 +4,14 @@
     {
       "name": "crm-bybluee-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "start"],
-      "port": 3000
+      "runtimeArgs": [
+        "run",
+        "start"
+      ],
+      "port": 3000,
+      "env": {
+        "RUN_BACKGROUND_JOBS": "0"
+      }
     }
   ]
 }

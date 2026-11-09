@@ -159,6 +159,8 @@ export function ChatPane({
           replyingTo={replyingTo}
           onClearReply={() => setReplyingTo(null)}
           onOptimisticSend={(message) => setPending((p) => [...p, message])}
+          plantillas={approvedTemplates}
+          lastInboundAt={lastInboundAt}
         />
       ) : (
         <div className="relative">
@@ -166,7 +168,12 @@ export function ChatPane({
               recordatorio ("llamar al cliente") es justo lo que se necesita ahi. */}
           <div className="absolute left-3 top-3 z-30 flex flex-col items-center gap-2 rounded-full border border-border bg-surface p-1.5 shadow-lg">
             <CitaPicker contactId={contactId} contactName={contactName} />
-            <RecordatorioPicker conversationId={conversationId} contactName={contactName} />
+            <RecordatorioPicker
+              conversationId={conversationId}
+              contactName={contactName}
+              plantillas={approvedTemplates}
+              lastInboundAt={lastInboundAt}
+            />
           </div>
           <TemplateGatePicker conversationId={conversationId} templates={approvedTemplates} />
         </div>
