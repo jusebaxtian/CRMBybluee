@@ -33,9 +33,9 @@ export async function guardarInstruccionesDelVendedor(instrucciones: string) {
 }
 
 /**
- * Enciende o apaga al agente. Como con los agentes por linea, solo uno responde a
- * la vez: al encenderlo se pausan las automatizaciones de palabra clave y etiqueta
- * (marcadas disabled_by_ai) y al apagarlo vuelven.
+ * Enciende o apaga al agente. Desde el 9 nov 2026 encenderlo ya no pausa
+ * automatizaciones (pueden estar las dos activas). Al apagarlo se reactivan las
+ * que la regla vieja habia pausado (marcadas disabled_by_ai).
  */
 export async function cambiarVendedorActivo(activo: boolean) {
   const workspaceId = await espacioDelVendedor();
@@ -46,13 +46,6 @@ export async function cambiarVendedorActivo(activo: boolean) {
     const vendedor = await vendedorDelEspacio(admin, workspaceId);
     if (!vendedor) return { error: "No hay una llave de IA conectada en tu espacio." };
     if (!vendedor.instrucciones.trim()) return { error: "Escribe sus instrucciones antes de encenderlo." };
-    const { error } = await admin
-      .from("automations")
-      .update({ is_active: false, disabled_by_ai: true })
-      .eq("workspace_id", workspaceId)
-      .eq("is_active", true)
-      .in("trigger_type", ["keyword", "tag_added"]);
-    if (error) return { error: "No se pudieron pausar las automatizaciones; no se encendió." };
   }
 
   const { error } = await admin.from("agente_vendedor").update({ activo, actualizado_el: new Date().toISOString() }).eq("workspace_id", workspaceId);

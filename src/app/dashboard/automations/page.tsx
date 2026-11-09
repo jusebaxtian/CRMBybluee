@@ -36,12 +36,13 @@ export default async function AutomationsPage() {
         <div className="flex items-center gap-3 rounded-xl border border-warning/30 bg-warning/10 p-4">
           <Bot size={18} className="shrink-0 text-warning" />
           <p className="text-sm text-foreground">
-            El agente de IA está activo, así que las automatizaciones quedaron pausadas
-            automáticamente para evitar que compitan por responder los mensajes. Apaga la IA en{" "}
+            El agente de IA está activo. Tus automatizaciones también pueden estarlo: cuando una
+            automatización se activa con un mensaje, la IA no responde ese mensaje para que el cliente no
+            reciba dos respuestas. Puedes apagar la IA en{" "}
             <Link href="/dashboard/settings" className="text-primary hover:underline">
               Configuración
-            </Link>{" "}
-            para poder activarlas de nuevo.
+            </Link>
+            .
           </p>
         </div>
       )}
@@ -104,7 +105,6 @@ export default async function AutomationsPage() {
                   automationId={a.id}
                   automationName={a.name}
                   isActive={a.is_active}
-                  lockedByAi={aiAgentActive}
                 />
               </div>
             );

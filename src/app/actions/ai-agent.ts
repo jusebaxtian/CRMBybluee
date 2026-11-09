@@ -235,9 +235,11 @@ export async function testAiAgentMessage(
   };
 }
 
-// La IA y las automatizaciones de palabra clave/etiqueta reaccionan al mismo
-// mensaje entrante, asi que solo una responde a la vez: al encender la IA se
-// pausan las automatizaciones (marcadas disabled_by_ai) y al apagarla vuelven.
+// Desde el 9 nov 2026 encender la IA ya no pausa automatizaciones: pueden estar
+// las dos activas y cada cuenta decide cuales apaga. En un mismo mensaje no
+// chocan: si una automatizacion lo toma, la IA no lo responde (ingest.ts).
+// Al apagarla todavia se reactivan las que la regla vieja habia pausado
+// (marcadas disabled_by_ai), para no dejarlas apagadas sin que nadie lo decidiera.
 //
 // IMPORTANTE: esto va POR LINEA (migracion 0118). Encender el agente de
 // Soporte no puede tocar las automatizaciones de Ventas — paso el 25 sep 2026
@@ -251,18 +253,6 @@ export async function toggleAiAgentActive(isActive: boolean, whatsappAccountId?:
   // linea, o las "de todas las lineas" cuando el agente es el general.
   const delMismoAlcance = <T extends { eq: (c: string, v: unknown) => T; is: (c: string, v: null) => T }>(q: T) =>
     whatsappAccountId ? q.eq("whatsapp_account_id", whatsappAccountId) : q.is("whatsapp_account_id", null);
-
-  if (isActive) {
-    const { error: pauseError } = await delMismoAlcance(
-      supabase
-        .from("automations")
-        .update({ is_active: false, disabled_by_ai: true })
-        .eq("workspace_id", workspaceId)
-        .eq("is_active", true)
-        .in("trigger_type", ["keyword", "tag_added"])
-    );
-    if (pauseError) return { error: pauseError.message };
-  }
 
   const consulta = supabase.from("ai_agents").update({ is_active: isActive }).eq("workspace_id", workspaceId);
   const { error } = await (whatsappAccountId

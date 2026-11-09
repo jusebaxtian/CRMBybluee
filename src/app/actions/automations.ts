@@ -289,30 +289,9 @@ export async function toggleAutomationActive(automationId: string, isActive: boo
   if ("error" in ctx) return { error: ctx.error };
   const { supabase, workspaceId } = ctx;
 
-  // Solo bloquea la IA de la MISMA linea que la automatizacion.
-  if (isActive) {
-    const { data: automacion } = await supabase
-      .from("automations")
-      .select("whatsapp_account_id")
-      .eq("id", automationId)
-      .eq("workspace_id", workspaceId)
-      .maybeSingle();
-    const { data: agentesActivos } = await supabase
-      .from("ai_agents")
-      .select("whatsapp_account_id")
-      .eq("workspace_id", workspaceId)
-      .eq("is_active", true);
-    const chocan = (agentesActivos ?? []).some(
-      (a) => (a.whatsapp_account_id ?? null) === (automacion?.whatsapp_account_id ?? null)
-    );
-    if (chocan) {
-      return {
-        error:
-          "El agente de IA de esa línea está activo — apágalo primero para poder activar automatizaciones en esa línea.",
-      };
-    }
-  }
-
+  // Desde el 9 nov 2026 la IA ya no bloquea automatizaciones: pueden estar las
+  // dos activas y cada cuenta decide. No chocan en un mismo mensaje: si una
+  // automatizacion lo toma, la IA no responde ese mensaje (ingest.ts).
   const { error } = await supabase
     .from("automations")
     .update({ is_active: isActive, disabled_by_ai: false })
