@@ -21,7 +21,9 @@ export type MensajeProgramado = {
   error: string | null;
 };
 
+/** Con `id` edita uno que siga pendiente; sin `id`, programa uno nuevo. */
 export async function programarMensaje(input: {
+  id?: string | null;
   conversationId: string;
   enviarEn: string;
   texto?: string | null;
@@ -83,6 +85,21 @@ export async function programarMensaje(input: {
     const waba = (linea?.waba_id as string | null | undefined) ?? null;
     if (t.waba_id && waba && t.waba_id !== waba) return { error: "Esa plantilla no pertenece a la línea de este chat." };
     if (noSePuedeUsar(t.body_text)) return { error: `Esta plantilla no se puede enviar. ${motivoDelExceso(t.body_text)}` };
+  }
+
+  if (input.id) {
+    // Solo si sigue pendiente: uno que ya se esta enviando no se puede cambiar.
+    const { data: editado, error } = await supabase
+      .from("mensajes_programados")
+      .update({ enviar_en: cuando.toISOString(), texto, template_id: templateId, error: null })
+      .eq("id", input.id)
+      .eq("conversation_id", conv.id)
+      .eq("estado", "pendiente")
+      .select("id");
+    if (error) return { error: "No se pudo guardar el cambio." };
+    if (!editado || editado.length === 0) return { error: "Ese mensaje ya se envió o se está enviando." };
+    revalidatePath(`/dashboard/inbox/${conv.id}`);
+    return { success: true };
   }
 
   const {

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { AlarmClock, Bell, Check, Loader2, Send, Trash2, X } from "lucide-react";
 import { ProgramarMensajePanel, type PlantillaParaProgramar } from "@/components/inbox/programar-mensaje";
+import { listarMensajesProgramados } from "@/app/actions/mensajes-programados";
 import {
   actualizarRecordatorio,
   crearRecordatorio,
@@ -40,6 +41,8 @@ export function RecordatorioPicker({
 }) {
   const [modo, setModo] = useState<"menu" | "recordatorio" | "mensaje" | null>(null);
   const open = modo === "recordatorio";
+  // Cuantos mensajes hay programados, para verlo en el menu sin abrir el panel.
+  const [programados, setProgramados] = useState(0);
   const setOpen = (abierto: boolean) => setModo(abierto ? "recordatorio" : null);
   const [texto, setTexto] = useState("");
   const [cuando, setCuando] = useState(() => aLocal(new Date(Date.now() + 60 * 60 * 1000)));
@@ -122,6 +125,9 @@ export function RecordatorioPicker({
             className="flex w-full items-center gap-2 rounded-[9px] px-2.5 py-2 text-left text-[13px] text-foreground hover:bg-surface-hover"
           >
             <Send size={15} className="text-muted" /> Programar mensaje
+            {programados > 0 && (
+              <span className="ml-auto rounded-full bg-primary/15 px-1.5 text-[11px] font-semibold text-primary">{programados}</span>
+            )}
           </button>
         </div>
       )}
@@ -226,7 +232,11 @@ export function RecordatorioPicker({
 
       <button
         type="button"
-        onClick={() => setModo(modo ? null : "menu")}
+        onClick={() => {
+          if (modo) return setModo(null);
+          setModo("menu");
+          listarMensajesProgramados(conversationId).then((l) => setProgramados(l.filter((m) => m.estado === "pendiente").length));
+        }}
         title="Recordatorio o mensaje programado"
         aria-label="Recordatorio o mensaje programado"
         aria-haspopup="menu"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { AlertCircle, Check, Loader2, X } from "lucide-react";
+import { AlertCircle, Check, Loader2, Pencil, Trash2, X } from "lucide-react";
 import {
   cancelarMensajeProgramado,
   descartarMensajeFallido,
@@ -49,6 +49,7 @@ export function ProgramarMensajePanel({
   const [listo, setListo] = useState(false);
   const [pending, startTransition] = useTransition();
   const [programados, setProgramados] = useState<MensajeProgramado[]>([]);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
 
   useEffect(() => {
     listarMensajesProgramados(conversationId).then(setProgramados);
@@ -61,10 +62,27 @@ export function ProgramarMensajePanel({
   const faltaRespaldo = tipo === "libre" && cerradaParaEsaHora && !plantillaId;
   const nombreDe = new Map(plantillas.map((p) => [p.id, p.meta_template_name]));
 
+  function editar(m: MensajeProgramado) {
+    setEditandoId(m.id);
+    setCuando(aLocal(new Date(m.enviar_en)));
+    setTipo(m.texto ? "libre" : "plantilla");
+    setTexto(m.texto ?? "");
+    setPlantillaId(m.template_id ?? "");
+    setError(null);
+  }
+
+  function limpiar() {
+    setEditandoId(null);
+    setTexto("");
+    setPlantillaId("");
+    setCuando(aLocal(new Date(Date.now() + 60 * 60 * 1000)));
+  }
+
   function guardar() {
     setError(null);
     startTransition(async () => {
       const r = await programarMensaje({
+        id: editandoId,
         conversationId,
         enviarEn: new Date(cuando).toISOString(),
         texto: tipo === "libre" ? texto : null,
@@ -78,8 +96,7 @@ export function ProgramarMensajePanel({
       listarMensajesProgramados(conversationId).then(setProgramados);
       setTimeout(() => {
         setListo(false);
-        setTexto("");
-        setPlantillaId("");
+        limpiar();
       }, 1500);
     });
   }
@@ -88,6 +105,7 @@ export function ProgramarMensajePanel({
     startTransition(async () => {
       const r = m.estado === "fallido" ? await descartarMensajeFallido(m.id) : await cancelarMensajeProgramado(m.id);
       if ("error" in r) setError(r.error);
+      if (editandoId === m.id) limpiar();
       listarMensajesProgramados(conversationId).then(setProgramados);
     });
   }
@@ -105,7 +123,7 @@ export function ProgramarMensajePanel({
 
       {listo ? (
         <p className="flex items-center gap-2 py-2 text-sm text-success">
-          <Check size={15} /> Mensaje programado
+          <Check size={15} /> {editandoId ? "Cambios guardados" : "Mensaje programado"}
         </p>
       ) : (
         <div className="flex flex-col gap-2">
@@ -176,15 +194,24 @@ export function ProgramarMensajePanel({
             className="flex items-center justify-center gap-2 rounded-[9px] bg-primary px-3 py-2 text-sm font-bold text-white hover:bg-primary-hover disabled:opacity-50"
           >
             {pending && <Loader2 size={14} className="animate-spin" />}
-            Programar
+            {editandoId ? "Guardar cambios" : "Programar"}
           </button>
+          {editandoId && (
+            <button type="button" onClick={limpiar} className="text-xs text-muted hover:text-foreground">
+              Cancelar edición
+            </button>
+          )}
         </div>
       )}
 
       {programados.length > 0 && (
         <ul className="mt-3 flex flex-col gap-1.5 border-t border-border pt-2">
+          <li className="text-[11px] font-medium uppercase tracking-wide text-muted">Programados en este chat</li>
           {programados.map((m) => (
-            <li key={m.id} className="flex items-start gap-2 text-xs">
+            <li
+              key={m.id}
+              className={`flex items-start gap-2 rounded-[8px] px-1.5 py-1 text-xs ${editandoId === m.id ? "bg-primary/10" : ""}`}
+            >
               <div className="min-w-0 flex-1">
                 <p className={m.estado === "fallido" ? "text-error" : "text-muted"}>
                   {m.estado === "fallido" && <AlertCircle size={11} className="mr-1 inline" />}
@@ -199,16 +226,28 @@ export function ProgramarMensajePanel({
                 )}
                 {m.estado === "fallido" && m.error && <p className="text-[11px] text-error">{m.error}</p>}
               </div>
+              {m.estado === "pendiente" && (
+                <button
+                  type="button"
+                  onClick={() => editar(m)}
+                  disabled={pending}
+                  title="Editar"
+                  aria-label="Editar mensaje programado"
+                  className="mt-0.5 text-muted hover:text-foreground"
+                >
+                  <Pencil size={13} />
+                </button>
+              )}
               {m.estado !== "enviando" && (
                 <button
                   type="button"
                   onClick={() => quitar(m)}
                   disabled={pending}
-                  title={m.estado === "fallido" ? "Quitar de la lista" : "Cancelar envío"}
-                  aria-label={m.estado === "fallido" ? "Quitar de la lista" : "Cancelar envío"}
+                  title={m.estado === "fallido" ? "Quitar de la lista" : "Eliminar"}
+                  aria-label={m.estado === "fallido" ? "Quitar de la lista" : "Eliminar mensaje programado"}
                   className="mt-0.5 text-muted hover:text-error"
                 >
-                  <X size={13} />
+                  {m.estado === "fallido" ? <X size={13} /> : <Trash2 size={13} />}
                 </button>
               )}
             </li>
