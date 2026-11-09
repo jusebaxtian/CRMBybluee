@@ -1,6 +1,8 @@
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { agenteDeLaLinea, agenteParaBloque, maybeRespondWithAiAgent } from "@/lib/ai/agent";
-import { contactoEnBloqueDeIa } from "@/lib/flujos/motor";
+import { contactoEnBloqueDeIa, iniciarPorEtiqueta } from "@/lib/flujos/motor";
+import { runTagAddedAutomations } from "@/lib/automations/engine";
+import { maybeTrackPurchaseFromTag } from "@/lib/meta/conversions";
 import { leerImagenConIa, type MimeDeImagen } from "@/lib/ai/providers";
 import { avisoDeComprobante, INSTRUCCION_LECTURA, interpretarLectura, type LecturaDeImagen } from "@/lib/ai/lectura-imagen";
 
@@ -28,8 +30,11 @@ export async function leerImagenEntrante(
     const agente = enBloque
       ? await agenteParaBloque(supabase, d.workspaceId, d.whatsappAccountId)
       : await agenteDeLaLinea(supabase, d.workspaceId, d.whatsappAccountId, d.waId);
-    if (!agente) return null;
-    if (!enBloque && (!agente.is_active || !agente.lee_imagenes)) return null;
+    if (!agente?.api_key) return null;
+    // Se activa a mano en el agente y gasta la llave conectada del cliente. No
+    // exige que el agente este respondiendo: con la IA pausada igual se avisa y
+    // se etiqueta el soporte de pago (0178). Responder si sigue dependiendo de is_active.
+    if (!enBloque && !agente.lee_imagenes) return null;
 
     const mime = (d.mimeType ?? "").split(";")[0].trim() as MimeDeImagen;
     if (!MIMES.includes(mime)) return null;
@@ -62,11 +67,48 @@ export async function leerImagenEntrante(
       .select("id");
     if (!guardada?.length) return null;
 
-    if (lectura.esComprobante) await avisarComprobante(supabase, d, lectura);
+    if (lectura.esComprobante) {
+      await avisarComprobante(supabase, d, lectura);
+      await etiquetarComprobante(supabase, d);
+    }
     return lectura;
   } catch (err) {
     console.error(`lectura de imagen fallida: workspace=${d.workspaceId} mensaje=${d.waMessageId}:`, err);
     return null;
+  }
+}
+
+/**
+ * La etiqueta que eligio el espacio para los soportes de pago (0178): la del
+ * agente de la linea o, si la linea no tiene agente propio, la del general.
+ * Tiene las mismas consecuencias que ponerla a mano: flujos, automatizaciones y
+ * conversiones. Un fallo aqui no tumba la lectura.
+ */
+async function etiquetarComprobante(supabase: Supabase, d: { workspaceId: string; contactId: string; whatsappAccountId: string }) {
+  try {
+    const { data: agentes } = await supabase
+      .from("ai_agents")
+      .select("whatsapp_account_id, etiqueta_comprobante_id")
+      .eq("workspace_id", d.workspaceId);
+    const fila =
+      (agentes ?? []).find((a) => a.whatsapp_account_id === d.whatsappAccountId) ??
+      (agentes ?? []).find((a) => !a.whatsapp_account_id);
+    const tagId = (fila?.etiqueta_comprobante_id as string | null | undefined) ?? null;
+    if (!tagId) return;
+
+    const { data: puesta, error } = await supabase
+      .from("contact_tags")
+      .upsert({ contact_id: d.contactId, tag_id: tagId }, { onConflict: "contact_id,tag_id", ignoreDuplicates: true })
+      .select("tag_id");
+    if (error) throw new Error(error.message);
+    // Ya la tenia: no se repiten las automatizaciones por cada foto.
+    if (!puesta?.length) return;
+
+    const loTomoUnFlujo = await iniciarPorEtiqueta(supabase, d.workspaceId, d.contactId, tagId);
+    if (!loTomoUnFlujo) await runTagAddedAutomations(supabase, d.workspaceId, d.contactId, tagId);
+    await maybeTrackPurchaseFromTag(supabase, d.workspaceId, d.contactId, tagId);
+  } catch (err) {
+    console.error(`comprobante: no se pudo poner la etiqueta: workspace=${d.workspaceId}:`, err instanceof Error ? err.message : err);
   }
 }
 

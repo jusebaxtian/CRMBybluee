@@ -122,7 +122,7 @@ export default async function SettingsPage() {
       ? await supabase
           .from("ai_agents")
           .select(
-            "whatsapp_account_id, provider, model, agent_name, persona, is_active, followup_enabled, followup_steps, followup_template_id"
+            "whatsapp_account_id, provider, model, agent_name, persona, is_active, followup_enabled, followup_steps, followup_template_id, lee_imagenes, etiqueta_comprobante_id"
           )
           .eq("workspace_id", workspaceId)
       : { data: [] };
@@ -145,8 +145,13 @@ export default async function SettingsPage() {
           .order("meta_template_name")
       : { data: [] };
 
+    const { data: etiquetasDelEspacio } = workspaceId
+      ? await supabase.from("tags").select("id, name").eq("workspace_id", workspaceId).order("name")
+      : { data: [] };
+
     aiAgentSection = (
       <AgentesPorLinea
+        etiquetas={etiquetasDelEspacio ?? []}
         agentes={(aiAgents ?? []) as AgenteFila[]}
         lineas={(accounts ?? []).filter((a) => a.status !== "frozen")}
         mediaItems={aiAgentMedia ?? []}

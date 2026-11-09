@@ -19,6 +19,9 @@ export async function saveAiAgent(_prevState: unknown, formData: FormData) {
   const persona = String(formData.get("persona") ?? "").trim();
   const followupEnabled = formData.get("followupEnabled") === "on";
   const followupTemplateId = String(formData.get("followupTemplateId") ?? "").trim() || null;
+  // Lectura de imagenes y etiqueta del soporte de pago (0167, 0178): se activan a mano.
+  const leeImagenes = formData.get("leeImagenes") === "on";
+  const etiquetaComprobanteId = leeImagenes ? String(formData.get("etiquetaComprobanteId") ?? "").trim() || null : null;
 
   let followupSteps: { delay_minutes: number; focus: string }[] = [];
   const followupStepsRaw = String(formData.get("followupSteps") ?? "[]");
@@ -103,6 +106,16 @@ export async function saveAiAgent(_prevState: unknown, formData: FormData) {
     }
   }
 
+  if (etiquetaComprobanteId) {
+    const { data: etiqueta } = await supabase
+      .from("tags")
+      .select("id")
+      .eq("id", etiquetaComprobanteId)
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+    if (!etiqueta) return { error: "Esa etiqueta no existe en tu cuenta." };
+  }
+
   // Un agente por linea: se actualiza el de esa linea o se crea si no existe.
   const consultaId = supabase.from("ai_agents").select("id").eq("workspace_id", workspaceId);
   const { data: filaExistente } = await (whatsappAccountId
@@ -121,6 +134,8 @@ export async function saveAiAgent(_prevState: unknown, formData: FormData) {
     followup_enabled: followupEnabled,
     followup_steps: followupSteps,
     followup_template_id: followupTemplateId,
+    lee_imagenes: leeImagenes,
+    etiqueta_comprobante_id: etiquetaComprobanteId,
     updated_at: new Date().toISOString(),
   };
   const { error } = filaExistente

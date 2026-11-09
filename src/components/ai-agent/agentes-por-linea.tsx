@@ -16,6 +16,8 @@ export type AgenteFila = {
   followup_enabled?: boolean;
   followup_steps?: FollowupStep[];
   followup_template_id?: string | null;
+  lee_imagenes?: boolean;
+  etiqueta_comprobante_id?: string | null;
 };
 
 export type LineaOpcion = { id: string; label: string | null; display_phone_number: string };
@@ -49,11 +51,13 @@ export function AgentesPorLinea({
   lineas,
   mediaItems = [],
   templates = [],
+  etiquetas = [],
 }: {
   agentes: AgenteFila[];
   lineas: LineaOpcion[];
   mediaItems?: MediaItem[];
   templates?: TemplateOption[];
+  etiquetas?: { id: string; name: string }[];
 }) {
   const [seleccion, setSeleccion] = useState<string | null>(() => {
     // Empieza en el agente general si existe; si no, en el primero que haya.
@@ -74,6 +78,7 @@ export function AgentesPorLinea({
         agent={agenteDe(null)}
         mediaItems={mediosDe(null)}
         templates={templates}
+        etiquetas={etiquetas}
         whatsappAccountId={null}
         hayLlaveEnElEspacio={hayLlave}
       />
@@ -136,6 +141,7 @@ export function AgentesPorLinea({
         agent={agenteDe(seleccion ?? null)}
         mediaItems={mediosDe(seleccion ?? null)}
         templates={templates}
+        etiquetas={etiquetas}
         whatsappAccountId={seleccion ?? null}
         hayLlaveEnElEspacio={hayLlave}
       />

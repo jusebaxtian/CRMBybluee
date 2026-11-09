@@ -19,6 +19,8 @@ type AiAgent = {
   followup_enabled?: boolean;
   followup_steps?: FollowupStep[];
   followup_template_id?: string | null;
+  lee_imagenes?: boolean;
+  etiqueta_comprobante_id?: string | null;
 } | null;
 
 type MediaItem = {
@@ -69,7 +71,10 @@ export function AiAgentPanel({
   templates = [],
   whatsappAccountId = null,
   hayLlaveEnElEspacio = false,
+  etiquetas = [],
 }: {
+  /** Etiquetas del espacio, para la que se pone al detectar un soporte de pago. */
+  etiquetas?: { id: string; name: string }[];
   agent: AiAgent;
   mediaItems?: MediaItem[];
   templates?: TemplateOption[];
@@ -84,6 +89,7 @@ export function AiAgentPanel({
   const [plantillaDeSeguimiento, setPlantillaDeSeguimiento] = useState(agent?.followup_template_id ?? "");
   const [togglePending, setTogglePending] = useState(false);
   const [followupEnabled, setFollowupEnabled] = useState(agent?.followup_enabled ?? false);
+  const [leeImagenes, setLeeImagenes] = useState(agent?.lee_imagenes ?? false);
   const [steps, setSteps] = useState<StepDraft[]>(() => {
     if (agent?.followup_steps && agent.followup_steps.length > 0) {
       return agent.followup_steps.map((s) => {
@@ -361,6 +367,44 @@ export function AiAgentPanel({
                   </p>
                 )}
               </div>
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-border p-4">
+          <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <input
+              type="checkbox"
+              name="leeImagenes"
+              checked={leeImagenes}
+              onChange={(e) => setLeeImagenes(e.target.checked)}
+              className="h-4 w-4 rounded border-border"
+            />
+            Leer imágenes y detectar soportes de pago
+          </label>
+          <p className="mt-1 text-[11px] text-muted">
+            Cada foto que mande el cliente la lee tu API key de IA (gasta tokens de tu cuenta). Si es un soporte de pago,
+            te avisa en la campana y puede ponerle una etiqueta. Funciona aunque el agente esté pausado. Solo fotos o
+            capturas: un comprobante en PDF no se detecta. La IA nunca confirma el pago: revísalo tú.
+          </p>
+          {leeImagenes && (
+            <div className="mt-3">
+              <label className="mb-1 block text-xs font-medium text-muted">Etiqueta al detectar un soporte de pago</label>
+              <select
+                name="etiquetaComprobanteId"
+                defaultValue={agent?.etiqueta_comprobante_id ?? ""}
+                className="w-full rounded-[9px] border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary"
+              >
+                <option value="">Sin etiqueta, solo el aviso</option>
+                {etiquetas.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-muted">
+                Si esa etiqueta dispara una automatización o un flujo, también se ejecuta (por ejemplo, responder “Recibimos tu soporte”).
+              </p>
             </div>
           )}
         </div>
