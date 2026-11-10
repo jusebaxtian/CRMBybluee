@@ -2,6 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyBoldWebhookSignature } from "@/lib/bold";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { addBillingCycle } from "@/lib/billing/cycle";
+import { estadoTrasEvento, filaDeAviso, type EstadoBold, type PayloadBold } from "@/lib/bold-pagos";
+
+async function guardarAviso(supabase: ReturnType<typeof createAdminClient>, payload: PayloadBold) {
+  const fila = filaDeAviso(payload);
+  if (!fila) return;
+  const { data: anterior } = await supabase.from("bold_pagos").select("estado").eq("payment_id", fila.payment_id).maybeSingle();
+  const estado = estadoTrasEvento((anterior?.estado as EstadoBold | undefined) ?? null, payload.type);
+  // Un aviso repetido con menos datos no borra lo que ya se sabia del pago.
+  const conDatos = Object.fromEntries(Object.entries(fila).filter(([, v]) => v !== null));
+  const { error } = await supabase
+    .from("bold_pagos")
+    .upsert({ ...conDatos, estado, payload, updated_at: new Date().toISOString() }, { onConflict: "payment_id" });
+  if (error) throw new Error(error.message);
+}
 
 type BoldWebhookPayload = {
   id: string;
@@ -19,6 +33,12 @@ export async function POST(request: NextRequest) {
 
   const payload = JSON.parse(rawBody) as BoldWebhookPayload;
   const supabase = createAdminClient();
+
+  // Todo pago en linea queda guardado (0180), sea del producto que sea: se ve en
+  // Admin -> Pagos. Un fallo aqui no debe frenar la activacion de abajo.
+  await guardarAviso(supabase, JSON.parse(rawBody) as PayloadBold).catch((err) =>
+    console.error("bold webhook: no se pudo guardar el aviso:", err)
+  );
 
   if (payload.type === "SALE_APPROVED") {
     const { data: payment } = await supabase

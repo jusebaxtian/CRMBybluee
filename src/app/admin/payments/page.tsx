@@ -6,6 +6,8 @@ import { NuevoEnlaceDemo } from "@/components/admin/nuevo-enlace-demo";
 import { headers } from "next/headers";
 import { toPublicUrl } from "@/lib/supabase/config";
 import { ResumenVentas, type VentaFila } from "@/components/admin/resumen-ventas";
+import { PagosBold } from "@/components/admin/pagos-bold";
+import { listarPagosBold } from "@/lib/bold-pagos-lista";
 
 const statusColor: Record<string, string> = {
   pending: "text-warning border-warning",
@@ -110,6 +112,8 @@ export default async function AdminPaymentsPage({
     }
   }
 
+  const pagosBold = await listarPagosBold(admin);
+
   // Enlaces de registro con pago pendientes de usar (0105).
   const h = await headers();
   const origen = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("x-forwarded-host") ?? h.get("host") ?? "crmbybluee.blue"}`;
@@ -143,6 +147,8 @@ export default async function AdminPaymentsPage({
 
       <NuevoEnlaceDemo />
       <InvitacionesRegistro filas={invitacionFilas} />
+
+      <PagosBold filas={pagosBold} />
 
       <div className="overflow-x-auto rounded-xl border border-border bg-surface">
         <table className="w-full min-w-[720px] text-left text-sm">
