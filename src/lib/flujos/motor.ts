@@ -6,6 +6,7 @@ import {
   ACCION_DE_MEDIA,
   MEDIA_SIN_PIE,
   limitesIa,
+  limiteDeBotones,
   puedeReingresar,
   reingresosDeFin,
   salidasDe,
@@ -378,12 +379,21 @@ export async function avanzar(supabase: Supabase, ejecucionId: string): Promise<
         });
       }
 
-      // Queda esperando la pulsacion. Sin tiempo limite: el vencimiento de la
-      // ejecucion es el que evita que se quede ahi para siempre.
+      // Queda esperando la pulsacion. Con tiempo limite (opcional), al vencer
+      // sigue por "No respondió"; sin el, solo el vencimiento de la ejecucion
+      // evita que se quede ahi para siempre.
       await supabase
         .from("flujo_ejecuciones")
         .update({ estado: "esperando", nodo_id: nodoActual.id, pasos, actualizado_el: new Date().toISOString() })
         .eq("id", ejecucionId);
+      const limite = limiteDeBotones(datos);
+      if (limite) {
+        await supabase.from("flujo_esperas").insert({
+          ejecucion_id: ejecucionId,
+          nodo_id: nodoActual.id,
+          vence_el: new Date(Date.now() + limite * 60_000).toISOString(),
+        });
+      }
       return;
     }
 
@@ -766,6 +776,8 @@ export async function procesarEntrada(
     const salida = entrada.botonId !== null && salidas.some((s) => s.id === entrada.botonId)
       ? entrada.botonId
       : "otro";
+    // Contesto a tiempo: el tiempo limite, si lo tenia, ya no aplica.
+    await cancelarEsperas(supabase, ejecucion.id as string);
     const destino = destinoDe(conexiones, nodo.id, salida);
     if (!destino) {
       await cerrar(supabase, ejecucion.id as string, "terminado");

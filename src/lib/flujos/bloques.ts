@@ -279,6 +279,13 @@ export type DatosBloque = {
   mediaNombre?: string;
   /** botones: los titulos que ve el cliente */
   botones?: string[];
+  /**
+   * botones: tiempo limite opcional (10 nov 2026). Vacio = espera sin limite,
+   * como siempre. Con tiempo, aparece la salida "No respondió". Se guarda en
+   * minutos; la unidad es solo para mostrarlo como lo escribio.
+   */
+  esperaMinutos?: number;
+  esperaUnidad?: UnidadEspera;
   /** esperar */
   minutos?: number;
   /** ia: lo que debe lograr antes de soltar el chat */
@@ -315,6 +322,25 @@ export type DatosBloque = {
   flujoDestinoId?: string;
   flujoDestinoNombre?: string;
 };
+
+export type UnidadEspera = "minutos" | "horas" | "dias";
+
+export const MINUTOS_POR_UNIDAD: Record<UnidadEspera, number> = { minutos: 1, horas: 60, dias: 1440 };
+
+/** Los minutos del tiempo limite del bloque de botones, o null si no tiene. */
+export function limiteDeBotones(datos: DatosBloque): number | null {
+  const m = Math.floor(Number(datos.esperaMinutos ?? 0));
+  return m > 0 ? m : null;
+}
+
+/** "30 minutos", "2 horas", "1 día": como lo escribio quien armo el flujo. */
+export function textoDeEspera(minutos: number, unidad: UnidadEspera | undefined): string {
+  const u = unidad && minutos % MINUTOS_POR_UNIDAD[unidad] === 0 ? unidad : "minutos";
+  const n = minutos / MINUTOS_POR_UNIDAD[u];
+  if (u === "dias") return `${n} ${n === 1 ? "día" : "días"}`;
+  if (u === "horas") return `${n} ${n === 1 ? "hora" : "horas"}`;
+  return `${n} ${n === 1 ? "minuto" : "minutos"}`;
+}
 
 export const IA_MAX_RESPUESTAS = 10;
 export const IA_MINUTOS_ESPERA = 60;
@@ -358,6 +384,8 @@ export function salidasDe(tipo: TipoBloque, datos: DatosBloque): Salida[] {
     // Siempre hay una salida para "escribió otra cosa": sin ella, un contacto
     // que no toca ningun boton se queda atascado.
     salidas.push({ id: "otro", etiqueta: "Escribió otra cosa" });
+    // Solo si le pusieron tiempo limite: sin el, sigue esperando sin fin.
+    if (limiteDeBotones(datos)) salidas.push({ id: "no_respondio", etiqueta: "No respondió" });
     return salidas;
   }
   return BLOQUES[tipo].salidasFijas ?? [];
@@ -386,8 +414,7 @@ ${texto}` : adjunto;
     return texto || "Sin mensaje todavía";
   }
   if (tipo === "botones") {
-    const texto = datos.texto?.trim() || "Sin pregunta todavía";
-    return texto;
+    return datos.texto?.trim() || "Sin pregunta todavía";
   }
   if (tipo === "esperar") {
     const m = datos.minutos ?? 5;

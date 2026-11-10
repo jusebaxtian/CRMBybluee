@@ -16,7 +16,7 @@ import {
   Workflow,
   Zap,
 } from "lucide-react";
-import { BLOQUES, resumenDe, salidasDe, type DatosBloque, type TipoBloque } from "@/lib/flujos/bloques";
+import { BLOQUES, limiteDeBotones, resumenDe, salidasDe, textoDeEspera, type DatosBloque, type TipoBloque } from "@/lib/flujos/bloques";
 
 const ICONOS: Record<TipoBloque, typeof Play> = {
   inicio: Play,
@@ -82,6 +82,11 @@ export function BloqueNodo({ data, selected }: NodeProps) {
               {b.trim() || `Botón ${i + 1}`}
             </span>
           ))}
+          {limiteDeBotones(datos) && (
+            <span className="text-center text-[11px] text-warning">
+              ⏱ Espera {textoDeEspera(limiteDeBotones(datos)!, datos.esperaUnidad)}
+            </span>
+          )}
         </div>
       )}
 

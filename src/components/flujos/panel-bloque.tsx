@@ -13,6 +13,9 @@ import {
   type Disparador,
   type TipoBloque,
   type TipoDisparador,
+  limiteDeBotones,
+  MINUTOS_POR_UNIDAD,
+  type UnidadEspera,
 } from "@/lib/flujos/bloques";
 
 /**
@@ -66,6 +69,7 @@ export function PanelBloque({
       })),
     });
   const botones = datos.botones ?? [];
+  const unidadBotones: UnidadEspera = datos.esperaUnidad ?? "minutos";
   const disparadores = datos.disparadores ?? [];
 
   const cambiarDisparador = (i: number, cambios: Partial<Disparador>) => {
@@ -231,6 +235,51 @@ export function PanelBloque({
           <p className="mt-2 text-[11px] leading-relaxed text-muted">
             Máximo {MAX_BOTONES} botones y 20 caracteres cada uno: es límite de WhatsApp. Los botones solo se
             pueden enviar dentro de las 24 horas siguientes al último mensaje del contacto.
+          </p>
+
+          <label className="mb-1 mt-4 block text-xs font-medium text-muted">Tiempo de espera (opcional)</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              value={
+                limiteDeBotones(datos)
+                  ? limiteDeBotones(datos)! / MINUTOS_POR_UNIDAD[unidadBotones]
+                  : ""
+              }
+              onChange={(e) => {
+                const n = Math.floor(Number(e.target.value));
+                onCambiar({
+                  ...datos,
+                  esperaUnidad: unidadBotones,
+                  esperaMinutos: e.target.value === "" || !(n > 0) ? undefined : n * MINUTOS_POR_UNIDAD[unidadBotones],
+                });
+              }}
+              placeholder="Sin límite"
+              className="w-24 rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary"
+            />
+            <select
+              value={unidadBotones}
+              onChange={(e) => {
+                const unidad = e.target.value as UnidadEspera;
+                const actual = limiteDeBotones(datos);
+                const n = actual ? actual / MINUTOS_POR_UNIDAD[unidadBotones] : null;
+                onCambiar({
+                  ...datos,
+                  esperaUnidad: unidad,
+                  esperaMinutos: n ? Math.round(n * MINUTOS_POR_UNIDAD[unidad]) : undefined,
+                });
+              }}
+              className="rounded-[9px] border border-border bg-background px-2 py-1.5 text-[13px] text-foreground outline-none focus:border-primary"
+            >
+              <option value="minutos">minutos</option>
+              <option value="horas">horas</option>
+              <option value="dias">días</option>
+            </select>
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-muted">
+            Déjalo vacío y espera a que toque un botón sin límite. Si le pones tiempo, aparece la salida
+            &ldquo;No respondió&rdquo;: por ahí sigue quien no toque ningún botón ni escriba en ese tiempo.
           </p>
         </div>
       )}

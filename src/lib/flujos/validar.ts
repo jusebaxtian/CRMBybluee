@@ -1,4 +1,4 @@
-import { BLOQUES, MAX_BOTONES, salidasDe, type DatosBloque, type TipoBloque } from "@/lib/flujos/bloques";
+import { BLOQUES, MAX_BOTONES, limiteDeBotones, salidasDe, type DatosBloque, type TipoBloque } from "@/lib/flujos/bloques";
 
 /**
  * Avisos del flujo: lo que esta mal armado y lo que va a fallar en el envio.
@@ -131,9 +131,10 @@ export function revisarFlujo(
       }
     }
 
-    if (nodo.tipo === "esperar") {
-      const m = nodo.datos.minutos ?? 0;
-      if (m <= 0) {
+    if (nodo.tipo === "esperar" || nodo.tipo === "botones") {
+      // En botones el tiempo es opcional: sin el no hay "No respondió" que revisar.
+      const m = nodo.tipo === "esperar" ? (nodo.datos.minutos ?? 0) : (limiteDeBotones(nodo.datos) ?? 0);
+      if (nodo.tipo === "esperar" && m <= 0) {
         avisos.push({ nivel: "error", nodoId: nodo.id, texto: "La espera tiene que ser de al menos 1 minuto." });
       }
 
