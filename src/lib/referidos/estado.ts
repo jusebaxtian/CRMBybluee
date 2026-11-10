@@ -37,29 +37,25 @@ export type ResumenDeReferidos = {
 };
 
 /**
- * Lo que necesita la tarjeta. `elegible` es verdadero solo para quien tiene la
- * licencia activa Y la pago alguna vez: un plan regalado (sin pagos
- * aprobados) no participa.
+ * Lo que necesita la tarjeta. `elegible` es verdadero para quien tiene la
+ * licencia activa y un plan de pago: todos menos DEMO (precio 0) o sin plan.
+ * Desde el 10 nov 2026 no hace falta un pago registrado en el CRM: clientes del
+ * plan Inicial que pagaron por fuera no veian la invitacion.
  */
 export async function cargarReferidos(
   supabase: SupabaseClient,
   workspaceId: string
 ): Promise<{ elegible: boolean; resumen: ResumenDeReferidos | null; disponibles: number }> {
-  const [{ data: espacio }, { data: premios }, { count: pagos }] = await Promise.all([
-    supabase.from("workspaces").select("status, referral_code").eq("id", workspaceId).maybeSingle(),
+  const [{ data: espacio }, { data: premios }] = await Promise.all([
+    supabase.from("workspaces").select("status, referral_code, plans(price_cents)").eq("id", workspaceId).maybeSingle(),
     supabase.from("referral_rewards").select("status").eq("referrer_id", workspaceId),
-    supabase
-      .from("payments")
-      .select("id", { count: "exact", head: true })
-      .eq("workspace_id", workspaceId)
-      .eq("status", "approved")
-      .gt("amount_cents", 0),
   ]);
 
   const cuenta = (estado: string) => (premios ?? []).filter((p) => p.status === estado).length;
   const disponibles = cuenta("disponible");
   const codigo = (espacio?.referral_code as string | null) ?? null;
-  const elegible = !!codigo && espacio?.status === "active" && (pagos ?? 0) > 0;
+  const precioPlan = Number((espacio?.plans as unknown as { price_cents: number } | null)?.price_cents ?? 0);
+  const elegible = !!codigo && espacio?.status === "active" && precioPlan > 0;
 
   return {
     elegible,
