@@ -21,6 +21,7 @@ import { MODULO_GOOGLE_CALENDAR } from "@/lib/integraciones/google/contexto";
 import { bogotaAIso, sumarMinutos } from "@/lib/agenda/tiempo";
 import { normalizarCorreos } from "@/lib/agenda/correos";
 import { MENSAJE_MODO_SOPORTE, contextoDeCita } from "@/lib/agenda/contexto-de-cita";
+import { descripcionParaGoogle, nombresDeUsuarios, usuarioDeCalendario } from "@/lib/agenda/calendario-del-equipo";
 import { sendMessage } from "@/app/actions/whatsapp";
 import { isWindowOpen } from "@/lib/whatsapp/message-window";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
@@ -66,6 +67,10 @@ export type EventoAgenda = {
   conversation_id: string | null;
   contact_id: string;
   contacto: string;
+  /** Quien la agendo (10 nov 2026). */
+  agendado_por: string | null;
+  /** Una cita del calendario del dueno que este vendedor no puede ver: solo bloquea la hora. */
+  solo_ocupado?: boolean;
 };
 
 type Entrada = {
@@ -106,7 +111,7 @@ export async function consultarDisponibilidad(input: { inicioLocal: string; dura
     data: { user },
   } = await ctx.supabase.auth.getUser();
   if (!user) return { ocupado: false as const };
-  const conexion = await conexionDelUsuario(user.id);
+  const conexion = await conexionDelUsuario(await usuarioDeCalendario(ctx.supabase, ctx.workspaceId, user.id));
   if (!conexion) return { ocupado: false as const };
   const acceso = await accesoDeConexion(conexion);
   if ("error" in acceso) return { ocupado: false as const };
@@ -178,8 +183,10 @@ export async function crearEventoAgenda(input: Entrada) {
   if ((await contextoDeCita(supabase, workspaceId, user)).modoSoporte) return { error: MENSAJE_MODO_SOPORTE };
 
   if (!(await moduloIncluidoEnPlan(supabase, workspaceId))) return { error: "Tu plan no incluye Google Calendar." };
-  const conexion = await conexionDelUsuario(user.id);
-  if (!conexion) return { error: MENSAJE_SIN_GOOGLE };
+  // Un vendedor agenda en el calendario del dueno del espacio.
+  const calendarioDe = await usuarioDeCalendario(supabase, workspaceId, user.id);
+  const conexion = await conexionDelUsuario(calendarioDe);
+  if (!conexion) return { error: calendarioDe === user.id ? MENSAJE_SIN_GOOGLE : "El dueño de la cuenta todavía no conectó su Google Calendar." };
 
   const { data: contacto } = await supabase
     .from("contacts")
@@ -215,10 +222,11 @@ export async function crearEventoAgenda(input: Entrada) {
   if (errFila || !fila) return { error: "No se pudo guardar la cita." };
 
   try {
+    const agendadoPor = (await nombresDeUsuarios([user.id])).get(user.id) ?? null;
     const creado = await crearEnGoogle(acceso.token, {
       crmEventoId: fila.id as string,
       titulo: v.titulo,
-      descripcion: input.descripcion?.trim() || null,
+      descripcion: descripcionParaGoogle(input.descripcion, agendadoPor),
       inicioIso: v.inicioIso,
       finIso: v.finIso,
       invitadosEmails: v.emails,
@@ -253,7 +261,7 @@ export async function actualizarEventoAgenda(input: {
 
   const { data: actual } = await supabase
     .from("agenda_eventos")
-    .select("id, google_event_id, conexion_id, estado")
+    .select("id, google_event_id, conexion_id, estado, created_by")
     .eq("id", input.id)
     .eq("workspace_id", workspaceId)
     .maybeSingle();
@@ -266,9 +274,11 @@ export async function actualizarEventoAgenda(input: {
     const acceso = await accesoDeConexion(conexion);
     if ("error" in acceso) return { error: acceso.error };
     try {
+      const creador = (actual.created_by as string | null) ?? null;
+      const agendadoPor = creador ? ((await nombresDeUsuarios([creador])).get(creador) ?? null) : null;
       await actualizarEnGoogle(acceso.token, actual.google_event_id as string, {
         titulo: v.titulo,
-        descripcion: input.descripcion?.trim() || null,
+        descripcion: descripcionParaGoogle(input.descripcion, agendadoPor),
         inicioIso: v.inicioIso,
         finIso: v.finIso,
         invitadosEmails: v.emails,
@@ -334,12 +344,13 @@ export async function listarEventosEntre(desdeIso: string, hastaIso: string): Pr
   if ("error" in ctx) return [];
   const { data } = await ctx.supabase
     .from("agenda_eventos")
-    .select("id, titulo, descripcion, inicio, fin, invitado_email, invitados, con_meet, meet_url, estado, cancelado_desde, conversation_id, contact_id, contacts(name, wa_id)")
+    .select("id, titulo, descripcion, inicio, fin, invitado_email, invitados, con_meet, meet_url, estado, cancelado_desde, conversation_id, contact_id, created_by, contacts(name, wa_id)")
     .eq("workspace_id", ctx.workspaceId)
     .gte("inicio", desdeIso)
     .lt("inicio", hastaIso)
     .order("inicio");
-  return (data ?? []).map((e) => {
+  const nombres = await nombresDeUsuarios((data ?? []).map((e) => e.created_by as string).filter(Boolean));
+  const visibles: EventoAgenda[] = (data ?? []).map((e) => {
     const c = e.contacts as unknown as { name: string | null; wa_id: string } | null;
     return {
       id: e.id as string,
@@ -356,8 +367,43 @@ export async function listarEventosEntre(desdeIso: string, hastaIso: string): Pr
       conversation_id: (e.conversation_id as string | null) ?? null,
       contact_id: e.contact_id as string,
       contacto: c?.name?.trim() || c?.wa_id || "Contacto",
+      agendado_por: e.created_by ? (nombres.get(e.created_by as string) ?? null) : null,
     };
   });
+
+  // Un vendedor agenda en el calendario del dueno: ve a que horas ya hay citas, sin
+  // saber de quien son (sus reglas solo le dejan ver sus clientes).
+  const { data: esVendedor } = await ctx.supabase.rpc("soy_vendedor");
+  if (!esVendedor) return visibles;
+  const ya = new Set(visibles.map((e) => e.id));
+  const { data: todas } = await createAdminClient()
+    .from("agenda_eventos")
+    .select("id, inicio, fin")
+    .eq("workspace_id", ctx.workspaceId)
+    .eq("estado", "confirmado")
+    .gte("inicio", desdeIso)
+    .lt("inicio", hastaIso);
+  const ocupadas: EventoAgenda[] = (todas ?? [])
+    .filter((e) => !ya.has(e.id as string))
+    .map((e) => ({
+      id: e.id as string,
+      titulo: "Ocupado",
+      descripcion: null,
+      inicio: e.inicio as string,
+      fin: e.fin as string,
+      invitado_email: null,
+      invitados: [],
+      con_meet: false,
+      meet_url: null,
+      estado: "confirmado" as const,
+      cancelado_desde: null,
+      conversation_id: null,
+      contact_id: "",
+      contacto: "Agenda ocupada",
+      agendado_por: null,
+      solo_ocupado: true,
+    }));
+  return [...visibles, ...ocupadas].sort((a, b) => a.inicio.localeCompare(b.inicio));
 }
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
@@ -571,7 +617,7 @@ export async function estadoDeAgendaDelUsuario(): Promise<{
   } = await ctx.supabase.auth.getUser();
   if (!user) return vacio;
   const moduloIncluido = await moduloIncluidoEnPlan(ctx.supabase, ctx.workspaceId);
-  const conexion = moduloIncluido ? await conexionDelUsuario(user.id) : null;
+  const conexion = moduloIncluido ? await conexionDelUsuario(await usuarioDeCalendario(ctx.supabase, ctx.workspaceId, user.id)) : null;
   const { correo, modoSoporte } = await contextoDeCita(ctx.supabase, ctx.workspaceId, user);
   return {
     listo: moduloIncluido && !modoSoporte && conexion?.estado === "conectado",

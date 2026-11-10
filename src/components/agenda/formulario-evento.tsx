@@ -262,6 +262,12 @@ export function FormularioEvento({
           </button>
         </div>
 
+        {existente?.agendado_por && (
+          <p className="-mt-1 text-xs text-muted">
+            Agendado por: <span className="font-medium text-foreground">{existente.agendado_por}</span>
+          </p>
+        )}
+
         {cancelada && <p className="rounded-[9px] border border-border bg-background px-3 py-2 text-xs text-muted">{existente?.cancelado_desde === "google" ? "Esta cita se canceló desde Google Calendar." : "Esta cita está cancelada."}</p>}
 
         {!existente && (

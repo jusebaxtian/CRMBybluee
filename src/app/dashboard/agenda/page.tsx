@@ -5,6 +5,7 @@ import { listarRecordatoriosEntre } from "@/app/actions/recordatorios";
 import { listarEventosEntre } from "@/app/actions/agenda-eventos";
 import { getEnabledModuleKeys } from "@/lib/entitlements";
 import { contextoDeCita, conexionGoogleDe, duenoEnModoSoporte } from "@/lib/agenda/contexto-de-cita";
+import { usuarioDeCalendario } from "@/lib/agenda/calendario-del-equipo";
 
 /**
  * Agenda del espacio: todos los recordatorios de todos los contactos en un
@@ -28,7 +29,10 @@ export default async function AgendaPage() {
   } = await supabase.auth.getUser();
   // En modo soporte se mira la conexion del dueno del espacio, no la del administrador.
   const duenoSoporte = await duenoEnModoSoporte(supabase, workspaceId);
-  const conexion = await conexionGoogleDe(duenoSoporte ? duenoSoporte.userId : (user?.id ?? null));
+  // Un vendedor agenda en el calendario del dueno del espacio.
+  const conexion = await conexionGoogleDe(
+    duenoSoporte ? duenoSoporte.userId : user && workspaceId ? await usuarioDeCalendario(supabase, workspaceId, user.id) : null
+  );
   const { correo: correoDeCuenta, modoSoporte } = user ? await contextoDeCita(supabase, workspaceId, user) : { correo: null, modoSoporte: false };
   const googleListo = moduloIncluido && !modoSoporte && conexion?.estado === "conectado";
   const requiereReconexion = moduloIncluido && !modoSoporte && conexion?.estado === "requiere_reconexion";

@@ -207,12 +207,28 @@ export function Agenda({
                   </button>
                 </div>
                 <ul className="flex flex-col gap-1">
-                  {citas.map((e) => (
+                  {citas.map((e) =>
+                    e.solo_ocupado ? (
+                      <li key={e.id}>
+                        <div
+                          title="Ya hay una cita a esta hora en la agenda"
+                          className="flex w-full items-start gap-1 rounded-md border border-border bg-surface-hover/60 px-1.5 py-1 text-[11px] leading-tight text-muted"
+                        >
+                          <CalendarDays size={10} className="mt-0.5 shrink-0" />
+                          <span className="min-w-0">
+                            <span className="font-semibold">
+                              {new Date(e.inicio).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "2-digit", minute: "2-digit" })}
+                            </span>{" "}
+                            Ocupado
+                          </span>
+                        </div>
+                      </li>
+                    ) : (
                     <li key={e.id}>
                       <button
                         type="button"
                         onClick={() => setEditandoEvento(e)}
-                        title={`${e.contacto}: ${e.titulo}${e.estado === "cancelado" ? " · cancelada" : ""}`}
+                        title={`${e.contacto}: ${e.titulo}${e.agendado_por ? ` · Agendado por: ${e.agendado_por}` : ""}${e.estado === "cancelado" ? " · cancelada" : ""}`}
                         className={`flex w-full items-start gap-1 rounded-md border px-1.5 py-1 text-left text-[11px] leading-tight hover:bg-info/20 ${
                           e.estado === "cancelado" ? "border-border bg-surface-hover/60 text-muted line-through" : "border-info/40 bg-info/10 text-foreground"
                         }`}
@@ -224,10 +240,12 @@ export function Agenda({
                           </span>{" "}
                           <span className="text-muted">{e.contacto}</span>
                           <span className="block truncate">{e.titulo}</span>
+                          {e.agendado_por && <span className="block truncate text-[10px] text-muted">Agendado por: {e.agendado_por}</span>}
                         </span>
                       </button>
                     </li>
-                  ))}
+                    )
+                  )}
                   {lista.map((r) => (
                     <li key={r.id}>
                       <button
