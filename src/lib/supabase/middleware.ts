@@ -88,10 +88,14 @@ export async function updateSession(request: NextRequest) {
 
       // Agents only get the inbox — every other /dashboard/* route bounces back there.
       // Los vendedores (0160) tambien entran a Dashboard, Contactos y Agenda,
-      // donde la base solo les deja ver lo suyo.
+      // donde la base solo les deja ver lo suyo, y desde el 11 nov 2026 a
+      // Capacitaciones. Debe coincidir con RUTAS_VENDEDOR del menu (sidebar.tsx).
       if (membership?.role === "agent" && !pathname.startsWith("/dashboard/inbox")) {
         const rutaDeVendedor =
-          pathname === "/dashboard" || pathname.startsWith("/dashboard/contacts") || pathname.startsWith("/dashboard/agenda");
+          pathname === "/dashboard" ||
+          pathname.startsWith("/dashboard/contacts") ||
+          pathname.startsWith("/dashboard/agenda") ||
+          pathname.startsWith("/dashboard/tutoriales");
         const esVendedor = rutaDeVendedor ? !!(await supabase.rpc("soy_vendedor")).data : false;
         if (!esVendedor) {
           const url = request.nextUrl.clone();
