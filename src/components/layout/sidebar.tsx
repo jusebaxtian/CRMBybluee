@@ -38,8 +38,9 @@ const navItems = [
   { href: "/dashboard/tutoriales", label: "Capacitaciones", icon: PlaySquare, built: true, moduleKey: null },
 ];
 
-// Lo que ve un vendedor (0160): ademas de Conversaciones, Dashboard, Contactos y Agenda.
-const RUTAS_VENDEDOR = ["/dashboard", "/dashboard/inbox", "/dashboard/contacts", "/dashboard/agenda"];
+// Lo que ve un vendedor (0160): Conversaciones, Dashboard, Contactos y Agenda, y
+// desde el 11 nov 2026 Capacitaciones. Los agentes que no son vendedores no la ven.
+const RUTAS_VENDEDOR = ["/dashboard", "/dashboard/inbox", "/dashboard/contacts", "/dashboard/agenda", "/dashboard/tutoriales"];
 
 export function Sidebar({
   workspaceName,
