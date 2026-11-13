@@ -122,7 +122,7 @@ export async function planificar(
   const [{ data: espacios }, { data: suscripciones }, { data: duenos }, { data: lineas }, { data: demos }, { data: planesDemo }] = await Promise.all([
     // Son ~100 espacios; PostgREST corta en 1000 sin avisar, asi que si esto
     // creciera hay que paginar.
-    admin.from("workspaces").select("id, name, status, access_disabled, phone, phone_e164, plan_id, created_at"),
+    admin.from("workspaces").select("id, name, status, access_disabled, phone, phone_e164, plan_id, created_at, cliente_contact_id"),
     admin.from("subscriptions").select("workspace_id, current_period_end, created_at"),
     admin.from("workspace_members").select("workspace_id, user_id").eq("role", "owner"),
     admin.from("whatsapp_accounts").select("workspace_id"),
@@ -162,6 +162,22 @@ export async function planificar(
     }
   }
 
+  // A quien le escribimos: si en el chat el espacio esta enlazado a mano a un
+  // contacto, a ese contacto y a nadie mas. El telefono del registro puede ser
+  // de otra persona (13 nov 2026: quien mando el enlace de pago de "Be Like
+  // Lina" recibia los avisos de vencimiento de esa cuenta).
+  const enlazados = [...new Set((espacios ?? []).map((e) => e.cliente_contact_id as string | null).filter(Boolean))] as string[];
+  const { data: contactosEnlazados } = enlazados.length
+    ? await admin.from("contacts").select("id, wa_id").in("id", enlazados)
+    : { data: [] as { id: string; wa_id: string }[] };
+  // Solo si es un numero: los contactos con usuario de WhatsApp ("CO.123...")
+  // no reciben plantillas por numero; ahi se sigue usando el del registro.
+  const waIdEnlazado = new Map(
+    (contactosEnlazados ?? [])
+      .filter((c) => /^\d{8,15}$/.test(c.wa_id as string))
+      .map((c) => [c.id as string, c.wa_id as string])
+  );
+
   const { data: lista } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
   const usuarios = new Map((lista?.users ?? []).map((u) => [u.id, u]));
   const duenoDe = new Map((duenos ?? []).map((d) => [d.workspace_id as string, d.user_id as string]));
@@ -170,7 +186,8 @@ export async function planificar(
   const candidatos: Decision[] = [];
   for (const e of espacios ?? []) {
     if (e.id === espacioDelAdmin) continue;
-    const telefono = digitos(e.phone_e164 || e.phone);
+    const enlazado = e.cliente_contact_id ? waIdEnlazado.get(e.cliente_contact_id as string) : undefined;
+    const telefono = digitos(enlazado || e.phone_e164 || e.phone);
     const usuario = usuarios.get(duenoDe.get(e.id) ?? "");
     const persona = (usuario?.user_metadata?.full_name as string | undefined) ?? null;
     const correo = usuario?.email ?? "";
