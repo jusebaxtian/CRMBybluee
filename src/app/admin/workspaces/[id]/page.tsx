@@ -14,6 +14,7 @@ import { NotifyActivationButton } from "@/components/admin/notify-activation-but
 import { ClienteEnMiChat, type ClienteDeEspacio } from "@/components/admin/cliente-en-mi-chat";
 import { PagosDelCliente, type PagoDelCliente } from "@/components/admin/pagos-del-cliente";
 import { DatosLegalesAdmin } from "@/components/admin/datos-legales-admin";
+import { ReferidosDelEspacio } from "@/components/admin/referidos-del-espacio";
 import { toPublicUrl } from "@/lib/supabase/config";
 import { getActivationTemplateConfig } from "@/app/actions/admin-whatsapp";
 import { limiteDeNumeros } from "@/lib/whatsapp/limite-numeros";
@@ -219,6 +220,8 @@ export default async function AdminWorkspaceDetailPage({
       </div>
 
       <ClienteEnMiChat workspaceId={workspace.id} cliente={cliente} />
+
+      <ReferidosDelEspacio workspaceId={workspace.id} />
 
       <WorkspaceAdminEditor
         workspaceId={workspace.id}

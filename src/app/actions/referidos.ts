@@ -30,5 +30,6 @@ export async function resolverReferido(rewardId: string, aprobar: boolean): Prom
   const { error } = await createAdminClient().rpc("resolver_referido", { p_reward: rewardId, p_aprobar: aprobar });
   if (error) return { error: "No se pudo guardar la decisión." };
   revalidatePath("/admin/fidelidad");
+  revalidatePath("/admin/workspaces", "layout");
   return { success: true as const };
 }
