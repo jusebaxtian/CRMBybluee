@@ -17,13 +17,14 @@ describe("normalizarCodigoDeReferido", () => {
 });
 
 describe("casillasDeReferidos", () => {
-  it("siempre devuelve tres casillas", () => {
-    expect(casillasDeReferidos({ usados: 0, disponibles: 0, enRevision: 0 })).toEqual(["libre", "libre", "libre"]);
-    expect(casillasDeReferidos({ usados: 1, disponibles: 1, enRevision: 1 })).toEqual(["usado", "disponible", "en_revision"]);
+  it("siempre devuelve una casilla por mes posible (5)", () => {
+    expect(TOPE_REFERIDOS).toBe(5);
+    expect(casillasDeReferidos({ usados: 0, disponibles: 0, enRevision: 0 })).toEqual(["libre", "libre", "libre", "libre", "libre"]);
+    expect(casillasDeReferidos({ usados: 1, disponibles: 1, enRevision: 1 })).toEqual(["usado", "disponible", "en_revision", "libre", "libre"]);
     expect(casillasDeReferidos({ usados: 3, disponibles: 0, enRevision: 0 })).toHaveLength(TOPE_REFERIDOS);
   });
   it("nunca pasa del tope aunque los datos vengan de mas", () => {
-    expect(casillasDeReferidos({ usados: 2, disponibles: 2, enRevision: 0 })).toEqual(["usado", "usado", "disponible"]);
+    expect(casillasDeReferidos({ usados: 3, disponibles: 3, enRevision: 0 })).toEqual(["usado", "usado", "usado", "disponible", "disponible"]);
   });
 });
 

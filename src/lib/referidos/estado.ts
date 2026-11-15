@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-/** Meses gratis que un espacio puede ganar por referidos, de por vida. */
-export const TOPE_REFERIDOS = 3;
+/** Meses gratis que un espacio puede ganar por referidos, de por vida. Era 3 hasta el 15 nov 2026 (0181). */
+export const TOPE_REFERIDOS = 5;
 
 export const URL_BASE_REFERIDOS = "https://crmbybluee.blue";
 
@@ -18,7 +18,7 @@ export function normalizarCodigoDeReferido(valor: unknown): string | null {
 
 export type CasillaDeReferido = "usado" | "disponible" | "en_revision" | "libre";
 
-/** Las tres casillas de la tarjeta, en orden: usados, disponibles, en revision y libres. */
+/** Las casillas de la tarjeta (una por mes posible), en orden: usados, disponibles, en revision y libres. */
 export function casillasDeReferidos(r: { usados: number; disponibles: number; enRevision: number }): CasillaDeReferido[] {
   const casillas: CasillaDeReferido[] = [
     ...Array<CasillaDeReferido>(r.usados).fill("usado"),

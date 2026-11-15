@@ -5,6 +5,7 @@ import { isPlatformAdmin } from "@/lib/admin";
 import { getWorkspaceId } from "@/lib/workspace";
 import { FidelidadConfigPanel } from "@/components/admin/fidelidad-config";
 import { ReferidosRevision } from "@/components/admin/referidos-revision";
+import { TOPE_REFERIDOS } from "@/lib/referidos/estado";
 import { ClientesPorEstadoPanel } from "@/components/admin/clientes-por-estado";
 import { cargarClientesPorEstado } from "@/lib/fidelidad/clientes-por-estado";
 import { aplicarFrenos, calidadDeLaLinea, leerConfigFidelidad, planificar } from "@/lib/fidelidad/envio";
@@ -239,7 +240,7 @@ export default async function FidelidadPage() {
       <section className="rounded-xl border border-border bg-surface p-5">
         <p className="mb-1 text-sm font-medium text-foreground">Referidos</p>
         <p className="mb-3 text-xs text-muted">
-          Cada cliente con licencia de pago tiene un enlace; cuando su referido hace su primer pago gana un mes (máximo 3). Si
+          Cada cliente con licencia de pago tiene un enlace; cuando su referido hace su primer pago gana un mes (máximo {TOPE_REFERIDOS}). Si
           comparten IP, teléfono o documento queda en revisión para que lo decidas.
         </p>
         {(referidos ?? []).length === 0 ? (

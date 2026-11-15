@@ -39,7 +39,7 @@ function fecha(iso: string | null | undefined) {
 
 /**
  * Referidos de un espacio, para el administrador (15 nov 2026): quien lo
- * refirio, a quienes refirio y en que va cada mes gratis, con las mismas tres
+ * refirio, a quienes refirio y en que va cada mes gratis, con las mismas
  * casillas que ve el cliente en su panel.
  */
 export async function ReferidosDelEspacio({ workspaceId }: { workspaceId: string }) {
@@ -102,7 +102,7 @@ export async function ReferidosDelEspacio({ workspaceId }: { workspaceId: string
           </>
         ) : null}
       </p>
-      <div className="mb-5 grid grid-cols-3 gap-2 sm:max-w-md">
+      <div className="mb-5 grid grid-cols-3 gap-2 sm:max-w-2xl sm:grid-cols-5">
         {casillas.map((c, i) => (
           <div key={i} className={`rounded-lg border px-2 py-2 text-center text-xs font-semibold ${ESTILO_CASILLA[c]}`}>
             {NOMBRE_CASILLA[c]}
