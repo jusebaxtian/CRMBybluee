@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { idsDeEspaciosPausados, listaParaExcluir } from "@/lib/billing/pausa";
 import { resumeAutomationRun, isContactExcludedFromFollowups, ejecutarRespuestaRapida } from "@/lib/automations/engine";
 
 // Picks up automation actions that were deferred with a delay and are now
@@ -12,12 +13,16 @@ export async function processDueAutomationRuns() {
   // A paused row (contact replied — see handle_message_for_followups()) has
   // an old run_at that's already in the past, but must NOT fire until the
   // next outbound message re-arms it 30 minutes out and clears the pause.
-  const { data: dueRuns } = await supabase
+  // Las cuentas con el plan vencido se saltan sin tocar sus pendientes: corren
+  // cuando paguen (16 nov 2026).
+  const pausados = listaParaExcluir(await idsDeEspaciosPausados(supabase));
+  let consulta = supabase
     .from("automation_pending_runs")
     .select("id, workspace_id, automation_id, contact_id, next_position, automations(trigger_type)")
     .eq("paused", false)
-    .lte("run_at", new Date().toISOString())
-    .limit(50);
+    .lte("run_at", new Date().toISOString());
+  if (pausados) consulta = consulta.not("workspace_id", "in", pausados);
+  const { data: dueRuns } = await consulta.limit(50);
 
   for (const run of dueRuns ?? []) {
     // Se comprueba que el borrado se haya llevado la fila, no solo que no
@@ -73,12 +78,13 @@ export async function processDueAutomationRuns() {
 export async function processDueQuickReplyRuns() {
   const supabase = createAdminClient();
 
-  const { data: vencidas } = await supabase
+  const pausados = listaParaExcluir(await idsDeEspaciosPausados(supabase));
+  let consulta = supabase
     .from("respuesta_rapida_pendientes")
     .select("id, workspace_id, quick_reply_id, contact_id, next_position")
-    .lte("run_at", new Date().toISOString())
-    .order("run_at")
-    .limit(50);
+    .lte("run_at", new Date().toISOString());
+  if (pausados) consulta = consulta.not("workspace_id", "in", pausados);
+  const { data: vencidas } = await consulta.order("run_at").limit(50);
 
   for (const run of vencidas ?? []) {
     const { data: reclamada, error } = await supabase

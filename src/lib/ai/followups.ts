@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { idsDeEspaciosPausados } from "@/lib/billing/pausa";
 import { callAiProvider, type ChatTurn } from "@/lib/ai/providers";
 import { sendTextMessage, sendTemplateMessage } from "@/lib/whatsapp/graph";
 import {
@@ -45,7 +46,10 @@ export async function processAiFollowups() {
     .eq("is_active", true)
     .eq("followup_enabled", true);
 
+  // Cuenta con el plan vencido: sin seguimientos hasta que pague (16 nov 2026).
+  const pausados = new Set(await idsDeEspaciosPausados(supabase));
   for (const agent of agents ?? []) {
+    if (pausados.has(agent.workspace_id as string)) continue;
     try {
       await processWorkspaceFollowups(supabase, agent as AgentRow);
     } catch (err) {

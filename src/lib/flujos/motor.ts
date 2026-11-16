@@ -1,5 +1,6 @@
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
+import { idsDeEspaciosPausados, listaParaExcluir } from "@/lib/billing/pausa";
 import { sendInteractiveButtonsMessage, sendTextMessage } from "@/lib/whatsapp/graph";
 import { recordOutboundMessage } from "@/lib/messaging/record";
 import {
@@ -866,12 +867,16 @@ export async function iniciarFlujo(
 
 /** Trabajo de fondo: las esperas que ya vencieron siguen por "no respondió". */
 export async function procesarEsperasVencidas(supabase: Supabase): Promise<number> {
-  const { data: esperas } = await supabase
+  // Las esperas de una cuenta con el plan vencido quedan quietas, sin
+  // procesarse, hasta que pague (16 nov 2026).
+  const pausados = listaParaExcluir(await idsDeEspaciosPausados(supabase));
+  let consulta = supabase
     .from("flujo_esperas")
-    .select("id, ejecucion_id, nodo_id")
+    .select("id, ejecucion_id, nodo_id, flujo_ejecuciones!inner(workspace_id)")
     .is("procesada_el", null)
-    .lte("vence_el", new Date().toISOString())
-    .limit(100);
+    .lte("vence_el", new Date().toISOString());
+  if (pausados) consulta = consulta.not("flujo_ejecuciones.workspace_id", "in", pausados);
+  const { data: esperas } = await consulta.limit(100);
 
   let procesadas = 0;
   for (const espera of esperas ?? []) {

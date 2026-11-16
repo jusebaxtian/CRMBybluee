@@ -21,6 +21,8 @@ const { createAdminClient, resumeAutomationRun, isContactExcludedFromFollowups }
 
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient }));
 vi.mock("@/lib/automations/engine", () => ({ resumeAutomationRun, isContactExcludedFromFollowups }));
+// Ninguna cuenta pausada: estas pruebas miran el reclamo, no la pausa por plan vencido.
+vi.mock("@/lib/billing/pausa", () => ({ idsDeEspaciosPausados: async () => [], listaParaExcluir: () => null }));
 
 import { processDueAutomationRuns } from "@/lib/automations/scheduler";
 

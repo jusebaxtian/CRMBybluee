@@ -10,6 +10,8 @@ const executeCampaignSend = mocks.executeCampaignSend;
 
 vi.mock("@/lib/campaigns/send", () => ({ executeCampaignSend: mocks.executeCampaignSend }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => mocks.clienteActual.valor }));
+// Ninguna cuenta pausada: estas pruebas miran el reclamo, no la pausa por plan vencido.
+vi.mock("@/lib/billing/pausa", () => ({ idsDeEspaciosPausados: async () => [], listaParaExcluir: () => null }));
 
 let cliente: ReturnType<typeof fakeSupabase>;
 /** Deja el doble listo para que createAdminClient lo devuelva. */

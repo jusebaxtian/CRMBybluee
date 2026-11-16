@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { idsDeEspaciosPausados } from "@/lib/billing/pausa";
 import { executeCampaignSend } from "@/lib/campaigns/send";
 
 type SupabaseAdmin = ReturnType<typeof createAdminClient>;
@@ -26,12 +27,15 @@ export async function processDueCampaigns() {
 
 /** Campañas en borrador cuya `scheduled_at` ya pasó. */
 async function startDueCampaigns(supabase: SupabaseAdmin) {
-  const { data: due } = await supabase
+  // Una campaña programada de una cuenta con el plan vencido espera a que pague.
+  const pausados = new Set(await idsDeEspaciosPausados(supabase));
+  const { data: todas } = await supabase
     .from("campaigns")
     .select("id, workspace_id")
     .eq("status", "draft")
     .not("scheduled_at", "is", null)
     .lte("scheduled_at", new Date().toISOString());
+  const due = (todas ?? []).filter((c) => !pausados.has(c.workspace_id as string));
 
   for (const campaign of due ?? []) {
     // Se reclama primero (draft -> sending) para que un envío lento no lo
@@ -68,11 +72,13 @@ async function startDueCampaigns(supabase: SupabaseAdmin) {
 async function resumeStalledCampaigns(supabase: SupabaseAdmin) {
   const corte = new Date(Date.now() - STALLED_AFTER_MS).toISOString();
 
-  const { data: stalled } = await supabase
+  const pausados = new Set(await idsDeEspaciosPausados(supabase));
+  const { data: todas } = await supabase
     .from("campaigns")
     .select("id, workspace_id")
     .eq("status", "sending")
     .lt("last_progress_at", corte);
+  const stalled = (todas ?? []).filter((c) => !pausados.has(c.workspace_id as string));
 
   for (const campaign of stalled ?? []) {
     // Reclamar el reinicio moviendo el latido antes de actuar. Si dos ticks

@@ -14,6 +14,7 @@ import { getMediaUrl, downloadMedia } from "@/lib/whatsapp/graph";
 import { notifyNewMessage } from "@/lib/push/send";
 import { vistaPreviaDeMensaje } from "@/lib/push/aviso";
 import { maybeRespondWithAiAgent } from "@/lib/ai/agent";
+import { espacioPausado } from "@/lib/billing/pausa";
 import { transcribeAudio } from "@/lib/ai/providers";
 import { toPublicUrl } from "@/lib/supabase/config";
 import { recordInboundMessage } from "@/lib/messaging/record";
@@ -350,6 +351,9 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
       if (!account) continue;
       const workspaceId = account.workspace_id as string;
       const whatsappAccountId = account.id as string;
+      // Plan vencido sin pagar (o cuenta desactivada): el mensaje se guarda y
+      // se avisa, pero no corre nada automatico hasta que pague (16 nov 2026).
+      const pausado = await espacioPausado(supabase, workspaceId);
 
       for (const message of value.messages ?? []) {
         // Meta's webhook delivery is at-least-once — it resends the same
@@ -484,7 +488,7 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
         }
 
         let audioTranscript: string | null = null;
-        if (message.type === "audio" && mediaUrl) {
+        if (message.type === "audio" && mediaUrl && !pausado) {
           audioTranscript = await transcribeIncomingAudio(supabase, workspaceId, mediaUrl, contact.id, waId);
         }
 
@@ -564,7 +568,7 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
         // Arranca ya y no se espera aqui: los flujos y las automatizaciones de
         // abajo no tienen por que demorarse lo que tarde la IA en leer la foto.
         const lecturaEnCurso =
-          message.type === "image" && mediaUrl
+          message.type === "image" && mediaUrl && !pausado
             ? leerImagenEntrante(supabase, {
                 workspaceId,
                 conversationId: conversation.id,
@@ -595,6 +599,9 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           waId,
           notificationPreview
         );
+
+        // Cuenta pausada: ni flujos, ni automatizaciones, ni IA.
+        if (pausado) continue;
 
         // Flujos manda sobre todo lo demas. Si el contacto ya esta dentro de
         // uno, el flujo decide que pasa con este mensaje y nada mas se mete:

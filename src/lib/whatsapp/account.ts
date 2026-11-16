@@ -1,6 +1,8 @@
 import type { createClient } from "@/lib/supabase/server";
 import type { createAdminClient } from "@/lib/supabase/admin";
 
+import { estaPausado } from "@/lib/billing/pausa";
+
 type AnySupabase = Awaited<ReturnType<typeof createClient>> | ReturnType<typeof createAdminClient>;
 
 export type SendAccount = {
@@ -19,6 +21,11 @@ export async function resolveSendAccount(
   workspaceId: string,
   whatsappAccountId?: string | null
 ): Promise<SendAccount | null> {
+  // Red de seguridad: una cuenta con el plan vencido no envia nada (16 nov
+  // 2026). Los trabajos de fondo ya la saltan antes, sin gastar sus pendientes.
+  const { data: espacio } = await supabase.from("workspaces").select("status, access_disabled").eq("id", workspaceId).maybeSingle();
+  if (estaPausado(espacio)) return null;
+
   if (whatsappAccountId) {
     const { data } = await supabase
       .from("whatsapp_accounts")
