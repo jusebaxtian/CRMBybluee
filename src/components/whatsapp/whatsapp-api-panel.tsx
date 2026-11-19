@@ -1,10 +1,11 @@
-import { BadgeCheck, Gauge, MessageSquareOff, Snowflake } from "lucide-react";
+import { BadgeCheck, ExternalLink, Gauge, MessageSquareOff, Snowflake } from "lucide-react";
 import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
 import { ConnectWhatsAppButton } from "@/components/whatsapp/connect-whatsapp-button";
 import { DisconnectWhatsAppButton } from "@/components/whatsapp/disconnect-whatsapp-button";
 import { RenameWhatsAppAccount } from "@/components/whatsapp/rename-whatsapp-account";
 import { BusinessProfileEditor } from "@/components/whatsapp/business-profile-editor";
 import type { PhoneNumberStatus } from "@/lib/whatsapp/graph";
+import { enlacesDelAdministrador } from "@/lib/whatsapp/enlaces-meta";
 
 const qualityLabel: Record<string, string> = {
   GREEN: "Buena",
@@ -112,6 +113,32 @@ function AccountCard({
       {!frozen && (
         <div className="mt-4">
           <BusinessProfileEditor accountId={account.id} />
+        </div>
+      )}
+
+      {enlacesDelAdministrador(account.waba_id).length > 0 && (
+        <div className="mt-5 border-t border-border pt-4">
+          <p className="text-sm font-medium text-foreground">Abrir en el Administrador de WhatsApp de Meta</p>
+          <p className="mb-3 text-xs text-muted">
+            Se abre en Facebook. Entra con la cuenta de Facebook que administra este número.
+          </p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {enlacesDelAdministrador(account.waba_id).map((e) => (
+              <a
+                key={e.clave}
+                href={e.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-start gap-2 rounded-lg border border-border px-3 py-2 transition-colors hover:border-primary hover:bg-primary/5"
+              >
+                <ExternalLink size={14} className="mt-0.5 shrink-0 text-primary" />
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-foreground">{e.texto}</span>
+                  <span className="block text-xs text-muted">{e.ayuda}</span>
+                </span>
+              </a>
+            ))}
+          </div>
         </div>
       )}
 
