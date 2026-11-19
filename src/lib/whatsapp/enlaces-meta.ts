@@ -17,5 +17,13 @@ export function enlacesDelAdministrador(wabaId: string): EnlaceMeta[] {
     { clave: "numeros", texto: "Números y perfil", ayuda: "Foto, descripción, nombre visible", url: url("phone-numbers") },
     { clave: "plantillas", texto: "Plantillas", ayuda: "Crear y revisar plantillas", url: url("message-templates") },
     { clave: "estadisticas", texto: "Estadísticas", ayuda: "Mensajes enviados, entregados y costos", url: url("insights") },
+    // Meta no tiene un enlace oficial que abra el pago de una sola cuenta: se
+    // abre Metodos de pago del Centro de facturacion y ahi se elige la cuenta.
+    {
+      clave: "pago",
+      texto: "Añadir método de pago",
+      ayuda: `Agrega la tarjeta y elige la cuenta ${wabaId.trim()}`,
+      url: "https://business.facebook.com/billing_hub/payment_methods",
+    },
   ];
 }
