@@ -17,3 +17,18 @@ describe("clasificar cliente", () => {
   });
   it("activo sin fecha cuenta como activo", () => expect(clasificar("active", null, ahora)).toBe("activos"));
 });
+
+describe("semaforoDeUso", () => {
+  it("verde si envio mensajes en los ultimos 7 dias", async () => {
+    const { semaforoDeUso } = await import("@/lib/fidelidad/clientes-por-estado");
+    expect(semaforoDeUso(12, "2026-11-21T10:00:00Z")).toBe("verde");
+  });
+  it("amarillo si envio alguna vez pero no esta semana", async () => {
+    const { semaforoDeUso } = await import("@/lib/fidelidad/clientes-por-estado");
+    expect(semaforoDeUso(0, "2026-10-01T10:00:00Z")).toBe("amarillo");
+  });
+  it("rojo si nunca envio", async () => {
+    const { semaforoDeUso } = await import("@/lib/fidelidad/clientes-por-estado");
+    expect(semaforoDeUso(0, null)).toBe("rojo");
+  });
+});

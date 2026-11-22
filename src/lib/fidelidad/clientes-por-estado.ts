@@ -11,7 +11,22 @@ export type ClienteResumen = {
   dias: number | null;
   /** Chat con el cliente en el espacio del administrador, si lo hay. */
   conversationId: string | null;
+  /** Semaforo de uso: verde = envio mensajes en los ultimos 7 dias; amarillo = alguna vez, pero no esta semana; rojo = nunca. */
+  uso: SemaforoUso;
+  /** Mensajes enviados (salientes) en los ultimos 7 dias. */
+  enviados7d: number;
+  /** Ultimo mensaje enviado (ISO), o null si nunca envio. */
+  ultimoEnvio: string | null;
 };
+
+export type SemaforoUso = "verde" | "amarillo" | "rojo";
+
+/** Semaforo de probabilidad de renovar segun el uso (22 nov 2026). */
+export function semaforoDeUso(enviados7d: number, ultimoEnvio: string | null): SemaforoUso {
+  if (enviados7d > 0) return "verde";
+  if (ultimoEnvio) return "amarillo";
+  return "rojo";
+}
 
 export type ClientesPorEstado = { activos: ClienteResumen[]; porVencer: ClienteResumen[]; vencidos: ClienteResumen[] };
 
@@ -44,12 +59,20 @@ export async function cargarClientesPorEstado(
   espacioDelAdmin: string | null,
   ahora: Date = new Date()
 ): Promise<ClientesPorEstado> {
-  const [{ data: espacios }, { data: subs }, { data: planes }, { data: enlaces }] = await Promise.all([
+  const [{ data: espacios }, { data: subs }, { data: planes }, { data: enlaces }, { data: usos }] = await Promise.all([
     admin.from("workspaces").select("id, name, status, plan_id, trial_ends_at"),
     admin.from("subscriptions").select("workspace_id, current_period_end"),
     admin.from("plans").select("id, name, is_demo"),
     supabase.rpc("admin_clientes_de_espacios"),
+    admin.rpc("admin_uso_de_espacios"),
   ]);
+
+  const usoDe = new Map(
+    ((usos ?? []) as { workspace_id: string; enviados_7d: number | string; ultimo_envio: string | null }[]).map((u) => [
+      u.workspace_id,
+      { enviados7d: Number(u.enviados_7d) || 0, ultimoEnvio: u.ultimo_envio },
+    ])
+  );
 
   const finDe = new Map<string, string>();
   for (const s of subs ?? []) {
@@ -82,6 +105,7 @@ export async function cargarClientesPorEstado(
     const vence = finDe.get(e.id) ?? (e.trial_ends_at as string | null) ?? null;
     const plan = e.plan_id ? planDe.get(e.plan_id as string) : undefined;
     const contacto = contactoDe.get(e.id);
+    const uso = usoDe.get(e.id as string) ?? { enviados7d: 0, ultimoEnvio: null };
     grupos[clasificar(e.status as string, vence, ahora)].push({
       workspaceId: e.id as string,
       nombre: (e.name as string) || "Sin nombre",
@@ -90,6 +114,9 @@ export async function cargarClientesPorEstado(
       vence,
       dias: vence ? Math.ceil((new Date(vence).getTime() - ahora.getTime()) / DIA_MS) : null,
       conversationId: contacto ? (chatDe.get(contacto) ?? null) : null,
+      uso: semaforoDeUso(uso.enviados7d, uso.ultimoEnvio),
+      enviados7d: uso.enviados7d,
+      ultimoEnvio: uso.ultimoEnvio,
     });
   }
 
