@@ -43,6 +43,7 @@ export async function register() {
   const { sincronizarGoogleCalendar } = await import("@/lib/integraciones/google/sincronizar");
   const { sincronizarEstadoDePlantillas } = await import("@/lib/templates/sincronizar-estado");
   const { sincronizarEtiquetaDemo } = await import("@/lib/demo/etiqueta-demo");
+  const { marcarLeadsInactivos } = await import("@/lib/leads/inactivos");
 
   const MINUTO = 60_000;
 
@@ -83,6 +84,8 @@ export async function register() {
     // Cada minuto: quien gana un mes por referido recibe la notificacion enseguida.
     { nombre: "avisos de referidos", cadaMs: MINUTO, correr: avisarMesesGanados },
     { nombre: "etiqueta DEMO", cadaMs: 2 * MINUTO, correr: sincronizarEtiquetaDemo },
+    // Cada 10 min: el cliente de "Pagó" cuyo plan vencio sin renovar pasa a "Inactivo".
+    { nombre: "leads inactivos", cadaMs: 10 * MINUTO, correr: marcarLeadsInactivos },
     { nombre: "limpieza de notificaciones", cadaMs: 60 * MINUTO, correr: cleanupOldNotifications },
     { nombre: "espacios sin activar", cadaMs: 60 * MINUTO, correr: deleteStaleUnactivatedWorkspaces },
     { nombre: "ordenes de Bold abandonadas", cadaMs: 60 * MINUTO, correr: cleanupAbandonedBoldOrders },

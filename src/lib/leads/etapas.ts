@@ -1,9 +1,9 @@
 /**
- * Etapas de un lead (migraciones 0168 y 0176). "No interesado" queda fuera del
+ * Etapas de un lead (migraciones 0168, 0176 y 0184). "No interesado" queda fuera del
  * embudo: sin IA, sin seguimientos y fuera de las campanas hasta que el cliente
  * vuelva a mostrar interes. Las clases van completas para que Tailwind las vea.
  */
-export const ETAPAS = ["frio", "tibio", "caliente", "pago", "no_interesado"] as const;
+export const ETAPAS = ["frio", "tibio", "caliente", "pago", "inactivo", "no_interesado"] as const;
 export type Etapa = (typeof ETAPAS)[number];
 
 export const ESTILO_ETAPA: Record<Etapa, { texto: string; clase: string }> = {
@@ -11,6 +11,8 @@ export const ESTILO_ETAPA: Record<Etapa, { texto: string; clase: string }> = {
   tibio: { texto: "Tibio", clase: "bg-warning/15 text-warning" },
   caliente: { texto: "Caliente", clase: "bg-red-500/15 text-red-400" },
   pago: { texto: "Pagó", clase: "bg-success/15 text-success" },
+  // Pago pero no renovo (0184): pasa solo al vencer y vuelve a "Pagó" con el siguiente pago.
+  inactivo: { texto: "Inactivo", clase: "bg-orange-500/15 text-orange-400" },
   no_interesado: { texto: "No interesado", clase: "bg-muted/15 text-muted" },
 };
 

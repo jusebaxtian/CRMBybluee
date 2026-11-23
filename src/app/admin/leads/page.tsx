@@ -18,6 +18,7 @@ type Fila = {
   tibio_el: string | null;
   caliente_el: string | null;
   pago_el: string | null;
+  inactivo_el: string | null;
   no_interesado_el: string | null;
   asignados: string[];
   conversation_id: string | null;
@@ -281,6 +282,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
                 tibio: l.tibio_el,
                 caliente: l.caliente_el,
                 pago: l.pago_el,
+                inactivo: l.inactivo_el,
                 no_interesado: l.no_interesado_el,
               };
               return (

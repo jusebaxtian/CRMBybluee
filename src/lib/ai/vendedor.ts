@@ -29,6 +29,7 @@ const OBJETIVO: Record<Etapa, string> = {
   tibio: "Ya conoce el precio. Resuelve sus dudas y objeciones, ayúdalo a elegir el plan que le sirve y llévalo a pedir los medios de pago.",
   caliente: "Ya tiene los medios de pago. Acompáñalo a pagar, resuelve lo que lo frene y pídele que envíe el comprobante.",
   pago: "Ya pagó. Agradécele y ayúdalo con lo que necesite. No le vendas lo que ya compró.",
+  inactivo: "Fue cliente pero no renovó su plan. Trátalo como cliente conocido, pregúntale cómo le fue y ayúdalo a reactivar su plan sin presionar.",
   // En el chat real no se le responde (0176); esto solo se ve en la prueba del panel.
   no_interesado: "Dijo que no le interesa. No insistas ni le vendas: responde con amabilidad solo lo que pregunte.",
 };

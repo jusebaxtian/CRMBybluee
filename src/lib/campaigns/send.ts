@@ -229,7 +229,10 @@ async function runCampaignSendLoop(
   // doesn't interrupt that conversation. Same reasoning/pattern as the
   // no-followup exclusion above.
   const activeChatContactIds = new Set<string>();
-  if (recipients.length > 0) {
+  // Tambien trae a los que estan en la etapa "No interesado" (0184). Se vuelve
+  // a leer durante el envio: una campana grande tarda decenas de minutos y en
+  // ese tiempo alguien puede pasar a "No interesado" o recibir la etiqueta.
+  const cargarExcluidos = async () => {
     for (let offset = 0; ; offset += PAGE_SIZE) {
       const { data: excluded } = await supabase
         .rpc("campaign_no_followup_recipient_ids", { p_campaign_id: campaignId })
@@ -238,6 +241,9 @@ async function runCampaignSendLoop(
       for (const row of batch) noFollowupContactIds.add(row.contact_id);
       if (batch.length < PAGE_SIZE) break;
     }
+  };
+  if (recipients.length > 0) {
+    await cargarExcluidos();
     for (let offset = 0; ; offset += PAGE_SIZE) {
       const { data: activeChats } = await supabase
         .rpc("campaign_active_chat_recipient_ids", { p_campaign_id: campaignId })
@@ -311,7 +317,10 @@ async function runCampaignSendLoop(
 
   for (const recipient of recipients ?? []) {
     procesados += 1;
-    if (procesados % HEARTBEAT_EVERY === 0) await latir();
+    if (procesados % HEARTBEAT_EVERY === 0) {
+      await latir();
+      await cargarExcluidos();
+    }
 
     const contact = recipient.contacts as unknown as {
       wa_id: string;
@@ -352,7 +361,7 @@ async function runCampaignSendLoop(
         .from("campaign_recipients")
         .update({
           status: "failed",
-          error_message: "Contacto tiene una etiqueta de \"no seguimientos\" — excluido de envíos masivos.",
+          error_message: "Está como \"No interesado\" o tiene una etiqueta de \"no seguimientos\" — excluido de envíos masivos.",
         })
         .eq("id", recipient.id);
       continue;
