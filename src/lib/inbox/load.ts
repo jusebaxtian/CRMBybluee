@@ -29,12 +29,15 @@ export type InboxConversation = {
   lastMessagePreview: string | null;
   answered: boolean;
   unreadCount: number;
+  /** Marcado como no leido a mano (0185): se pinta como no leido aunque no haya mensajes nuevos. */
+  marcadoNoLeido: boolean;
   assignedAgentId: string | null;
   lastInboundAt: string | null;
   fromAds: boolean;
   adHeadline: string | null;
   likelyBlocked: boolean;
   needsHuman: boolean;
+  contactId: string;
   contact: { name: string | null; wa_id: string };
   tags: { id: string; name: string; color: string }[];
 };
@@ -58,7 +61,7 @@ const ETIQUETA_MEDIA: Record<string, string> = {
 };
 
 const CAMPOS =
-  "id, last_message_at, pinned_at, assigned_agent_id, ad_source_id, ad_headline, ai_handoff_requested, ai_manually_paused, whatsapp_account_id, contacts(name, wa_id, likely_blocked, contact_tags(tags(id, name, color)))";
+  "id, contact_id, last_message_at, pinned_at, marcado_no_leido, assigned_agent_id, ad_source_id, ad_headline, ai_handoff_requested, ai_manually_paused, whatsapp_account_id, contacts(name, wa_id, likely_blocked, contact_tags(tags(id, name, color)))";
 
 /**
  * El orden de la bandeja: fijadas arriba, y dentro de cada grupo por
@@ -164,12 +167,14 @@ export async function loadInboxPage(
           : r.last_body ?? ETIQUETA_MEDIA[r.last_message_type ?? ""] ?? "Mensaje",
       answered: r.last_direction === null ? true : r.last_direction === "out",
       unreadCount: Number(r.unread_count ?? 0),
+      marcadoNoLeido: !!c.marcado_no_leido,
       assignedAgentId: c.assigned_agent_id as string | null,
       lastInboundAt: r.last_inbound_at,
       fromAds: !!c.ad_source_id,
       adHeadline: c.ad_headline as string | null,
       likelyBlocked: contacto.likely_blocked,
       needsHuman: (c.ai_handoff_requested || c.ai_manually_paused) as boolean,
+      contactId: c.contact_id as string,
       contact: { name: contacto.name, wa_id: contacto.wa_id },
       tags: contacto.contact_tags
         .map((ct) => ct.tags)

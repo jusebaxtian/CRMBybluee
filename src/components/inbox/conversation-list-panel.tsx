@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, SlidersHorizontal, X, Clock, Megaphone, ShieldAlert, Bot, Check, Pin, PinOff } from "lucide-react";
-import { setConversationPinned, cargarConversaciones } from "@/app/actions/conversations";
-import { NewMessageButton } from "@/components/inbox/new-message-button";
+import { Search, SlidersHorizontal, X, Clock, Megaphone, ShieldAlert, Bot, Check, Pin } from "lucide-react";
+import { cargarConversaciones } from "@/app/actions/conversations";
+import { MenuDeFila, NuevaConversacionBoton } from "@/components/inbox/acciones-de-chat";
 import { claseAvatar, ESTILO_CICLO } from "@/components/inbox/etiqueta-ciclo";
 import type { Ciclo } from "@/lib/inbox/ciclo-de-plan";
 import { PullToRefresh } from "@/components/ui/pull-to-refresh";
@@ -24,12 +24,14 @@ type Conversation = {
   lastMessagePreview: string | null;
   answered: boolean;
   unreadCount: number;
+  marcadoNoLeido: boolean;
   assignedAgentId: string | null;
   lastInboundAt: string | null;
   fromAds: boolean;
   adHeadline: string | null;
   likelyBlocked: boolean;
   needsHuman: boolean;
+  contactId: string;
   contact: { name: string | null; wa_id: string };
   tags: Tag[];
 };
@@ -86,11 +88,9 @@ function WindowExpiringSoonBadge({
   );
 }
 
-type Contact = { id: string; name: string | null; wa_id: string };
 
 export function ConversationListPanel({
   conversations: primeraPagina,
-  contacts,
   allTags,
   agents,
   channels,
@@ -99,7 +99,6 @@ export function ConversationListPanel({
   ciclos = {},
 }: {
   conversations: Conversation[];
-  contacts: Contact[];
   allTags: Tag[];
   agents: Agent[];
   channels: Channel[];
@@ -221,19 +220,8 @@ export function ConversationListPanel({
     setQuedanMas(resultado.hayMas);
   }
 
-  const [, startTransition] = useTransition();
+  // Errores de las acciones del menu de cada fila (fijar, no leido, eliminar).
   const [pinError, setPinError] = useState<string | null>(null);
-
-  // El fijado es del espacio o, con trabajo_individual, de cada persona: lo
-  // decide el servidor. El orden ya viene de alli (fijados primero), asi que
-  // aqui solo se dispara la accion.
-  function handleTogglePin(conversationId: string, pinned: boolean) {
-    setPinError(null);
-    startTransition(async () => {
-      const result = await setConversationPinned(conversationId, pinned);
-      if (result?.error) setPinError(result.error);
-    });
-  }
 
   const channelColor = new Map(channels.map((c, i) => [c.id, CHANNEL_COLORS[i % CHANNEL_COLORS.length]]));
   const agentesPorId = new Map(agents.map((a) => [a.id, a]));
@@ -311,7 +299,7 @@ export function ConversationListPanel({
             </span>
           )}
         </div>
-        <NewMessageButton contacts={contacts} compact />
+        <NuevaConversacionBoton />
       </div>
 
       <div className="flex items-center gap-2 border-b border-border p-3">
@@ -537,16 +525,21 @@ export function ConversationListPanel({
         )}
         {filtered.map((conv) => {
           const active = pathname === `/dashboard/inbox/${conv.id}`;
+          // Diseno A (23 nov 2026): el no leido lleva barra azul gruesa a la
+          // izquierda, fondo azul suave, y nombre y ultimo mensaje resaltados.
+          const noLeido = !active && (conv.unreadCount > 0 || conv.marcadoNoLeido);
           return (
             <Link
               key={conv.id}
               href={`/dashboard/inbox/${conv.id}`}
-              className={`group flex items-center gap-3 border-b border-border px-4 py-3 ${
+              className={`group flex items-center gap-3 border-b border-l-4 border-b-border py-3 pl-3 pr-4 ${
                 active
-                  ? "bg-surface-hover"
-                  : conv.pinnedAt
-                    ? "bg-primary/5 hover:bg-surface-hover"
-                    : "hover:bg-surface-hover"
+                  ? "border-l-transparent bg-surface-hover"
+                  : noLeido
+                    ? "border-l-primary bg-primary/10 hover:bg-primary/15"
+                    : conv.pinnedAt
+                      ? "border-l-transparent bg-primary/5 hover:bg-surface-hover"
+                      : "border-l-transparent hover:bg-surface-hover"
               }`}
             >
               <div className="relative shrink-0">
@@ -572,7 +565,12 @@ export function ConversationListPanel({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between">
-                  <p className="flex min-w-0 items-center gap-1 truncate text-sm font-medium text-foreground">
+                  <p className={`flex min-w-0 items-center gap-1 truncate text-sm text-foreground ${noLeido ? "font-bold" : "font-medium"}`}>
+                    {conv.pinnedAt && (
+                      <span title="Fijado arriba">
+                        <Pin size={11} className="shrink-0 text-primary" />
+                      </span>
+                    )}
                     <span className="truncate">{conv.contact.name || conv.contact.wa_id}</span>
                     {conv.fromAds && (
                       <span
@@ -603,33 +601,20 @@ export function ConversationListPanel({
                   <span className="flex shrink-0 items-center gap-1">
                     <WindowExpiredBadge lastInboundAt={conv.lastInboundAt} />
                     <WindowExpiringSoonBadge lastInboundAt={conv.lastInboundAt} now={now} />
-                    <button
-                      type="button"
-                      // La fila entera es un <Link>: sin esto, fijar navegaria
-                      // al chat en vez de quedarse en la lista.
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleTogglePin(conv.id, !conv.pinnedAt);
-                      }}
-                      title={conv.pinnedAt ? "Quitar de fijados" : "Fijar arriba"}
-                      aria-label={conv.pinnedAt ? "Quitar de fijados" : "Fijar arriba"}
-                      // Siempre visible y con area de toque de 32px: en el
-                      // celular no hay "pasar el cursor" que lo revele.
-                      className={`-my-1 flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
-                        conv.pinnedAt
-                          ? "text-primary hover:bg-primary/10"
-                          : "text-muted/60 hover:bg-surface-hover hover:text-foreground"
-                      }`}
-                    >
-                      {conv.pinnedAt ? <Pin size={16} /> : <PinOff size={16} />}
-                    </button>
-                    <span className="text-[10px] text-muted">
+                    <span className={`text-[10px] ${noLeido ? "font-semibold text-primary" : "text-muted"}`}>
                       {new Date(conv.last_message_at).toLocaleTimeString("es-CO", {
                         hour: "2-digit",
                         minute: "2-digit",
                       })}
                     </span>
+                    <MenuDeFila
+                      conversationId={conv.id}
+                      contactId={conv.contactId}
+                      nombre={conv.contact.name || conv.contact.wa_id}
+                      noLeido={conv.unreadCount > 0 || conv.marcadoNoLeido}
+                      fijado={!!conv.pinnedAt}
+                      onError={setPinError}
+                    />
                   </span>
                 </div>
                 <div className="flex min-w-0 items-center gap-1.5">
@@ -680,7 +665,7 @@ export function ConversationListPanel({
                   </div>
                 )}
                 <div className="flex items-center justify-between gap-2">
-                  <p className="flex min-w-0 items-center gap-1 truncate text-xs text-muted">
+                  <p className={`flex min-w-0 items-center gap-1 truncate text-xs ${noLeido ? "font-medium text-foreground" : "text-muted"}`}>
                     {conv.answered && (
                       <Check
                         size={12}
@@ -690,10 +675,14 @@ export function ConversationListPanel({
                     )}
                     <span className="truncate">{conv.lastMessagePreview ?? "Sin mensajes"}</span>
                   </p>
-                  {conv.unreadCount > 0 && (
-                    <span className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-white">
+                  {conv.unreadCount > 0 ? (
+                    <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-bold text-white">
                       {conv.unreadCount > 99 ? "99+" : conv.unreadCount}
                     </span>
+                  ) : (
+                    conv.marcadoNoLeido && (
+                      <span title="Marcado como no leído" className="h-3 w-3 shrink-0 rounded-full bg-primary" />
+                    )
                   )}
                 </div>
               </div>

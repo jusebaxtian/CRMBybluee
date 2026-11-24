@@ -702,9 +702,17 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
           errorCode = status.errors[0].code;
         }
 
+        // Hora en que Meta dice que se entrego o se leyo (0185): el chat la
+        // muestra bajo cada mensaje enviado ("Leído hoy 2:41 p. m.").
+        const cuandoMeta = Number(status.timestamp) > 0 ? new Date(Number(status.timestamp) * 1000).toISOString() : new Date().toISOString();
         const { data: updatedMessages } = await supabase
           .from("messages")
-          .update({ status: status.status, error_detail: errorDetail })
+          .update({
+            status: status.status,
+            error_detail: errorDetail,
+            ...(status.status === "delivered" ? { entregado_el: cuandoMeta } : {}),
+            ...(status.status === "read" ? { leido_el: cuandoMeta } : {}),
+          })
           .eq("wa_message_id", status.id)
           .select("conversation_id");
 

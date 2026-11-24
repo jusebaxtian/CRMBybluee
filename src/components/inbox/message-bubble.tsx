@@ -23,7 +23,45 @@ type Message = {
   sent_from_app?: boolean | null;
   buttons?: MessageButton[] | null;
   created_at: string;
+  /** Cuando WhatsApp confirmo la entrega y la lectura (0185). Los mensajes viejos no lo tienen. */
+  entregado_el?: string | null;
+  leido_el?: string | null;
 };
+
+/**
+ * "hoy 2:41 p. m.", "ayer 9:05 a. m." o "21 nov, 4:10 p. m.", en hora de Bogota.
+ * Exportada para las pruebas.
+ */
+export function cuandoCorto(iso: string, ahora: Date = new Date()): string {
+  const zona = "America/Bogota";
+  const dia = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: zona });
+  const fecha = new Date(iso);
+  const hora = fecha.toLocaleTimeString("es-CO", { hour: "numeric", minute: "2-digit", timeZone: zona });
+  if (dia(fecha) === dia(ahora)) return `hoy ${hora}`;
+  if (dia(fecha) === dia(new Date(ahora.getTime() - 86_400_000))) return `ayer ${hora}`;
+  return `${fecha.toLocaleDateString("es-CO", { day: "numeric", month: "short", timeZone: zona })}, ${hora}`;
+}
+
+/** Bajo cada mensaje enviado: cuando lo leyo el cliente o, si aun no, cuando le llego. */
+function Lectura({ m }: { m: Message }) {
+  if (m.leido_el) {
+    return (
+      <p className="mt-0.5 flex items-center justify-end gap-1 text-[10.5px] font-medium text-sky-200" title={`Leído el ${new Date(m.leido_el).toLocaleString("es-CO", { timeZone: "America/Bogota" })}`}>
+        <CheckCheck size={12} />
+        Leído {cuandoCorto(m.leido_el)}
+      </p>
+    );
+  }
+  if (m.entregado_el && m.status !== "failed") {
+    return (
+      <p className="mt-0.5 flex items-center justify-end gap-1 text-[10.5px] opacity-70">
+        <CheckCheck size={12} />
+        Entregado {cuandoCorto(m.entregado_el)}
+      </p>
+    );
+  }
+  return null;
+}
 
 function StatusTicks({ status, errorDetail }: { status: string; errorDetail?: string | null }) {
   if (status === "failed")
@@ -324,6 +362,7 @@ export function MessageBubble({
           {time}
           {out && <StatusTicks status={m.status} errorDetail={m.error_detail} />}
         </p>
+        {out && <Lectura m={m} />}
 
         {/* Tooltips don't work on touch devices — show the reason inline too. */}
         {out && m.status === "failed" && m.error_detail && (

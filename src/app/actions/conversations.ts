@@ -1,7 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireWorkspace } from "@/lib/auth/with-workspace";
+import { requireWorkspace, requireWorkspaceRole } from "@/lib/auth/with-workspace";
+import { normalizeWaId } from "@/lib/phone";
+import { mensajeDeErrorDeContactos } from "@/lib/billing/demo";
+import { abrirConversacion } from "@/lib/whatsapp/conversacion";
 import { MAX_PINNED_CONVERSATIONS } from "@/lib/inbox/pins";
 import { loadInboxPage, type InboxCursor, type InboxFilters } from "@/lib/inbox/load";
 
@@ -126,4 +129,109 @@ export async function cargarConversaciones(entrada: {
     filters: entrada.filters,
   });
   return { conversations, hayMas };
+}
+
+/**
+ * Marca un chat como no leido (o leido) a mano (0185). La marca es del espacio,
+ * como `last_read_at`, y se limpia sola al abrir el chat.
+ */
+export async function marcarChatNoLeido(conversationId: string, noLeido: boolean) {
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
+
+  const { error } = await supabase
+    .from("conversations")
+    .update(noLeido ? { marcado_no_leido: true } : { marcado_no_leido: false, last_read_at: new Date().toISOString() })
+    .eq("id", conversationId)
+    .eq("workspace_id", workspaceId);
+  if (error) return { error: "No se pudo cambiar el estado del chat." };
+  revalidatePath("/dashboard/inbox", "layout");
+  return { success: true as const };
+}
+
+/**
+ * Guarda un contacto nuevo (o actualiza el nombre de uno que ya existe con ese
+ * numero) y, si se pide, abre su chat. El chat se abre sin enviar nada: si el
+ * contacto no ha escrito en 24 h, el chat ofrece las plantillas.
+ */
+export async function guardarContactoDesdeChat(entrada: { nombre: string; telefono: string; abrirChat: boolean }) {
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
+
+  const waId = normalizeWaId(entrada.telefono);
+  if (!waId) return { error: "Ingresa un número válido con código de país, por ejemplo 57 300 123 4567." };
+  const nombre = entrada.nombre.trim();
+
+  const { data: existente } = await supabase
+    .from("contacts")
+    .select("id, name")
+    .eq("workspace_id", workspaceId)
+    .eq("wa_id", waId)
+    .maybeSingle();
+
+  let contactId = existente?.id as string | undefined;
+  if (contactId) {
+    // Un nombre vacio no borra el que ya tenia.
+    if (nombre && nombre !== existente?.name) {
+      await supabase.from("contacts").update({ name: nombre, name_source: "manual" }).eq("id", contactId);
+    }
+  } else {
+    const { data: nuevo, error } = await supabase
+      .from("contacts")
+      .insert({ workspace_id: workspaceId, wa_id: waId, name: nombre || null, ...(nombre ? { name_source: "manual" } : {}) })
+      .select("id")
+      .single();
+    if (error || !nuevo) return { error: mensajeDeErrorDeContactos(error?.message ?? "") };
+    contactId = nuevo.id as string;
+  }
+
+  revalidatePath("/dashboard/contacts");
+  if (!entrada.abrirChat) return { success: true as const, yaExistia: !!existente, conversationId: null };
+
+  const conversacion = await abrirConversacion(supabase, workspaceId, contactId);
+  if (!conversacion) return { error: "Se guardó el contacto, pero no se pudo abrir el chat. ¿Tienes una línea de WhatsApp conectada?" };
+  revalidatePath("/dashboard/inbox", "layout");
+  return { success: true as const, yaExistia: !!existente, conversationId: conversacion.id };
+}
+
+/** Edita nombre y numero del contacto desde el chat. */
+export async function editarContactoDesdeChat(contactId: string, nombre: string, telefono: string) {
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
+
+  const waId = normalizeWaId(telefono);
+  if (!waId) return { error: "Ingresa un número válido con código de país." };
+  const { error } = await supabase
+    .from("contacts")
+    .update({ name: nombre.trim() || null, wa_id: waId, name_source: nombre.trim() ? "manual" : "whatsapp" })
+    .eq("id", contactId)
+    .eq("workspace_id", workspaceId);
+  if (error) {
+    return { error: error.message.includes("duplicate") ? "Ya existe otro contacto con ese número." : "No se pudo guardar el contacto." };
+  }
+  revalidatePath("/dashboard/inbox", "layout");
+  revalidatePath("/dashboard/contacts");
+  return { success: true as const };
+}
+
+/**
+ * Elimina el contacto y, con el, sus chats y mensajes. Solo dueño o
+ * administrador del espacio: un agente no borra historial.
+ */
+export async function eliminarContactoDesdeChat(contactId: string) {
+  const ctx = await requireWorkspaceRole(["owner", "admin"], "Solo el dueño o un administrador puede eliminar contactos.");
+  if ("error" in ctx) return { error: ctx.error };
+  const { supabase, workspaceId } = ctx;
+
+  const { error } = await supabase.rpc("bulk_delete_contacts", {
+    p_workspace_id: workspaceId,
+    p_contact_ids: [contactId],
+  });
+  if (error) return { error: "No se pudo eliminar el contacto." };
+  revalidatePath("/dashboard/inbox", "layout");
+  revalidatePath("/dashboard/contacts");
+  return { success: true as const };
 }

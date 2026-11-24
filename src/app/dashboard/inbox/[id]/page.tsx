@@ -16,6 +16,7 @@ import { ChatPane } from "@/components/inbox/chat-pane";
 import { RealtimeRefresh } from "@/components/ui/realtime-refresh";
 import { ConversationAssignmentControl } from "@/components/inbox/conversation-assignment-control";
 import { ConversationDetailsSheet } from "@/components/inbox/conversation-details-sheet";
+import { AccionesDelChat } from "@/components/inbox/acciones-de-chat";
 import { ConversationWindowStatus } from "@/components/inbox/conversation-window-status";
 import { ConversationFollowupsToggle } from "@/components/inbox/conversation-followups-toggle";
 import { ContactBlockedNotice } from "@/components/inbox/contact-blocked-notice";
@@ -67,7 +68,7 @@ export default async function ConversationPage({
     supabase
       .from("conversations")
       .select(
-        "id, contact_id, last_read_at, assigned_agent_id, ad_source_id, ad_headline, ad_body, followups_enabled, ai_handoff_requested, ai_manually_paused, whatsapp_account_id, contacts(name, wa_id, username, notes, likely_blocked, bloqueado_el, contact_tags(tag_id, tags(excludes_followups)))"
+        "id, contact_id, last_read_at, marcado_no_leido, assigned_agent_id, ad_source_id, ad_headline, ad_body, followups_enabled, ai_handoff_requested, ai_manually_paused, whatsapp_account_id, contacts(name, wa_id, username, notes, likely_blocked, bloqueado_el, contact_tags(tag_id, tags(excludes_followups)))"
       )
       .eq("id", id)
       .eq("workspace_id", workspaceId ?? "")
@@ -83,7 +84,7 @@ export default async function ConversationPage({
     supabase
       .from("messages")
       .select(
-        "id, direction, body, caption, status, message_type, media_url, media_mime_type, error_detail, wa_message_id, context_wa_message_id, sent_from_app, buttons, created_at, sent_by_user_id, origen, via_automation_id"
+        "id, direction, body, caption, status, message_type, media_url, media_mime_type, error_detail, wa_message_id, context_wa_message_id, sent_from_app, buttons, created_at, entregado_el, leido_el, sent_by_user_id, origen, via_automation_id"
       )
       .eq("conversation_id", id)
       .order("created_at", { ascending: false })
@@ -280,10 +281,11 @@ export default async function ConversationPage({
           // si alguna de las suyas coincide con alguna del contacto.
           .overlaps("trigger_tag_ids", assignedTagIds)
       : Promise.resolve({ data: [] as { id: string; name: string; is_active: boolean }[] }),
-    hasUnread
+    // Abrir el chat lo deja leido, tambien si lo habian marcado como no leido a mano (0185).
+    hasUnread || conversation.marcado_no_leido
       ? supabase
           .from("conversations")
-          .update({ last_read_at: new Date().toISOString() })
+          .update({ last_read_at: new Date().toISOString(), marcado_no_leido: false })
           .eq("id", id)
       : Promise.resolve(null),
   ]);
@@ -342,6 +344,12 @@ export default async function ConversationPage({
               </div>
             )}
           </div>
+          <AccionesDelChat
+            conversationId={conversation.id}
+            contactId={conversation.contact_id}
+            nombre={contact.name}
+            telefono={contact.wa_id}
+          />
           <ConversationDetailsSheet
             contactName={contact.name}
             contactWaId={contact.wa_id}

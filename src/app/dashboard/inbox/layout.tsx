@@ -42,12 +42,6 @@ export default async function InboxLayout({
         .order("connected_at")
     : { data: [] };
 
-  const { data: contacts } = await supabase
-    .from("contacts")
-    .select("id, name, wa_id")
-    .eq("workspace_id", workspaceId ?? "")
-    .order("name");
-
   const { data: workspaceTags } = await supabase
     .from("tags")
     .select("id, name, color")
@@ -96,7 +90,6 @@ export default async function InboxLayout({
       conversations={conversations}
       hayMas={hayMas}
       unreadConversationsCount={Number(sinLeer ?? 0)}
-      contacts={contacts ?? []}
       allTags={workspaceTags ?? []}
       agents={agents}
       channels={channels ?? []}
