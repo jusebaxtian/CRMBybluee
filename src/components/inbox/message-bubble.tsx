@@ -42,24 +42,16 @@ export function cuandoCorto(iso: string, ahora: Date = new Date()): string {
   return `${fecha.toLocaleDateString("es-CO", { day: "numeric", month: "short", timeZone: zona })}, ${hora}`;
 }
 
-/** Bajo cada mensaje enviado: cuando lo leyo el cliente o, si aun no, cuando le llego. */
-function Lectura({ m }: { m: Message }) {
-  if (m.leido_el) {
-    return (
-      <p className="mt-0.5 flex items-center justify-end gap-1 text-[10.5px] font-medium text-sky-200" title={`Leído el ${new Date(m.leido_el).toLocaleString("es-CO", { timeZone: "America/Bogota" })}`}>
-        <CheckCheck size={12} />
-        Leído {cuandoCorto(m.leido_el)}
-      </p>
-    );
-  }
-  if (m.entregado_el && m.status !== "failed") {
-    return (
-      <p className="mt-0.5 flex items-center justify-end gap-1 text-[10.5px] opacity-70">
-        <CheckCheck size={12} />
-        Entregado {cuandoCorto(m.entregado_el)}
-      </p>
-    );
-  }
+/**
+ * Pie de un mensaje enviado con una sola fecha (pedido del 23 nov 2026):
+ * "Entregado hoy 7:28 p. m." y, cuando el cliente lo lee, "Visto hoy 7:30 p. m.".
+ * Null si WhatsApp aun no confirma nada (o el mensaje es de antes de guardar
+ * estas horas): ahi se muestra la hora de envio como siempre.
+ */
+export function textoDeLectura(m: Pick<Message, "status" | "entregado_el" | "leido_el">, ahora?: Date): string | null {
+  if (m.status === "failed") return null;
+  if (m.leido_el) return `Visto ${cuandoCorto(m.leido_el, ahora)}`;
+  if (m.entregado_el) return `Entregado ${cuandoCorto(m.entregado_el, ahora)}`;
   return null;
 }
 
@@ -353,16 +345,20 @@ export function MessageBubble({
           </div>
         )}
 
-        <p className="mt-1 flex items-center justify-end gap-1 text-[10px] opacity-70">
+        <p
+          className={`mt-1 flex items-center justify-end gap-1 text-[10px] ${
+            out && m.leido_el && m.status !== "failed" ? "font-semibold text-sky-200" : "opacity-70"
+          }`}
+          title={`Enviado ${cuandoCorto(m.created_at)}`}
+        >
           {m.sent_from_app && (
             <span title="Enviado desde el celular" aria-label="Enviado desde el celular">
               📱
             </span>
           )}
-          {time}
+          {(out && textoDeLectura(m)) || time}
           {out && <StatusTicks status={m.status} errorDetail={m.error_detail} />}
         </p>
-        {out && <Lectura m={m} />}
 
         {/* Tooltips don't work on touch devices — show the reason inline too. */}
         {out && m.status === "failed" && m.error_detail && (

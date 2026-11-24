@@ -11,6 +11,7 @@ import { RecordatorioPicker } from "@/components/inbox/recordatorio-picker";
 import { CitaPicker } from "@/components/inbox/cita-picker";
 import { useMessageWindow } from "@/lib/use-message-window";
 import { cerrarAvisoDelChat } from "@/lib/push/cerrar-avisos";
+import { quitarMarcaNoLeidoAlAbrir } from "@/app/actions/conversations";
 
 export type OptimisticMessage = {
   id: string;
@@ -71,6 +72,13 @@ export function ChatPane({
   // optimistically added is now included for real — drop the local copy.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => setPending([]), [messages.length]);
+
+  // Abrir el chat quita la marca manual de "no leido". Solo al abrirlo (cambia
+  // el id), no en cada refresco: si no, marcarlo desde la lista con el chat
+  // abierto la borraria al instante.
+  useEffect(() => {
+    void quitarMarcaNoLeidoAlAbrir(conversationId);
+  }, [conversationId]);
 
   // Estoy leyendo este chat: su aviso del celular ya no tiene sentido (ni su "(N)").
   useEffect(() => {

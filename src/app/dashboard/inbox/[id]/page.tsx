@@ -68,7 +68,7 @@ export default async function ConversationPage({
     supabase
       .from("conversations")
       .select(
-        "id, contact_id, last_read_at, marcado_no_leido, assigned_agent_id, ad_source_id, ad_headline, ad_body, followups_enabled, ai_handoff_requested, ai_manually_paused, whatsapp_account_id, contacts(name, wa_id, username, notes, likely_blocked, bloqueado_el, contact_tags(tag_id, tags(excludes_followups)))"
+        "id, contact_id, last_read_at, assigned_agent_id, ad_source_id, ad_headline, ad_body, followups_enabled, ai_handoff_requested, ai_manually_paused, whatsapp_account_id, contacts(name, wa_id, username, notes, likely_blocked, bloqueado_el, contact_tags(tag_id, tags(excludes_followups)))"
       )
       .eq("id", id)
       .eq("workspace_id", workspaceId ?? "")
@@ -281,11 +281,13 @@ export default async function ConversationPage({
           // si alguna de las suyas coincide con alguna del contacto.
           .overlaps("trigger_tag_ids", assignedTagIds)
       : Promise.resolve({ data: [] as { id: string; name: string; is_active: boolean }[] }),
-    // Abrir el chat lo deja leido, tambien si lo habian marcado como no leido a mano (0185).
-    hasUnread || conversation.marcado_no_leido
+    // La marca manual de "no leido" (0185) NO se limpia aqui: esta pagina se
+    // vuelve a pintar con cada refresco (incluido el de marcarla), y la
+    // borraba en el acto. La limpia el chat al abrirse (ChatPane).
+    hasUnread
       ? supabase
           .from("conversations")
-          .update({ last_read_at: new Date().toISOString(), marcado_no_leido: false })
+          .update({ last_read_at: new Date().toISOString() })
           .eq("id", id)
       : Promise.resolve(null),
   ]);

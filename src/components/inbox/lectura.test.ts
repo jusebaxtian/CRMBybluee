@@ -19,3 +19,21 @@ describe("cuandoCorto", () => {
     expect(cuandoCorto("2026-11-20T21:10:00Z", AHORA)).toMatch(/^20 de nov/);
   });
 });
+
+describe("textoDeLectura", () => {
+  it("dice Entregado con una sola fecha mientras no lo lea", async () => {
+    const { textoDeLectura } = await import("@/components/inbox/message-bubble");
+    expect(textoDeLectura({ status: "delivered", entregado_el: "2026-11-23T19:28:00Z", leido_el: null }, AHORA)).toMatch(/^Entregado hoy 2:28/);
+  });
+  it("cambia a Visto cuando lo lee", async () => {
+    const { textoDeLectura } = await import("@/components/inbox/message-bubble");
+    expect(
+      textoDeLectura({ status: "read", entregado_el: "2026-11-23T19:28:00Z", leido_el: "2026-11-23T19:30:00Z" }, AHORA)
+    ).toMatch(/^Visto hoy 2:30/);
+  });
+  it("sin confirmacion de WhatsApp no inventa nada (se muestra la hora de envio)", async () => {
+    const { textoDeLectura } = await import("@/components/inbox/message-bubble");
+    expect(textoDeLectura({ status: "sent", entregado_el: null, leido_el: null }, AHORA)).toBeNull();
+    expect(textoDeLectura({ status: "failed", entregado_el: "2026-11-23T19:28:00Z", leido_el: null }, AHORA)).toBeNull();
+  });
+});

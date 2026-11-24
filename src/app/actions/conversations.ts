@@ -151,6 +151,21 @@ export async function marcarChatNoLeido(conversationId: string, noLeido: boolean
 }
 
 /**
+ * Al abrir un chat se quita la marca manual de "no leido". Sin revalidar: la
+ * lista se entera por el aviso en vivo de `conversations`.
+ */
+export async function quitarMarcaNoLeidoAlAbrir(conversationId: string) {
+  const ctx = await requireWorkspace();
+  if ("error" in ctx) return;
+  await ctx.supabase
+    .from("conversations")
+    .update({ marcado_no_leido: false })
+    .eq("id", conversationId)
+    .eq("workspace_id", ctx.workspaceId)
+    .eq("marcado_no_leido", true);
+}
+
+/**
  * Guarda un contacto nuevo (o actualiza el nombre de uno que ya existe con ese
  * numero) y, si se pide, abre su chat. El chat se abre sin enviar nada: si el
  * contacto no ha escrito en 24 h, el chat ofrece las plantillas.

@@ -527,16 +527,16 @@ export function ConversationListPanel({
           const active = pathname === `/dashboard/inbox/${conv.id}`;
           // Diseno A (23 nov 2026): el no leido lleva barra azul gruesa a la
           // izquierda, fondo azul suave, y nombre y ultimo mensaje resaltados.
-          const noLeido = !active && (conv.unreadCount > 0 || conv.marcadoNoLeido);
+          const noLeido = conv.marcadoNoLeido || (!active && conv.unreadCount > 0);
           return (
             <Link
               key={conv.id}
               href={`/dashboard/inbox/${conv.id}`}
               className={`group flex items-center gap-3 border-b border-l-4 border-b-border py-3 pl-3 pr-4 ${
-                active
-                  ? "border-l-transparent bg-surface-hover"
-                  : noLeido
-                    ? "border-l-primary bg-primary/10 hover:bg-primary/15"
+                noLeido
+                  ? "border-l-primary bg-primary/10 hover:bg-primary/15"
+                  : active
+                    ? "border-l-transparent bg-surface-hover"
                     : conv.pinnedAt
                       ? "border-l-transparent bg-primary/5 hover:bg-surface-hover"
                       : "border-l-transparent hover:bg-surface-hover"
