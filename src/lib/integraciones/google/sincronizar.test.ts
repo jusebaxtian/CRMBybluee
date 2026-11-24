@@ -154,11 +154,23 @@ describe("citaDesdeGoogle (citas creadas en Google, 24 nov 2026)", () => {
     expect(citaDesdeGoogle({ ...reserva, organizer: { email: "otro@ejemplo.com", self: false } })).toBeNull();
   });
 
-  it("un evento hecho a mano en Gmail sin invitados entra con su titulo", async () => {
+  it("una nota personal sin invitados no es una cita y no entra", async () => {
     const { citaDesdeGoogle } = await import("@/lib/integraciones/google/sincronizar");
-    const c = citaDesdeGoogle({ ...reserva, summary: "Llamada con proveedor", description: undefined, attendees: undefined, extendedProperties: undefined });
-    expect(c!.titulo).toBe("Llamada con proveedor");
-    expect(c!.nombre_externo).toBeNull();
-    expect(c!.invitados).toEqual([]);
+    expect(citaDesdeGoogle({ ...reserva, summary: "NO DAR CITA", description: undefined, attendees: undefined, extendedProperties: undefined })).toBeNull();
+    expect(citaDesdeGoogle({ ...reserva, summary: "Pagar claro casa", attendees: [{ email: "yo@ejemplo.com", self: true, organizer: true }], extendedProperties: undefined })).toBeNull();
+  });
+
+  it("un evento hecho a mano en Gmail con un invitado si entra", async () => {
+    const { citaDesdeGoogle } = await import("@/lib/integraciones/google/sincronizar");
+    const c = citaDesdeGoogle({
+      ...reserva,
+      summary: "Demo con cliente",
+      description: undefined,
+      extendedProperties: undefined,
+      attendees: [{ email: "yo@ejemplo.com", self: true, organizer: true }, { email: "cliente@ejemplo.com", displayName: "Ana Ruiz" }],
+    });
+    expect(c!.titulo).toBe("Demo con cliente");
+    expect(c!.nombre_externo).toBe("Ana Ruiz");
+    expect(c!.invitados).toEqual(["cliente@ejemplo.com"]);
   });
 });

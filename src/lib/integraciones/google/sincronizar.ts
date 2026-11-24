@@ -122,9 +122,15 @@ function textoPlano(html: string | undefined): string {
 
 /**
  * Si un evento de Google debe entrar a la Agenda y con que datos. Puro.
- * Se dejan fuera: los cancelados, los de todo el dia (sin hora), los que creo
- * el propio CRM (citas y recordatorios: ya estan o no son citas) y aquellos a
- * los que invitaron a la persona pero organiza otro.
+ *
+ * Solo entran CITAS: reservas de la pagina de citas de Google o eventos con al
+ * menos un invitado. Las notas personales del calendario (bloqueos "no dar
+ * cita", recordatorios de pagos...) no son citas: no se traen, porque la Agenda
+ * la ve el equipo del espacio y cada cita dispara un aviso.
+ *
+ * Tambien quedan fuera: los cancelados, los de todo el dia (sin hora), los que
+ * creo el propio CRM (citas y recordatorios) y aquellos a los que invitaron a
+ * la persona pero organiza otro.
  */
 export function citaDesdeGoogle(g: EventoDeGoogle): CitaDeGoogle | null {
   if (g.status === "cancelled") return null;
@@ -134,6 +140,8 @@ export function citaDesdeGoogle(g: EventoDeGoogle): CitaDeGoogle | null {
   if (g.organizer && !g.organizer.self) return null;
 
   const invitados = invitadosDe(g);
+  const esReserva = Object.keys(marcas).some((k) => k.startsWith("goo.createdBy"));
+  if (!esReserva && invitados.length === 0) return null;
   const descripcion = textoPlano(g.description);
   // Reserva de la pagina de citas de Google: "Reservada por\n<nombre>\n<correo>".
   const reserva = /Reservad[ao] por\s*\n\s*([^\n]+)/i.exec(descripcion);
