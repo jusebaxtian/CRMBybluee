@@ -113,3 +113,52 @@ describe("varios invitados", () => {
     expect(cambiosDesdeGoogle(cuenta, g)).toEqual({});
   });
 });
+
+describe("citaDesdeGoogle (citas creadas en Google, 24 nov 2026)", () => {
+  const reserva = {
+    id: "g1",
+    status: "confirmed",
+    summary: "Asesoría  (Mauricio Espinosa)",
+    description: "<b>Reservada por</b>\nMauricio Espinosa\nmauricio@ejemplo.com",
+    start: { dateTime: "2026-11-24T13:30:00-05:00" },
+    end: { dateTime: "2026-11-24T14:30:00-05:00" },
+    organizer: { email: "yo@ejemplo.com", self: true },
+    attendees: [
+      { email: "yo@ejemplo.com", self: true, organizer: true },
+      { email: "Mauricio@Ejemplo.com" },
+    ],
+    extendedProperties: { private: { "goo.createdByAvailId": "x" } },
+  };
+
+  it("trae una reserva de la pagina de citas de Google con el nombre de quien reservo", async () => {
+    const { citaDesdeGoogle } = await import("@/lib/integraciones/google/sincronizar");
+    const c = citaDesdeGoogle(reserva);
+    expect(c).not.toBeNull();
+    expect(c!.titulo).toBe("Asesoría (Mauricio Espinosa)");
+    expect(c!.nombre_externo).toBe("Mauricio Espinosa");
+    expect(c!.invitados).toEqual(["mauricio@ejemplo.com"]);
+    expect(c!.inicio).toBe("2026-11-24T18:30:00.000Z");
+    expect(c!.descripcion).toContain("Reservada por");
+  });
+
+  it("no trae lo que creo el CRM, ni recordatorios, ni cancelados, ni eventos de todo el dia", async () => {
+    const { citaDesdeGoogle } = await import("@/lib/integraciones/google/sincronizar");
+    expect(citaDesdeGoogle({ ...reserva, extendedProperties: { private: { crmEventoId: "1" } } })).toBeNull();
+    expect(citaDesdeGoogle({ ...reserva, extendedProperties: { private: { crmRecordatorioId: "1" } } })).toBeNull();
+    expect(citaDesdeGoogle({ ...reserva, status: "cancelled" })).toBeNull();
+    expect(citaDesdeGoogle({ ...reserva, start: { date: "2026-11-24" }, end: { date: "2026-11-25" } })).toBeNull();
+  });
+
+  it("no trae reuniones a las que invitaron a la persona pero organiza otro", async () => {
+    const { citaDesdeGoogle } = await import("@/lib/integraciones/google/sincronizar");
+    expect(citaDesdeGoogle({ ...reserva, organizer: { email: "otro@ejemplo.com", self: false } })).toBeNull();
+  });
+
+  it("un evento hecho a mano en Gmail sin invitados entra con su titulo", async () => {
+    const { citaDesdeGoogle } = await import("@/lib/integraciones/google/sincronizar");
+    const c = citaDesdeGoogle({ ...reserva, summary: "Llamada con proveedor", description: undefined, attendees: undefined, extendedProperties: undefined });
+    expect(c!.titulo).toBe("Llamada con proveedor");
+    expect(c!.nombre_externo).toBeNull();
+    expect(c!.invitados).toEqual([]);
+  });
+});

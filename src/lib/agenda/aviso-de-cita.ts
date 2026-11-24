@@ -31,7 +31,7 @@ export async function avisarCitasProximas() {
 
   const { data: citas } = await supabase
     .from("agenda_eventos")
-    .select("id, workspace_id, titulo, inicio, fin, meet_url, conversation_id, created_by, contacts(name, wa_id)")
+    .select("id, workspace_id, titulo, inicio, fin, meet_url, conversation_id, created_by, nombre_externo, contacts(name, wa_id)")
     .is("aviso_enviado_el", null)
     .eq("estado", "confirmado")
     .gte("inicio", desde)
@@ -63,7 +63,7 @@ export async function avisarCitasProximas() {
     if (!destinatarios.length) continue;
 
     const contacto = c.contacts as unknown as { name: string | null; wa_id: string } | null;
-    const quien = contacto?.name?.trim() || contacto?.wa_id || "tu cliente";
+    const quien = contacto?.name?.trim() || contacto?.wa_id || (c.nombre_externo as string | null) || "tu cliente";
     const meet = (c.meet_url as string | null) ?? null;
     const { titulo, cuerpo } = textoDelAviso({ contacto: quien, titulo: c.titulo as string, inicioIso: c.inicio as string, conMeet: !!meet });
     const irA = meet ?? (c.conversation_id ? `/dashboard/inbox/${c.conversation_id}` : "/dashboard/agenda");

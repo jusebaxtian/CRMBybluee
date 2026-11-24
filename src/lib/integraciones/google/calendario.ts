@@ -1,8 +1,11 @@
 /**
  * Cliente minimo de Google Calendar para la Agenda del CRM.
  *
- * Solo toca el calendario PRINCIPAL del usuario y solo los eventos que el CRM
- * creo (cada uno lleva una marca privada con el id del evento en el CRM).
+ * Solo toca el calendario PRINCIPAL del usuario. Escribe solo en los eventos
+ * que el CRM creo (cada uno lleva una marca privada con el id del evento en el
+ * CRM); desde el 24 nov 2026 tambien LEE los demas eventos propios para traer a
+ * la Agenda las citas creadas en Google (reservas de clientes, citas hechas a
+ * mano en Gmail). Mismo permiso aprobado: calendar.events.owned.
  * No toca la base: recibe el token de acceso ya listo. Lo puro (el cuerpo del
  * evento, el calculo de choques) se prueba sin red.
  */
@@ -160,9 +163,35 @@ export type EventoDeGoogle = {
   description?: string;
   start?: { dateTime?: string; date?: string };
   end?: { dateTime?: string; date?: string };
-  attendees?: { email: string; self?: boolean; organizer?: boolean }[];
+  attendees?: { email: string; self?: boolean; organizer?: boolean; displayName?: string; responseStatus?: string }[];
+  organizer?: { email?: string; self?: boolean };
   hangoutLink?: string;
+  extendedProperties?: { private?: Record<string, string>; shared?: Record<string, string> };
 };
+
+/**
+ * Eventos del calendario principal entre dos fechas (los recurrentes ya
+ * separados en ocurrencias). Hasta 1.000 por llamada: de sobra para 60 dias.
+ */
+export async function listarEventos(accessToken: string, desdeIso: string, hastaIso: string): Promise<EventoDeGoogle[]> {
+  const todos: EventoDeGoogle[] = [];
+  let pagina: string | undefined;
+  for (let i = 0; i < 4; i++) {
+    const q = new URLSearchParams({
+      singleEvents: "true",
+      orderBy: "startTime",
+      maxResults: "250",
+      timeMin: desdeIso,
+      timeMax: hastaIso,
+      ...(pagina ? { pageToken: pagina } : {}),
+    });
+    const r = await llamar<{ items?: EventoDeGoogle[]; nextPageToken?: string }>(accessToken, `/calendars/primary/events?${q.toString()}`);
+    todos.push(...(r.items ?? []));
+    pagina = r.nextPageToken;
+    if (!pagina) break;
+  }
+  return todos;
+}
 
 export type LecturaDeEvento = { tipo: "sin_cambios" } | { tipo: "borrado" } | { tipo: "evento"; evento: EventoDeGoogle };
 

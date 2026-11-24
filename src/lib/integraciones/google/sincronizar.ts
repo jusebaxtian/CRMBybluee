@@ -2,12 +2,16 @@ import { randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { accesoDeConexion, type Conexion } from "@/lib/integraciones/google/acceso";
-import { detenerCanal, leerEvento, suscribirCanal, type EventoDeGoogle } from "@/lib/integraciones/google/calendario";
+import { detenerCanal, leerEvento, listarEventos, suscribirCanal, type EventoDeGoogle } from "@/lib/integraciones/google/calendario";
 
 /**
  * Google -> CRM: lo que el usuario cambia en Google en una cita que creo el CRM
- * vuelve a la Agenda. Gana el ultimo cambio. Los eventos de Google que no son del
- * CRM no se leen: se consulta cada cita nuestra por su id.
+ * vuelve a la Agenda. Gana el ultimo cambio.
+ *
+ * Desde el 24 nov 2026 tambien se TRAEN a la Agenda las citas creadas en Google
+ * (reservas de la pagina de citas de Google, eventos hechos a mano en Gmail):
+ * ver `citaDesdeGoogle` e `importarCitasDeGoogle`. Una vez importadas, se
+ * sincronizan igual que las del CRM (por su id).
  */
 
 export type FilaDeCita = {
@@ -94,6 +98,137 @@ export function cambiosDesdeGoogle(cita: FilaDeCita, g: EventoDeGoogle): Cambios
   return cambios;
 }
 
+/** Lo que se guarda en la Agenda de un evento creado en Google. */
+export type CitaDeGoogle = {
+  titulo: string;
+  descripcion: string | null;
+  inicio: string;
+  fin: string;
+  invitados: string[];
+  meet_url: string | null;
+  /** Quien reservo (nombre), para mostrarlo si no hay contacto en el CRM. */
+  nombre_externo: string | null;
+};
+
+/** Texto plano de la descripcion de Google (trae HTML: <b>, <br>). */
+function textoPlano(html: string | undefined): string {
+  return (html ?? "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .trim();
+}
+
+/**
+ * Si un evento de Google debe entrar a la Agenda y con que datos. Puro.
+ * Se dejan fuera: los cancelados, los de todo el dia (sin hora), los que creo
+ * el propio CRM (citas y recordatorios: ya estan o no son citas) y aquellos a
+ * los que invitaron a la persona pero organiza otro.
+ */
+export function citaDesdeGoogle(g: EventoDeGoogle): CitaDeGoogle | null {
+  if (g.status === "cancelled") return null;
+  if (!g.start?.dateTime || !g.end?.dateTime) return null;
+  const marcas = { ...(g.extendedProperties?.shared ?? {}), ...(g.extendedProperties?.private ?? {}) };
+  if (marcas.crmEventoId || marcas.crmRecordatorioId) return null;
+  if (g.organizer && !g.organizer.self) return null;
+
+  const invitados = invitadosDe(g);
+  const descripcion = textoPlano(g.description);
+  // Reserva de la pagina de citas de Google: "Reservada por\n<nombre>\n<correo>".
+  const reserva = /Reservad[ao] por\s*\n\s*([^\n]+)/i.exec(descripcion);
+  const asistente = (g.attendees ?? []).find((a) => !a.self && !a.organizer);
+  const nombre = reserva?.[1]?.trim() || asistente?.displayName?.trim() || asistente?.email || null;
+
+  return {
+    titulo: (g.summary?.trim() || (nombre ? `Cita con ${nombre}` : "Cita de Google")).replace(/\s+/g, " ").slice(0, 200),
+    descripcion: descripcion ? descripcion.slice(0, 2000) : null,
+    inicio: new Date(g.start.dateTime).toISOString(),
+    fin: new Date(g.end.dateTime).toISOString(),
+    invitados,
+    meet_url: g.hangoutLink ?? null,
+    nombre_externo: nombre ? nombre.slice(0, 120) : null,
+  };
+}
+
+/** Cuantos dias hacia adelante se traen las citas de Google. */
+const DIAS_A_IMPORTAR = 60;
+
+/**
+ * Trae a la Agenda los eventos de Google que aun no estan en el CRM. Se intenta
+ * ligar cada uno a un contacto por el correo de quien reservo; si no hay, la
+ * cita queda igual en la Agenda con el nombre de esa persona.
+ */
+async function importarCitasDeGoogle(
+  supabase: SupabaseClient,
+  conexionId: string,
+  token: string
+): Promise<number> {
+  const { data: datos } = await supabase
+    .from("integraciones_conexiones")
+    .select("workspace_id, user_id")
+    .eq("id", conexionId)
+    .maybeSingle();
+  if (!datos?.workspace_id) return 0;
+  const workspaceId = datos.workspace_id as string;
+
+  const desde = new Date(Date.now() - 24 * 3_600_000).toISOString();
+  const hasta = new Date(Date.now() + DIAS_A_IMPORTAR * 24 * 3_600_000).toISOString();
+  const eventos = await listarEventos(token, desde, hasta);
+  if (eventos.length === 0) return 0;
+
+  const { data: ya } = await supabase
+    .from("agenda_eventos")
+    .select("google_event_id")
+    .eq("conexion_id", conexionId)
+    .in("google_event_id", eventos.map((e) => e.id));
+  const conocidos = new Set((ya ?? []).map((r) => r.google_event_id as string));
+
+  let nuevas = 0;
+  for (const g of eventos) {
+    if (conocidos.has(g.id)) continue;
+    const cita = citaDesdeGoogle(g);
+    if (!cita) continue;
+
+    let contactId: string | null = null;
+    for (const correo of cita.invitados) {
+      const { data } = await supabase.rpc("agenda_contacto_por_correo", { p_workspace: workspaceId, p_correo: correo });
+      if (data) {
+        contactId = data as string;
+        break;
+      }
+    }
+
+    const { error } = await supabase.from("agenda_eventos").insert({
+      workspace_id: workspaceId,
+      conexion_id: conexionId,
+      contact_id: contactId,
+      titulo: cita.titulo,
+      descripcion: cita.descripcion,
+      inicio: cita.inicio,
+      fin: cita.fin,
+      invitado_email: cita.invitados[0] ?? null,
+      invitados: cita.invitados,
+      con_meet: !!cita.meet_url,
+      meet_url: cita.meet_url,
+      google_event_id: g.id,
+      google_etag: g.etag ?? null,
+      estado: "confirmado",
+      origen: "google",
+      nombre_externo: cita.nombre_externo,
+      // A quien conecto Google le llega el aviso de la reunion, como con las suyas.
+      created_by: (datos.user_id as string | null) ?? null,
+    });
+    // 23505: otra revision (aviso de Google y revision periodica a la vez) ya la trajo.
+    if (error && error.code !== "23505") {
+      console.error("google calendar: no se pudo traer una cita de Google:", error.message);
+      continue;
+    }
+    if (!error) nuevas += 1;
+  }
+  return nuevas;
+}
+
 const enCurso = new Set<string>();
 
 /**
@@ -106,6 +241,14 @@ export async function sincronizarConexion(supabase: SupabaseClient, conexion: Co
   try {
     const acceso = await accesoDeConexion(conexion);
     if ("error" in acceso) return { cambiadas: 0 };
+
+    let importadas = 0;
+    try {
+      importadas = await importarCitasDeGoogle(supabase, conexion.id, acceso.token);
+      if (importadas > 0) console.log(`google calendar: ${importadas} cita(s) nuevas traidas de Google`);
+    } catch (err) {
+      console.error("google calendar: no se pudieron traer las citas de Google:", err instanceof Error ? err.message : err);
+    }
 
     const desde = new Date(Date.now() - 24 * 3_600_000).toISOString();
     const { data: citas } = await supabase
@@ -142,7 +285,7 @@ export async function sincronizarConexion(supabase: SupabaseClient, conexion: Co
         console.error("google calendar: no se pudo revisar una cita:", err instanceof Error ? err.message : err);
       }
     }
-    return { cambiadas };
+    return { cambiadas: cambiadas + importadas };
   } finally {
     enCurso.delete(conexion.id);
   }

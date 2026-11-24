@@ -65,8 +65,11 @@ export type EventoAgenda = {
   estado: "confirmado" | "cancelado";
   cancelado_desde: "crm" | "google" | null;
   conversation_id: string | null;
-  contact_id: string;
+  /** Null en una cita traida de Google sin contacto en el CRM (0187). */
+  contact_id: string | null;
   contacto: string;
+  /** "google" si se creo en Google Calendar (reserva de un cliente, evento de Gmail). */
+  origen?: "crm" | "google";
   /** Quien la agendo (10 nov 2026). */
   agendado_por: string | null;
   /** Una cita del calendario del dueno que este vendedor no puede ver: solo bloquea la hora. */
@@ -344,7 +347,7 @@ export async function listarEventosEntre(desdeIso: string, hastaIso: string): Pr
   if ("error" in ctx) return [];
   const { data } = await ctx.supabase
     .from("agenda_eventos")
-    .select("id, titulo, descripcion, inicio, fin, invitado_email, invitados, con_meet, meet_url, estado, cancelado_desde, conversation_id, contact_id, created_by, contacts(name, wa_id)")
+    .select("id, titulo, descripcion, inicio, fin, invitado_email, invitados, con_meet, meet_url, estado, cancelado_desde, conversation_id, contact_id, created_by, origen, nombre_externo, contacts(name, wa_id)")
     .eq("workspace_id", ctx.workspaceId)
     .gte("inicio", desdeIso)
     .lt("inicio", hastaIso)
@@ -365,9 +368,11 @@ export async function listarEventosEntre(desdeIso: string, hastaIso: string): Pr
       estado: e.estado as "confirmado" | "cancelado",
       cancelado_desde: (e.cancelado_desde as "crm" | "google" | null) ?? null,
       conversation_id: (e.conversation_id as string | null) ?? null,
-      contact_id: e.contact_id as string,
-      contacto: c?.name?.trim() || c?.wa_id || "Contacto",
-      agendado_por: e.created_by ? (nombres.get(e.created_by as string) ?? null) : null,
+      contact_id: (e.contact_id as string | null) ?? null,
+      contacto: c?.name?.trim() || c?.wa_id || (e.nombre_externo as string | null) || (e.invitado_email as string | null) || "Contacto",
+      origen: e.origen === "google" ? ("google" as const) : ("crm" as const),
+      // La de Google la agenda el cliente o la persona en Gmail: no "Agendado por" alguien del equipo.
+      agendado_por: e.origen === "google" ? null : e.created_by ? (nombres.get(e.created_by as string) ?? null) : null,
     };
   });
 
@@ -398,7 +403,7 @@ export async function listarEventosEntre(desdeIso: string, hastaIso: string): Pr
       estado: "confirmado" as const,
       cancelado_desde: null,
       conversation_id: null,
-      contact_id: "",
+      contact_id: null,
       contacto: "Agenda ocupada",
       agendado_por: null,
       solo_ocupado: true,
@@ -440,7 +445,9 @@ async function prepararConfirmacionDeCita(supabase: Supabase, workspaceId: strin
   if (e.estado === "cancelado") return { error: "La cita está cancelada." };
 
   const contacto = e.contacts as unknown as { name: string | null; wa_id: string } | null;
-  if (!contacto) return { error: "Contacto no encontrado." };
+  if (!contacto) {
+    return { error: "Esta cita llegó desde Google Calendar y no está ligada a un contacto del CRM, así que no hay a quién enviarle el WhatsApp." };
+  }
   const nombre = contacto.name?.trim();
   const titulo = e.titulo as string;
   const inicioIso = e.inicio as string;

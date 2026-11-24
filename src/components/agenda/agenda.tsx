@@ -228,7 +228,7 @@ export function Agenda({
                       <button
                         type="button"
                         onClick={() => setEditandoEvento(e)}
-                        title={`${e.contacto}: ${e.titulo}${e.agendado_por ? ` · Agendado por: ${e.agendado_por}` : ""}${e.estado === "cancelado" ? " · cancelada" : ""}`}
+                        title={`${e.contacto}: ${e.titulo}${e.agendado_por ? ` · Agendado por: ${e.agendado_por}` : ""}${e.origen === "google" ? " · desde Google Calendar" : ""}${e.estado === "cancelado" ? " · cancelada" : ""}`}
                         className={`flex w-full items-start gap-1 rounded-md border px-1.5 py-1 text-left text-[11px] leading-tight hover:bg-info/20 ${
                           e.estado === "cancelado" ? "border-border bg-surface-hover/60 text-muted line-through" : "border-info/40 bg-info/10 text-foreground"
                         }`}
@@ -241,6 +241,9 @@ export function Agenda({
                           <span className="text-muted">{e.contacto}</span>
                           <span className="block truncate">{e.titulo}</span>
                           {e.agendado_por && <span className="block truncate text-[10px] text-muted">Agendado por: {e.agendado_por}</span>}
+                          {e.origen === "google" && (
+                            <span className="block truncate text-[10px] text-info">Desde Google Calendar{e.contact_id ? "" : " · sin contacto en el CRM"}</span>
+                          )}
                         </span>
                       </button>
                     </li>
