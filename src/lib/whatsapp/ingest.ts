@@ -283,7 +283,8 @@ async function transcribeIncomingAudio(
   workspaceId: string,
   mediaUrl: string,
   contactId: string,
-  waId: string
+  waId: string,
+  chat?: { lineaId: string | null; asignadoA: string | null }
 ): Promise<string | null> {
   // Basta con que el espacio tenga un agente de OpenAI activo (cualquier linea).
   const { data: agentes } = await supabase
@@ -295,7 +296,7 @@ async function transcribeIncomingAudio(
     .limit(1);
   // El agente vendedor (0169) usa la llave conectada aunque los agentes por linea esten apagados.
   const vendedor = await vendedorDelEspacio(supabase, workspaceId);
-  let agent: { api_key: string } | null = agentes?.[0] ?? (vendedor && vendedorAtiende(vendedor, waId) && vendedor.provider === "openai" ? vendedor : null);
+  let agent: { api_key: string } | null = agentes?.[0] ?? (vendedor && vendedorAtiende(vendedor, waId, chat) && vendedor.provider === "openai" ? vendedor : null);
   // En un bloque de IA de un flujo basta la llave: no depende del boton del agente.
   if (!agent && (await contactoEnBloqueDeIa(supabase, contactId))) {
     const conexion = await conexionDeIa(supabase, workspaceId);
@@ -489,7 +490,10 @@ export async function ingestWhatsAppWebhook(payload: WhatsAppWebhookPayload) {
 
         let audioTranscript: string | null = null;
         if (message.type === "audio" && mediaUrl && !pausado) {
-          audioTranscript = await transcribeIncomingAudio(supabase, workspaceId, mediaUrl, contact.id, waId);
+          audioTranscript = await transcribeIncomingAudio(supabase, workspaceId, mediaUrl, contact.id, waId, {
+            lineaId: whatsappAccountId ?? null,
+            asignadoA: (conversation.assigned_agent_id as string | null) ?? null,
+          });
         }
 
         // A tap-and-hold reaction has no text body of its own — the emoji

@@ -27,9 +27,12 @@ export async function leerImagenEntrante(
     // En un bloque de IA de un flujo basta la llave: no depende del boton del
     // agente ni de la lectura de imagenes. Fuera de el, se activa agente por agente.
     const enBloque = await contactoEnBloqueDeIa(supabase, d.contactId);
+    const { data: chat } = enBloque
+      ? { data: null }
+      : await supabase.from("conversations").select("assigned_agent_id").eq("id", d.conversationId).maybeSingle();
     const agente = enBloque
       ? await agenteParaBloque(supabase, d.workspaceId, d.whatsappAccountId)
-      : await agenteDeLaLinea(supabase, d.workspaceId, d.whatsappAccountId, d.waId);
+      : await agenteDeLaLinea(supabase, d.workspaceId, d.whatsappAccountId, d.waId, (chat?.assigned_agent_id as string | null) ?? null);
     if (!agente?.api_key) return null;
     // Se activa a mano en el agente y gasta la llave conectada del cliente. No
     // exige que el agente este respondiendo: con la IA pausada igual se avisa y

@@ -24,3 +24,42 @@ describe("limpiarNumerosDePrueba", () => {
   });
   it("vacio queda vacio", () => expect(limpiarNumerosDePrueba("  ")).toEqual([]));
 });
+
+describe("vendedorAtiende: lineas y asesores (0188)", () => {
+  const base = { activo: true, numeros_prueba: ["573166230373"], lineas_modo: "todas", lineas_ids: [], asesores_modo: "todos", asesores_ids: [] };
+
+  it("por defecto responde en todas las lineas y todos los chats", () => {
+    expect(vendedorAtiende(base, "573001112233", { lineaId: "L1", asignadoA: "u1" })).toBe(true);
+  });
+
+  it("solo en las lineas elegidas", () => {
+    const v = { ...base, lineas_modo: "seleccionadas", lineas_ids: ["L1"] };
+    expect(vendedorAtiende(v, "573001112233", { lineaId: "L1", asignadoA: null })).toBe(true);
+    expect(vendedorAtiende(v, "573001112233", { lineaId: "L2", asignadoA: null })).toBe(false);
+    expect(vendedorAtiende(v, "573001112233", { lineaId: null })).toBe(false);
+  });
+
+  it("solo en los chats de los asesores elegidos, con 'sin asignar' como opcion", () => {
+    const v = { ...base, asesores_modo: "seleccionados", asesores_ids: ["u1", "sin_asignar"] };
+    expect(vendedorAtiende(v, "573001112233", { lineaId: "L1", asignadoA: "u1" })).toBe(true);
+    expect(vendedorAtiende(v, "573001112233", { lineaId: "L1", asignadoA: null })).toBe(true);
+    expect(vendedorAtiende(v, "573001112233", { lineaId: "L1", asignadoA: "u2" })).toBe(false);
+    const sinSinAsignar = { ...v, asesores_ids: ["u1"] };
+    expect(vendedorAtiende(sinSinAsignar, "573001112233", { lineaId: "L1", asignadoA: null })).toBe(false);
+  });
+
+  it("sin saber el asesor (bloque de flujo) solo filtra por linea", () => {
+    const v = { ...base, asesores_modo: "seleccionados", asesores_ids: ["u1"] };
+    expect(vendedorAtiende(v, "573001112233", { lineaId: "L1" })).toBe(true);
+  });
+
+  it("los numeros de prueba reciben respuesta aunque esten fuera de la seleccion", () => {
+    const v = { ...base, lineas_modo: "seleccionadas", lineas_ids: ["L1"], asesores_modo: "seleccionados", asesores_ids: ["u1"] };
+    expect(vendedorAtiende(v, "573166230373", { lineaId: "L2", asignadoA: "u2" })).toBe(true);
+    expect(vendedorAtiende({ ...v, activo: false }, "573166230373", { lineaId: "L2", asignadoA: "u2" })).toBe(true);
+  });
+
+  it("apagado no responde a nadie mas", () => {
+    expect(vendedorAtiende({ ...base, activo: false }, "573001112233", { lineaId: "L1", asignadoA: "u1" })).toBe(false);
+  });
+});

@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isPlatformAdmin } from "@/lib/admin";
 import { buildSystemPrompt, customerRequestedHuman, interpretAiReply } from "@/lib/ai/agent";
 import { callAiProvider, type ChatTurn } from "@/lib/ai/providers";
-import { limpiarNumerosDePrueba, seccionDeVenta, vendedorDelEspacio } from "@/lib/ai/vendedor";
+import { SIN_ASIGNAR, limpiarNumerosDePrueba, seccionDeVenta, vendedorDelEspacio } from "@/lib/ai/vendedor";
 import { generarAudioMp3, vozDisponible } from "@/lib/ai/voz";
 import { decidirAudio } from "@/lib/ai/voz-texto";
 import { entregaMediosDePago, quitarNumerosInventados } from "@/lib/ai/numeros-inventados";
@@ -91,6 +91,44 @@ export async function guardarNumerosDePrueba(entrada: string) {
   if (error) return { error: "No se pudieron guardar los números." };
   revalidatePath("/admin/agente-juanes");
   return { success: true as const, numeros };
+}
+
+/**
+ * Donde responde (0188): lineas y asesores. Solo se guardan ids que son del
+ * espacio; elegir "solo estas" sin marcar ninguna no se permite (seria apagarlo).
+ */
+export async function guardarAlcanceDelVendedor(entrada: {
+  lineasModo: string;
+  lineasIds: string[];
+  asesoresModo: string;
+  asesoresIds: string[];
+}) {
+  const workspaceId = await espacioDelVendedor();
+  if (!workspaceId) return { error: "No tienes permiso." };
+  const admin = createAdminClient();
+
+  const lineasModo = entrada.lineasModo === "seleccionadas" ? "seleccionadas" : "todas";
+  const asesoresModo = entrada.asesoresModo === "seleccionados" ? "seleccionados" : "todos";
+
+  const [{ data: lineas }, { data: miembros }] = await Promise.all([
+    admin.from("whatsapp_accounts").select("id").eq("workspace_id", workspaceId),
+    admin.from("workspace_members").select("user_id").eq("workspace_id", workspaceId),
+  ]);
+  const lineasValidas = new Set((lineas ?? []).map((l) => l.id as string));
+  const asesoresValidos = new Set([SIN_ASIGNAR, ...(miembros ?? []).map((m) => m.user_id as string)]);
+  const lineasIds = lineasModo === "seleccionadas" ? [...new Set(entrada.lineasIds)].filter((id) => lineasValidas.has(id)) : [];
+  const asesoresIds = asesoresModo === "seleccionados" ? [...new Set(entrada.asesoresIds)].filter((id) => asesoresValidos.has(id)) : [];
+
+  if (lineasModo === "seleccionadas" && lineasIds.length === 0) return { error: "Marca al menos una línea, o elige «Todas las líneas»." };
+  if (asesoresModo === "seleccionados" && asesoresIds.length === 0) return { error: "Marca al menos un asesor (o «Chats sin asignar»), o elige «Todos»." };
+
+  const { error } = await admin
+    .from("agente_vendedor")
+    .update({ lineas_modo: lineasModo, lineas_ids: lineasIds, asesores_modo: asesoresModo, asesores_ids: asesoresIds, actualizado_el: new Date().toISOString() })
+    .eq("workspace_id", workspaceId);
+  if (error) return { error: "No se pudo guardar." };
+  revalidatePath("/admin/agente-juanes");
+  return { success: true as const };
 }
 
 /** Chat de prueba: usa las instrucciones escritas en pantalla y no le envia nada a nadie. */

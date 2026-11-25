@@ -188,13 +188,15 @@ export async function agenteDeLaLinea(
   supabase: ReturnType<typeof createAdminClient>,
   workspaceId: string,
   whatsappAccountId: string | null,
-  waIdDelContacto?: string | null
+  waIdDelContacto?: string | null,
+  /** Asesor asignado al chat (null = sin asignar). Sin el, el vendedor solo filtra por linea. */
+  asignadoA?: string | null
 ) {
-  // El agente vendedor (0169), si esta encendido, atiende todos los chats del
-  // espacio con la llave ya conectada. Apagado, solo sus numeros de prueba (0175).
-  // Los adjuntos siguen siendo los de la linea.
+  // El agente vendedor (0169), si esta encendido, atiende los chats de las lineas
+  // y asesores elegidos (0188) con la llave ya conectada. Apagado, solo sus
+  // numeros de prueba (0175). Los adjuntos siguen siendo los de la linea.
   const vendedor = await vendedorDelEspacio(supabase, workspaceId);
-  if (vendedor && vendedorAtiende(vendedor, waIdDelContacto)) {
+  if (vendedor && vendedorAtiende(vendedor, waIdDelContacto, { lineaId: whatsappAccountId, asignadoA })) {
     return {
       id: "vendedor",
       provider: vendedor.provider,
@@ -399,7 +401,7 @@ export async function maybeRespondWithAiAgent(
 ) {
   const { data: conversation } = await supabase
     .from("conversations")
-    .select("ai_handoff_requested, ai_manually_paused, whatsapp_account_id")
+    .select("ai_handoff_requested, ai_manually_paused, whatsapp_account_id, assigned_agent_id")
     .eq("id", conversationId)
     .maybeSingle();
   if (!conversation || conversation.ai_handoff_requested || conversation.ai_manually_paused) return;
@@ -413,7 +415,13 @@ export async function maybeRespondWithAiAgent(
     .eq("id", contactId)
     .single();
 
-  const agent = await agenteDeLaLinea(supabase, workspaceId, conversation.whatsapp_account_id, contact?.wa_id as string | undefined);
+  const agent = await agenteDeLaLinea(
+    supabase,
+    workspaceId,
+    conversation.whatsapp_account_id,
+    contact?.wa_id as string | undefined,
+    (conversation.assigned_agent_id as string | null) ?? null
+  );
   if (!agent || !agent.is_active) return;
 
   // A contact tagged "excluir de automatizaciones" (ej: "Ya compró") skips

@@ -11,7 +11,7 @@ export function AgenteVendedorPanel({
   activo,
   instrucciones,
   conexion,
-  automatizacionesAPausar,
+  alcance,
   vozActiva,
   vozId,
   hayLlaveDeVoz,
@@ -22,7 +22,8 @@ export function AgenteVendedorPanel({
   instrucciones: string;
   /** Proveedor y modelo de la llave conectada. Null si no hay ninguna. */
   conexion: string | null;
-  automatizacionesAPausar: string[];
+  /** Tarjeta "Dónde responde" (0188). */
+  alcance?: React.ReactNode;
   vozActiva: boolean;
   vozId: string;
   /** La llave de ElevenLabs esta en el servidor. */
@@ -147,13 +148,10 @@ export function AgenteVendedorPanel({
               <span className={`absolute left-1 top-1/2 h-4.5 w-4.5 -translate-y-1/2 rounded-full bg-white shadow-sm transition-transform ${encendido ? "translate-x-[18px]" : "translate-x-0"}`} />
             </button>
           </div>
-          {!encendido && automatizacionesAPausar.length > 0 && (
-            <p className="mt-3 rounded-lg bg-warning/10 p-2.5 text-xs text-foreground">
-              Al encenderlo responderá en todos tus chats y se pausarán estas automatizaciones hasta que lo apagues: {automatizacionesAPausar.join(", ")}.
-            </p>
-          )}
           {aviso && <p className={`mt-3 text-xs ${aviso.error ? "text-red-400" : "text-success"}`}>{aviso.texto}</p>}
         </div>
+
+        {alcance}
 
         <div className="rounded-[13px] border border-border bg-surface p-4">
           <label htmlFor="numerosPrueba" className="text-sm font-semibold text-foreground">Números de prueba</label>

@@ -61,13 +61,47 @@ ${datos.length > 0 ? datos.join("\n") : "- Todavía no hay datos de este cliente
 Si el cliente ya tiene cuenta y necesita soporte, ayúdalo con lo que sepas de ella. No inventes datos de su cuenta ni prometas cambios: si no puedes resolverlo, pásalo a una persona con la regla obligatoria de arriba.`;
 }
 
-/** Encendido atiende a todos; apagado, solo los numeros de prueba. */
+/** Valor que representa en `asesores_ids` a los chats sin asesor asignado. */
+export const SIN_ASIGNAR = "sin_asignar";
+
+export type AlcanceDelVendedor = {
+  activo: boolean;
+  numeros_prueba?: string[] | null;
+  lineas_modo?: string | null;
+  lineas_ids?: string[] | null;
+  asesores_modo?: string | null;
+  asesores_ids?: string[] | null;
+};
+
+/**
+ * Si el vendedor responde en este chat. Puro.
+ *
+ * - Los numeros de prueba reciben respuesta siempre (encendido o apagado).
+ * - Apagado, nadie mas.
+ * - Encendido, solo en las lineas elegidas (o todas) y en los chats de los
+ *   asesores elegidos (o todos; "sin asignar" cuenta como un asesor mas) (0188).
+ *
+ * `chat.asignadoA` undefined = no se sabe el asesor (un bloque de flujo): ahi
+ * solo se mira la linea.
+ */
 export function vendedorAtiende(
-  vendedor: { activo: boolean; numeros_prueba?: string[] | null } | null | undefined,
-  waId: string | null | undefined
+  vendedor: AlcanceDelVendedor | null | undefined,
+  waId: string | null | undefined,
+  chat?: { lineaId?: string | null; asignadoA?: string | null }
 ): boolean {
   if (!vendedor) return false;
-  return vendedor.activo || (!!waId && (vendedor.numeros_prueba ?? []).includes(waId));
+  if (waId && (vendedor.numeros_prueba ?? []).includes(waId)) return true;
+  if (!vendedor.activo) return false;
+
+  if (vendedor.lineas_modo === "seleccionadas") {
+    const linea = chat?.lineaId ?? null;
+    if (!linea || !(vendedor.lineas_ids ?? []).includes(linea)) return false;
+  }
+  if (vendedor.asesores_modo === "seleccionados" && chat && chat.asignadoA !== undefined) {
+    const quien = chat.asignadoA ?? SIN_ASIGNAR;
+    if (!(vendedor.asesores_ids ?? []).includes(quien)) return false;
+  }
+  return true;
 }
 
 /** Los numeros tal como se guardan en WhatsApp: solo digitos y con el 57 de Colombia. */
@@ -84,7 +118,7 @@ export function limpiarNumerosDePrueba(entrada: string): string[] {
 export async function vendedorDelEspacio(supabase: Supabase, workspaceId: string) {
   const { data: vendedor } = await supabase
     .from("agente_vendedor")
-    .select("nombre, activo, instrucciones, voz_activa, voz_id, numeros_prueba")
+    .select("nombre, activo, instrucciones, voz_activa, voz_id, numeros_prueba, lineas_modo, lineas_ids, asesores_modo, asesores_ids")
     .eq("workspace_id", workspaceId)
     .maybeSingle();
   if (!vendedor) return null;
