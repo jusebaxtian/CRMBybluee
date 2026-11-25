@@ -1,5 +1,5 @@
 import type { createAdminClient } from "@/lib/supabase/admin";
-import { agenteDeLaLinea, agenteParaBloque, maybeRespondWithAiAgent } from "@/lib/ai/agent";
+import { agenteDeLaLinea, agenteParaBloque, entregarChatPorComprobante, maybeRespondWithAiAgent } from "@/lib/ai/agent";
 import { contactoEnBloqueDeIa, iniciarPorEtiqueta } from "@/lib/flujos/motor";
 import { runTagAddedAutomations } from "@/lib/automations/engine";
 import { maybeTrackPurchaseFromTag } from "@/lib/meta/conversions";
@@ -160,7 +160,12 @@ export async function responderImagenCuandoSeLea(
   d: { workspaceId: string; conversationId: string; contactId: string; waMessageId: string }
 ) {
   try {
-    if (!(await lecturaEnCurso)) return;
+    const lectura = await lecturaEnCurso;
+    if (!lectura) return;
+    // Llego el soporte de pago a un chat del vendedor: confirma, pasa a una
+    // persona y sale del chat (25 nov 2026), aunque despues llegaran mas
+    // mensajes. Si el chat no es del vendedor, sigue igual que siempre.
+    if (lectura.esComprobante && (await entregarChatPorComprobante(supabase, d))) return;
     const { data: ultimo } = await supabase
       .from("messages")
       .select("wa_message_id")

@@ -504,3 +504,65 @@ export async function maybeRespondWithAiAgent(
     fuentesDeNumeros: "esVendedor" in agent ? `${instrucciones}\n${history.map((t) => t.content).join("\n")}` : undefined,
   });
 }
+
+/** Lo que dice el vendedor al recibir el comprobante, antes de pasar el chat a una persona. */
+export const MENSAJE_COMPROBANTE_RECIBIDO =
+  "¡Recibimos tu comprobante! 🙌 Una persona de nuestro equipo lo valida y te confirma en breve. ¡Gracias por tu confianza!";
+
+/**
+ * El vendedor (Juanes) cumplio su tarea cuando el cliente manda el soporte de
+ * pago (25 nov 2026): le confirma que lo recibio con un mensaje fijo, marca el
+ * chat como "Humano" (ai_handoff_requested) y deja de responder ahi. El aviso
+ * del comprobante a los duenos y al asesor ya lo envio la lectura de la imagen.
+ *
+ * Solo actua si quien atiende el chat es el vendedor, y si la IA no estaba ya
+ * pausada o pasada a una persona. Devuelve true si entrego el chat; con false
+ * se sigue como siempre (la IA de la linea responde a la imagen).
+ */
+export async function entregarChatPorComprobante(
+  supabase: ReturnType<typeof createAdminClient>,
+  d: { workspaceId: string; conversationId: string; contactId: string }
+): Promise<boolean> {
+  const { data: conversation } = await supabase
+    .from("conversations")
+    .select("ai_handoff_requested, ai_manually_paused, whatsapp_account_id, assigned_agent_id")
+    .eq("id", d.conversationId)
+    .maybeSingle();
+  if (!conversation || conversation.ai_handoff_requested || conversation.ai_manually_paused) return false;
+
+  const { data: contact } = await supabase.from("contacts").select("wa_id").eq("id", d.contactId).maybeSingle();
+  const agent = await agenteDeLaLinea(
+    supabase,
+    d.workspaceId,
+    conversation.whatsapp_account_id,
+    (contact?.wa_id as string | undefined) ?? null,
+    (conversation.assigned_agent_id as string | null) ?? null
+  );
+  if (!agent || !("esVendedor" in agent)) return false;
+  if (await isContactExcludedFromAutomations(supabase, d.contactId)) return false;
+
+  // Primero se marca: si el envio falla, igual deja de vender sobre un pago ya hecho.
+  const { data: marcada } = await supabase
+    .from("conversations")
+    .update({ ai_handoff_requested: true })
+    .eq("id", d.conversationId)
+    .eq("ai_handoff_requested", false)
+    .select("id");
+  if (!marcada?.length) return true;
+
+  const account = await resolveSendAccount(supabase, d.workspaceId, conversation.whatsapp_account_id);
+  if (!account || !contact?.wa_id) return true;
+  try {
+    const result = await sendTextMessage(account.phone_number_id, account.access_token, contact.wa_id as string, MENSAJE_COMPROBANTE_RECIBIDO);
+    await recordOutboundMessage(supabase, {
+      origen: "ia",
+      conversationId: d.conversationId,
+      messageType: "text",
+      body: MENSAJE_COMPROBANTE_RECIBIDO,
+      waMessageId: result.messages[0]?.id,
+    });
+  } catch (err) {
+    console.error(`comprobante: no se pudo confirmar al cliente (workspace=${d.workspaceId}):`, err instanceof Error ? err.message : err);
+  }
+  return true;
+}
