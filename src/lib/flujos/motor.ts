@@ -681,7 +681,7 @@ async function turnoDeIa(
     }
 
     const [adjuntos, historial, seccionVendedor] = await Promise.all([
-      adjuntosDelAgente(supabase, workspaceId, agente.whatsapp_account_id),
+      adjuntosDelAgente(supabase, workspaceId, agente.whatsapp_account_id, "esVendedor" in agente),
       historialDelChat(supabase, conversationId),
       seccionesDelVendedor(supabase, agente, contactId),
     ]);

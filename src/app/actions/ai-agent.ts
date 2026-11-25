@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isPlatformAdmin } from "@/lib/admin";
 import { callAiProvider, type ChatTurn } from "@/lib/ai/providers";
 import { buildSystemPrompt, interpretAiReply, customerRequestedHuman } from "@/lib/ai/agent";
 import { mediaKindFromMime, validateMediaFile } from "@/lib/whatsapp/media-limits";
@@ -154,6 +155,7 @@ export async function saveAiAgent(_prevState: unknown, formData: FormData) {
   }
 
   revalidatePath("/dashboard/settings");
+  revalidatePath("/admin/agente-juanes");
   return { success: true as const };
 }
 
@@ -186,7 +188,8 @@ export async function testAiAgentMessage(
   const consultaMedios = supabase
     .from("ai_agent_media")
     .select("key, label, trigger_description, media_type, media_url, media_mime_type, filename")
-    .eq("workspace_id", workspaceId);
+    .eq("workspace_id", workspaceId)
+    .eq("del_vendedor", false);
   const { data: mediaLibrary } = await (whatsappAccountId
     ? consultaMedios.eq("whatsapp_account_id", whatsappAccountId)
     : consultaMedios.is("whatsapp_account_id", null));
@@ -284,7 +287,9 @@ export async function addAiAgentMedia(_prevState: unknown, formData: FormData) {
   const triggerDescription = String(formData.get("triggerDescription") ?? "").trim();
   const file = formData.get("file") as File | null;
   // Agente al que pertenece el adjunto (0163): su linea, o vacio = el general.
-  const whatsappAccountId = String(formData.get("whatsappAccountId") ?? "") || null;
+  // "paraVendedor": la biblioteca propia de Juanes (0190), sin linea.
+  const paraVendedor = formData.get("paraVendedor") === "1";
+  const whatsappAccountId = paraVendedor ? null : String(formData.get("whatsappAccountId") ?? "") || null;
 
   if (!key || !keySlugPattern.test(key)) {
     return { error: "La clave solo puede tener letras minúsculas, números, - y _ (ej: qr_pago)." };
@@ -301,9 +306,18 @@ export async function addAiAgentMedia(_prevState: unknown, formData: FormData) {
 
   const ctx = await requireWorkspace();
   if ("error" in ctx) return { error: ctx.error };
-  const { supabase, workspaceId } = ctx;
+  const { supabase } = ctx;
+  let { workspaceId } = ctx;
 
   const admin = createAdminClient();
+  // La biblioteca del vendedor es del espacio que tiene el vendedor y solo la
+  // toca el administrador de la plataforma (aunque este en modo soporte de otro).
+  if (paraVendedor) {
+    if (!(await isPlatformAdmin(supabase))) return { error: "No tienes permiso." };
+    const { data: vendedor } = await admin.from("agente_vendedor").select("workspace_id").limit(1).maybeSingle();
+    if (!vendedor?.workspace_id) return { error: "El agente vendedor no existe." };
+    workspaceId = vendedor.workspace_id as string;
+  }
   const path = `${workspaceId}/ai-agent-media/${Date.now()}-${file.name}`;
   const { error: uploadError } = await admin.storage
     .from("chat-media")
@@ -315,9 +329,10 @@ export async function addAiAgentMedia(_prevState: unknown, formData: FormData) {
   } = admin.storage.from("chat-media").getPublicUrl(path);
   const publicUrl = toPublicUrl(rawPublicUrl);
 
-  const { error } = await supabase.from("ai_agent_media").insert({
+  const { error } = await (paraVendedor ? admin : supabase).from("ai_agent_media").insert({
     workspace_id: workspaceId,
     whatsapp_account_id: whatsappAccountId,
+    del_vendedor: paraVendedor,
     key,
     label,
     trigger_description: triggerDescription,
@@ -335,6 +350,7 @@ export async function addAiAgentMedia(_prevState: unknown, formData: FormData) {
   }
 
   revalidatePath("/dashboard/settings");
+  revalidatePath("/admin/agente-juanes");
   return { success: true as const };
 }
 
@@ -389,6 +405,7 @@ export async function editAiAgentMedia(_prevState: unknown, formData: FormData) 
   if (error) return { error: error.message };
 
   revalidatePath("/dashboard/settings");
+  revalidatePath("/admin/agente-juanes");
   return { success: true as const };
 }
 
@@ -399,6 +416,7 @@ export async function deleteAiAgentMedia(id: string) {
 
   await supabase.from("ai_agent_media").delete().eq("id", id).eq("workspace_id", workspaceId);
   revalidatePath("/dashboard/settings");
+  revalidatePath("/admin/agente-juanes");
   return { success: true as const };
 }
 

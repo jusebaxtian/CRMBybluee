@@ -5,6 +5,7 @@ import { conexionDeIa } from "@/lib/ai/vendedor";
 import { vozDisponible } from "@/lib/ai/voz";
 import { AgenteVendedorPanel } from "@/components/admin/agente-vendedor";
 import { AlcanceJuanes } from "@/components/admin/alcance-juanes";
+import { AiAgentMediaLibrary } from "@/components/ai-agent/ai-agent-media-library";
 import { personasConChats } from "@/lib/agents";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export default async function AgenteJuanesPage() {
   const { data: vendedor } = await admin.from("agente_vendedor").select("workspace_id, nombre, activo, instrucciones, voz_activa, voz_id, numeros_prueba, lineas_modo, lineas_ids, asesores_modo, asesores_ids").limit(1).maybeSingle();
   if (!vendedor) return <p className="p-6 text-sm text-muted">El agente todavía no está creado.</p>;
 
-  const [conexion, { data: lineas }, personas] = await Promise.all([
+  const [conexion, { data: lineas }, personas, { data: biblioteca }] = await Promise.all([
     conexionDeIa(admin, vendedor.workspace_id as string),
     admin
       .from("whatsapp_accounts")
@@ -25,6 +26,12 @@ export default async function AgenteJuanesPage() {
       .eq("workspace_id", vendedor.workspace_id)
       .order("connected_at"),
     personasConChats(admin as unknown as Awaited<ReturnType<typeof createClient>>, vendedor.workspace_id as string),
+    admin
+      .from("ai_agent_media")
+      .select("id, key, label, trigger_description, media_type, media_url")
+      .eq("workspace_id", vendedor.workspace_id)
+      .eq("del_vendedor", true)
+      .order("created_at"),
   ]);
 
   return (
@@ -40,6 +47,12 @@ export default async function AgenteJuanesPage() {
         vozId={vendedor.voz_id as string}
         hayLlaveDeVoz={vozDisponible()}
         numerosPrueba={(vendedor.numeros_prueba as string[] | null) ?? []}
+        biblioteca={
+          <AiAgentMediaLibrary
+            items={(biblioteca ?? []) as Parameters<typeof AiAgentMediaLibrary>[0]["items"]}
+            paraVendedor
+          />
+        }
         alcance={
           <AlcanceJuanes
             nombre={vendedor.nombre as string}

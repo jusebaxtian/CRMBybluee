@@ -132,6 +132,7 @@ export default async function SettingsPage() {
           .from("ai_agent_media")
           .select("id, key, label, trigger_description, media_type, media_url, whatsapp_account_id")
           .eq("workspace_id", workspaceId)
+          .eq("del_vendedor", false)
           .order("created_at")
       : { data: [] };
 

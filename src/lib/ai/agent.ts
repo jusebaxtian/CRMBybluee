@@ -168,7 +168,9 @@ export function formatoWhatsApp(texto: string): string {
   return texto
     .replace(/(?<![\p{L}\p{N}])\*\*(\S(?:[^\n]*?\S)?)\*\*/gu, "*$1*")
     .replace(/^#{1,6}\s+/gm, "")
-    .replace(/^\s*[-•]\s+/gm, "• ");
+    .replace(/^\s*[-•]\s+/gm, "• ")
+    // [texto](enlace) no se ve como enlace en WhatsApp (25 nov 2026): queda "texto: enlace".
+    .replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g, "$1: $2");
 }
 
 // Pure parsing shared by the real webhook path and the settings-page test
@@ -245,13 +247,20 @@ export async function agenteParaBloque(
 export async function adjuntosDelAgente(
   supabase: ReturnType<typeof createAdminClient>,
   workspaceId: string,
-  whatsappAccountId: string | null
+  whatsappAccountId: string | null,
+  /** El vendedor (Juanes) tiene su propia biblioteca (0190). */
+  delVendedor = false
 ): Promise<MediaItem[]> {
   // Los adjuntos son de cada agente (0163): solo los del agente que responde.
   const consultaMedios = supabase
     .from("ai_agent_media")
     .select("key, label, trigger_description, media_type, media_url, media_mime_type, filename")
-    .eq("workspace_id", workspaceId);
+    .eq("workspace_id", workspaceId)
+    .eq("del_vendedor", delVendedor);
+  if (delVendedor) {
+    const { data } = await consultaMedios;
+    return (data ?? []) as MediaItem[];
+  }
   const { data } = await (whatsappAccountId
     ? consultaMedios.eq("whatsapp_account_id", whatsappAccountId)
     : consultaMedios.is("whatsapp_account_id", null));
@@ -431,7 +440,7 @@ export async function maybeRespondWithAiAgent(
   const account = await resolveSendAccount(supabase, workspaceId, conversation.whatsapp_account_id);
   if (!contact || !account) return;
 
-  const mediaLibrary = await adjuntosDelAgente(supabase, workspaceId, agent.whatsapp_account_id);
+  const mediaLibrary = await adjuntosDelAgente(supabase, workspaceId, agent.whatsapp_account_id, "esVendedor" in agent);
 
   const { data: pastMessages } = await supabase
     .from("messages")

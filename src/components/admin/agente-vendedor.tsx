@@ -12,6 +12,7 @@ export function AgenteVendedorPanel({
   instrucciones,
   conexion,
   alcance,
+  biblioteca,
   vozActiva,
   vozId,
   hayLlaveDeVoz,
@@ -24,6 +25,8 @@ export function AgenteVendedorPanel({
   conexion: string | null;
   /** Tarjeta "Dónde responde" (0188). */
   alcance?: React.ReactNode;
+  /** Su biblioteca de imagenes, videos y documentos (0190). */
+  biblioteca?: React.ReactNode;
   vozActiva: boolean;
   vozId: string;
   /** La llave de ElevenLabs esta en el servidor. */
@@ -152,6 +155,8 @@ export function AgenteVendedorPanel({
         </div>
 
         {alcance}
+
+        {biblioteca && <div className="rounded-[13px] border border-border bg-surface p-4">{biblioteca}</div>}
 
         <div className="rounded-[13px] border border-border bg-surface p-4">
           <label htmlFor="numerosPrueba" className="text-sm font-semibold text-foreground">Números de prueba</label>

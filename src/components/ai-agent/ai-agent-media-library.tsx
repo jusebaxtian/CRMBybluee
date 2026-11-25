@@ -131,10 +131,13 @@ function EditMediaButton({ item }: { item: MediaItem }) {
 export function AiAgentMediaLibrary({
   items,
   whatsappAccountId = null,
+  paraVendedor = false,
 }: {
   items: MediaItem[];
   /** Agente al que se suben los adjuntos nuevos: su linea, o null = el general (0163). */
   whatsappAccountId?: string | null;
+  /** Biblioteca propia del agente vendedor (Juanes, 0190). */
+  paraVendedor?: boolean;
 }) {
   const [state, action, pending] = useActionState(addAiAgentMedia, undefined);
 
@@ -178,6 +181,7 @@ export function AiAgentMediaLibrary({
 
       <form action={action} className="flex flex-col gap-3 border-t border-border pt-4">
         <input type="hidden" name="whatsappAccountId" value={whatsappAccountId ?? ""} />
+        {paraVendedor && <input type="hidden" name="paraVendedor" value="1" />}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-xs font-medium text-muted">

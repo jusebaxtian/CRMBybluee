@@ -145,13 +145,13 @@ export async function probarVendedor(input: { instrucciones: string; etapa: stri
 
   const conVoz = vendedor.voz_activa && vozDisponible();
 
+  // Su propia biblioteca (0190), la misma que usa en los chats.
   const { data: adjuntos } = await admin
     .from("ai_agent_media")
     .select("key, label, trigger_description, media_type, media_url, media_mime_type, filename")
-    .eq("workspace_id", workspaceId);
-  // Los adjuntos son por linea: en la prueba, una vez cada clave.
-  const porClave = new Map((adjuntos ?? []).map((m) => [m.key as string, m]));
-  const biblioteca = [...porClave.values()];
+    .eq("workspace_id", workspaceId)
+    .eq("del_vendedor", true);
+  const biblioteca = adjuntos ?? [];
 
   const instrucciones =
     buildSystemPrompt(vendedor.nombre, input.instrucciones, biblioteca) +
@@ -194,6 +194,6 @@ export async function probarVendedor(input: { instrucciones: string; etapa: stri
     audioBase64,
     quitoNumero: revisada.quito,
     pasaAPersona: handoff,
-    adjuntos: mediaKeys.map((k) => (porClave.get(k)?.label as string | undefined) ?? k),
+    adjuntos: mediaKeys.map((k) => (biblioteca.find((m) => m.key === k)?.label as string | undefined) ?? k),
   };
 }

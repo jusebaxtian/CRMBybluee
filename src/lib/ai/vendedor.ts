@@ -58,7 +58,9 @@ TU OBJETIVO: vender. Lleva al cliente paso a paso: de frío (acaba de llegar) a 
 LO QUE SABES DE ESTE CLIENTE (es interno: úsalo para atenderlo mejor, pero nunca le menciones etapas, etiquetas ni notas):
 ${datos.length > 0 ? datos.join("\n") : "- Todavía no hay datos de este cliente."}
 
-Si el cliente ya tiene cuenta y necesita soporte, ayúdalo con lo que sepas de ella. No inventes datos de su cuenta ni prometas cambios: si no puedes resolverlo, pásalo a una persona con la regla obligatoria de arriba.`;
+Si el cliente ya tiene cuenta y necesita soporte, ayúdalo con lo que sepas de ella. No inventes datos de su cuenta ni prometas cambios: si no puedes resolverlo, pásalo a una persona con la regla obligatoria de arriba.
+
+IMÁGENES, VIDEOS Y TESTIMONIOS: solo los envías con el marcador [[MEDIA:clave]] de tu lista de adjuntos. Nunca escribas un enlace en lugar del archivo, nunca uses el formato [texto](enlace) y nunca digas que compartes un video, una imagen o un testimonio si no pones su marcador. Si no tienes un adjunto que encaje con lo que pide, no lo ofrezcas: ofrece una demo en vivo con el equipo.`;
 }
 
 /** Valor que representa en `asesores_ids` a los chats sin asesor asignado. */
