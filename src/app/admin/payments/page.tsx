@@ -8,6 +8,7 @@ import { toPublicUrl } from "@/lib/supabase/config";
 import { ResumenVentas, type VentaFila } from "@/components/admin/resumen-ventas";
 import { PagosBold } from "@/components/admin/pagos-bold";
 import { listarPagosBold } from "@/lib/bold-pagos-lista";
+import { ComprasDeCursos } from "@/components/admin/compras-de-cursos";
 
 const statusColor: Record<string, string> = {
   pending: "text-warning border-warning",
@@ -144,6 +145,8 @@ export default async function AdminPaymentsPage({
       </div>
 
       <ResumenVentas ventas={ventas} desde={desde ?? null} hasta={hasta ?? null} />
+
+      <ComprasDeCursos />
 
       <NuevoEnlaceDemo />
       <InvitacionesRegistro filas={invitacionFilas} />

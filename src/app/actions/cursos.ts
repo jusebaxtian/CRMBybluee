@@ -55,6 +55,7 @@ export async function crearCurso(_prev: unknown, formData: FormData) {
     return { error: err instanceof Error ? err.message : "No se pudo crear el curso." };
   }
   revalidatePath("/admin/tutoriales");
+  revalidatePath("/admin/payments");
   revalidatePath("/dashboard/tutoriales");
   return { success: true as const };
 }
@@ -76,6 +77,7 @@ export async function actualizarCurso(id: string, _prev: unknown, formData: Form
     return { error: err instanceof Error ? err.message : "No se pudo guardar el curso." };
   }
   revalidatePath("/admin/tutoriales");
+  revalidatePath("/admin/payments");
   revalidatePath("/dashboard/tutoriales");
   return { success: true as const };
 }
@@ -86,6 +88,7 @@ export async function eliminarCurso(id: string) {
   const { error } = await supabase.from("cursos").delete().eq("id", id);
   if (error) return { error: error.message };
   revalidatePath("/admin/tutoriales");
+  revalidatePath("/admin/payments");
   revalidatePath("/dashboard/tutoriales");
   return { success: true as const };
 }
@@ -107,6 +110,7 @@ export async function revisarCompra(compraId: string, aprobar: boolean) {
     .eq("id", compraId);
   if (error) return { error: error.message };
   revalidatePath("/admin/tutoriales");
+  revalidatePath("/admin/payments");
   revalidatePath("/dashboard/tutoriales");
   return { success: true as const };
 }
@@ -124,7 +128,9 @@ export async function verComprobante(compraId: string) {
   const admin = createAdminClient();
   const { data, error } = await admin.storage.from("payment-proofs").createSignedUrl(compra.proof_path, 300);
   if (error || !data) return { error: "No se pudo abrir el comprobante." };
-  return { url: data.signedUrl };
+  // La URL firmada sale con la base interna del servidor (localhost): el
+  // navegador del admin necesita el dominio publico, como en Pagos.
+  return { url: toPublicUrl(data.signedUrl) };
 }
 
 /* ---------------------------------------------------------------- cliente */
