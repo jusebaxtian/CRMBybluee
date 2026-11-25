@@ -34,7 +34,7 @@ export default async function CursoPage({
 
   const { data: curso } = await supabase
     .from("cursos")
-    .select("id, titulo, descripcion, portada_url, precio_cents, currency, activo")
+    .select("id, titulo, descripcion, portada_url, precio_cents, currency, activo, compra_repetible")
     .eq("id", id)
     .maybeSingle();
   if (!curso) notFound();
@@ -107,7 +107,7 @@ export default async function CursoPage({
           {/* UN solo bloque de compra, dentro de la misma tarjeta del producto: antes habia
               un "Comprar ahora" aqui y otra tarjeta de pago mas abajo, dos botones de compra
               compitiendo. */}
-          {!acceso && (
+          {(!acceso || curso.compra_repetible) && (
             <ComprarCurso cursoId={curso.id} precio={precioCop(curso.precio_cents, curso.currency)} hayPendiente={pendiente} />
           )}
         </div>

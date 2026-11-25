@@ -16,6 +16,8 @@ export type CursoAdmin = {
   activo: boolean;
   orden: number;
   lecciones: number;
+  /** Se puede comprar varias veces, como un servicio de 1 hora (0189). */
+  compra_repetible: boolean;
 };
 
 export type CompraAdmin = {
@@ -91,6 +93,15 @@ function Campos({ c }: { c?: CursoAdmin }) {
           <input name="orden" type="number" defaultValue={c?.orden ?? 0} className={`${INPUT} mt-1`} />
         </label>
       </div>
+      <label className="flex items-start gap-2 text-sm text-foreground">
+        <input type="checkbox" name="compraRepetible" defaultChecked={c?.compra_repetible ?? false} className="mt-0.5" />
+        <span>
+          Se puede comprar varias veces
+          <span className="block text-[11px] text-muted">
+            Para servicios que se contratan de nuevo, como 1 hora de asesoría. Apagado, es de pago único: una vez aprobado queda comprado.
+          </span>
+        </span>
+      </label>
       <p className="text-[11px] text-muted">
         Las lecciones son tutoriales: créalos arriba y elige este curso en el campo &quot;Curso&quot;.
       </p>
@@ -154,6 +165,9 @@ export function FilaCurso({ c }: { c: CursoAdmin }) {
         <p className="truncate text-sm font-medium text-foreground">
           {c.titulo}
           {!c.activo && <span className="ml-2 rounded-full border border-border px-2 py-0.5 text-[10px] text-muted">Oculto</span>}
+          {c.compra_repetible && (
+            <span className="ml-2 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] text-primary">Se compra varias veces</span>
+          )}
         </p>
         <p className="truncate text-xs text-muted">
           {pesos(c.precio_cents)} · {c.lecciones} {c.lecciones === 1 ? "lección" : "lecciones"}

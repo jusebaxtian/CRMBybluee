@@ -30,7 +30,7 @@ export default async function TutorialesPage({ searchParams }: { searchParams: P
       .order("created_at"),
     supabase
       .from("cursos")
-      .select("id, titulo, portada_url, precio_cents, currency")
+      .select("id, titulo, portada_url, precio_cents, currency, compra_repetible")
       .eq("activo", true)
       .order("orden")
       .order("created_at"),
@@ -70,6 +70,7 @@ export default async function TutorialesPage({ searchParams }: { searchParams: P
                 precio={precioCop(c.precio_cents, c.currency)}
                 gratis={c.precio_cents <= 0}
                 comprado={comprados.has(c.id)}
+                repetible={!!c.compra_repetible}
               />
             ))}
           </div>

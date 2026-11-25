@@ -14,7 +14,7 @@ export default async function AdminTutorialesPage() {
       .order("created_at"),
     supabase
       .from("cursos")
-      .select("id, titulo, descripcion, portada_url, precio_cents, currency, datos_transferencia, activo, orden")
+      .select("id, titulo, descripcion, portada_url, precio_cents, currency, datos_transferencia, activo, orden, compra_repetible")
       .order("orden")
       .order("created_at"),
     supabase.from("curso_compras").select("id", { count: "exact", head: true }).eq("status", "pending"),

@@ -27,6 +27,7 @@ export function TarjetaServicio({
   precio,
   gratis,
   comprado,
+  repetible = false,
 }: {
   id: string;
   titulo: string;
@@ -34,6 +35,8 @@ export function TarjetaServicio({
   precio: string;
   gratis: boolean;
   comprado: boolean;
+  /** Se puede comprar varias veces (0189): despues de comprar sigue el boton. */
+  repetible?: boolean;
 }) {
   const ficha = `/dashboard/tutoriales/curso/${id}`;
 
@@ -61,7 +64,14 @@ export function TarjetaServicio({
           ) : (
             <span className="text-[17px] font-bold leading-none tracking-[-.2px] text-foreground">{gratis ? "Gratis" : precio}</span>
           )}
-          {comprado ? (
+          {comprado && repetible ? (
+            <Link
+              href={`${ficha}#pagar`}
+              className="flex items-center gap-1.5 whitespace-nowrap rounded-[9px] bg-primary px-3.5 py-1.5 text-xs font-bold text-white hover:bg-primary-hover"
+            >
+              <ShoppingCart size={13} /> Comprar otra vez
+            </Link>
+          ) : comprado ? (
             <Link
               href={ficha}
               className="flex items-center gap-1.5 whitespace-nowrap rounded-[9px] border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-hover"

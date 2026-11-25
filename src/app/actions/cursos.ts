@@ -39,7 +39,11 @@ function leerCurso(formData: FormData) {
   if (!titulo) return { error: "Escribe el título del curso." };
   if (!Number.isFinite(precio) || precio < 0) return { error: "El precio no es válido." };
   // La UI pide pesos; la base guarda centavos como el resto de la plataforma.
-  return { datos: { titulo, descripcion, datos_transferencia: datosTransferencia, precio_cents: precio * 100, orden } };
+  // Se puede comprar varias veces (servicio por horas, 0189).
+  const compraRepetible = formData.get("compraRepetible") === "on";
+  return {
+    datos: { titulo, descripcion, datos_transferencia: datosTransferencia, precio_cents: precio * 100, orden, compra_repetible: compraRepetible },
+  };
 }
 
 export async function crearCurso(_prev: unknown, formData: FormData) {
