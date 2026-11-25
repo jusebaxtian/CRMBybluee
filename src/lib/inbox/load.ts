@@ -1,4 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { estaPausado } from "@/lib/billing/pausa";
+import { iaDelChat } from "@/lib/inbox/ia-del-chat";
 
 /**
  * Carga una pagina de la bandeja.
@@ -37,6 +40,8 @@ export type InboxConversation = {
   adHeadline: string | null;
   likelyBlocked: boolean;
   needsHuman: boolean;
+  /** Nombre del agente de IA que le responderia a este chat, o null (25 nov 2026). */
+  atiendeIa: string | null;
   contactId: string;
   contact: { name: string | null; wa_id: string };
   tags: { id: string; name: string; color: string }[];
@@ -61,7 +66,38 @@ const ETIQUETA_MEDIA: Record<string, string> = {
 };
 
 const CAMPOS =
-  "id, contact_id, last_message_at, pinned_at, marcado_no_leido, assigned_agent_id, ad_source_id, ad_headline, ai_handoff_requested, ai_manually_paused, whatsapp_account_id, contacts(name, wa_id, likely_blocked, contact_tags(tags(id, name, color)))";
+  "id, contact_id, last_message_at, pinned_at, marcado_no_leido, assigned_agent_id, ad_source_id, ad_headline, ai_handoff_requested, ai_manually_paused, followups_enabled, whatsapp_account_id, contacts(name, wa_id, likely_blocked, bloqueado_el, marketing_opt_out_at, contact_tags(tags(id, name, color, excludes_followups)))";
+
+/**
+ * Lo que hace falta para saber que chats atiende la IA: los agentes del espacio,
+ * el vendedor (Juanes) y si la cuenta esta pausada. Con el cliente de servicio:
+ * la tabla del vendedor solo la lee el administrador y la de agentes guarda la
+ * llave (aqui no se lee la llave; solo si existe). Nada de esto viaja al navegador.
+ */
+async function iaDelEspacio(workspaceId: string, contactIds: string[]) {
+  const admin = createAdminClient();
+  const [{ data: agentes }, { data: vendedor }, { data: espacio }, { data: noInteresados }] = await Promise.all([
+    admin.from("ai_agents").select("agent_name, is_active, whatsapp_account_id, tiene_llave:api_key").eq("workspace_id", workspaceId),
+    admin
+      .from("agente_vendedor")
+      .select("nombre, activo, numeros_prueba, lineas_modo, lineas_ids, asesores_modo, asesores_ids")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle(),
+    admin.from("workspaces").select("status, access_disabled").eq("id", workspaceId).maybeSingle(),
+    contactIds.length
+      ? admin.from("lead_etapas").select("contact_id").in("contact_id", contactIds).eq("etapa", "no_interesado")
+      : Promise.resolve({ data: [] as { contact_id: string }[] }),
+  ]);
+  const lista = (agentes ?? []) as { agent_name: string | null; is_active: boolean; whatsapp_account_id: string | null; tiene_llave: string | null }[];
+  // El vendedor usa la llave conectada en el espacio: sin llave no responde.
+  const hayLlave = lista.some((a) => !!a.tiene_llave);
+  return {
+    agentes: lista.map(({ agent_name, is_active, whatsapp_account_id }) => ({ agent_name, is_active, whatsapp_account_id })),
+    vendedor: vendedor && hayLlave ? (vendedor as unknown as Parameters<typeof iaDelChat>[0]["vendedor"]) : null,
+    pausado: estaPausado(espacio as { status?: string | null; access_disabled?: boolean | null } | null),
+    noInteresados: new Set((noInteresados ?? []).map((r) => r.contact_id as string)),
+  };
+}
 
 /**
  * El orden de la bandeja: fijadas arriba, y dentro de cada grupo por
@@ -145,6 +181,7 @@ export async function loadInboxPage(
     .in("id", filas.map((r) => r.conversation_id));
 
   const porId = new Map((completas ?? []).map((c) => [c.id as string, c]));
+  const ia = await iaDelEspacio(workspaceId, (completas ?? []).map((c) => c.contact_id as string));
 
   const conversations = filas.flatMap((r) => {
     const c = porId.get(r.conversation_id);
@@ -153,8 +190,19 @@ export async function loadInboxPage(
       name: string | null;
       wa_id: string;
       likely_blocked: boolean;
-      contact_tags: { tags: { id: string; name: string; color: string } | null }[];
+      bloqueado_el: string | null;
+      marketing_opt_out_at: string | null;
+      contact_tags: { tags: { id: string; name: string; color: string; excludes_followups: boolean } | null }[];
     };
+    const atencionHumana = !!(c.ai_handoff_requested || c.ai_manually_paused);
+    // Misma regla que isContactExcludedFromAutomations (sin la parte de flujos).
+    const contactoExcluido =
+      c.followups_enabled === false ||
+      contacto.likely_blocked ||
+      !!contacto.bloqueado_el ||
+      !!contacto.marketing_opt_out_at ||
+      ia.noInteresados.has(c.contact_id as string) ||
+      contacto.contact_tags.some((ct) => ct.tags?.excludes_followups);
 
     return [{
       id: r.conversation_id,
@@ -173,12 +221,23 @@ export async function loadInboxPage(
       fromAds: !!c.ad_source_id,
       adHeadline: c.ad_headline as string | null,
       likelyBlocked: contacto.likely_blocked,
-      needsHuman: (c.ai_handoff_requested || c.ai_manually_paused) as boolean,
+      needsHuman: atencionHumana,
+      atiendeIa: iaDelChat({
+        vendedor: ia.vendedor,
+        agentes: ia.agentes,
+        lineaId: (c.whatsapp_account_id as string | null) ?? null,
+        asignadoA: (c.assigned_agent_id as string | null) ?? null,
+        waId: contacto.wa_id,
+        atencionHumana,
+        contactoExcluido,
+        espacioPausado: ia.pausado,
+      }),
       contactId: c.contact_id as string,
       contact: { name: contacto.name, wa_id: contacto.wa_id },
       tags: contacto.contact_tags
         .map((ct) => ct.tags)
-        .filter((t): t is { id: string; name: string; color: string } => t !== null),
+        .filter((t): t is { id: string; name: string; color: string; excludes_followups: boolean } => t !== null)
+        .map(({ id, name, color }) => ({ id, name, color })),
     }];
   });
 

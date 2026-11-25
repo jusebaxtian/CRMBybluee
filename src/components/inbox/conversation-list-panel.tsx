@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, SlidersHorizontal, X, Clock, Megaphone, ShieldAlert, Bot, Check, Pin } from "lucide-react";
+import { Search, SlidersHorizontal, X, Clock, Megaphone, ShieldAlert, Bot, Check, Pin, Sparkles } from "lucide-react";
 import { cargarConversaciones } from "@/app/actions/conversations";
 import { MenuDeFila, NuevaConversacionBoton } from "@/components/inbox/acciones-de-chat";
 import { claseAvatar, ESTILO_CICLO } from "@/components/inbox/etiqueta-ciclo";
@@ -31,6 +31,7 @@ type Conversation = {
   adHeadline: string | null;
   likelyBlocked: boolean;
   needsHuman: boolean;
+  atiendeIa: string | null;
   contactId: string;
   contact: { name: string | null; wa_id: string };
   tags: Tag[];
@@ -595,6 +596,15 @@ export function ConversationListPanel({
                       >
                         <Bot size={9} />
                         Humano
+                      </span>
+                    )}
+                    {conv.atiendeIa && (
+                      <span
+                        title={`Lo atiende la IA (${conv.atiendeIa}): responde sola cuando el cliente escribe`}
+                        className="flex shrink-0 items-center gap-0.5 rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[9px] font-semibold text-violet-400"
+                      >
+                        <Sparkles size={9} />
+                        IA
                       </span>
                     )}
                   </p>
