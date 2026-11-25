@@ -10,7 +10,8 @@ export type EspacioDelCliente = {
   plan_name: string | null;
   vence: string | null;
   apis_conectadas: number;
-  origen: "manual" | "telefono";
+  /** "adicional": este chat es uno de los contactos extra del espacio (0191). */
+  origen: "manual" | "telefono" | "adicional";
 };
 
 /** Enlace de registro con pago pendiente de usar (migracion 0105). */
@@ -106,6 +107,9 @@ export function EspacioDelClienteCard({
                   )}
                   <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${estado.clase}`}>
                     {estado.texto}
+                  </span>
+                  <span className="ml-1 mt-1 inline-block rounded-full bg-surface-hover px-2 py-0.5 text-[10.5px] text-muted">
+                    {e.origen === "adicional" ? "Contacto adicional" : "Contacto principal"}
                   </span>
                   <p className="mt-1 text-muted">
                     {[

@@ -125,7 +125,8 @@ export default async function AdminWorkspaceDetailPage({
 
   // Con quién habló el administrador para vender este espacio (0096).
   const { data: clienteRows } = await supabase.rpc("admin_cliente_de_espacio", { p_workspace_id: id });
-  const cliente = ((clienteRows ?? []) as ClienteDeEspacio[])[0] ?? null;
+  // Hasta 5 contactos: el principal primero (0191).
+  const contactosDelEspacio = (clienteRows ?? []) as ClienteDeEspacio[];
 
   // Solo los pagos aprobados: son los que de verdad entraron. Los pendientes
   // y rechazados se ven en la pantalla de Pagos, donde se aprueban.
@@ -219,7 +220,7 @@ export default async function AdminWorkspaceDetailPage({
         <PagosDelCliente pagos={pagos} sinDocumento={!workspace.datos_legales_el} />
       </div>
 
-      <ClienteEnMiChat workspaceId={workspace.id} cliente={cliente} />
+      <ClienteEnMiChat workspaceId={workspace.id} contactos={contactosDelEspacio} />
 
       <ReferidosDelEspacio workspaceId={workspace.id} />
 

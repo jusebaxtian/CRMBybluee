@@ -506,3 +506,131 @@ export async function buscarContactosDelAdmin(termino: string) {
   if (error) return { error: error.message };
   return { contactos: (data ?? []) as { id: string; name: string | null; wa_id: string }[] };
 }
+
+// --- Varios contactos por espacio (0191) ------------------------------------
+// El principal sigue en workspaces.cliente_contact_id (o es el que coincide con
+// el telefono de registro); los demas, hasta 5 en total, en espacio_contactos_extra.
+
+type ContactoVinculado = { contact_id: string; principal: boolean; origen: "manual" | "telefono" | "adicional" };
+
+async function contactosDelEspacio(supabase: Awaited<ReturnType<typeof createClient>>, workspaceId: string) {
+  const { data } = await supabase.rpc("admin_cliente_de_espacio", { p_workspace_id: workspaceId });
+  return (data ?? []) as ContactoVinculado[];
+}
+
+function refrescarVinculos(workspaceId: string) {
+  revalidatePath(`/admin/workspaces/${workspaceId}`);
+  revalidatePath("/admin");
+  revalidatePath("/dashboard/inbox", "layout");
+}
+
+/** Vincula un contacto del chat a un espacio: principal si no tiene, si no adicional. */
+export async function vincularContactoAEspacio(workspaceId: string, contactId: string) {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const lista = await contactosDelEspacio(supabase, workspaceId);
+  if (lista.some((c) => c.contact_id === contactId)) return { success: true as const, yaEstaba: true };
+  if (lista.length >= 5) return { error: "Este espacio ya tiene 5 contactos vinculados. Quita uno para vincular otro." };
+
+  const principal = lista.find((c) => c.principal);
+  if (!principal) {
+    const { error } = await supabase.from("workspaces").update({ cliente_contact_id: contactId }).eq("id", workspaceId);
+    if (error) return { error: error.message };
+    refrescarVinculos(workspaceId);
+    return { success: true as const, principal: true };
+  }
+  // El principal que solo coincidia por telefono se deja fijo, para que no se
+  // pierda al haber otros contactos vinculados.
+  if (principal.origen === "telefono") {
+    await supabase.from("workspaces").update({ cliente_contact_id: principal.contact_id }).eq("id", workspaceId);
+  }
+  const { error } = await supabase
+    .from("espacio_contactos_extra")
+    .insert({ workspace_id: workspaceId, contact_id: contactId, created_by: user?.id ?? null });
+  if (error) return { error: error.message.includes("máximo 5") ? "Este espacio ya tiene 5 contactos vinculados." : error.message };
+  refrescarVinculos(workspaceId);
+  return { success: true as const, principal: false };
+}
+
+/** Marca un contacto vinculado como el principal; el anterior queda como adicional. */
+export async function marcarContactoPrincipal(workspaceId: string, contactId: string) {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
+  const lista = await contactosDelEspacio(supabase, workspaceId);
+  const actual = lista.find((c) => c.principal);
+  if (actual?.contact_id === contactId) return { success: true as const };
+  if (!lista.some((c) => c.contact_id === contactId)) return { error: "Ese contacto no está vinculado a este espacio." };
+
+  // Primero sale de los adicionales (el tope cuenta solo adicionales).
+  await supabase.from("espacio_contactos_extra").delete().eq("workspace_id", workspaceId).eq("contact_id", contactId);
+  if (actual) {
+    const { error: errorAnterior } = await supabase
+      .from("espacio_contactos_extra")
+      .upsert({ workspace_id: workspaceId, contact_id: actual.contact_id }, { onConflict: "workspace_id,contact_id", ignoreDuplicates: true });
+    if (errorAnterior) return { error: errorAnterior.message };
+  }
+  const { error } = await supabase.from("workspaces").update({ cliente_contact_id: contactId }).eq("id", workspaceId);
+  if (error) return { error: error.message };
+  refrescarVinculos(workspaceId);
+  return { success: true as const };
+}
+
+/** Quita un contacto del espacio. Si era el principal, sube el adicional mas antiguo. */
+export async function desvincularContactoDeEspacio(workspaceId: string, contactId: string) {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." };
+  const lista = await contactosDelEspacio(supabase, workspaceId);
+  const fila = lista.find((c) => c.contact_id === contactId);
+  if (!fila) return { success: true as const };
+
+  if (!fila.principal) {
+    const { error } = await supabase.from("espacio_contactos_extra").delete().eq("workspace_id", workspaceId).eq("contact_id", contactId);
+    if (error) return { error: error.message };
+    refrescarVinculos(workspaceId);
+    return { success: true as const };
+  }
+  if (fila.origen === "telefono") {
+    return { error: "Este contacto se liga solo porque tiene el número de registro del espacio. Marca otro como principal." };
+  }
+  const siguiente = lista.find((c) => !c.principal);
+  if (siguiente) {
+    await supabase.from("espacio_contactos_extra").delete().eq("workspace_id", workspaceId).eq("contact_id", siguiente.contact_id);
+  }
+  const { error } = await supabase
+    .from("workspaces")
+    .update({ cliente_contact_id: siguiente?.contact_id ?? null })
+    .eq("id", workspaceId);
+  if (error) return { error: error.message };
+  refrescarVinculos(workspaceId);
+  return { success: true as const };
+}
+
+/** Busca espacios por nombre o telefono, para vincular un chat desde la bandeja. */
+export async function buscarEspaciosParaVincular(termino: string) {
+  const supabase = await createClient();
+  if (!(await isPlatformAdmin(supabase))) return { error: "No autorizado." as const };
+  const q = termino.trim();
+  if (q.length < 2) return { espacios: [] };
+  const digitos = q.replace(/\D/g, "");
+  const filtro = digitos.length >= 4 ? `name.ilike.%${q.replace(/[%,()]/g, "")}%,phone.ilike.%${digitos}%` : `name.ilike.%${q.replace(/[%,()]/g, "")}%`;
+  const { data, error } = await createAdminClient()
+    .from("workspaces")
+    .select("id, name, status, phone, plans(name)")
+    .or(filtro)
+    .order("created_at", { ascending: false })
+    .limit(8);
+  if (error) return { error: "No se pudo buscar." as const };
+  return {
+    espacios: (data ?? []).map((w) => ({
+      id: w.id as string,
+      nombre: (w.name as string) || "Sin nombre",
+      estado: w.status as string,
+      telefono: (w.phone as string | null) ?? null,
+      plan: ((w.plans as unknown as { name: string } | null)?.name as string | undefined) ?? null,
+    })),
+  };
+}
