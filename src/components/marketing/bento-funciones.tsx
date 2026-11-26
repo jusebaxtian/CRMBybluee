@@ -30,23 +30,30 @@ function Tarjeta({ f }: { f: Funcion }) {
     el.style.setProperty("--x", `${e.clientX - r.left}px`);
     el.style.setProperty("--y", `${e.clientY - r.top}px`);
   };
+  // Al salir, el brillo se va fuera de la tarjeta y el borde vuelve a su color.
+  const salir = () => {
+    ref.current?.style.setProperty("--x", "-400px");
+    ref.current?.style.setProperty("--y", "-400px");
+  };
   return (
     <article
       ref={ref}
       onMouseMove={mover}
-      className="group/bento relative isolate flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-background p-5 transition duration-300 motion-safe:hover:-translate-y-1"
+      onMouseLeave={salir}
+      className="group/bento relative isolate flex h-full flex-col overflow-hidden rounded-2xl border border-transparent p-5 transition-transform duration-300 motion-safe:hover:-translate-y-1"
+      // El brillo vive SOLO en el borde (25 nov 2026: encima del texto tapaba las
+      // letras). El fondo de la tarjeta se pinta en el padding-box y el degradado
+      // que sigue al cursor solo asoma por el borde de 1px (border-box).
+      style={{
+        background:
+          "linear-gradient(var(--background), var(--background)) padding-box, radial-gradient(170px circle at var(--x, -400px) var(--y, -400px), var(--primary), var(--border) 75%) border-box",
+      }}
     >
-      {/* Brillo del borde que sigue el cursor (solo con puntero que flota). */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] p-px opacity-0 transition-opacity duration-300 [mask-composite:exclude] [mask:linear-gradient(#000_0_0)_content-box,linear-gradient(#000_0_0)] [@media(hover:hover)]:group-hover/bento:opacity-100"
-        style={{ background: "radial-gradient(180px circle at var(--x, -200px) var(--y, -200px), var(--primary), transparent 70%)" }}
-      />
-      {/* Lavado suave de la superficie. */}
+      {/* Resplandor muy suave detras del contenido, nunca encima de las letras. */}
       <span
         aria-hidden
         className="pointer-events-none absolute inset-0 -z-10 opacity-0 transition-opacity duration-300 [@media(hover:hover)]:group-hover/bento:opacity-100"
-        style={{ background: "radial-gradient(260px circle at var(--x, -200px) var(--y, -200px), #1ba84a1f, transparent 70%)" }}
+        style={{ background: "radial-gradient(220px circle at var(--x, -400px) var(--y, -400px), #1ba84a12, transparent 70%)" }}
       />
       {f.visual && (
         <div aria-hidden className="mb-4 flex min-h-[96px] flex-1 items-center justify-center transition-transform duration-500 motion-safe:group-hover/bento:-translate-y-1">
