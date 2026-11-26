@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Check, ArrowRight } from "lucide-react";
+import { Check, ArrowRight, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Reveal } from "@/components/marketing/reveal";
+import { BentoFunciones } from "@/components/marketing/bento-funciones";
 import { SocialLinks } from "@/components/marketing/social-links";
 import { InsigniaPartner } from "@/components/marketing/insignia-partner";
 import { ApiConexiones } from "@/components/marketing/api-conexiones";
@@ -24,16 +25,7 @@ const PAISES: [string, string][] = [
   ["🇪🇸", "España"], ["🇺🇸", "Hispanos en EE. UU."],
 ];
 
-const FUNCIONES: [string, string, string][] = [
-  ["▤", "Tu equipo en el mismo número", "Añade personas a tu equipo: cada una entra con su usuario, responde desde el mismo número y recibe los chats que le asignes. Tú lo ves todo."],
-  ["⚡", "Automatizaciones", "Bienvenida, palabras clave, botones y asignación automática desde el primer mensaje."],
-  ["↻", "Seguimientos", "Si el cliente deja de responder, el CRM insiste con el mensaje y el tiempo que definas."],
-  ["◎", "Campañas masivas", "Plantillas aprobadas por Meta, segmentadas por etiqueta, con reporte de entrega y lectura."],
-  ["✦", "Agente de IA", "Responde con tu tono cuando no hay nadie, y entrega la conversación a una persona cuando toca."],
-  ["📱", "App móvil", "Responde desde el celular con la misma bandeja, notificaciones al instante y notas de voz. Tu equipo atiende desde donde esté."],
-  ["⏰", "Agenda y reportes", "Recordatorios por cliente en un calendario y reportes de tiempos de respuesta y ventas."],
-  ["∞", "Activo 24/7", "Nunca se apaga: responde, asigna e insiste de noche, fines de semana y festivos, aunque nadie esté conectado."],
-];
+// Las 8 funciones (mismo texto) viven en BentoFunciones: rejilla bento adaptada de 21st.dev.
 
 const FAQ: [string, string][] = [
   ["¿ByBluee usa la API oficial de WhatsApp?", "Sí. Conectas tu número con el registro oficial de Meta desde el mismo CRM. No usamos celulares conectados ni métodos que bloqueen tu línea."],
@@ -193,18 +185,7 @@ export default async function Home() {
               <h2 className={H2}>Todo lo que necesitas para vender por WhatsApp</h2>
             </div>
           </Reveal>
-          <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
-            {FUNCIONES.map(([ic, t, d], i) => (
-              <Reveal key={t} delay={i * 60}>
-                <div className="group relative h-full overflow-hidden rounded-[16px] border border-border bg-background p-5 transition duration-300 hover:-translate-y-1.5 hover:border-primary/50 hover:shadow-[0_20px_50px_rgba(0,0,0,0.45)]">
-                  <div className="pointer-events-none absolute -bottom-[60%] -right-[40%] h-[220px] w-[220px] rounded-full bg-[radial-gradient(#1ba84a33,transparent_70%)] opacity-0 transition group-hover:opacity-100" />
-                  <div className="grid h-[38px] w-[38px] place-items-center rounded-[10px] bg-primary/15 text-lg font-black text-primary">{ic}</div>
-                  <h3 className="mb-1.5 mt-3 font-dash-display text-lg font-semibold">{t}</h3>
-                  <p className="text-[13.5px] leading-[1.55] text-muted">{d}</p>
-                </div>
-              </Reveal>
-            ))}
-          </div>
+          <BentoFunciones />
         </div>
       </section>
 
@@ -281,26 +262,38 @@ export default async function Home() {
             {plans.map((plan, i) => {
               const featured = Boolean(plan.badge_label);
               return (
-                <Reveal key={plan.id} delay={i * 100}>
-                  <div className={`relative flex h-full flex-col rounded-[16px] border p-6 transition hover:-translate-y-1 ${featured ? "border-primary bg-[linear-gradient(180deg,#12261a,#0e1411)] shadow-[0_24px_60px_#1ba84a22]" : "border-border bg-background"}`}>
-                    {plan.badge_label && (
-                      <span className="absolute -top-[11px] left-[18px] rounded-full bg-primary px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[.08em] text-white">{plan.badge_label}</span>
-                    )}
-                    <h5 className="text-xs font-semibold uppercase tracking-[.1em] text-muted">{plan.name}</h5>
-                    <div className="mt-2 flex items-baseline gap-1.5">
-                      <span className="font-dash-display text-4xl font-bold tracking-[-.03em]">${formatCents(plan.price_cents)}</span>
-                      <span className="text-[13px] text-[#7c8a82]">{plan.currency} / {planCycleLabel(plan.billing_cycle)}</span>
+                <Reveal key={plan.id} delay={i * 100} className="h-full">
+                  {/* Marco con la tarjeta del precio flotando adentro: adaptado de "Minimal Pricing Plan" (21st.dev). */}
+                  <div className={`relative flex h-full flex-col rounded-[24px] border p-2 transition duration-300 motion-safe:hover:-translate-y-1 ${featured ? "border-primary/70 bg-primary/[.07] shadow-[0_24px_60px_#1ba84a22]" : "border-border bg-surface/50"}`}>
+                    <div className={`relative rounded-[18px] border p-6 ${featured ? "border-primary/40 bg-[linear-gradient(180deg,#12261a,#0e1411)]" : "border-border/70 bg-background"}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="font-dash-display text-xl font-bold tracking-[-.02em]">{plan.name}</h3>
+                        {plan.badge_label && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[.08em] text-white">
+                            <Sparkles size={11} /> {plan.badge_label}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-3 flex items-baseline gap-1.5">
+                        <span className="font-dash-display text-[40px] font-bold leading-none tracking-[-.03em]">${formatCents(plan.price_cents)}</span>
+                        <span className="text-[13px] text-[#7c8a82]">{plan.currency} / {planCycleLabel(plan.billing_cycle)}</span>
+                      </div>
+                      <div className="mt-1.5 min-h-4 text-xs font-bold text-[#7ee3a1]">
+                        {plan.compare_price_cents !== null && <span className="mr-2 font-normal text-muted line-through">${formatCents(plan.compare_price_cents)}</span>}
+                        {plan.savings_cents !== null && <>Ahorras ${formatCents(plan.savings_cents)}</>}
+                      </div>
                     </div>
-                    <div className="min-h-4 text-xs font-bold text-[#7ee3a1]">
-                      {plan.compare_price_cents !== null && <span className="mr-2 font-normal text-muted line-through">${formatCents(plan.compare_price_cents)}</span>}
-                      {plan.savings_cents !== null && <>Ahorras ${formatCents(plan.savings_cents)}</>}
-                    </div>
-                    <ul className="my-4 grid flex-1 gap-2 text-[13.5px] text-[#dbe9df]">
+                    <ul className="grid flex-1 content-start gap-2.5 px-4 pb-4 pt-5 text-[13.5px] text-[#dbe9df]">
                       {plan.features.map((f, fi) => (
-                        <li key={`${plan.id}-${fi}`} className="flex items-start gap-2"><Check size={14} className="mt-0.5 shrink-0 text-primary" />{f}</li>
+                        <li key={`${plan.id}-${fi}`} className="flex items-start gap-2.5">
+                          <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full bg-primary/15"><Check size={11} className="text-primary" /></span>
+                          {f}
+                        </li>
                       ))}
                     </ul>
-                    <Link href="/signup" className={featured ? BTN : BTN_GHOST}>{featured ? `Empezar con ${plan.name}` : "Empezar"}</Link>
+                    <div className="px-2 pb-2">
+                      <Link href="/signup" className={`${featured ? BTN : BTN_GHOST} w-full justify-center`}>{featured ? `Empezar con ${plan.name}` : "Empezar"}</Link>
+                    </div>
                   </div>
                 </Reveal>
               );
