@@ -459,7 +459,7 @@ export async function maybeRespondWithAiAgent(
   if (lastUserTurn && customerRequestedHuman(lastUserTurn.body as string)) {
     await supabase
       .from("conversations")
-      .update({ ai_handoff_requested: true })
+      .update({ ai_handoff_requested: true, marcado_no_leido: true })
       .eq("id", conversationId);
 
     const fallback = "¡Claro que sí! Ya te conecto con nuestro equipo, en un momento te contactan 🙌";
@@ -497,7 +497,7 @@ export async function maybeRespondWithAiAgent(
   if (handoff) {
     await supabase
       .from("conversations")
-      .update({ ai_handoff_requested: true })
+      .update({ ai_handoff_requested: true, marcado_no_leido: true })
       .eq("id", conversationId);
   }
 
@@ -553,7 +553,7 @@ export async function entregarChatPorComprobante(
   // Primero se marca: si el envio falla, igual deja de vender sobre un pago ya hecho.
   const { data: marcada } = await supabase
     .from("conversations")
-    .update({ ai_handoff_requested: true })
+    .update({ ai_handoff_requested: true, marcado_no_leido: true })
     .eq("id", d.conversationId)
     .eq("ai_handoff_requested", false)
     .select("id");

@@ -607,7 +607,7 @@ async function salirDeIa(
   if (conversationId) {
     await supabase
       .from("conversations")
-      .update({ ai_manually_paused: true, ...(salida === "humano" ? { ai_handoff_requested: true } : {}) })
+      .update({ ai_manually_paused: true, ...(salida === "humano" ? { ai_handoff_requested: true, marcado_no_leido: true } : {}) })
       .eq("id", conversationId);
   }
   const destino = destinoDe(conexiones, nodoId, salida);
