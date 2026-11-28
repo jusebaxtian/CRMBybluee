@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { conversacionActiva, enSilencio, horariosDeSilencio, ultimoEntranteDeConversacion, ventanaAbierta } from "@/lib/silencio";
 import { idsDeEspaciosPausados } from "@/lib/billing/pausa";
 import { callAiProvider, type ChatTurn } from "@/lib/ai/providers";
 import { sendTextMessage, sendTemplateMessage } from "@/lib/whatsapp/graph";
@@ -123,7 +124,23 @@ export async function processWorkspaceFollowups(
   }
   if (conversations.length === 0) return;
 
-  const { tocan, vencidas } = clasificarPendientes(conversations, steps, Date.now());
+  const clasificadas = clasificarPendientes(conversations, steps, Date.now());
+  const tocan = clasificadas.tocan;
+
+  // Horario de silencio (0192): un seguimiento que vencio de noche no se da por
+  // "llegado tarde" al terminar el silencio: se manda entonces (si no pasaron
+  // 24 h). Y mientras dura el silencio, los de texto esperan.
+  const horario = (await horariosDeSilencio(supabase, [agent.workspace_id])).get(agent.workspace_id) ?? null;
+  const ahora = new Date();
+  const silencioAhora = !!horario && enSilencio(horario, ahora);
+  const rescatadas = horario
+    ? clasificadas.vencidas.filter((v) => v.atrasoMs < 24 * 60 * 60 * 1000 && enSilencio(horario, new Date(v.venceEn)))
+    : [];
+  const vencidas = clasificadas.vencidas.filter((v) => !rescatadas.includes(v));
+  if (rescatadas.length > 0) {
+    tocan.push(...rescatadas);
+    tocan.sort((a, b) => a.venceEn - b.venceEn);
+  }
 
   // Un seguimiento que se paso de tiempo no se manda tarde: se da por cerrado ese
   // paso (se avanza el contador igual que si se hubiera enviado) y la secuencia
@@ -175,6 +192,13 @@ export async function processWorkspaceFollowups(
     if (procesadas >= LOTE_POR_VUELTA || revisadas >= REVISION_MAXIMA_POR_VUELTA) break;
     revisadas++;
     if (await isContactExcludedFromAutomations(supabase, conversation.contact_id)) continue;
+
+    // En silencio solo sale el seguimiento por plantilla (ventana cerrada); el de
+    // texto espera al final del silencio, salvo que el cliente acabe de escribir.
+    if (silencioAhora) {
+      const entrante = await ultimoEntranteDeConversacion(supabase, conversation.id);
+      if (!conversacionActiva(entrante, ahora) && ventanaAbierta(entrante, ahora)) continue;
+    }
 
     const step = steps[conversation.ai_followup_count];
 

@@ -1,4 +1,5 @@
 import { coexistenciaPermitidaPara } from "@/lib/whatsapp/coexistencia";
+import { HorarioSilencio } from "@/components/settings/horario-silencio";
 import { redirect } from "next/navigation";
 import { Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -104,8 +105,20 @@ export default async function SettingsPage() {
     </div>
   );
 
+  // Horario de silencio (0192).
+  const { data: silencio } = workspaceId
+    ? await supabase.from("workspaces").select("silencio_activo, silencio_inicio, silencio_fin").eq("id", workspaceId).maybeSingle()
+    : { data: null };
+
   const whatsappSection = (
     <div className="flex flex-col gap-5">
+      <HorarioSilencio
+        inicial={{
+          activo: !!silencio?.silencio_activo,
+          inicio: (silencio?.silencio_inicio as string | undefined) ?? "22:00",
+          fin: (silencio?.silencio_fin as string | undefined) ?? "05:00",
+        }}
+      />
       <WhatsAppApiPanel accounts={accounts} phoneStatuses={phoneStatuses} maxNumbers={maxWhatsappNumbers} coexistencia={coexistenciaPermitidaPara(workspaceId)} />
       {accounts
         .filter((a) => a.status !== "frozen")

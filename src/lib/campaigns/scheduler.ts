@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { enSilencio, finDelSilencio, horariosDeSilencio } from "@/lib/silencio";
 import { idsDeEspaciosPausados } from "@/lib/billing/pausa";
 import { executeCampaignSend } from "@/lib/campaigns/send";
 
@@ -31,13 +32,27 @@ async function startDueCampaigns(supabase: SupabaseAdmin) {
   const pausados = new Set(await idsDeEspaciosPausados(supabase));
   const { data: todas } = await supabase
     .from("campaigns")
-    .select("id, workspace_id")
+    .select("id, workspace_id, send_type")
     .eq("status", "draft")
     .not("scheduled_at", "is", null)
     .lte("scheduled_at", new Date().toISOString());
   const due = (todas ?? []).filter((c) => !pausados.has(c.workspace_id as string));
 
+  // Horario de silencio (0192): una campana de texto libre que toca de noche se
+  // mueve al final del silencio. Las de plantilla salen normal.
+  const silencios = await horariosDeSilencio(supabase, due.map((c) => c.workspace_id as string));
+  const ahora = new Date();
+
   for (const campaign of due ?? []) {
+    const horario = silencios.get(campaign.workspace_id as string);
+    if (horario && campaign.send_type !== "template" && enSilencio(horario, ahora)) {
+      await supabase
+        .from("campaigns")
+        .update({ scheduled_at: finDelSilencio(horario, ahora).toISOString() })
+        .eq("id", campaign.id)
+        .eq("status", "draft");
+      continue;
+    }
     // Se reclama primero (draft -> sending) para que un envío lento no lo
     // vuelva a tomar el siguiente tick — mismo patrón de reclamar-y-actuar
     // que el planificador de automatizaciones.

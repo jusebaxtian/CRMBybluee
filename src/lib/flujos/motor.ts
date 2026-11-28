@@ -1,6 +1,7 @@
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { resolveSendAccount } from "@/lib/whatsapp/account";
 import { idsDeEspaciosPausados, listaParaExcluir } from "@/lib/billing/pausa";
+import { conversacionActiva, enSilencio, finDelSilencio, horariosDeSilencio, ultimoEntranteDeConversacion } from "@/lib/silencio";
 import { sendInteractiveButtonsMessage, sendTextMessage } from "@/lib/whatsapp/graph";
 import { recordOutboundMessage } from "@/lib/messaging/record";
 import {
@@ -878,8 +879,34 @@ export async function procesarEsperasVencidas(supabase: Supabase): Promise<numbe
   if (pausados) consulta = consulta.not("flujo_ejecuciones.workspace_id", "in", pausados);
   const { data: esperas } = await consulta.limit(100);
 
+  // Horario de silencio (0192): una espera que vence de noche se mueve al final
+  // del silencio, salvo que el cliente este escribiendo justo ahora.
+  const espacioDe = (e: { flujo_ejecuciones: unknown }) =>
+    ((Array.isArray(e.flujo_ejecuciones) ? e.flujo_ejecuciones[0] : e.flujo_ejecuciones) as { workspace_id: string } | null)?.workspace_id ?? "";
+  const silencios = await horariosDeSilencio(supabase, (esperas ?? []).map((e) => espacioDe(e)));
+  const ahora = new Date();
+
   let procesadas = 0;
   for (const espera of esperas ?? []) {
+    const horario = silencios.get(espacioDe(espera));
+    if (horario && enSilencio(horario, ahora)) {
+      const { data: ej } = await supabase
+        .from("flujo_ejecuciones")
+        .select("conversation_id")
+        .eq("id", espera.ejecucion_id as string)
+        .maybeSingle();
+      const conversacion = (ej?.conversation_id as string | null) ?? null;
+      const entrante = conversacion ? await ultimoEntranteDeConversacion(supabase, conversacion) : null;
+      if (!conversacionActiva(entrante, ahora)) {
+        await supabase
+          .from("flujo_esperas")
+          .update({ vence_el: finDelSilencio(horario, ahora).toISOString() })
+          .eq("id", espera.id as string)
+          .is("procesada_el", null);
+        continue;
+      }
+    }
+
     // Se reclama de forma atomica: si dos procesos corren el trabajo a la vez,
     // solo uno se queda con la espera.
     const { data: reclamada } = await supabase

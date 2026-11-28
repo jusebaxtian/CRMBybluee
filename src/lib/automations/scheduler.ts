@@ -1,6 +1,19 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { idsDeEspaciosPausados, listaParaExcluir } from "@/lib/billing/pausa";
 import { resumeAutomationRun, isContactExcludedFromFollowups, ejecutarRespuestaRapida } from "@/lib/automations/engine";
+import {
+  conversacionActiva,
+  enSilencio,
+  finDelSilencio,
+  horariosDeSilencio,
+  ultimoEntranteDelContacto,
+  ventanaAbierta,
+} from "@/lib/silencio";
+
+/** Pasos que mandan algo al cliente y dependen de la ventana de 24 h (las plantillas no). */
+function necesitaVentana(actionType: string | null | undefined): boolean {
+  return !!actionType && actionType.startsWith("send_") && actionType !== "send_template";
+}
 
 // Picks up automation actions that were deferred with a delay and are now
 // due, and resumes them from where they left off. Runs in-process (see
@@ -18,13 +31,39 @@ export async function processDueAutomationRuns() {
   const pausados = listaParaExcluir(await idsDeEspaciosPausados(supabase));
   let consulta = supabase
     .from("automation_pending_runs")
-    .select("id, workspace_id, automation_id, contact_id, next_position, automations(trigger_type)")
+    .select("id, workspace_id, automation_id, contact_id, next_position, pospuesta_por_silencio, automations(trigger_type)")
     .eq("paused", false)
     .lte("run_at", new Date().toISOString());
   if (pausados) consulta = consulta.not("workspace_id", "in", pausados);
   const { data: dueRuns } = await consulta.limit(50);
 
+  // Horario de silencio (0192): los pasos que el CRM envia por su cuenta se mueven
+  // al final del silencio, salvo plantillas o si el cliente esta escribiendo ahora.
+  const silencios = await horariosDeSilencio(supabase, (dueRuns ?? []).map((r) => r.workspace_id as string));
+  const ahora = new Date();
+  const accionDe = async (automationId: string, posicion: number) => {
+    const { data } = await supabase
+      .from("automation_actions")
+      .select("action_type")
+      .eq("automation_id", automationId)
+      .eq("position", posicion)
+      .maybeSingle();
+    return (data?.action_type as string | undefined) ?? null;
+  };
+
   for (const run of dueRuns ?? []) {
+    const horario = silencios.get(run.workspace_id as string);
+    if (horario && enSilencio(horario, ahora)) {
+      const entrante = await ultimoEntranteDelContacto(supabase, run.contact_id as string);
+      if (!conversacionActiva(entrante, ahora) && (await accionDe(run.automation_id as string, run.next_position as number)) !== "send_template") {
+        await supabase
+          .from("automation_pending_runs")
+          .update({ run_at: finDelSilencio(horario, ahora).toISOString(), pospuesta_por_silencio: true })
+          .eq("id", run.id);
+        continue;
+      }
+    }
+
     // Se comprueba que el borrado se haya llevado la fila, no solo que no
     // diera error. Un DELETE que no encuentra nada devuelve error nulo: con
     // dos procesos, los dos leen la misma tarea vencida, los dos la borran, y
@@ -59,6 +98,13 @@ export async function processDueAutomationRuns() {
     const triggerType = (run.automations as unknown as { trigger_type: string } | null)?.trigger_type;
     if (triggerType === "no_reply" && (await isContactExcludedFromFollowups(supabase, run.contact_id))) {
       continue;
+    }
+
+    // Se retoma despues del silencio: un texto que ya no cabe en la ventana de
+    // 24 h no sale (Meta lo rechazaria). Una plantilla o una etiqueta si.
+    if (run.pospuesta_por_silencio && necesitaVentana(await accionDe(run.automation_id as string, run.next_position as number))) {
+      const entrante = await ultimoEntranteDelContacto(supabase, run.contact_id as string);
+      if (!ventanaAbierta(entrante, new Date())) continue;
     }
 
     await resumeAutomationRun(
